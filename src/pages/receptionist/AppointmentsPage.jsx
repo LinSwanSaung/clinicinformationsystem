@@ -109,19 +109,19 @@ const AppointmentsPage = () => {
   };
 
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div className="min-h-screen bg-background">
       <Navbar />
       
       <div className="container py-6 max-w-5xl mx-auto">
         <div className="flex justify-between items-center mb-6">
           <div>
-            <h1 className="text-2xl font-bold text-gray-900">Appointments</h1>
-            <p className="text-gray-600">Manage patient appointments</p>
+            <h1 className="text-2xl font-bold text-foreground">Appointments</h1>
+            <p className="text-muted-foreground">Manage patient appointments</p>
           </div>
           <Button
             onClick={() => navigate('/receptionist/dashboard')}
             variant="outline"
-            className="flex items-center gap-2"
+            className="flex items-center gap-2 border-border text-foreground hover:bg-accent"
           >
             <ArrowLeft className="h-4 w-4" />
             Back to Dashboard
@@ -130,9 +130,9 @@ const AppointmentsPage = () => {
 
         <div className="grid md:grid-cols-12 gap-6 max-w-4xl mx-auto">
           {/* Calendar Side */}
-          <Card className="md:col-span-4">
+          <Card className="md:col-span-4 bg-card border-border">
             <CardHeader className="text-center">
-              <CardTitle>Select Date</CardTitle>
+              <CardTitle className="text-card-foreground">Select Date</CardTitle>
             </CardHeader>
             <CardContent className="flex flex-col items-center">
               <Calendar
@@ -142,7 +142,7 @@ const AppointmentsPage = () => {
                 className="mx-auto"
               />
               <Button 
-                className="w-full mt-4"
+                className="w-full mt-4 bg-primary text-primary-foreground hover:bg-primary/90"
                 onClick={() => setShowNewAppointment(true)}
               >
                 <Plus className="h-4 w-4 mr-2" />
@@ -153,18 +153,18 @@ const AppointmentsPage = () => {
 
           {/* Appointments List */}
           <div className="md:col-span-8 space-y-6">
-            <Card>
+            <Card className="bg-card border-border">
               <CardHeader className="text-center">
-                <CardTitle>
+                <CardTitle className="text-card-foreground">
                   Appointments for {selectedDate.toLocaleDateString()}
                 </CardTitle>
                 <div className="relative max-w-md mx-auto">
-                  <Search className="absolute left-3 top-3 h-4 w-4 text-gray-400" />
+                  <Search className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
                   <Input
                     placeholder="Search appointments..."
                     value={searchTerm}
                     onChange={(e) => setSearchTerm(e.target.value)}
-                    className="pl-10"
+                    className="pl-10 border-input"
                   />
                 </div>
               </CardHeader>
@@ -173,26 +173,26 @@ const AppointmentsPage = () => {
                   <Table>
                     <TableHeader>
                       <TableRow>
-                        <TableHead className="text-center">Time</TableHead>
-                        <TableHead className="text-center">Patient</TableHead>
-                        <TableHead className="text-center">Doctor</TableHead>
-                        <TableHead className="text-center">Type</TableHead>
-                        <TableHead className="text-center">Status</TableHead>
+                        <TableHead className="text-center text-muted-foreground">Time</TableHead>
+                        <TableHead className="text-center text-muted-foreground">Patient</TableHead>
+                        <TableHead className="text-center text-muted-foreground">Doctor</TableHead>
+                        <TableHead className="text-center text-muted-foreground">Type</TableHead>
+                        <TableHead className="text-center text-muted-foreground">Status</TableHead>
                       </TableRow>
                     </TableHeader>
                     <TableBody>
                       {filteredAppointments.map((appointment) => (
-                        <TableRow key={appointment.id}>
-                          <TableCell className="font-medium text-center">
+                        <TableRow key={appointment.id} className="hover:bg-accent">
+                          <TableCell className="font-medium text-center text-foreground">
                             {appointment.time}
                           </TableCell>
-                          <TableCell className="text-center">
+                          <TableCell className="text-center text-foreground">
                             {getPatientName(appointment.patientId)}
                           </TableCell>
-                          <TableCell className="text-center">
+                          <TableCell className="text-center text-foreground">
                             {getDoctorName(appointment.doctorId)}
                           </TableCell>
-                          <TableCell className="text-center">{appointment.type}</TableCell>
+                          <TableCell className="text-center text-foreground">{appointment.type}</TableCell>
                           <TableCell className="text-center">
                             <div className="flex justify-center">
                               <Badge 
@@ -203,6 +203,7 @@ const AppointmentsPage = () => {
                                     ? 'default'
                                     : 'outline'
                                 }
+                                className="text-foreground border-border"
                               >
                                 {appointment.status}
                               </Badge>
@@ -214,9 +215,9 @@ const AppointmentsPage = () => {
                   </Table>
                 ) : (
                   <div className="text-center py-8">
-                    <p className="text-gray-500">No appointments found for this date.</p>
+                    <p className="text-muted-foreground">No appointments found for this date.</p>
                     <Button 
-                      className="mt-4"
+                      className="mt-4 bg-primary text-primary-foreground hover:bg-primary/90"
                       onClick={() => setShowNewAppointment(true)}
                     >
                       <Plus className="h-4 w-4 mr-2" />
@@ -228,28 +229,28 @@ const AppointmentsPage = () => {
             </Card>
 
             {/* Available Doctors */}
-            <Card>
+            <Card className="bg-card border-border">
               <CardHeader className="text-center">
-                <CardTitle>Available Doctors</CardTitle>
-                <CardDescription>Doctors available for appointments today</CardDescription>
+                <CardTitle className="text-card-foreground">Available Doctors</CardTitle>
+                <CardDescription className="text-muted-foreground">Doctors available for appointments today</CardDescription>
               </CardHeader>
               <CardContent>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4 max-w-2xl mx-auto">
                   {availableDoctors.map(doctor => (
-                    <Card key={doctor.id} className="p-4">
+                    <Card key={doctor.id} className="p-4 bg-accent border-border">
                       <div className="flex items-center space-x-4">
-                        <div className="rounded-full bg-gray-100 p-2 flex-shrink-0">
-                          <CalendarIcon className="h-5 w-5 text-gray-500" />
+                        <div className="rounded-full bg-accent p-2 flex-shrink-0">
+                          <CalendarIcon className="h-5 w-5 text-accent-foreground" />
                         </div>
                         <div>
-                          <p className="font-medium">{doctor.name}</p>
-                          <p className="text-sm text-gray-500">{doctor.specialty}</p>
+                          <p className="font-medium text-foreground">{doctor.name}</p>
+                          <p className="text-sm text-muted-foreground">{doctor.specialty}</p>
                         </div>
                       </div>
                     </Card>
                   ))}
                   {availableDoctors.length === 0 && (
-                    <p className="text-gray-500 col-span-2 text-center py-4">No doctors are currently available.</p>
+                    <p className="text-muted-foreground col-span-2 text-center py-4">No doctors are currently available.</p>
                   )}
                 </div>
               </CardContent>
@@ -259,15 +260,15 @@ const AppointmentsPage = () => {
 
         {/* New Appointment Form */}
         {showNewAppointment && (
-          <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-            <div className="bg-white rounded-lg shadow-lg w-full max-w-2xl overflow-auto">
-              <div className="p-6">
-                <h2 className="text-xl font-bold mb-6 text-center">Schedule New Appointment</h2>
+          <div className="fixed inset-0 bg-background/50 flex items-center justify-center z-50 p-4">
+            <Card className="w-full max-w-2xl overflow-auto bg-card border-border">
+              <CardContent className="p-6">
+                <h2 className="text-xl font-bold mb-6 text-center text-card-foreground">Schedule New Appointment</h2>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
                   <div className="grid gap-2">
-                    <label className="text-sm font-medium">Patient</label>
+                    <label className="text-sm font-medium text-foreground">Patient</label>
                     <select
-                      className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background"
+                      className="flex h-10 w-full rounded-md border border-input bg-background text-foreground px-3 py-2 text-sm ring-offset-background"
                       value={newAppointment.patientId}
                       onChange={(e) => setNewAppointment({ ...newAppointment, patientId: e.target.value })}
                     >
@@ -280,9 +281,9 @@ const AppointmentsPage = () => {
                     </select>
                   </div>
                   <div className="grid gap-2">
-                    <label className="text-sm font-medium">Doctor</label>
+                    <label className="text-sm font-medium text-foreground">Doctor</label>
                     <select
-                      className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background"
+                      className="flex h-10 w-full rounded-md border border-input bg-background text-foreground px-3 py-2 text-sm ring-offset-background"
                       value={newAppointment.doctorId}
                       onChange={(e) => setNewAppointment({ ...newAppointment, doctorId: e.target.value })}
                     >
@@ -295,17 +296,18 @@ const AppointmentsPage = () => {
                     </select>
                   </div>
                   <div className="grid gap-2">
-                    <label className="text-sm font-medium">Date</label>
+                    <label className="text-sm font-medium text-foreground">Date</label>
                     <Input
                       type="date"
+                      className="border-input"
                       value={newAppointment.date.toISOString().split('T')[0]}
                       onChange={(e) => setNewAppointment({ ...newAppointment, date: new Date(e.target.value) })}
                     />
                   </div>
                   <div className="grid gap-2">
-                    <label className="text-sm font-medium">Time</label>
+                    <label className="text-sm font-medium text-foreground">Time</label>
                     <select
-                      className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background"
+                      className="flex h-10 w-full rounded-md border border-input bg-background text-foreground px-3 py-2 text-sm ring-offset-background"
                       value={newAppointment.time}
                       onChange={(e) => setNewAppointment({ ...newAppointment, time: e.target.value })}
                     >
@@ -317,9 +319,9 @@ const AppointmentsPage = () => {
                     </select>
                   </div>
                   <div className="grid gap-2">
-                    <label className="text-sm font-medium">Type</label>
+                    <label className="text-sm font-medium text-foreground">Type</label>
                     <select
-                      className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background"
+                      className="flex h-10 w-full rounded-md border border-input bg-background text-foreground px-3 py-2 text-sm ring-offset-background"
                       value={newAppointment.type}
                       onChange={(e) => setNewAppointment({ ...newAppointment, type: e.target.value })}
                     >
@@ -330,9 +332,10 @@ const AppointmentsPage = () => {
                     </select>
                   </div>
                   <div className="grid gap-2">
-                    <label className="text-sm font-medium">Notes</label>
+                    <label className="text-sm font-medium text-foreground">Notes</label>
                     <Input
                       placeholder="Add any additional notes"
+                      className="border-input"
                       value={newAppointment.notes}
                       onChange={(e) => setNewAppointment({ ...newAppointment, notes: e.target.value })}
                     />
@@ -341,16 +344,20 @@ const AppointmentsPage = () => {
                 <div className="flex justify-center gap-4">
                   <Button
                     variant="outline"
+                    className="border-border text-foreground hover:bg-accent"
                     onClick={() => setShowNewAppointment(false)}
                   >
                     Cancel
                   </Button>
-                  <Button onClick={handleNewAppointment}>
+                  <Button 
+                    onClick={handleNewAppointment}
+                    className="bg-primary text-primary-foreground hover:bg-primary/90"
+                  >
                     Schedule Appointment
                   </Button>
                 </div>
-              </div>
-            </div>
+              </CardContent>
+            </Card>
           </div>
         )}
 

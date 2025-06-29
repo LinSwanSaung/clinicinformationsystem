@@ -77,7 +77,7 @@ const RegisterPatient = () => {
         <div className="flex justify-end mb-6">
           <Button
             variant="outline"
-            className="flex items-center gap-2"
+            className="flex items-center gap-2 border-border text-foreground hover:bg-accent"
             onClick={() => navigate('/receptionist/dashboard')}
           >
             <ArrowLeft className="h-4 w-4" /> Back to Dashboard
@@ -86,13 +86,13 @@ const RegisterPatient = () => {
 
         <div className="grid grid-cols-1 md:grid-cols-12 gap-6">
           {/* Photo Upload Card */}
-          <Card className="md:col-span-4">
+          <Card className="md:col-span-4 bg-card border-border">
             <CardHeader className="text-center">
-              <CardTitle>Patient Photo</CardTitle>
-              <CardDescription>Upload a clear photo of the patient</CardDescription>
+              <CardTitle className="text-card-foreground">Patient Photo</CardTitle>
+              <CardDescription className="text-muted-foreground">Upload a clear photo of the patient</CardDescription>
             </CardHeader>
             <CardContent className="flex flex-col items-center">
-              <div className="w-48 h-48 rounded-full bg-gray-100 flex items-center justify-center overflow-hidden mb-4">
+              <div className="w-48 h-48 rounded-full bg-muted flex items-center justify-center overflow-hidden mb-4">
                 {photoPreview ? (
                   <img 
                     src={photoPreview} 
@@ -100,11 +100,15 @@ const RegisterPatient = () => {
                     className="w-full h-full object-cover"
                   />
                 ) : (
-                  <Camera className="h-12 w-12 text-gray-400" />
+                  <Camera className="h-12 w-12 text-muted-foreground" />
                 )}
               </div>
               <label className="w-full">
-                <Button className="w-full" variant="outline" onClick={() => document.getElementById('photo-upload').click()}>
+                <Button 
+                  className="w-full border-border text-foreground hover:bg-accent" 
+                  variant="outline" 
+                  onClick={() => document.getElementById('photo-upload').click()}
+                >
                   Choose Photo
                 </Button>
                 <input
@@ -119,17 +123,17 @@ const RegisterPatient = () => {
           </Card>
 
           {/* Patient Details Form */}
-          <Card className="md:col-span-8">
+          <Card className="md:col-span-8 bg-card border-border">
             <CardHeader className="text-center">
-              <CardTitle>Patient Information</CardTitle>
-              <CardDescription>Fill in the required patient details</CardDescription>
+              <CardTitle className="text-card-foreground">Patient Information</CardTitle>
+              <CardDescription className="text-muted-foreground">Fill in the required patient details</CardDescription>
             </CardHeader>
             <CardContent>
               <form onSubmit={handleSubmit} className="space-y-6">
                 <div className="grid md:grid-cols-2 gap-6">
                   {/* Full Name */}
                   <div className="space-y-2">
-                    <label className="text-sm font-medium text-gray-700">
+                    <label className="text-sm font-medium text-foreground">
                       Full Name
                     </label>
                     <Input
@@ -137,13 +141,14 @@ const RegisterPatient = () => {
                       value={formData.name}
                       onChange={handleInputChange}
                       placeholder="Enter patient's full name"
+                      className="border-input"
                       required
                     />
                   </div>
 
                   {/* Date of Birth */}
                   <div className="space-y-2">
-                    <label className="text-sm font-medium text-gray-700">
+                    <label className="text-sm font-medium text-foreground">
                       Date of Birth
                     </label>
                     <Popover>
@@ -152,7 +157,7 @@ const RegisterPatient = () => {
                           type="button"
                           variant="outline"
                           className={cn(
-                            'w-full justify-start text-left font-normal',
+                            'w-full justify-start text-left font-normal border-input',
                             !formData.dateOfBirth && 'text-muted-foreground'
                           )}
                         >
@@ -164,7 +169,7 @@ const RegisterPatient = () => {
                           )}
                         </Button>
                       </PopoverTrigger>
-                      <PopoverContent className="w-auto p-0">
+                      <PopoverContent className="w-auto p-0 bg-popover border-border">
                         <Calendar
                           mode="single"
                           selected={formData.dateOfBirth}
@@ -173,6 +178,7 @@ const RegisterPatient = () => {
                             date > new Date() || date < new Date('1900-01-01')
                           }
                           initialFocus
+                          className="text-popover-foreground"
                         />
                       </PopoverContent>
                     </Popover>
@@ -180,7 +186,7 @@ const RegisterPatient = () => {
 
                   {/* ID Number */}
                   <div className="space-y-2">
-                    <label className="text-sm font-medium text-gray-700">
+                    <label className="text-sm font-medium text-foreground">
                       ID Number
                     </label>
                     <Input
@@ -188,13 +194,14 @@ const RegisterPatient = () => {
                       value={formData.idNumber}
                       onChange={handleInputChange}
                       placeholder="Enter ID number"
+                      className="border-input"
                       required
                     />
                   </div>
 
                   {/* Contact Number */}
                   <div className="space-y-2">
-                    <label className="text-sm font-medium text-gray-700">
+                    <label className="text-sm font-medium text-foreground">
                       Contact Number
                     </label>
                     <Input
@@ -202,13 +209,14 @@ const RegisterPatient = () => {
                       value={formData.contact}
                       onChange={handleInputChange}
                       placeholder="Enter contact number"
+                      className="border-input"
                       required
                     />
                   </div>
 
                   {/* Email */}
                   <div className="space-y-2">
-                    <label className="text-sm font-medium text-gray-700">
+                    <label className="text-sm font-medium text-foreground">
                       Email Address
                     </label>
                     <Input
@@ -217,12 +225,13 @@ const RegisterPatient = () => {
                       value={formData.email}
                       onChange={handleInputChange}
                       placeholder="Enter email address"
+                      className="border-input"
                     />
                   </div>
 
                   {/* Address */}
                   <div className="space-y-2">
-                    <label className="text-sm font-medium text-gray-700">
+                    <label className="text-sm font-medium text-foreground">
                       Address
                     </label>
                     <Input
@@ -230,6 +239,7 @@ const RegisterPatient = () => {
                       value={formData.address}
                       onChange={handleInputChange}
                       placeholder="Enter address"
+                      className="border-input"
                     />
                   </div>
                 </div>
@@ -238,13 +248,14 @@ const RegisterPatient = () => {
                   <Button
                     type="button"
                     variant="outline"
+                    className="border-border text-foreground hover:bg-accent"
                     onClick={() => navigate('/receptionist/dashboard')}
                   >
                     Cancel
                   </Button>
                   <Button
                     type="submit"
-                    className="bg-primary hover:bg-primary/90"
+                    className="bg-primary text-primary-foreground hover:bg-primary/90"
                   >
                     <UserPlus className="h-4 w-4 mr-2" />
                     Register Patient

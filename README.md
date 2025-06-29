@@ -15,6 +15,7 @@ A modern, responsive Clinic Information System designed for low-resource healthc
 - **Frontend**: Vite + React + TailwindCSS + shadcn/ui
 - **Icons**: Lucide React
 - **Routing**: React Router v6
+- **Design System**: Supabase theme with custom design tokens
 - **Backend**: Node.js + Supabase (PostgreSQL) - *Coming Soon*
 - **Authentication**: Supabase Auth - *Coming Soon*
 
@@ -93,10 +94,52 @@ This application follows the Supabase design system for:
 ## 📁 Project Structure
 
 ```
-src/
-├── components/
-│   └── ui/               # shadcn/ui components
-├── pages/
+realcis/
+├── src/
+│   ├── components/
+│   │   ├── ui/               # shadcn/ui components
+│   │   ├── Alert.jsx         # Custom alert component
+│   │   ├── Navbar.jsx        # Navigation component
+│   │   └── PageLayout.jsx    # Layout wrapper
+│   ├── contexts/
+│   │   └── AuthContext.jsx   # Authentication context
+│   ├── data/
+│   │   └── dummyData.js      # Sample data for development
+│   ├── hooks/
+│   │   └── useAuth.js        # Authentication hooks
+│   ├── lib/
+│   │   └── utils.js          # Utility functions
+│   ├── pages/
+│   │   ├── admin/            # Admin role pages
+│   │   ├── receptionist/     # Receptionist role pages
+│   │   └── AdminLogin.jsx    # Login page
+│   ├── styles/
+│   │   ├── theme.css         # Design tokens (Supabase theme)
+│   │   └── README.md         # Styles documentation
+│   ├── App.jsx               # Main app component
+│   ├── index.css             # Global styles
+│   └── main.jsx              # App entry point
+├── public/                   # Static assets
+├── tailwind.config.js        # Tailwind configuration
+└── package.json              # Dependencies and scripts
+```
+
+## 🎨 Design System
+
+The application uses a centralized design system based on the **Supabase theme**:
+
+- **Theme File**: `src/styles/theme.css`
+- **Design Tokens**: Colors, typography, spacing, shadows
+- **Dark Mode**: Automatic support via CSS variables
+- **Tailwind Integration**: All design tokens mapped to Tailwind classes
+
+### Available Design Tokens
+- Colors: `primary`, `secondary`, `accent`, `muted`, `destructive`
+- Typography: `font-sans` (Outfit), `font-serif`, `font-mono`
+- Spacing: `radius-sm`, `radius-md`, `radius-lg`, `radius-xl`
+- Shadows: `shadow-xs` through `shadow-2xl`
+
+## 📱 Usage
 │   ├── admin/           # Admin-specific pages
 │   └── AdminLogin.jsx   # Login page
 ├── data/

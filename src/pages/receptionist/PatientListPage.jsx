@@ -5,12 +5,13 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Search, Plus, UserCircle, Calendar, FileText } from "lucide-react";
 import { dummyPatients } from "@/data/dummyReceptionistData";
-import { Link } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import PageLayout from "@/components/PageLayout";
 
 export default function PatientListPage() {
   const [searchTerm, setSearchTerm] = useState("");
   const [filteredPatients, setFilteredPatients] = useState(dummyPatients);
+  const navigate = useNavigate();
 
   const handleSearch = (e) => {
     const term = e.target.value.toLowerCase();
@@ -24,6 +25,14 @@ export default function PatientListPage() {
         patient.email.toLowerCase().includes(term)
     );
     setFilteredPatients(filtered);
+  };
+
+  const handleBookAppointment = (patient) => {
+    navigate('/receptionist/appointments', {
+      state: { 
+        patient: patient
+      }
+    });
   };
 
   return (
@@ -79,7 +88,12 @@ export default function PatientListPage() {
                   </div>
                 </div>
                 <div className="flex flex-wrap gap-2">
-                  <Button variant="outline" size="sm" className="flex items-center gap-2 border-border hover:bg-accent hover:text-accent-foreground">
+                  <Button 
+                    variant="outline" 
+                    size="sm" 
+                    className="flex items-center gap-2 border-border hover:bg-accent hover:text-accent-foreground"
+                    onClick={() => handleBookAppointment(patient)}
+                  >
                     <Calendar className="h-4 w-4 text-primary" />
                     Book Appointment
                   </Button>

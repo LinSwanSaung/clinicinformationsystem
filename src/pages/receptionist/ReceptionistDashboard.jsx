@@ -5,16 +5,17 @@ import {
   Calendar,
   Users,
   UserCircle,
-  FileText
+  FileText,
+  Star,
+  Clock
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
+import { doctors } from '@/data/dummyDoctorsData';
 import { 
   dummyPatients, 
-  doctorSchedules, 
-  appointments,
-  getAvailableDoctors 
+  appointments 
 } from '@/data/dummyReceptionistData';
 import { useAuth } from '@/contexts/AuthContext';
 import PageLayout from '@/components/PageLayout';
@@ -40,7 +41,7 @@ const ReceptionistDashboard = () => {
         ).length;
 
         // Get available doctors
-        const availDoctors = getAvailableDoctors();
+        const availDoctors = doctors.filter(doc => doc.status === 'available');
         
         setStats({
           todayAppointments: todayAppts,
@@ -88,124 +89,134 @@ const ReceptionistDashboard = () => {
       title="Reception Dashboard"
       subtitle="Welcome to the clinic management system"
     >
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-6">
-        <Card className="bg-card">
-          <CardHeader className="text-center">
-            <CardTitle className="text-sm font-medium text-muted-foreground">
-              Today's Appointments
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="flex justify-center">
-            <div className="flex items-center">
-              <Calendar className="h-8 w-8 text-primary mr-2" />
-              <div className="text-2xl font-bold text-card-foreground">{stats.todayAppointments}</div>
-            </div>
-          </CardContent>
-        </Card>
+      <div className="space-y-6">
+        {/* Stats Cards */}
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+          <Card className="bg-card">
+            <CardHeader className="text-center">
+              <CardTitle className="text-sm font-medium text-muted-foreground">
+                Today's Appointments
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="flex justify-center">
+              <div className="flex items-center">
+                <Calendar className="h-8 w-8 text-primary mr-2" />
+                <span className="text-2xl font-bold">{stats.todayAppointments}</span>
+              </div>
+            </CardContent>
+          </Card>
 
-        <Card className="bg-card">
-          <CardHeader className="text-center">
-            <CardTitle className="text-sm font-medium text-muted-foreground">
-              Available Doctors
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="flex justify-center">
-            <div className="flex items-center">
-              <Users className="h-8 w-8 text-primary mr-2" />
-              <div className="text-2xl font-bold text-card-foreground">{stats.availableDoctorCount}</div>
-            </div>
-          </CardContent>
-        </Card>
+          <Card className="bg-card">
+            <CardHeader className="text-center">
+              <CardTitle className="text-sm font-medium text-muted-foreground">
+                Available Doctors
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="flex justify-center">
+              <div className="flex items-center">
+                <UserCircle className="h-8 w-8 text-primary mr-2" />
+                <span className="text-2xl font-bold">{stats.availableDoctorCount}</span>
+              </div>
+            </CardContent>
+          </Card>
 
-        <Card className="bg-card">
-          <CardHeader className="text-center">
-            <CardTitle className="text-sm font-medium text-muted-foreground">
-              Total Patients
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="flex justify-center">
-            <div className="flex items-center">
-              <UserCircle className="h-8 w-8 text-primary mr-2" />
-              <div className="text-2xl font-bold text-card-foreground">{stats.totalPatients}</div>
-            </div>
-          </CardContent>
-        </Card>
-      </div>
+          <Card className="bg-card">
+            <CardHeader className="text-center">
+              <CardTitle className="text-sm font-medium text-muted-foreground">
+                Total Patients
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="flex justify-center">
+              <div className="flex items-center">
+                <Users className="h-8 w-8 text-primary mr-2" />
+                <span className="text-2xl font-bold">{stats.totalPatients}</span>
+              </div>
+            </CardContent>
+          </Card>
+        </div>
 
-      <div className="grid grid-cols-1 mb-6">
-        <Card className="bg-card">
-          <CardHeader className="text-center">
-            <CardTitle className="text-card-foreground">Quick Actions</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4 max-w-3xl mx-auto">
-              <Button
-                onClick={handleNewPatient}
-                className="flex items-center justify-center gap-2 h-24 bg-card text-card-foreground hover:bg-accent hover:text-accent-foreground border border-border shadow-sm transition-colors"
-              >
-                <UserPlus className="h-6 w-6 text-primary" />
-                <div>
-                  <div className="font-semibold">Register Patient</div>
-                  <div className="text-sm text-muted-foreground">Add new patient</div>
-                </div>
-              </Button>
-              
-              <Button
-                onClick={handleAppointments}
-                className="flex items-center justify-center gap-2 h-24 bg-card text-card-foreground hover:bg-accent hover:text-accent-foreground border border-border shadow-sm transition-colors"
-              >
-                <Calendar className="h-6 w-6 text-primary" />
-                <div>
-                  <div className="font-semibold">Manage Appointments</div>
-                  <div className="text-sm text-muted-foreground">Schedule and view appointments</div>
-                </div>
-              </Button>
+        {/* Quick Actions */}
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+          <Button
+            onClick={handleNewPatient}
+            className="bg-card hover:bg-accent text-foreground hover:text-accent-foreground border border-border h-24"
+          >
+            <UserPlus className="h-6 w-6 text-primary mr-2" />
+            Register New Patient
+          </Button>
+          <Button
+            onClick={handleAppointments}
+            className="bg-card hover:bg-accent text-foreground hover:text-accent-foreground border border-border h-24"
+          >
+            <Calendar className="h-6 w-6 text-primary mr-2" />
+            Manage Appointments
+          </Button>
+          <Button
+            onClick={handlePatientList}
+            className="bg-card hover:bg-accent text-foreground hover:text-accent-foreground border border-border h-24"
+          >
+            <FileText className="h-6 w-6 text-primary mr-2" />
+            Patient Records
+          </Button>
+        </div>
 
-              <Button
-                onClick={handlePatientList}
-                className="flex items-center justify-center gap-2 h-24 bg-card text-card-foreground hover:bg-accent hover:text-accent-foreground border border-border shadow-sm transition-colors"
-              >
-                <Users className="h-6 w-6 text-primary" />
-                <div>
-                  <div className="font-semibold">Patient Records</div>
-                  <div className="text-sm text-muted-foreground">View and manage patient information</div>
-                </div>
-              </Button>
-            </div>
-          </CardContent>
-        </Card>
-      </div>
-        
         {/* Available Doctors Section */}
-        <Card className="col-span-full bg-card mt-6">
-          <CardHeader className="text-center">
-            <CardTitle className="text-card-foreground">Currently Available Doctors</CardTitle>
+        <Card className="bg-card">
+          <CardHeader>
+            <CardTitle className="text-xl font-semibold">Available Doctors</CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 max-w-4xl mx-auto">
-              {availableDoctors.map(doctor => (
-                <Card key={doctor.id} className="flex items-start p-4 gap-4 bg-card hover:bg-accent transition-colors">
-                  <div className="rounded-full bg-muted p-2">
-                    <UserCircle className="h-10 w-10 text-primary" />
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+              {availableDoctors.map((doctor) => (
+                <Card key={doctor.id} className="bg-card text-card-foreground rounded-lg shadow-lg p-6 space-y-4">
+                  <div className="flex items-center space-x-4">
+                    <div className="relative w-16 h-16">
+                      <img
+                        src={doctor.image}
+                        alt={doctor.name}
+                        className="rounded-full object-cover"
+                        onError={(e) => {
+                          e.target.src = 'https://via.placeholder.com/64x64';
+                        }}
+                      />
+                      <span className="absolute bottom-0 right-0 w-3 h-3 bg-green-500 border-2 border-white rounded-full"></span>
+                    </div>
+                    <div>
+                      <h3 className="text-lg font-semibold">{doctor.name}</h3>
+                      <p className="text-muted-foreground">{doctor.specialization}</p>
+                    </div>
                   </div>
-                  <div>
-                    <h3 className="font-semibold text-card-foreground">{doctor.name}</h3>
-                    <p className="text-sm text-muted-foreground">{doctor.specialty}</p>
-                    <Badge variant="secondary" className="mt-2 bg-secondary text-secondary-foreground">
-                      Available
-                    </Badge>
+
+                  <div className="space-y-2">
+                    <div className="flex items-center text-muted-foreground">
+                      <Star className="w-4 h-4 mr-2 text-yellow-400" />
+                      <span>{doctor.rating} Rating</span>
+                    </div>
+                    <div className="flex items-center text-muted-foreground">
+                      <Users className="w-4 h-4 mr-2" />
+                      <span>{doctor.patients}+ Patients</span>
+                    </div>
+                    <div className="flex items-center text-muted-foreground">
+                      <Clock className="w-4 h-4 mr-2" />
+                      <span>{doctor.availability}</span>
+                    </div>
                   </div>
+
+                  <Button
+                    onClick={() => navigate('/receptionist/appointments', {
+                      state: { doctor: doctor }
+                    })}
+                    className="w-full bg-primary text-primary-foreground hover:bg-primary/90"
+                  >
+                    Book Appointment
+                  </Button>
                 </Card>
               ))}
-              {availableDoctors.length === 0 && (
-                <p className="text-center text-muted-foreground py-4 col-span-full">
-                  No doctors are currently available
-                </p>
-              )}
             </div>
           </CardContent>
         </Card>
-      </PageLayout>
+      </div>
+    </PageLayout>
   );
 };
 

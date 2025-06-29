@@ -88,117 +88,118 @@ const ReceptionistDashboard = () => {
     <PageLayout
       title="Reception Dashboard"
       subtitle="Welcome to the clinic management system"
+      fullWidth
     >
-      <div className="space-y-6">
+      <div className="space-y-8 p-8">
         {/* Stats Cards */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
           <Card className="bg-card">
-            <CardHeader className="text-center">
-              <CardTitle className="text-sm font-medium text-muted-foreground">
+            <CardHeader className="text-center pb-4">
+              <CardTitle className="text-lg font-medium text-muted-foreground">
                 Today's Appointments
               </CardTitle>
             </CardHeader>
             <CardContent className="flex justify-center">
               <div className="flex items-center">
-                <Calendar className="h-8 w-8 text-primary mr-2" />
-                <span className="text-2xl font-bold">{stats.todayAppointments}</span>
+                <Calendar className="h-8 w-8 text-primary mr-3" />
+                <span className="text-3xl font-bold">{stats.todayAppointments}</span>
               </div>
             </CardContent>
           </Card>
 
           <Card className="bg-card">
-            <CardHeader className="text-center">
-              <CardTitle className="text-sm font-medium text-muted-foreground">
+            <CardHeader className="text-center pb-4">
+              <CardTitle className="text-lg font-medium text-muted-foreground">
                 Available Doctors
               </CardTitle>
             </CardHeader>
             <CardContent className="flex justify-center">
               <div className="flex items-center">
-                <UserCircle className="h-8 w-8 text-primary mr-2" />
-                <span className="text-2xl font-bold">{stats.availableDoctorCount}</span>
+                <UserCircle className="h-8 w-8 text-primary mr-3" />
+                <span className="text-3xl font-bold">{stats.availableDoctorCount}</span>
               </div>
             </CardContent>
           </Card>
 
           <Card className="bg-card">
-            <CardHeader className="text-center">
-              <CardTitle className="text-sm font-medium text-muted-foreground">
+            <CardHeader className="text-center pb-4">
+              <CardTitle className="text-lg font-medium text-muted-foreground">
                 Total Patients
               </CardTitle>
             </CardHeader>
             <CardContent className="flex justify-center">
               <div className="flex items-center">
-                <Users className="h-8 w-8 text-primary mr-2" />
-                <span className="text-2xl font-bold">{stats.totalPatients}</span>
+                <Users className="h-8 w-8 text-primary mr-3" />
+                <span className="text-3xl font-bold">{stats.totalPatients}</span>
               </div>
             </CardContent>
           </Card>
         </div>
 
         {/* Quick Actions */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
           <Button
             onClick={handleNewPatient}
-            className="bg-card hover:bg-accent text-foreground hover:text-accent-foreground border border-border h-24"
+            className="bg-card hover:bg-accent text-foreground hover:text-accent-foreground border border-border h-28 text-lg"
           >
-            <UserPlus className="h-6 w-6 text-primary mr-2" />
+            <UserPlus className="h-7 w-7 text-primary mr-3" />
             Register New Patient
           </Button>
           <Button
             onClick={handleAppointments}
-            className="bg-card hover:bg-accent text-foreground hover:text-accent-foreground border border-border h-24"
+            className="bg-card hover:bg-accent text-foreground hover:text-accent-foreground border border-border h-28 text-lg"
           >
-            <Calendar className="h-6 w-6 text-primary mr-2" />
+            <Calendar className="h-7 w-7 text-primary mr-3" />
             Manage Appointments
           </Button>
           <Button
             onClick={handlePatientList}
-            className="bg-card hover:bg-accent text-foreground hover:text-accent-foreground border border-border h-24"
+            className="bg-card hover:bg-accent text-foreground hover:text-accent-foreground border border-border h-28 text-lg"
           >
-            <FileText className="h-6 w-6 text-primary mr-2" />
+            <FileText className="h-7 w-7 text-primary mr-3" />
             Patient Records
           </Button>
         </div>
 
         {/* Available Doctors Section */}
         <Card className="bg-card">
-          <CardHeader>
-            <CardTitle className="text-xl font-semibold">Available Doctors</CardTitle>
+          <CardHeader className="pb-4">
+            <CardTitle className="text-2xl font-semibold">Available Doctors</CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
               {availableDoctors.map((doctor) => (
                 <Card key={doctor.id} className="bg-card text-card-foreground rounded-lg shadow-lg p-6 space-y-4">
                   <div className="flex items-center space-x-4">
-                    <div className="relative w-16 h-16">
+                    <div className="relative w-20 h-20">
                       <img
                         src={doctor.image}
                         alt={doctor.name}
-                        className="rounded-full object-cover"
+                        className="rounded-full object-cover w-full h-full"
                         onError={(e) => {
-                          e.target.src = 'https://via.placeholder.com/64x64';
+                          e.target.src = 'https://via.placeholder.com/80x80';
                         }}
                       />
-                      <span className="absolute bottom-0 right-0 w-3 h-3 bg-green-500 border-2 border-white rounded-full"></span>
+                      <span className="absolute bottom-0 right-0 w-4 h-4 bg-green-500 border-2 border-white rounded-full"></span>
                     </div>
                     <div>
-                      <h3 className="text-lg font-semibold">{doctor.name}</h3>
-                      <p className="text-muted-foreground">{doctor.specialization}</p>
+                      <h3 className="text-xl font-semibold">{doctor.name}</h3>
+                      <p className="text-lg text-muted-foreground">{doctor.specialization}</p>
                     </div>
                   </div>
 
-                  <div className="space-y-2">
+                  <div className="space-y-3">
                     <div className="flex items-center text-muted-foreground">
-                      <Star className="w-4 h-4 mr-2 text-yellow-400" />
-                      <span>{doctor.rating} Rating</span>
+                      <Star className="w-5 h-5 mr-2 text-yellow-400" />
+                      <span className="text-base">{doctor.rating} Rating</span>
                     </div>
                     <div className="flex items-center text-muted-foreground">
-                      <Users className="w-4 h-4 mr-2" />
-                      <span>{doctor.patients}+ Patients</span>
+                      <Users className="w-5 h-5 mr-2" />
+                      <span className="text-base">{doctor.patients}+ Patients</span>
                     </div>
                     <div className="flex items-center text-muted-foreground">
-                      <Clock className="w-4 h-4 mr-2" />
-                      <span>{doctor.availability}</span>
+                      <Clock className="w-5 h-5 mr-2" />
+                      <span className="text-base">{doctor.availability}</span>
                     </div>
                   </div>
 
@@ -206,7 +207,7 @@ const ReceptionistDashboard = () => {
                     onClick={() => navigate('/receptionist/appointments', {
                       state: { doctor: doctor }
                     })}
-                    className="w-full bg-primary text-primary-foreground hover:bg-primary/90"
+                    className="w-full bg-primary text-primary-foreground hover:bg-primary/90 text-lg py-6"
                   >
                     Book Appointment
                   </Button>

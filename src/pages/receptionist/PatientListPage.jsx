@@ -39,47 +39,52 @@ export default function PatientListPage() {
     <PageLayout 
       title="Patient Records"
       subtitle="Search and manage patient information"
+      fullWidth
     >
-      <div className="w-full max-w-4xl mx-auto space-y-6">
+      <div className="space-y-8 p-8">
         <div className="flex justify-between items-center">
-          <h2 className="text-xl font-semibold text-foreground">Patient List</h2>
+          <h2 className="text-2xl font-semibold text-foreground">Patient List</h2>
           <Link to="/receptionist/register-patient">
-            <Button className="flex items-center gap-2 bg-primary text-primary-foreground hover:bg-primary/90">
-              <Plus className="h-4 w-4" />
+            <Button className="flex items-center gap-3 bg-primary text-primary-foreground hover:bg-primary/90 text-lg py-6 px-8">
+              <Plus className="h-6 w-6" />
               New Patient
             </Button>
           </Link>
         </div>
 
-        <Card className="bg-card p-4">
+        <Card className="bg-card p-6">
           <div className="relative">
-            <Search className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
+            <Search className="absolute left-4 top-4 h-6 w-6 text-muted-foreground" />
             <Input
               type="text"
               placeholder="Search patients by name, ID, contact, or email..."
               value={searchTerm}
               onChange={handleSearch}
-              className="pl-10 w-full bg-background text-foreground placeholder:text-muted-foreground"
+              className="pl-14 w-full bg-background text-foreground placeholder:text-muted-foreground h-14 text-lg"
             />
           </div>
         </Card>
 
-        <div className="grid gap-4">
+        <div className="grid gap-6">
           {filteredPatients.map((patient) => (
-            <Card key={patient.id} className="p-4 bg-card hover:bg-accent hover:text-accent-foreground transition-colors border border-border">
-              <div className="flex flex-col md:flex-row md:items-start md:justify-between gap-4">
-                <div className="flex items-start space-x-4">
-                  <div className="rounded-full bg-muted p-2">
-                    <UserCircle className="h-12 w-12 text-primary" />
+            <Card key={patient.id} className="p-6 bg-card hover:bg-accent hover:text-accent-foreground transition-colors border border-border">
+              <div className="flex flex-col md:flex-row md:items-start md:justify-between gap-6">
+                <div className="flex items-start space-x-6">
+                  <div className="rounded-full bg-muted p-3">
+                    <UserCircle className="h-16 w-16 text-primary" />
                   </div>
                   <div>
-                    <h3 className="font-semibold text-lg text-card-foreground">{patient.name}</h3>
-                    <div className="space-y-1">
-                      <p className="text-sm text-muted-foreground">ID: {patient.id}</p>
-                      <p className="text-sm text-muted-foreground">{patient.contact}</p>
-                      <div className="flex flex-wrap gap-2 mt-2">
+                    <h3 className="text-2xl font-semibold text-card-foreground mb-2">{patient.name}</h3>
+                    <div className="space-y-2">
+                      <p className="text-lg text-muted-foreground">ID: {patient.id}</p>
+                      <p className="text-lg text-muted-foreground">{patient.contact}</p>
+                      <div className="flex flex-wrap gap-2 mt-3">
                         {patient.medicalHistory.map((condition, index) => (
-                          <Badge key={index} variant="secondary" className="bg-secondary text-secondary-foreground">
+                          <Badge 
+                            key={index} 
+                            variant="secondary" 
+                            className="bg-secondary text-secondary-foreground px-4 py-1 text-base"
+                          >
                             {condition}
                           </Badge>
                         ))}
@@ -87,31 +92,35 @@ export default function PatientListPage() {
                     </div>
                   </div>
                 </div>
-                <div className="flex flex-wrap gap-2">
+                <div className="flex flex-wrap gap-4">
                   <Button 
                     variant="outline" 
-                    size="sm" 
-                    className="flex items-center gap-2 border-border hover:bg-accent hover:text-accent-foreground"
+                    size="lg" 
+                    className="flex items-center gap-3 border-border hover:bg-accent hover:text-accent-foreground text-lg py-6 px-8"
                     onClick={() => handleBookAppointment(patient)}
                   >
-                    <Calendar className="h-4 w-4 text-primary" />
+                    <Calendar className="h-6 w-6 text-primary" />
                     Book Appointment
                   </Button>
-                  <Button variant="outline" size="sm" className="flex items-center gap-2 border-border hover:bg-accent hover:text-accent-foreground">
-                    <FileText className="h-4 w-4 text-primary" />
+                  <Button 
+                    variant="outline" 
+                    size="lg" 
+                    className="flex items-center gap-3 border-border hover:bg-accent hover:text-accent-foreground text-lg py-6 px-8"
+                  >
+                    <FileText className="h-6 w-6 text-primary" />
                     View Records
                   </Button>
                 </div>
               </div>
-              <div className="mt-4">
-                <p className="text-sm text-muted-foreground">Last Visit: {new Date(patient.lastVisit).toLocaleDateString()}</p>
-                <p className="mt-1 text-sm text-muted-foreground">{patient.address}</p>
+              <div className="mt-6 flex flex-wrap gap-x-8 gap-y-2">
+                <p className="text-lg text-muted-foreground">Last Visit: {new Date(patient.lastVisit).toLocaleDateString()}</p>
+                <p className="text-lg text-muted-foreground">{patient.address}</p>
               </div>
             </Card>
           ))}
           {filteredPatients.length === 0 && (
-            <Card className="p-8 text-center bg-card">
-              <p className="text-muted-foreground">No patients found matching your search criteria.</p>
+            <Card className="p-12 text-center bg-card">
+              <p className="text-xl text-muted-foreground">No patients found matching your search criteria.</p>
             </Card>
           )}
         </div>

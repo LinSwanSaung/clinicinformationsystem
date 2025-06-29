@@ -12,16 +12,10 @@ import {
   LogOut,
   UserPlus
 } from 'lucide-react';
-import Navbar from '@/components/Navbar';
+import PageLayout from '@/components/PageLayout';
 
 const AdminDashboard = () => {
   const navigate = useNavigate();
-
-  const handleLogout = () => {
-    localStorage.removeItem('userRole');
-    localStorage.removeItem('isAuthenticated');
-    navigate('/');
-  };
 
   const statsCards = [
     {
@@ -50,139 +44,141 @@ const AdminDashboard = () => {
       value: "Active",
       description: "All systems operational",
       icon: Settings,
-      color: "text-primary"
+      color: "text-green-500"
     }
   ];
 
-  const actionCards = [
+  const quickActions = [
     {
-      title: "Employee Management",
-      description: "Manage staff, roles, and permissions",
+      title: "Manage Staff",
+      description: "Add, edit, or remove employee records",
       icon: Users,
-      action: () => navigate('/admin/employees'),
-      color: "bg-primary"
+      action: () => navigate('/admin/employees')
     },
     {
-      title: "Schedule Management", 
-      description: "Manage doctor schedules and appointments",
-      icon: Calendar,
-      action: () => alert('Feature coming soon!'),
-      color: "bg-primary"
-    },
-    {
-      title: "Reports & Analytics",
-      description: "View clinic performance and statistics", 
+      title: "Department Overview",
+      description: "View and manage departments",
       icon: BarChart3,
-      action: () => alert('Feature coming soon!'),
-      color: "bg-primary"
+      action: () => console.log("Department Overview")
     },
     {
-      title: "System Settings",
-      description: "Configure system preferences",
-      icon: Settings,
-      action: () => alert('Feature coming soon!'),
-      color: "bg-primary"
+      title: "Patient Statistics",
+      description: "View patient visit analytics",
+      icon: FileText,
+      action: () => console.log("Patient Statistics")
+    },
+    {
+      title: "Doctor Schedules",
+      description: "Manage doctor availability",
+      icon: Stethoscope,
+      action: () => console.log("Doctor Schedules")
     }
   ];
 
   return (
     <div className="min-h-screen bg-background">
-      <Navbar />
-
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        {/* Page Title */}
-        <div className="mb-8">
-          <h2 className="text-3xl font-bold text-foreground">Dashboard</h2>
-          <p className="text-muted-foreground mt-2">Overview of your clinic management system</p>
-        </div>
-
-        {/* Stats Grid */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
-          {statsCards.map((stat, index) => (
-            <Card key={index} className="bg-card">
-              <CardContent className="p-6">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <p className="text-sm font-medium text-muted-foreground mb-1">
-                      {stat.title}
-                    </p>
-                    <p className="text-3xl font-bold text-card-foreground">
-                      {stat.value}
-                    </p>
-                    <p className="text-sm text-muted-foreground mt-1">
-                      {stat.description}
-                    </p>
-                  </div>
-                  <stat.icon className="h-8 w-8 text-primary" />
-                </div>
-              </CardContent>
-            </Card>
-          ))}
-        </div>
-
-        {/* Quick Actions */}
-        <div className="mb-8">
-          <h3 className="text-xl font-semibold text-foreground mb-4">Quick Actions</h3>
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-            {actionCards.map((action, index) => (
-              <Card 
-                key={index}
-                className="cursor-pointer bg-card hover:bg-accent hover:text-accent-foreground transition-colors border border-border"
-                onClick={action.action}
-              >
-                <CardHeader className="pb-3">
-                  <div className="flex items-center gap-3">
-                    <div className="p-2 rounded-lg bg-primary">
-                      <action.icon className="h-5 w-5 text-primary-foreground" />
-                    </div>
-                    <CardTitle className="text-lg text-card-foreground">{action.title}</CardTitle>
-                  </div>
+      <PageLayout 
+        title="Admin Dashboard" 
+        subtitle="System overview and quick actions"
+        fullWidth
+      >
+        <div className="space-y-8 p-8">
+          {/* Stats Cards */}
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-8">
+            {statsCards.map((stat, index) => (
+              <Card key={index} className="bg-card">
+                <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-3">
+                  <CardTitle className="text-lg font-semibold text-foreground">
+                    {stat.title}
+                  </CardTitle>
+                  <stat.icon className={`h-6 w-6 ${stat.color}`} />
                 </CardHeader>
-                <CardContent className="pt-0">
-                  <CardDescription className="text-muted-foreground">
-                    {action.description}
-                  </CardDescription>
+                <CardContent>
+                  <div className="text-3xl font-bold mb-2">{stat.value}</div>
+                  <p className="text-base text-muted-foreground">{stat.description}</p>
                 </CardContent>
               </Card>
             ))}
           </div>
-        </div>
 
-        {/* Recent Activity */}
-        <div>
-          <h3 className="text-xl font-semibold text-foreground mb-4">Recent System Activity</h3>
-          <Card className="bg-card">
-            <CardContent className="p-6">
-              <div className="space-y-4">
-                <div className="flex items-center gap-3 pb-3 border-b border-border">
-                  <UserPlus className="h-5 w-5 text-primary" />
-                  <div className="flex-1">
-                    <p className="text-sm font-medium text-card-foreground">New employee added</p>
-                    <p className="text-xs text-muted-foreground">Dr. Ana Martinez joined Obstetrics department</p>
+          {/* Quick Actions Grid */}
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-8">
+            {quickActions.map((action, index) => (
+              <Card 
+                key={index} 
+                className="bg-card hover:bg-accent cursor-pointer transition-colors"
+                onClick={action.action}
+              >
+                <CardHeader className="pb-4">
+                  <div className="flex items-center gap-3">
+                    <action.icon className="h-7 w-7 text-primary" />
+                    <CardTitle className="text-xl">{action.title}</CardTitle>
                   </div>
-                  <span className="text-xs text-muted-foreground">2 hours ago</span>
-                </div>
-                <div className="flex items-center gap-3 pb-3 border-b border-border">
-                  <Settings className="h-5 w-5 text-primary" />
-                  <div className="flex-1">
-                    <p className="text-sm font-medium text-card-foreground">System backup completed</p>
-                    <p className="text-xs text-muted-foreground">Daily backup process finished successfully</p>
+                </CardHeader>
+                <CardContent>
+                  <CardDescription className="text-base">{action.description}</CardDescription>
+                </CardContent>
+              </Card>
+            ))}
+          </div>
+
+          {/* System Overview */}
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+            <Card className="bg-card col-span-1">
+              <CardHeader className="pb-4">
+                <CardTitle className="text-2xl mb-2">Recent Activities</CardTitle>
+                <CardDescription className="text-base">System events from the past 24 hours</CardDescription>
+              </CardHeader>
+              <CardContent>
+                <div className="space-y-6">
+                  {/* Activity items would go here */}
+                  <div className="flex items-center gap-4">
+                    <div className="bg-primary/10 p-3 rounded-full">
+                      <UserPlus className="h-6 w-6 text-primary" />
+                    </div>
+                    <div>
+                      <p className="text-lg text-foreground">New employee registered</p>
+                      <p className="text-base text-muted-foreground">2 hours ago</p>
+                    </div>
                   </div>
-                  <span className="text-xs text-muted-foreground">6 hours ago</span>
-                </div>
-                <div className="flex items-center gap-3">
-                  <Calendar className="h-5 w-5 text-primary" />
-                  <div className="flex-1">
-                    <p className="text-sm font-medium text-card-foreground">Schedule updated</p>
-                    <p className="text-xs text-muted-foreground">Dr. Smith's schedule modified for next week</p>
+                  <div className="flex items-center gap-4">
+                    <div className="bg-primary/10 p-3 rounded-full">
+                      <Calendar className="h-6 w-6 text-primary" />
+                    </div>
+                    <div>
+                      <p className="text-lg text-foreground">Updated doctor schedule</p>
+                      <p className="text-base text-muted-foreground">4 hours ago</p>
+                    </div>
                   </div>
-                  <span className="text-xs text-muted-foreground">1 day ago</span>
                 </div>
-              </div>
-            </CardContent>
-          </Card>
+              </CardContent>
+            </Card>
+
+            <Card className="bg-card col-span-1">
+              <CardHeader className="pb-4">
+                <CardTitle className="text-2xl mb-2">System Health</CardTitle>
+                <CardDescription className="text-base">Current system metrics and status</CardDescription>
+              </CardHeader>
+              <CardContent>
+                <div className="space-y-6">
+                  <div className="flex items-center justify-between p-4 bg-accent rounded-lg">
+                    <span className="text-lg font-medium text-foreground">Server Load</span>
+                    <span className="text-lg font-bold text-primary">23%</span>
+                  </div>
+                  <div className="flex items-center justify-between p-4 bg-accent rounded-lg">
+                    <span className="text-lg font-medium text-foreground">Database Status</span>
+                    <span className="text-lg font-bold text-green-500">Healthy</span>
+                  </div>
+                  <div className="flex items-center justify-between p-4 bg-accent rounded-lg">
+                    <span className="text-lg font-medium text-foreground">Last Backup</span>
+                    <span className="text-lg text-muted-foreground">2 hours ago</span>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+          </div>
         </div>
-      </div>
+      </PageLayout>
     </div>
   );
 };

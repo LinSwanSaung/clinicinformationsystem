@@ -19,270 +19,179 @@ import {
   Save,
   ArrowLeft
 } from 'lucide-react';
-import PageLayout from '@/components/PageLayout';
 import Alert from '@/components/Alert';
-import { cn } from '@/lib/utils';
+import PageLayout from '@/components/PageLayout';
 
 const RegisterPatient = () => {
   const navigate = useNavigate();
   const [showAlert, setShowAlert] = useState(false);
-  const [formData, setFormData] = useState({
-    name: '',
-    dateOfBirth: undefined,
-    idNumber: '',
-    contact: '',
-    email: '',
-    address: '',
-  });
-  const [photoPreview, setPhotoPreview] = useState(null);
-
-  const handlePhotoChange = (e) => {
-    const file = e.target.files[0];
-    if (file) {
-      const reader = new FileReader();
-      reader.onloadend = () => {
-        setPhotoPreview(reader.result);
-      };
-      reader.readAsDataURL(file);
-    }
-  };
-
-  const handleInputChange = (e) => {
-    const { name, value } = e.target;
-    setFormData(prev => ({
-      ...prev,
-      [name]: value
-    }));
-  };
-
-  const handleDateSelect = (date) => {
-    setFormData(prev => ({
-      ...prev,
-      dateOfBirth: date
-    }));
-  };
+  const [date, setDate] = useState(new Date());
 
   const handleSubmit = (e) => {
     e.preventDefault();
-    // Here you would normally submit the data to your backend
     setShowAlert(true);
+    setTimeout(() => {
+      navigate('/receptionist/patients');
+    }, 2000);
   };
 
   return (
     <PageLayout
       title="Register New Patient"
-      subtitle="Enter patient details to create a new record"
+      subtitle="Add a new patient to the system"
+      fullWidth
     >
-      <div className="max-w-5xl mx-auto w-full">
-        <div className="flex justify-end mb-6">
+      <div className="space-y-8 p-8">
+        {showAlert && (
+          <Alert
+            type="success"
+            message="Patient registered successfully!"
+            onClose={() => setShowAlert(false)}
+          />
+        )}
+
+        <div className="flex justify-between items-center">
           <Button
             variant="outline"
-            className="flex items-center gap-2 border-border text-foreground hover:bg-accent"
-            onClick={() => navigate('/receptionist/dashboard')}
+            onClick={() => navigate(-1)}
+            className="flex items-center gap-3 text-lg py-6 px-8"
           >
-            <ArrowLeft className="h-4 w-4" /> Back to Dashboard
+            <ArrowLeft className="h-6 w-6" />
+            Back
           </Button>
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-12 gap-6">
-          {/* Photo Upload Card */}
-          <Card className="md:col-span-4 bg-card border-border">
-            <CardHeader className="text-center">
-              <CardTitle className="text-card-foreground">Patient Photo</CardTitle>
-              <CardDescription className="text-muted-foreground">Upload a clear photo of the patient</CardDescription>
-            </CardHeader>
-            <CardContent className="flex flex-col items-center">
-              <div className="w-48 h-48 rounded-full bg-muted flex items-center justify-center overflow-hidden mb-4">
-                {photoPreview ? (
-                  <img 
-                    src={photoPreview} 
-                    alt="Patient preview" 
-                    className="w-full h-full object-cover"
-                  />
-                ) : (
-                  <Camera className="h-12 w-12 text-muted-foreground" />
-                )}
-              </div>
-              <label className="w-full">
-                <Button 
-                  className="w-full border-border text-foreground hover:bg-accent" 
-                  variant="outline" 
-                  onClick={() => document.getElementById('photo-upload').click()}
-                >
-                  Choose Photo
-                </Button>
-                <input
-                  type="file"
-                  id="photo-upload"
-                  className="hidden"
-                  accept="image/*"
-                  onChange={handlePhotoChange}
-                />
-              </label>
-            </CardContent>
-          </Card>
-
-          {/* Patient Details Form */}
-          <Card className="md:col-span-8 bg-card border-border">
-            <CardHeader className="text-center">
-              <CardTitle className="text-card-foreground">Patient Information</CardTitle>
-              <CardDescription className="text-muted-foreground">Fill in the required patient details</CardDescription>
-            </CardHeader>
-            <CardContent>
-              <form onSubmit={handleSubmit} className="space-y-6">
-                <div className="grid md:grid-cols-2 gap-6">
-                  {/* Full Name */}
-                  <div className="space-y-2">
-                    <label className="text-sm font-medium text-foreground">
-                      Full Name
-                    </label>
-                    <Input
-                      name="name"
-                      value={formData.name}
-                      onChange={handleInputChange}
-                      placeholder="Enter patient's full name"
-                      className="border-input"
-                      required
+        <Card className="bg-card">
+          <CardHeader className="pb-4">
+            <CardTitle className="text-2xl">Patient Information</CardTitle>
+            <CardDescription className="text-lg">Enter the patient's basic information</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <form onSubmit={handleSubmit} className="space-y-8">
+              {/* Basic Information */}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+                <div className="space-y-6">
+                  <div>
+                    <label className="text-lg font-medium block mb-2">Full Name</label>
+                    <Input 
+                      placeholder="Enter patient's full name" 
+                      className="h-12 text-lg border-2 focus:border-primary"
                     />
                   </div>
-
-                  {/* Date of Birth */}
-                  <div className="space-y-2">
-                    <label className="text-sm font-medium text-foreground">
-                      Date of Birth
-                    </label>
+                  <div>
+                    <label className="text-lg font-medium block mb-2">Date of Birth</label>
                     <Popover>
                       <PopoverTrigger asChild>
                         <Button
-                          type="button"
                           variant="outline"
-                          className={cn(
-                            'w-full justify-start text-left font-normal border-input',
-                            !formData.dateOfBirth && 'text-muted-foreground'
-                          )}
+                          className="w-full h-12 font-normal text-lg justify-start text-left border-2 hover:border-primary"
                         >
-                          <CalendarIcon className="mr-2 h-4 w-4" />
-                          {formData.dateOfBirth ? (
-                            format(formData.dateOfBirth, 'PPP')
-                          ) : (
-                            <span>Pick a date</span>
-                          )}
+                          <CalendarIcon className="mr-3 h-5 w-5" />
+                          {date ? format(date, 'PPP') : <span>Pick a date</span>}
                         </Button>
                       </PopoverTrigger>
-                      <PopoverContent className="w-auto p-0 bg-popover border-border">
+                      <PopoverContent className="w-auto p-0">
                         <Calendar
                           mode="single"
-                          selected={formData.dateOfBirth}
-                          onSelect={handleDateSelect}
-                          disabled={(date) =>
-                            date > new Date() || date < new Date('1900-01-01')
-                          }
+                          selected={date}
+                          onSelect={setDate}
                           initialFocus
-                          className="text-popover-foreground"
                         />
                       </PopoverContent>
                     </Popover>
                   </div>
-
-                  {/* ID Number */}
-                  <div className="space-y-2">
-                    <label className="text-sm font-medium text-foreground">
-                      ID Number
-                    </label>
-                    <Input
-                      name="idNumber"
-                      value={formData.idNumber}
-                      onChange={handleInputChange}
-                      placeholder="Enter ID number"
-                      className="border-input"
-                      required
-                    />
-                  </div>
-
-                  {/* Contact Number */}
-                  <div className="space-y-2">
-                    <label className="text-sm font-medium text-foreground">
-                      Contact Number
-                    </label>
-                    <Input
-                      name="contact"
-                      value={formData.contact}
-                      onChange={handleInputChange}
-                      placeholder="Enter contact number"
-                      className="border-input"
-                      required
-                    />
-                  </div>
-
-                  {/* Email */}
-                  <div className="space-y-2">
-                    <label className="text-sm font-medium text-foreground">
-                      Email Address
-                    </label>
-                    <Input
-                      name="email"
-                      type="email"
-                      value={formData.email}
-                      onChange={handleInputChange}
-                      placeholder="Enter email address"
-                      className="border-input"
-                    />
-                  </div>
-
-                  {/* Address */}
-                  <div className="space-y-2">
-                    <label className="text-sm font-medium text-foreground">
-                      Address
-                    </label>
-                    <Input
-                      name="address"
-                      value={formData.address}
-                      onChange={handleInputChange}
-                      placeholder="Enter address"
-                      className="border-input"
+                  <div>
+                    <label className="text-lg font-medium block mb-2">Contact Number</label>
+                    <Input 
+                      type="tel" 
+                      placeholder="Enter contact number" 
+                      className="h-12 text-lg border-2 focus:border-primary"
                     />
                   </div>
                 </div>
 
-                <div className="flex justify-center gap-4 pt-4">
-                  <Button
-                    type="button"
-                    variant="outline"
-                    className="border-border text-foreground hover:bg-accent"
-                    onClick={() => navigate('/receptionist/dashboard')}
-                  >
-                    Cancel
-                  </Button>
-                  <Button
-                    type="submit"
-                    className="bg-primary text-primary-foreground hover:bg-primary/90"
-                  >
-                    <UserPlus className="h-4 w-4 mr-2" />
-                    Register Patient
-                  </Button>
+                <div className="space-y-6">
+                  <div>
+                    <label className="text-lg font-medium block mb-2">Email Address</label>
+                    <Input 
+                      type="email" 
+                      placeholder="Enter email address" 
+                      className="h-12 text-lg border-2 focus:border-primary"
+                    />
+                  </div>
+                  <div>
+                    <label className="text-lg font-medium block mb-2">Address</label>
+                    <Input 
+                      placeholder="Enter full address" 
+                      className="h-12 text-lg border-2 focus:border-primary"
+                    />
+                  </div>
+                  <div>
+                    <label className="text-lg font-medium block mb-2">Emergency Contact</label>
+                    <Input 
+                      placeholder="Emergency contact number" 
+                      className="h-12 text-lg border-2 focus:border-primary"
+                    />
+                  </div>
                 </div>
-              </form>
-            </CardContent>
-          </Card>
-        </div>
+              </div>
+
+              {/* Medical Information */}
+              <div className="pt-6">
+                <h3 className="text-xl font-semibold mb-6">Medical Information</h3>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+                  <div>
+                    <label className="text-lg font-medium block mb-2">Medical History</label>
+                    <Input 
+                      placeholder="Enter relevant medical history" 
+                      className="h-12 text-lg border-2 focus:border-primary"
+                    />
+                  </div>
+                  <div>
+                    <label className="text-lg font-medium block mb-2">Current Medications</label>
+                    <Input 
+                      placeholder="List current medications" 
+                      className="h-12 text-lg border-2 focus:border-primary"
+                    />
+                  </div>
+                  <div>
+                    <label className="text-lg font-medium block mb-2">Allergies</label>
+                    <Input 
+                      placeholder="List any allergies" 
+                      className="h-12 text-lg border-2 focus:border-primary"
+                    />
+                  </div>
+                  <div>
+                    <label className="text-lg font-medium block mb-2">Blood Type</label>
+                    <Input 
+                      placeholder="Enter blood type" 
+                      className="h-12 text-lg border-2 focus:border-primary"
+                    />
+                  </div>
+                </div>
+              </div>
+
+              <div className="flex justify-end gap-4 pt-6">
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={() => navigate(-1)}
+                  className="text-lg py-6 px-8"
+                >
+                  Cancel
+                </Button>
+                <Button
+                  type="submit"
+                  className="bg-primary text-primary-foreground hover:bg-primary/90 text-lg py-6 px-8"
+                >
+                  <Save className="mr-2 h-5 w-5" />
+                  Register Patient
+                </Button>
+              </div>
+            </form>
+          </CardContent>
+        </Card>
       </div>
-      
-      {showAlert && (
-        <Alert
-          type="success"
-          title="Patient Registered Successfully!"
-          message="The patient has been added to the system. You can now proceed to schedule an appointment."
-          showConfirm={true}
-          onConfirm={() => {
-            setShowAlert(false);
-            navigate('/receptionist/appointments');
-          }}
-          onClose={() => {
-            setShowAlert(false);
-            navigate('/receptionist/dashboard');
-          }}
-        />
-      )}
     </PageLayout>
   );
 };

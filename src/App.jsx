@@ -8,6 +8,8 @@ import ReceptionistDashboard from './pages/receptionist/ReceptionistDashboard';
 import RegisterPatient from './pages/receptionist/RegisterPatient';
 import AppointmentsPage from './pages/receptionist/AppointmentsPage';
 import PatientListPage from './pages/receptionist/PatientListPage';
+import NurseDashboard from './pages/nurse/NurseDashboard';
+import EMRPage from './pages/nurse/EMRPage';
 import { useAuth } from './contexts/AuthContext';
 
 // Protected Route Component
@@ -19,7 +21,16 @@ const ProtectedRoute = ({ children, allowedRoles = [] }) => {
   }
   
   if (allowedRoles.length > 0 && !allowedRoles.includes(user.role)) {
-    return <Navigate to={user.role === 'Admin' ? '/admin/dashboard' : '/receptionist/dashboard'} replace />;
+    // Redirect based on user role
+    if (user.role === 'Admin') {
+      return <Navigate to="/admin/dashboard" replace />;
+    } else if (user.role === 'Receptionist') {
+      return <Navigate to="/receptionist/dashboard" replace />;
+    } else if (user.role === 'Nurse') {
+      return <Navigate to="/nurse/dashboard" replace />;
+    } else {
+      return <Navigate to="/" replace />;
+    }
   }
   
   return children;
@@ -30,7 +41,16 @@ const PublicRoute = ({ children }) => {
   const { user } = useAuth();
   
   if (user) {
-    return <Navigate to={user.role === 'Admin' ? '/admin/dashboard' : '/receptionist/dashboard'} replace />;
+    // Redirect based on user role
+    if (user.role === 'Admin') {
+      return <Navigate to="/admin/dashboard" replace />;
+    } else if (user.role === 'Receptionist') {
+      return <Navigate to="/receptionist/dashboard" replace />;
+    } else if (user.role === 'Nurse') {
+      return <Navigate to="/nurse/dashboard" replace />;
+    } else {
+      return <Navigate to="/" replace />;
+    }
   }
   
   return children;
@@ -94,6 +114,24 @@ function AppRoutes() {
         element={
           <ProtectedRoute allowedRoles={['Receptionist']}>
             <PatientListPage />
+          </ProtectedRoute>
+        } 
+      />
+      
+      {/* Protected Nurse Routes */}
+      <Route 
+        path="/nurse/dashboard" 
+        element={
+          <ProtectedRoute allowedRoles={['Nurse']}>
+            <NurseDashboard />
+          </ProtectedRoute>
+        } 
+      />
+      <Route 
+        path="/nurse/emr" 
+        element={
+          <ProtectedRoute allowedRoles={['Nurse']}>
+            <EMRPage />
           </ProtectedRoute>
         } 
       />

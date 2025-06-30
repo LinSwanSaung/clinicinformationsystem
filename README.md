@@ -71,6 +71,10 @@ A modern, responsive Clinic Information System designed for low-resource healthc
 - Email: `receptionist.brown@clinic.com`
 - Password: `clinic123`
 
+**Nurse Access:**
+- Email: `nurse@clinic.com`
+- Password: `nurse123`
+
 ## 📱 Usage
 
 1. **Login**: Use the demo credentials to access the admin panel

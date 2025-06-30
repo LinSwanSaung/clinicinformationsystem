@@ -34,6 +34,13 @@ export const AuthProvider = ({ children }) => {
       localStorage.setItem('isAuthenticated', 'true');
       navigate('/receptionist/dashboard');
       return true;
+    } else if (email === 'nurse@clinic.com' && password === 'nurse123') {
+      const userData = { role: 'Nurse' };
+      setUser(userData);
+      localStorage.setItem('userRole', 'Nurse');
+      localStorage.setItem('isAuthenticated', 'true');
+      navigate('/nurse/dashboard');
+      return true;
     }
     return false;
   };

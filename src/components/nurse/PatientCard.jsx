@@ -164,19 +164,19 @@ const PatientCard = ({
   };
   
   return (
-    <Card className="overflow-hidden">
+    <Card className="overflow-hidden shadow-lg w-[400px] min-h-[420px] flex flex-col mx-auto border-2 border-gray-200 hover:border-gray-300 hover:shadow-xl transition-all duration-200">
       <div className="flex items-center p-4 border-b">
-        <div className={`w-12 h-12 rounded-full flex items-center justify-center text-white font-bold 
+        <div className={`w-12 h-12 rounded-full flex items-center justify-center text-white text-lg font-bold 
           ${patient.avatarColor || 'bg-blue-500'}`}>
           {patient.initials || getInitials(patient.name)}
         </div>
         <div className="ml-3 flex-1">
           <div className="flex justify-between items-start">
-            <h3 className="font-bold">{patient.name}</h3>
-            <div className="text-xs text-gray-400">ID: {patient.id}</div>
+            <h3 className="text-xl font-bold">{patient.name}</h3>
+            <div className="text-base text-gray-400">ID: {patient.id}</div>
           </div>
           <div className="flex items-center justify-between mt-1">
-            <div className="flex items-center text-xs text-gray-500">
+            <div className="flex items-center text-base text-gray-500">
               {patient.age && (
                 <span className="mr-3">{patient.age} years</span>
               )}
@@ -185,7 +185,7 @@ const PatientCard = ({
               )}
             </div>
             {patient.urgency && (
-              <Badge className={urgencyColors[patient.urgency] || "bg-blue-100 text-blue-800"}>
+              <Badge className={`${urgencyColors[patient.urgency] || "bg-blue-100 text-blue-800"} text-base px-3 py-1`}>
                 {patient.urgency}
               </Badge>
             )}
@@ -193,23 +193,18 @@ const PatientCard = ({
         </div>
       </div>
       
-      <div className="flex justify-between items-center p-3 bg-gray-50">
-        <div className="flex items-center text-sm">
-          <Clock size={14} className="mr-1 text-gray-500" />
+      <div className="flex justify-between items-center p-4 bg-gray-50">
+        <div className="flex items-center text-base">
+          <Clock size={18} className="mr-2 text-gray-500" />
           <span>Appointment:</span>
         </div>
-        <span className="font-medium">{formatTime(patient.appointmentTime)}</span>
+        <span className="font-medium text-base">{formatTime(patient.appointmentTime)}</span>
       </div>
       
-      <div className="flex justify-between items-center px-3 py-2">
-        <div className="text-sm">Status:</div>
+      <div className="flex justify-between items-center px-4 py-3">
+        <div className="text-base">Status:</div>
         <div className="flex space-x-2">
-          {patient.delayReason && (
-            <Badge variant="outline" className="bg-red-50 text-red-700 border-red-200">
-              Delayed
-            </Badge>
-          )}
-          <Badge className={statusColors[patient.status] || "bg-gray-100"}>
+          <Badge className={`${statusColors[patient.status] || "bg-gray-100"} text-base px-4 py-1`}>
             {patient.status === 'waiting' ? 'Waiting' : 
              patient.status === 'delayed' ? 'Delayed' :
              patient.status === 'ready' ? 'Ready' : 
@@ -225,34 +220,34 @@ const PatientCard = ({
       )}
       
       {patient.vitals && patient.vitalsRecorded && (
-        <div className="p-3 border-t">
-          <h4 className="text-sm font-medium mb-2 text-gray-700">Vitals:</h4>
-          <div className="grid grid-cols-2 gap-y-2 gap-x-4 text-xs">
+        <div className="p-4 border-t">
+          <h4 className="text-base font-medium mb-3 text-gray-700">Vitals:</h4>
+          <div className="grid grid-cols-2 gap-y-3 gap-x-4 text-sm">
             {patient.vitals.bp && (
               <div className="flex items-center">
-                <Activity size={14} className="mr-1 text-gray-500" />
-                <span className="text-gray-600 mr-1">BP:</span>
+                <Activity size={16} className="mr-2 text-gray-500" />
+                <span className="text-gray-600 mr-2">BP:</span>
                 <span className="font-medium">{patient.vitals.bp}</span>
               </div>
             )}
             {patient.vitals.heartRate && (
               <div className="flex items-center">
-                <Heart size={14} className="mr-1 text-gray-500" />
-                <span className="text-gray-600 mr-1">BPM:</span>
+                <Heart size={16} className="mr-2 text-gray-500" />
+                <span className="text-gray-600 mr-2">BPM:</span>
                 <span className="font-medium">{patient.vitals.heartRate}</span>
               </div>
             )}
             {patient.vitals.weight && (
               <div className="flex items-center">
-                <Scale size={14} className="mr-1 text-gray-500" />
-                <span className="text-gray-600 mr-1">Weight:</span>
+                <Scale size={16} className="mr-2 text-gray-500" />
+                <span className="text-gray-600 mr-2">Weight:</span>
                 <span className="font-medium">{patient.vitals.weight} kg</span>
               </div>
             )}
             {patient.vitals.temp && (
               <div className="flex items-center">
-                <ThermometerSnowflake size={14} className="mr-1 text-gray-500" />
-                <span className="text-gray-600 mr-1">Temp:</span>
+                <ThermometerSnowflake size={16} className="mr-2 text-gray-500" />
+                <span className="text-gray-600 mr-2">Temp:</span>
                 <span className="font-medium">{patient.vitals.temp} °F</span>
               </div>
             )}
@@ -261,7 +256,7 @@ const PatientCard = ({
       )}
       
       {patient.notes && (
-        <div className="px-3 py-2 bg-gray-50 text-xs text-gray-700 border-t">
+        <div className="px-4 py-3 bg-gray-50 text-sm text-gray-700 border-t">
           <strong>Notes:</strong> {patient.notes}
         </div>
       )}
@@ -410,64 +405,74 @@ const PatientCard = ({
       </Dialog>
       
       {/* Action Buttons */}
-      <div className="p-3 border-t flex flex-col space-y-2">
+      <div className="mt-auto p-4 border-t flex flex-col space-y-3 bg-white">
         {!readOnly && !readyTab && !patient.vitalsRecorded && (
           <Button 
             variant="outline" 
-            className="w-full flex justify-center items-center border-blue-200 text-blue-700 hover:bg-blue-50 font-medium"
+            className="w-full flex justify-center items-center border-blue-200 text-blue-700 hover:bg-blue-50 font-medium py-3 text-base"
             onClick={() => setIsVitalsModalOpen(true)}
           >
-            <FileText size={16} className="mr-2" /> Add Vitals & Notes
+            <FileText size={18} className="mr-2" /> Add Vitals & Notes
           </Button>
         )}
         
         {!readOnly && !readyTab && patient.vitalsRecorded && (
           <Button 
             variant="default" 
-            className="w-full flex justify-center items-center bg-emerald-600 hover:bg-emerald-700 text-white font-medium"
+            className="w-full flex justify-center items-center bg-emerald-600 hover:bg-emerald-700 text-white font-medium py-3 text-base"
             onClick={() => onMarkReady(patient.id)}
           >
-            <ClipboardCheck size={16} className="mr-2" /> Mark Ready for Doctor
+            <ClipboardCheck size={18} className="mr-2" /> Mark Ready for Doctor
           </Button>
         )}
         
         {!readOnly && !readyTab && patient.vitalsRecorded && (
           <Button 
             variant="outline" 
-            className="w-full flex justify-center items-center border-orange-200 text-orange-700 hover:bg-orange-50 font-medium"
+            className="w-full flex justify-center items-center border-orange-200 text-orange-700 hover:bg-orange-50 font-medium py-3 text-base"
             onClick={() => setIsVitalsModalOpen(true)}
           >
-            <FileText size={16} className="mr-2" /> Edit Vitals & Notes
+            <FileText size={18} className="mr-2" /> Edit Vitals & Notes
           </Button>
         )}
         
-        {!readOnly && (
+        {!readOnly && patient.status !== 'delayed' && (
           <Button 
             variant="destructive" 
-            className="w-full flex justify-center items-center"
+            className="w-full flex justify-center items-center py-3 text-base"
             onClick={() => setIsDelayModalOpen(true)}
           >
-            <AlertCircle size={14} className="mr-1" /> 
-            {patient.status === 'delayed' ? 'Update Delay Reason' : 'Delay Patient'}
+            <AlertCircle size={16} className="mr-2" /> 
+            Delay Patient
           </Button>
         )}
         
         {!readOnly && patient.status === 'delayed' && (
-          <Button 
-            variant="outline" 
-            className="w-full flex justify-center items-center border-green-200 text-green-700 hover:bg-green-50"
-            onClick={() => onRemoveDelay && onRemoveDelay(patient.id)}
-          >
-            <Check size={14} className="mr-1" /> Remove Delay
-          </Button>
+          <>
+            <Button 
+              variant="destructive" 
+              className="w-full flex justify-center items-center py-3 text-base"
+              onClick={() => setIsDelayModalOpen(true)}
+            >
+              <AlertCircle size={16} className="mr-2" /> 
+              Update Delay Reason
+            </Button>
+            <Button 
+              variant="outline" 
+              className="w-full flex justify-center items-center border-green-200 text-green-700 hover:bg-green-50 py-3 text-base"
+              onClick={() => onRemoveDelay && onRemoveDelay(patient.id)}
+            >
+              <Check size={16} className="mr-2" /> Remove Delay
+            </Button>
+          </>
         )}
         
         <Button 
           variant="outline" 
-          className="w-full flex justify-center items-center"
+          className="w-full flex justify-center items-center py-3 text-base"
           onClick={handleViewFullPatientData}
         >
-          <FileText size={14} className="mr-1" /> View Full Patient Data
+          <FileText size={16} className="mr-2" /> View Full Patient Data
         </Button>
       </div>
     </Card>

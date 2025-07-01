@@ -13,8 +13,84 @@ export const nursePatientsData = [
     notes: "Patient reports severe headache and nausea. History of migraines.",
     urgency: "Priority",
     medicalHistory: "Chronic migraines, hypertension",
-    allergies: "Penicillin",
-    medications: "Sumatriptan as needed"
+    allergies: ["Penicillin", "Dust Mites"],
+    medications: "Sumatriptan as needed",
+    diagnosisHistory: [
+      { date: "2023-11-10", diagnosis: "Seasonal Allergies" },
+      { date: "2022-05-20", diagnosis: "Mild Hypertension" },
+      { date: "2021-08-15", diagnosis: "Acute Bronchitis" }
+    ],
+    currentMedications: [
+      {
+        name: "Sumatriptan",
+        dosage: "50mg",
+        frequency: "As needed",
+        prescribedBy: "Dr. Johnson"
+      },
+      {
+        name: "Lisinopril",
+        dosage: "10mg",
+        frequency: "Daily",
+        prescribedBy: "Dr. Smith"
+      }
+    ],
+    visitHistory: [
+      {
+        date: "2024-06-22",
+        type: "Follow-up for hypertension",
+        doctor: "Dr. Emily White",
+        nurseNotes: {
+          bp: "125/83",
+          bpm: "76",
+          weight: "65.5 kg",
+          temp: "98.8 °F",
+          observations: "Patient reports feeling well, no new symptoms."
+        },
+        doctorNotes: {
+          diagnosis: "Hypertension (controlled)",
+          comments: "Continue current medication. Next review in 3 months.",
+          prescribedMedications: [
+            { name: "Lisinopril", dosage: "10mg", frequency: "Daily" }
+          ]
+        }
+      },
+      {
+        date: "2024-05-10",
+        type: "Annual physical",
+        doctor: "Dr. Emily White",
+        nurseNotes: {
+          bp: "130/85",
+          bpm: "78",
+          weight: "66.0 kg",
+          temp: "98.6 °F",
+          observations: "Routine annual checkup, all vitals within normal range."
+        },
+        doctorNotes: {
+          diagnosis: "General health check",
+          comments: "Overall health good. Monitor blood pressure.",
+          prescribedMedications: []
+        }
+      },
+      {
+        date: "2023-11-10",
+        type: "Allergy symptoms",
+        doctor: "Dr. Sarah Johnson",
+        nurseNotes: {
+          bp: "120/80",
+          bpm: "72",
+          weight: "65.8 kg",
+          temp: "99.1 °F",
+          observations: "Patient experiencing seasonal allergy symptoms."
+        },
+        doctorNotes: {
+          diagnosis: "Seasonal allergies",
+          comments: "Prescribed antihistamine for symptom relief.",
+          prescribedMedications: [
+            { name: "Loratadine", dosage: "10mg", frequency: "Daily as needed" }
+          ]
+        }
+      }
+    ]
   },
   {
     id: "P006",
@@ -34,7 +110,34 @@ export const nursePatientsData = [
       heartRate: "78"
     },
     notes: "Follow-up for chronic condition.",
-    urgency: "Normal"
+    urgency: "Normal",
+    allergies: ["Shellfish"],
+    diagnosisHistory: [
+      { date: "2023-12-05", diagnosis: "Type 2 Diabetes" },
+      { date: "2022-08-10", diagnosis: "High Cholesterol" }
+    ],
+    currentMedications: [
+      {
+        name: "Metformin",
+        dosage: "500mg",
+        frequency: "Twice daily",
+        prescribedBy: "Dr. Anderson"
+      }
+    ],
+    visitHistory: [
+      {
+        date: "2025-06-20",
+        type: "Follow-up",
+        reason: "Diabetes management check",
+        doctor: "Dr. Anderson"
+      },
+      {
+        date: "2025-05-15",
+        type: "Lab Work",
+        reason: "HbA1c and lipid panel",
+        doctor: "Dr. Anderson"
+      }
+    ]
   },
   {
     id: "P007", 

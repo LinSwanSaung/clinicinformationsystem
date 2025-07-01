@@ -9,7 +9,9 @@ import RegisterPatient from './pages/receptionist/RegisterPatient';
 import AppointmentsPage from './pages/receptionist/AppointmentsPage';
 import PatientListPage from './pages/receptionist/PatientListPage';
 import NurseDashboard from './pages/nurse/NurseDashboard';
-import EMRPage from './pages/nurse/EMRPage';
+import ElectronicMedicalRecords from './pages/nurse/ElectronicMedicalRecords';
+import DoctorDashboard from './pages/doctor/DoctorDashboard';
+import PatientMedicalRecord from './pages/doctor/PatientMedicalRecord';
 import { useAuth } from './contexts/AuthContext';
 
 // Protected Route Component
@@ -48,6 +50,8 @@ const PublicRoute = ({ children }) => {
       return <Navigate to="/receptionist/dashboard" replace />;
     } else if (user.role === 'Nurse') {
       return <Navigate to="/nurse/dashboard" replace />;
+    } else if (user.role === 'Doctor') {
+      return <Navigate to="/doctor/dashboard" replace />;
     } else {
       return <Navigate to="/" replace />;
     }
@@ -131,11 +135,29 @@ function AppRoutes() {
         path="/nurse/emr" 
         element={
           <ProtectedRoute allowedRoles={['Nurse']}>
-            <EMRPage />
+            <ElectronicMedicalRecords />
           </ProtectedRoute>
         } 
       />
       
+      {/* Protected Doctor Routes */}
+      <Route 
+        path="/doctor/dashboard" 
+        element={
+          <ProtectedRoute allowedRoles={['Doctor']}>
+            <DoctorDashboard />
+          </ProtectedRoute>
+        } 
+      />
+      <Route 
+        path="/doctor/patient-record" 
+        element={
+          <ProtectedRoute allowedRoles={['Doctor']}>
+            <PatientMedicalRecord />
+          </ProtectedRoute>
+        } 
+      />
+
       {/* Fallback Route */}
       <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>

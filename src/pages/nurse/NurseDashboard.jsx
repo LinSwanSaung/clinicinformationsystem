@@ -7,20 +7,10 @@ import { Button } from '../../components/ui/button';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '../../components/ui/tabs';
 import { 
   Search, 
-  ClipboardList, 
-  UserCheck, 
-  User, 
-  Clock, 
-  Activity, 
-  ThermometerSnowflake, 
-  Scale, 
-  Heart, 
-  FileText, 
-  Check,
-  X
+  FileText 
 } from 'lucide-react';
-import { Badge } from '../../components/ui/badge';
-import PatientCard from '../../components/nurse/PatientCard';
+import PatientCard from '../../components/medical/PatientCard';
+import { PatientStats } from '../../components/medical/PatientStats';
 import { nursePatientsData } from '../../data/dummyNurseData';
 
 const NurseDashboard = () => {
@@ -99,45 +89,8 @@ const NurseDashboard = () => {
       fullWidth
     >
       <div className="space-y-8 p-8">
-        {/* Banner and summary cards */}
-        <div className="bg-emerald-600 text-white p-6 rounded-lg shadow-md">
-          <h1 className="text-2xl font-bold text-center mb-4">Nurse's Patient Queue</h1>
-          
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-            <Card className="bg-emerald-500/30 backdrop-blur border-emerald-300/50 text-white">
-              <div className="p-4 flex flex-col items-center text-center">
-                <div className="flex justify-between items-center w-full">
-                  <h2 className="text-sm font-medium">Patients Waiting</h2>
-                  <ClipboardList size={20} />
-                </div>
-                <p className="text-4xl font-bold my-1">{waitingPatients.length}</p>
-                <p className="text-xs opacity-80">Patients waiting and delayed</p>
-              </div>
-            </Card>
-
-            <Card className="bg-emerald-500/30 backdrop-blur border-emerald-300/50 text-white">
-              <div className="p-4 flex flex-col items-center text-center">
-                <div className="flex justify-between items-center w-full">
-                  <h2 className="text-sm font-medium">Ready for Doctor</h2>
-                  <UserCheck size={20} />
-                </div>
-                <p className="text-4xl font-bold my-1">{readyPatients.length}</p>
-                <p className="text-xs opacity-80">Vitals taken, ready for doctor</p>
-              </div>
-            </Card>
-
-            <Card className="bg-emerald-500/30 backdrop-blur border-emerald-300/50 text-white">
-              <div className="p-4 flex flex-col items-center text-center">
-                <div className="flex justify-between items-center w-full">
-                  <h2 className="text-sm font-medium">Seeing Doctor</h2>
-                  <User size={20} />
-                </div>
-                <p className="text-4xl font-bold my-1">{seeingDoctorPatients.length}</p>
-                <p className="text-xs opacity-80">Currently in doctor's room</p>
-              </div>
-            </Card>
-          </div>
-        </div>
+        {/* Patient Stats */}
+        <PatientStats patients={patients} userRole="nurse" />
 
         {/* Search bar */}
         <div className="flex gap-2">

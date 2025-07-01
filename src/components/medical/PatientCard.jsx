@@ -23,8 +23,8 @@ const Dialog = ({ isOpen, onClose, title, children }) => {
   if (!isOpen) return null;
   
   return (
-    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
-      <div className="bg-white rounded-lg shadow-xl w-full max-w-md max-h-[90vh] overflow-auto">
+    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+      <div className="bg-white rounded-lg shadow-xl w-full max-w-lg max-h-[90vh] overflow-auto">
         <div className="flex justify-between items-center p-4 border-b">
           <h3 className="font-medium">{title}</h3>
           <button onClick={onClose} className="text-gray-500 hover:text-gray-700">
@@ -59,6 +59,7 @@ const PatientCard = ({
     temp: patient.vitals?.temp || '',
     weight: patient.vitals?.weight || '',
     heartRate: patient.vitals?.heartRate || '',
+    urgency: patient.urgency || 'Normal'
   });
   
   // Modal states
@@ -334,17 +335,94 @@ const PatientCard = ({
           >
             {/* Vitals form content */}
             <div className="space-y-4">
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-sm font-medium mb-1 text-gray-700">
+                    <Heart size={16} className="inline mr-1" />
+                    Blood Pressure
+                  </label>
+                  <Input
+                    name="bp"
+                    placeholder="e.g., 120/80"
+                    value={vitalsForm.bp}
+                    onChange={(e) => setVitalsForm(prev => ({ ...prev, bp: e.target.value }))}
+                    className="w-full"
+                  />
+                </div>
+                
+                <div>
+                  <label className="block text-sm font-medium mb-1 text-gray-700">
+                    <ThermometerSnowflake size={16} className="inline mr-1" />
+                    Temperature (°F)
+                  </label>
+                  <Input
+                    name="temp"
+                    placeholder="e.g., 98.6"
+                    value={vitalsForm.temp}
+                    onChange={(e) => setVitalsForm(prev => ({ ...prev, temp: e.target.value }))}
+                    className="w-full"
+                  />
+                </div>
+              </div>
+              
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-sm font-medium mb-1 text-gray-700">
+                    <Scale size={16} className="inline mr-1" />
+                    Weight (kg)
+                  </label>
+                  <Input
+                    name="weight"
+                    placeholder="e.g., 70"
+                    value={vitalsForm.weight}
+                    onChange={(e) => setVitalsForm(prev => ({ ...prev, weight: e.target.value }))}
+                    className="w-full"
+                  />
+                </div>
+                
+                <div>
+                  <label className="block text-sm font-medium mb-1 text-gray-700">
+                    <Activity size={16} className="inline mr-1" />
+                    Heart Rate (bpm)
+                  </label>
+                  <Input
+                    name="heartRate"
+                    placeholder="e.g., 72"
+                    value={vitalsForm.heartRate}
+                    onChange={(e) => setVitalsForm(prev => ({ ...prev, heartRate: e.target.value }))}
+                    className="w-full"
+                  />
+                </div>
+              </div>
+
               <div>
-                <label className="block text-sm font-medium mb-1">BP</label>
-                <Input
-                  name="bp"
-                  placeholder="e.g., 120/80"
-                  value={vitalsForm.bp}
-                  onChange={(e) => setVitalsForm(prev => ({ ...prev, bp: e.target.value }))}
+                <label className="block text-sm font-medium mb-1 text-gray-700">
+                  Priority Level
+                </label>
+                <select
+                  value={vitalsForm.urgency || 'Normal'}
+                  onChange={(e) => setVitalsForm(prev => ({ ...prev, urgency: e.target.value }))}
+                  className="w-full p-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                >
+                  <option value="Normal">Normal</option>
+                  <option value="Priority">Priority</option>
+                  <option value="Urgent">Urgent</option>
+                </select>
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium mb-1 text-gray-700">
+                  Clinical Notes
+                </label>
+                <textarea
+                  placeholder="Additional observations or notes..."
+                  value={notes}
+                  onChange={(e) => setNotes(e.target.value)}
+                  className="w-full p-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent min-h-[80px] resize-none"
                 />
               </div>
-              {/* Other vital inputs... */}
-              <div className="flex space-x-2 pt-2">
+              
+              <div className="flex space-x-2 pt-4 border-t">
                 <Button variant="outline" onClick={() => setIsVitalsModalOpen(false)}>
                   Cancel
                 </Button>

@@ -10,13 +10,10 @@ import {
   UserCheck, 
   UserCog,
   CheckCircle,
-  Clock,
-  ClipboardList,
-  User,
-  FileText,
-  Activity
+  FileText
 } from 'lucide-react';
 import PatientCard from '../../components/medical/PatientCard';
+import { PatientStats } from '../../components/medical/PatientStats';
 
 const DoctorDashboard = () => {
   const navigate = useNavigate();
@@ -133,45 +130,8 @@ const DoctorDashboard = () => {
       fullWidth
     >
       <div className="space-y-8 p-8">
-        {/* Banner and summary cards */}
-        <div className="bg-blue-600 text-white p-6 rounded-lg shadow-md">
-          <h1 className="text-2xl font-bold text-center mb-4">Doctor's Patient Queue</h1>
-          
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-            <Card className="bg-blue-500/30 backdrop-blur border-blue-300/50 text-white">
-              <div className="p-4 flex flex-col items-center text-center">
-                <div className="flex justify-between items-center w-full">
-                  <h2 className="text-sm font-medium">Waiting for You</h2>
-                  <ClipboardList size={20} />
-                </div>
-                <p className="text-4xl font-bold my-1">{filteredPatients.filter(p => p.status === 'ready').length}</p>
-                <p className="text-xs opacity-80">Patients ready for consultation</p>
-              </div>
-            </Card>
-
-            <Card className="bg-blue-500/30 backdrop-blur border-blue-300/50 text-white">
-              <div className="p-4 flex flex-col items-center text-center">
-                <div className="flex justify-between items-center w-full">
-                  <h2 className="text-sm font-medium">In Progress</h2>
-                  <UserCog size={20} />
-                </div>
-                <p className="text-4xl font-bold my-1">{filteredPatients.filter(p => p.status === 'seeing_doctor').length}</p>
-                <p className="text-xs opacity-80">Currently consulting</p>
-              </div>
-            </Card>
-
-            <Card className="bg-blue-500/30 backdrop-blur border-blue-300/50 text-white">
-              <div className="p-4 flex flex-col items-center text-center">
-                <div className="flex justify-between items-center w-full">
-                  <h2 className="text-sm font-medium">Completed Today</h2>
-                  <CheckCircle size={20} />
-                </div>
-                <p className="text-4xl font-bold my-1">{filteredPatients.filter(p => p.status === 'completed').length}</p>
-                <p className="text-xs opacity-80">Consultations finished</p>
-              </div>
-            </Card>
-          </div>
-        </div>
+        {/* Patient Stats */}
+        <PatientStats patients={patients} userRole="doctor" />
 
         {/* Search and quick actions */}
         <div className="flex gap-2">

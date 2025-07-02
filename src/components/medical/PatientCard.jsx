@@ -65,7 +65,7 @@ const PatientCard = ({
   // Modal states
   const [isVitalsModalOpen, setIsVitalsModalOpen] = useState(false);
   const [isDelayModalOpen, setIsDelayModalOpen] = useState(false);
-  const [delayReason, setDelayReason] = useState('');
+  const [delayReason, setDelayReason] = useState(patient.delayReason || '');
   const [urgency, setUrgency] = useState(patient.urgency || 'Normal');
   const [notes, setNotes] = useState(patient.notes || '');
 
@@ -114,10 +114,10 @@ const PatientCard = ({
       <Button 
         key="view-data"
         variant="outline" 
-        className="w-full flex justify-center items-center py-3 text-base"
+        className="w-full flex justify-center items-center h-11 text-base font-medium"
         onClick={handleViewFullPatientData}
       >
-        <FileText size={16} className="mr-2" /> 
+        <FileText size={18} className="mr-2" /> 
         {userRole === 'doctor' ? 'View Medical Record' : 'View Full Patient Data'}
       </Button>
     );
@@ -129,7 +129,7 @@ const PatientCard = ({
           <Button 
             key="add-vitals"
             variant="outline" 
-            className="w-full flex justify-center items-center border-blue-200 text-blue-700 hover:bg-blue-50 font-medium py-3 text-base"
+            className="w-full flex justify-center items-center border-blue-200 text-blue-700 hover:bg-blue-50 h-11 text-base font-medium"
             onClick={() => setIsVitalsModalOpen(true)}
           >
             <FileText size={18} className="mr-2" /> Add Vitals & Notes
@@ -143,7 +143,7 @@ const PatientCard = ({
             <Button 
               key="mark-ready"
               variant="default" 
-              className="w-full flex justify-center items-center bg-emerald-600 hover:bg-emerald-700 text-white font-medium py-3 text-base"
+              className="w-full flex justify-center items-center bg-emerald-600 hover:bg-emerald-700 text-white h-11 text-base font-medium"
               onClick={() => onMarkReady(patient.id)}
             >
               <ClipboardCheck size={18} className="mr-2" /> Mark Ready for Doctor
@@ -151,7 +151,7 @@ const PatientCard = ({
             <Button 
               key="edit-vitals"
               variant="outline" 
-              className="w-full flex justify-center items-center border-orange-200 text-orange-700 hover:bg-orange-50 font-medium py-3 text-base"
+              className="w-full flex justify-center items-center border-orange-200 text-orange-700 hover:bg-orange-50 h-11 text-base font-medium"
               onClick={() => setIsVitalsModalOpen(true)}
             >
               <FileText size={18} className="mr-2" /> Edit Vitals & Notes
@@ -165,10 +165,10 @@ const PatientCard = ({
           <Button 
             key="delay"
             variant="destructive" 
-            className="w-full flex justify-center items-center py-3 text-base"
+            className="w-full flex justify-center items-center h-11 text-base font-medium"
             onClick={() => setIsDelayModalOpen(true)}
           >
-            <AlertCircle size={16} className="mr-2" /> Delay Patient
+            <AlertCircle size={18} className="mr-2" /> Delay Patient
           </Button>
         );
       } else {
@@ -177,30 +177,30 @@ const PatientCard = ({
             <Button 
               key="update-delay"
               variant="destructive" 
-              className="w-full flex justify-center items-center py-3 text-base"
+              className="w-full flex justify-center items-center h-11 text-base font-medium"
               onClick={() => setIsDelayModalOpen(true)}
             >
-              <AlertCircle size={16} className="mr-2" /> Update Delay Reason
+              <AlertCircle size={18} className="mr-2" /> Update Delay Reason
             </Button>
             <Button 
               key="remove-delay"
               variant="outline" 
-              className="w-full flex justify-center items-center border-green-200 text-green-700 hover:bg-green-50 py-3 text-base"
+              className="w-full flex justify-center items-center border-green-200 text-green-700 hover:bg-green-50 h-11 text-base font-medium"
               onClick={() => onRemoveDelay?.(patient.id)}
             >
-              <Check size={16} className="mr-2" /> Remove Delay
+              <Check size={18} className="mr-2" /> Remove Delay
             </Button>
           </>
         );
       }
     } else if (userRole === 'doctor') {
       // Doctor-specific buttons
-      if (patient.status === 'ready') {
+      if (patient.status === 'ready' || patient.status === 'delayed') {
         buttons.unshift(
           <Button 
             key="start-consultation"
             variant="default" 
-            className="w-full flex justify-center items-center bg-blue-600 hover:bg-blue-700 text-white font-medium py-3 text-base"
+            className="w-full flex justify-center items-center bg-blue-600 hover:bg-blue-700 text-white h-11 text-base font-medium"
             onClick={() => onStartConsultation?.(patient.id)}
           >
             <User size={18} className="mr-2" /> Start Consultation
@@ -213,7 +213,7 @@ const PatientCard = ({
           <Button 
             key="complete-visit"
             variant="default" 
-            className="w-full flex justify-center items-center bg-green-600 hover:bg-green-700 text-white font-medium py-3 text-base"
+            className="w-full flex justify-center items-center bg-green-600 hover:bg-green-700 text-white h-11 text-base font-medium"
             onClick={() => onCompleteVisit?.(patient.id)}
           >
             <ClipboardCheck size={18} className="mr-2" /> Complete Visit
@@ -226,103 +226,89 @@ const PatientCard = ({
   };
 
   return (
-    <Card className="overflow-hidden shadow-lg w-[400px] min-h-[420px] flex flex-col mx-auto border-2 border-gray-200 hover:border-gray-300 hover:shadow-xl transition-all duration-200">
-      <div className="flex items-center p-4 border-b">
-        <div className={`w-12 h-12 rounded-full flex items-center justify-center text-white text-lg font-bold 
-          ${patient.avatarColor || 'bg-blue-500'}`}>
-          {patient.initials || patient.name.split(' ').map(n => n[0]).join('').toUpperCase()}
-        </div>
-        <div className="ml-3 flex-1">
-          <div className="flex justify-between items-start">
-            <h3 className="text-xl font-bold">{patient.name}</h3>
-            <div className="text-base text-gray-400">ID: {patient.id}</div>
-          </div>
-          <div className="flex items-center justify-between mt-1">
-            <div className="flex items-center text-base text-gray-500">
-              {patient.age && (
-                <span className="mr-3">{patient.age} years</span>
-              )}
-              {patient.gender && (
-                <span>{patient.gender}</span>
+    <Card className="overflow-hidden hover:shadow-lg transition-shadow duration-200">
+      <div className="p-5 md:p-6 flex flex-col h-full">
+        {/* Header section */}
+        <div className="flex items-start justify-between mb-4">
+          <div className="flex-1 min-w-0">
+            <h3 className="text-xl font-semibold text-gray-900 truncate mb-2">
+              {patient.name}
+            </h3>
+            <div className="flex flex-wrap gap-2 items-center mb-2">
+              <Badge variant="outline" className="text-sm">
+                <Clock size={14} className="mr-1" />
+                {patient.appointmentTime}
+              </Badge>
+              {patient.urgency && (
+                <Badge className={urgencyColors[patient.urgency]}>
+                  {patient.urgency}
+                </Badge>
               )}
             </div>
-            {patient.urgency && (
-              <Badge className={`${urgencyColors[patient.urgency]} text-base px-3 py-1`}>
-                {patient.urgency}
+            <div className="mb-2">
+              <Badge 
+                className={`${statusColors[patient.status]} text-base px-3 py-1 font-medium`}
+              >
+                {getStatusText(patient.status)}
               </Badge>
-            )}
+            </div>
           </div>
         </div>
-      </div>
-      
-      <div className="flex justify-between items-center p-4 bg-gray-50">
-        <div className="flex items-center text-base">
-          <Clock size={18} className="mr-2 text-gray-500" />
-          <span>Appointment:</span>
-        </div>
-        <span className="font-medium text-base">{patient.appointmentTime}</span>
-      </div>
-      
-      <div className="flex justify-between items-center px-4 py-3">
-        <div className="text-base">Status:</div>
-        <div className="flex space-x-2">
-          <Badge className={`${statusColors[patient.status]} text-base px-4 py-1`}>
-            {getStatusText(patient.status)}
-          </Badge>
-        </div>
-      </div>
-      
-      {patient.delayReason && (
-        <div className="px-3 py-2 bg-red-50 text-xs text-red-700">
-          <strong>Delay Reason:</strong> {patient.delayReason}
-        </div>
-      )}
-      
-      {patient.vitals && patient.vitalsRecorded && (
-        <div className="p-4 border-t">
-          <h4 className="text-base font-medium mb-3 text-gray-700">Vitals:</h4>
-          <div className="grid grid-cols-2 gap-y-3 gap-x-4 text-sm">
-            {patient.vitals.bp && (
-              <div className="flex items-center">
-                <Activity size={16} className="mr-2 text-gray-500" />
-                <span className="text-gray-600 mr-2">BP:</span>
-                <span className="font-medium">{patient.vitals.bp}</span>
-              </div>
-            )}
-            {patient.vitals.heartRate && (
-              <div className="flex items-center">
-                <Heart size={16} className="mr-2 text-gray-500" />
-                <span className="text-gray-600 mr-2">BPM:</span>
-                <span className="font-medium">{patient.vitals.heartRate}</span>
-              </div>
-            )}
-            {patient.vitals.weight && (
-              <div className="flex items-center">
-                <Scale size={16} className="mr-2 text-gray-500" />
-                <span className="text-gray-600 mr-2">Weight:</span>
-                <span className="font-medium">{patient.vitals.weight} kg</span>
-              </div>
-            )}
-            {patient.vitals.temp && (
-              <div className="flex items-center">
-                <ThermometerSnowflake size={16} className="mr-2 text-gray-500" />
-                <span className="text-gray-600 mr-2">Temp:</span>
-                <span className="font-medium">{patient.vitals.temp} °F</span>
-              </div>
-            )}
-          </div>
-        </div>
-      )}
-      
-      {patient.notes && (
-        <div className="px-4 py-3 bg-gray-50 text-sm text-gray-700 border-t">
-          <strong>Notes:</strong> {patient.notes}
-        </div>
-      )}
 
-      {/* Action buttons section */}
-      <div className="mt-auto p-4 border-t flex flex-col space-y-3 bg-white">
-        {getActionButtons()}
+        {/* Patient info grid */}
+        <div className="grid grid-cols-2 gap-y-3 gap-x-4 text-base mb-4">
+          <div className="flex items-center text-gray-600">
+            <User size={18} className="mr-2" />
+            <span>{`${patient.age} years, ${patient.gender}`}</span>
+          </div>
+          <div className="flex items-center text-gray-600">
+            <Heart size={18} className="mr-2" />
+            <span>{patient.vitals?.heartRate || '-'} bpm</span>
+          </div>
+          <div className="flex items-center text-gray-600">
+            <Activity size={18} className="mr-2" />
+            <span>{patient.vitals?.bp || '-'}</span>
+          </div>
+          <div className="flex items-center text-gray-600">
+            <ThermometerSnowflake size={18} className="mr-2" />
+            <span>{patient.vitals?.temp ? `${patient.vitals.temp}°F` : '-'}</span>
+          </div>
+          <div className="flex items-center text-gray-600">
+            <Scale size={18} className="mr-2" />
+            <span>{patient.vitals?.weight ? `${patient.vitals.weight} kg` : '-'}</span>
+          </div>
+        </div>
+
+        {/* Show delay reason if patient is delayed */}
+        {patient.status === 'delayed' && patient.delayReason && (
+          <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded-lg">
+            <div className="flex items-start">
+              <AlertCircle size={16} className="text-red-600 mr-2 mt-0.5 flex-shrink-0" />
+              <div>
+                <div className="text-sm font-medium text-red-800 mb-1">Delay Reason:</div>
+                <div className="text-sm text-red-700">{patient.delayReason}</div>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Show clinical notes if available */}
+        {patient.notes && (
+          <div className="mb-4 p-3 bg-blue-50 border border-blue-200 rounded-lg">
+            <div className="flex items-start">
+              <FileText size={16} className="text-blue-600 mr-2 mt-0.5 flex-shrink-0" />
+              <div>
+                <div className="text-sm font-medium text-blue-800 mb-1">Clinical Notes:</div>
+                <div className="text-sm text-blue-700">{patient.notes}</div>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Action buttons */}
+        <div className="flex flex-wrap gap-3 mt-auto pt-4">
+          {getActionButtons()}
+        </div>
       </div>
 
       {/* Nurse-only modals */}
@@ -439,23 +425,39 @@ const PatientCard = ({
           <Dialog
             isOpen={isDelayModalOpen}
             onClose={() => setIsDelayModalOpen(false)}
-            title="Delay Patient"
+            title={patient.status === 'delayed' ? 'Update Delay Reason' : 'Delay Patient'}
           >
             <div className="space-y-4">
-              <Input
-                placeholder="Enter delay reason..."
-                value={delayReason}
-                onChange={(e) => setDelayReason(e.target.value)}
-              />
-              <div className="flex space-x-2">
-                <Button variant="outline" onClick={() => setIsDelayModalOpen(false)}>
+              <div>
+                <label className="block text-sm font-medium mb-2 text-gray-700">
+                  {patient.status === 'delayed' ? 'Update delay reason:' : 'Reason for delay:'}
+                </label>
+                <textarea
+                  placeholder="Enter reason for delaying this patient..."
+                  value={delayReason}
+                  onChange={(e) => setDelayReason(e.target.value)}
+                  className="w-full p-3 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent min-h-[100px] resize-none"
+                />
+              </div>
+              <div className="flex space-x-2 pt-4 border-t">
+                <Button variant="outline" onClick={() => {
+                  setIsDelayModalOpen(false);
+                  setDelayReason('');
+                }}>
                   Cancel
                 </Button>
-                <Button variant="destructive" onClick={() => {
-                  onDelayPatient(patient.id, delayReason);
-                  setIsDelayModalOpen(false);
-                }}>
-                  Confirm Delay
+                <Button 
+                  variant="destructive" 
+                  onClick={() => {
+                    if (delayReason.trim()) {
+                      onDelayPatient(patient.id, delayReason.trim());
+                      setIsDelayModalOpen(false);
+                      setDelayReason('');
+                    }
+                  }}
+                  disabled={!delayReason.trim()}
+                >
+                  {patient.status === 'delayed' ? 'Update Delay' : 'Confirm Delay'}
                 </Button>
               </div>
             </div>

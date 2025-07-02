@@ -86,6 +86,24 @@ const DoctorDashboard = () => {
       },
       vitalsRecorded: true,
       urgency: 'Priority'
+    },
+    {
+      id: '5',
+      name: 'Michael Brown',
+      age: 40,
+      gender: 'Male',
+      appointmentTime: '11:00 AM',
+      status: 'delayed',
+      delayReason: 'Waiting for lab results before consultation',
+      vitals: {
+        bp: '130/85',
+        temp: '99.1',
+        weight: '75',
+        heartRate: '80'
+      },
+      vitalsRecorded: true,
+      urgency: 'Priority',
+      notes: 'Patient shows elevated temperature, possible infection'
     }
     // Add more dummy patients as needed
   ]);
@@ -94,7 +112,7 @@ const DoctorDashboard = () => {
   const filteredPatients = patients.filter(patient => {
     const matchesSearch = patient.name.toLowerCase().includes(searchQuery.toLowerCase());
     const matchesTab = (
-      (selectedTab === 'waiting' && patient.status === 'ready') ||
+      (selectedTab === 'waiting' && (patient.status === 'ready' || patient.status === 'delayed')) ||
       (selectedTab === 'in_progress' && patient.status === 'seeing_doctor') ||
       (selectedTab === 'completed' && patient.status === 'completed')
     );
@@ -133,21 +151,21 @@ const DoctorDashboard = () => {
         {/* Patient Stats */}
         <PatientStats patients={patients} userRole="doctor" />
 
-        {/* Search and quick actions */}
-        <div className="flex gap-2">
-          <div className="relative flex-1">
-            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" size={18} />
+        {/* Search and actions bar */}
+        <div className="flex gap-4 items-center">
+          <div className="relative flex-1 max-w-md">
+            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" size={20} />
             <Input 
               type="search" 
               placeholder="Search by patient name..." 
-              className="pl-10" 
+              className="pl-10 h-12 text-base" 
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
             />
           </div>
-          <div className="min-w-[180px]">
+          <div className="min-w-[200px]">
             <select 
-              className="h-10 px-4 py-2 rounded-md border border-gray-200 focus:outline-none focus:ring-2 focus:ring-blue-500 w-full"
+              className="h-12 px-4 py-2 text-base rounded-md border border-gray-200 focus:outline-none focus:ring-2 focus:ring-blue-500 w-full"
               value={timeFilter}
               onChange={(e) => setTimeFilter(e.target.value)}
             >
@@ -156,24 +174,16 @@ const DoctorDashboard = () => {
               <option value="afternoon">Afternoon (PM)</option>
             </select>
           </div>
-          <Button 
-            variant="outline"
-            className="flex items-center space-x-2 border-blue-200 text-blue-700 hover:bg-blue-50"
-            onClick={() => navigate('/doctor/patient-record')}
-          >
-            <FileText size={16} />
-            <span>Patient EMR</span>
-          </Button>
         </div>
 
         {/* Patient tabs and cards */}
-        <Card className="p-6">
+        <Card className="p-8">
           <Tabs 
             value={selectedTab} 
             onValueChange={setSelectedTab}
             className="w-full"
           >
-            <TabsList className="grid grid-cols-3 w-full mb-6">
+            <TabsList className="grid grid-cols-3 w-full max-w-lg mx-auto mb-8 h-12">
               <TabsTrigger value="waiting" className="text-base py-3">
                 <UserCheck className="w-5 h-5 mr-2" />
                 Waiting
@@ -188,8 +198,8 @@ const DoctorDashboard = () => {
               </TabsTrigger>
             </TabsList>
 
-            <TabsContent value="waiting" className="space-y-6">
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+            <TabsContent value="waiting" className="mt-0">
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5 gap-6">
                 {filteredPatients.map(patient => (
                   <PatientCard
                     key={patient.id}
@@ -203,15 +213,15 @@ const DoctorDashboard = () => {
                   />
                 ))}
                 {filteredPatients.length === 0 && (
-                  <div className="col-span-full text-center py-10 text-gray-500">
+                  <div className="col-span-full text-center py-12 text-gray-500 text-lg">
                     No patients waiting for consultation.
                   </div>
                 )}
               </div>
             </TabsContent>
 
-            <TabsContent value="in_progress" className="space-y-6">
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+            <TabsContent value="in_progress" className="mt-0">
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5 gap-6">
                 {filteredPatients.map(patient => (
                   <PatientCard
                     key={patient.id}
@@ -225,15 +235,15 @@ const DoctorDashboard = () => {
                   />
                 ))}
                 {filteredPatients.length === 0 && (
-                  <div className="col-span-full text-center py-10 text-gray-500">
+                  <div className="col-span-full text-center py-12 text-gray-500 text-lg">
                     No patients currently in consultation.
                   </div>
                 )}
               </div>
             </TabsContent>
 
-            <TabsContent value="completed" className="space-y-6">
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+            <TabsContent value="completed" className="mt-0">
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5 gap-6">
                 {filteredPatients.map(patient => (
                   <PatientCard
                     key={patient.id}
@@ -247,7 +257,7 @@ const DoctorDashboard = () => {
                   />
                 ))}
                 {filteredPatients.length === 0 && (
-                  <div className="col-span-full text-center py-10 text-gray-500">
+                  <div className="col-span-full text-center py-12 text-gray-500 text-lg">
                     No completed consultations today.
                   </div>
                 )}

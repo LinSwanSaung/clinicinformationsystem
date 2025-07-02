@@ -2,13 +2,15 @@ import React, { useState } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import PageLayout from '../../components/PageLayout';
 import { Card } from '../../components/ui/card';
+import { Button } from '../../components/ui/button';
 import { 
   User,
   Activity,
   Calendar,
   FileText,
   ChevronDown,
-  ChevronRight
+  ChevronRight,
+  ArrowLeft
 } from 'lucide-react';
 
 // Import our new reusable components
@@ -80,7 +82,8 @@ const ElectronicMedicalRecords = () => {
   };
 
   const handleBackToSearch = () => {
-    navigate('/nurse/dashboard');
+    setSelectedPatient(null);
+    setActiveTab('overview');
   };
 
   // Medical action handlers (these would integrate with your backend)
@@ -260,13 +263,27 @@ const ElectronicMedicalRecords = () => {
 
   return (
     <PageLayout title="Electronic Medical Records" subtitle="Patient medical record management system" fullWidth={true}>
-      <div className="space-y-4 w-full">
+      <div className="space-y-6 w-full">
         {/* Patient Search */}
         {!selectedPatient && (
-          <PatientSearchInterface 
-            patients={nursePatientsData}
-            onPatientSelect={handlePatientSelect}
-          />
+          <div className="space-y-4">
+            {/* Back to Dashboard Button */}
+            <div className="flex justify-start">
+              <Button
+                variant="outline"
+                onClick={() => navigate('/nurse/dashboard')}
+                className="flex items-center space-x-2 h-12 px-6 text-base"
+              >
+                <ArrowLeft size={18} />
+                <span>Back to Dashboard</span>
+              </Button>
+            </div>
+            
+            <PatientSearchInterface 
+              patients={nursePatientsData}
+              onPatientSelect={handlePatientSelect}
+            />
+          </div>
         )}
 
         {/* Patient EMR Display */}

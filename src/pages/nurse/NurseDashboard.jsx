@@ -92,21 +92,21 @@ const NurseDashboard = () => {
         {/* Patient Stats */}
         <PatientStats patients={patients} userRole="nurse" />
 
-        {/* Search bar */}
-        <div className="flex gap-2">
-          <div className="relative flex-1">
-            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" size={18} />
+        {/* Search and actions bar */}
+        <div className="flex gap-4 items-center">
+          <div className="relative flex-1 max-w-md">
+            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" size={20} />
             <Input 
               type="search" 
               placeholder="Search by patient name..." 
-              className="pl-10" 
+              className="pl-10 h-12 text-base" 
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
             />
           </div>
-          <div className="min-w-[180px]">
+          <div className="min-w-[200px]">
             <select 
-              className="h-10 px-4 py-2 rounded-md border border-gray-200 focus:outline-none focus:ring-2 focus:ring-emerald-500 w-full"
+              className="h-12 px-4 py-2 text-base rounded-md border border-gray-200 focus:outline-none focus:ring-2 focus:ring-emerald-500 w-full"
               value={timeFilter}
               onChange={(e) => setTimeFilter(e.target.value)}
             >
@@ -119,25 +119,25 @@ const NurseDashboard = () => {
           </div>
           <Button 
             variant="outline"
-            className="flex items-center space-x-2 border-emerald-200 text-emerald-700 hover:bg-emerald-50"
+            className="flex items-center space-x-2 border-emerald-200 text-emerald-700 hover:bg-emerald-50 h-12 px-6 text-base"
             onClick={() => navigate('/nurse/emr')}
           >
-            <FileText size={16} />
+            <FileText size={18} />
             <span>Patient EMR</span>
           </Button>
         </div>
 
         {/* Patient tabs and cards */}
         <Tabs defaultValue="waiting" className="w-full">
-          <TabsList className="grid w-full grid-cols-3 mb-4">
-            <TabsTrigger value="waiting">Appointed Patients</TabsTrigger>
-            <TabsTrigger value="ready">Ready for Doctor</TabsTrigger>
-            <TabsTrigger value="seeing">Seeing Doctor</TabsTrigger>
+          <TabsList className="grid w-full grid-cols-3 max-w-lg mx-auto mb-6 h-12">
+            <TabsTrigger value="waiting" className="text-base">Waiting</TabsTrigger>
+            <TabsTrigger value="ready" className="text-base">Ready</TabsTrigger>
+            <TabsTrigger value="completed" className="text-base">Completed</TabsTrigger>
           </TabsList>
           
           {/* Waiting patients tab */}
           <TabsContent value="waiting" className="mt-0">
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5 gap-6">
               {waitingPatients.map(patient => (
                 <PatientCard 
                   key={patient.id} 
@@ -149,8 +149,8 @@ const NurseDashboard = () => {
                 />
               ))}
               {waitingPatients.length === 0 && (
-                <div className="col-span-3 text-center py-10">
-                  <p className="text-gray-500">No patients waiting</p>
+                <div className="col-span-full text-center py-12">
+                  <p className="text-gray-500 text-lg">No patients waiting</p>
                 </div>
               )}
             </div>
@@ -158,7 +158,7 @@ const NurseDashboard = () => {
           
           {/* Ready for doctor tab */}
           <TabsContent value="ready" className="mt-0">
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5 gap-6">
               {readyPatients.map(patient => (
                 <PatientCard 
                   key={patient.id} 
@@ -171,16 +171,16 @@ const NurseDashboard = () => {
                 />
               ))}
               {readyPatients.length === 0 && (
-                <div className="col-span-3 text-center py-10">
-                  <p className="text-gray-500">No patients ready for doctor</p>
+                <div className="col-span-full text-center py-12">
+                  <p className="text-gray-500 text-lg">No patients ready for doctor</p>
                 </div>
               )}
             </div>
           </TabsContent>
           
-          {/* Seeing doctor tab */}
-          <TabsContent value="seeing" className="mt-0">
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+          {/* Completed tab */}
+          <TabsContent value="completed" className="mt-0">
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5 gap-6">
               {seeingDoctorPatients.map(patient => (
                 <PatientCard 
                   key={patient.id} 
@@ -190,8 +190,8 @@ const NurseDashboard = () => {
                 />
               ))}
               {seeingDoctorPatients.length === 0 && (
-                <div className="col-span-3 text-center py-10">
-                  <p className="text-gray-500">No patients currently seeing doctor</p>
+                <div className="col-span-full text-center py-12">
+                  <p className="text-gray-500 text-lg">No patients currently seeing doctor</p>
                 </div>
               )}
             </div>

@@ -66,22 +66,39 @@ async function runMigrations() {
       throw new Error('Database connection failed');
     }
     
-    console.log('📋 Simple Database Setup Instructions:');
-    console.log('=====================================');
+    console.log('📋 Please run the schema manually in Supabase SQL Editor:');
     console.log('1. Go to your Supabase Dashboard');
     console.log('2. Navigate to SQL Editor');
     console.log('3. Copy and paste the contents of backend/database/schema.sql');
     console.log('4. Click "Run"');
-    console.log('');
-    console.log('📄 Schema file location: backend/database/schema.sql');
-    console.log('');
-    console.log('✅ This single file contains:');
-    console.log('   • All database tables');
-    console.log('   • Security policies');
-    console.log('   • Sample admin user');
-    console.log('   • Indexes and triggers');
-    console.log('');
-    console.log('💡 After running the SQL, test with: npm run db:test');
+    console.log('\nOr copy the individual migration files from backend/database/migrations/\n');
+    
+    // List available migration files
+    try {
+      const migrationsDir = join(__dirname, 'migrations');
+      const files = await fs.readdir(migrationsDir);
+      const migrationFiles = files.filter(file => file.endsWith('.sql')).sort();
+      
+      console.log('📋 Available migration files:');
+      migrationFiles.forEach((file, index) => {
+        console.log(`  ${index + 1}. ${file}`);
+      });
+      
+      console.log('\n📋 Available seed files:');
+      const seedsDir = join(__dirname, 'seeds');
+      const seedFiles = await fs.readdir(seedsDir);
+      const sqlSeedFiles = seedFiles.filter(file => file.endsWith('.sql')).sort();
+      
+      sqlSeedFiles.forEach((file, index) => {
+        console.log(`  ${index + 1}. ${file}`);
+      });
+      
+    } catch (err) {
+      console.log('No migration files found in migrations directory');
+    }
+    
+    console.log('\n✅ Migration setup completed!');
+    console.log('💡 After running the SQL in Supabase, you can test with: npm run db:test');
     
   } catch (error) {
     console.error('\n❌ Migration failed:', error.message);

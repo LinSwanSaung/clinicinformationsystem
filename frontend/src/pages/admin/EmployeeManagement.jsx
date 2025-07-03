@@ -17,14 +17,36 @@ import {
   Calendar,
   Clock
 } from 'lucide-react';
-import { dummyEmployees, roles } from '../../data/dummyData';
+import employeeService from '../../services/employeeService';
 
 const EmployeeManagement = () => {
   const navigate = useNavigate();
-  const [employees, setEmployees] = useState(dummyEmployees);
+  const [employees, setEmployees] = useState([]);
+  const [roles, setRoles] = useState([]);
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedRole, setSelectedRole] = useState('all');
   const [showAddForm, setShowAddForm] = useState(false);
+  const [isLoading, setIsLoading] = useState(true);
+
+  useEffect(() => {
+    const loadData = async () => {
+      try {
+        setIsLoading(true);
+        const [employeesData, rolesData] = await Promise.all([
+          employeeService.getAllEmployees(),
+          employeeService.getRoles()
+        ]);
+        setEmployees(employeesData);
+        setRoles(rolesData);
+        setIsLoading(false);
+      } catch (error) {
+        console.error('Error loading data:', error);
+        setIsLoading(false);
+      }
+    };
+
+    loadData();
+  }, []);
 
   // Filter employees based on search and role
   const filteredEmployees = employees.filter(employee => {
@@ -35,16 +57,29 @@ const EmployeeManagement = () => {
     return matchesSearch && matchesRole;
   });
 
-  const handleDeleteEmployee = (id) => {
+  const handleDeleteEmployee = async (id) => {
     if (confirm('Are you sure you want to delete this employee?')) {
-      setEmployees(employees.filter(emp => emp.id !== id));
+      try {
+        await employeeService.deleteEmployee(id);
+        setEmployees(employees.filter(emp => emp.id !== id));
+      } catch (error) {
+        console.error('Error deleting employee:', error);
+      }
     }
   };
 
-  const handleToggleActive = (id) => {
-    setEmployees(employees.map(emp => 
-      emp.id === id ? { ...emp, isActive: !emp.isActive } : emp
-    ));
+  const handleToggleActive = async (id) => {
+    try {
+      const employee = employees.find(emp => emp.id === id);
+      const updatedEmployee = await employeeService.updateEmployee(id, { 
+        isActive: !employee.isActive 
+      });
+      setEmployees(employees.map(emp => 
+        emp.id === id ? updatedEmployee : emp
+      ));
+    } catch (error) {
+      console.error('Error updating employee:', error);
+    }
   };
 
   const AddEmployeeForm = () => {

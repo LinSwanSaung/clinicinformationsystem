@@ -36,12 +36,11 @@ import {
 } from '@/components/ui/select';
 import { Textarea } from '@/components/ui/textarea';
 import { 
-  dummyPatients, 
-  doctorSchedules, 
+  patients as dummyPatients, 
   appointments,
-  getAvailableDoctors 
-} from '@/data/dummyReceptionistData';
-import { doctors } from '@/data/dummyDoctorsData';
+  doctors
+} from '@/data/mockData';
+import doctorService from '@/services/doctorService';
 import Alert from '@/components/Alert';
 import PageLayout from '@/components/PageLayout';
 
@@ -52,7 +51,8 @@ const AppointmentsPage = () => {
   const [searchTerm, setSearchTerm] = useState('');
   const [showNewAppointment, setShowNewAppointment] = useState(false);
   const [showAlert, setShowAlert] = useState(false);
-  const [availableDoctors, setAvailableDoctors] = useState(doctors.filter(d => d.status === 'available'));
+  const [availableDoctors, setAvailableDoctors] = useState([]);
+  const [isLoading, setIsLoading] = useState(true);
   const [newAppointment, setNewAppointment] = useState({
     patientId: location.state?.patient?.id || '',
     doctorId: location.state?.doctor?.id || '',
@@ -75,6 +75,22 @@ const AppointmentsPage = () => {
       }));
     }
   }, [location.state]);
+
+  useEffect(() => {
+    const loadAvailableDoctors = async () => {
+      try {
+        setIsLoading(true);
+        const doctors = await doctorService.getAvailableDoctors();
+        setAvailableDoctors(doctors);
+      } catch (error) {
+        console.error('Failed to load available doctors:', error);
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    loadAvailableDoctors();
+  }, []);
 
   // Filter appointments based on date and search term
   const filteredAppointments = appointments.filter(appointment => {

@@ -12,11 +12,9 @@ import {
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { doctors } from '@/data/dummyDoctorsData';
-import { 
-  dummyPatients, 
-  appointments 
-} from '@/data/dummyReceptionistData';
+import doctorService from '@/services/doctorService';
+import { patientService } from '@/services/patientService';
+import { appointments } from '@/data/mockData';
 import { useAuth } from '@/contexts/AuthContext';
 import PageLayout from '@/components/PageLayout';
 
@@ -32,24 +30,29 @@ const ReceptionistDashboard = () => {
   });
 
   useEffect(() => {
-    const loadDashboardData = () => {
+    const loadDashboardData = async () => {
       try {
+        setIsLoading(true);
+        
         // Get today's appointments
         const today = new Date().toDateString();
         const todayAppts = appointments.filter(
           app => new Date(app.date).toDateString() === today
         ).length;
 
-        // Get available doctors
-        const availDoctors = doctors.filter(doc => doc.status === 'available');
+        // Get available doctors and patients
+        const [doctorsResponse, patientsResponse] = await Promise.all([
+          doctorService.getAvailableDoctors(),
+          patientService.getAllPatients()
+        ]);
         
         setStats({
           todayAppointments: todayAppts,
-          availableDoctorCount: availDoctors.length,
-          totalPatients: dummyPatients.length
+          availableDoctorCount: doctorsResponse.length,
+          totalPatients: patientsResponse.length
         });
         
-        setAvailableDoctors(availDoctors);
+        setAvailableDoctors(doctorsResponse);
         setIsLoading(false);
       } catch (error) {
         console.error('Error loading dashboard data:', error);

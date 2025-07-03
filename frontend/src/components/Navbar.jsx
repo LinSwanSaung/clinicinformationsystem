@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
 import { Button } from '@/components/ui/button';
@@ -10,7 +10,7 @@ import {
   ChevronDown,
   Heart
 } from 'lucide-react';
-import { dummyEmployees } from '@/data/dummyData';
+import employeeService from '@/services/employeeService';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -24,11 +24,25 @@ const Navbar = () => {
   const { user, logout } = useAuth();
   const navigate = useNavigate();
   const [showNotifications, setShowNotifications] = useState(false);
+  const [userDetails, setUserDetails] = useState(null);
 
-  // Find user details from dummy data
-  const userDetails = dummyEmployees.find(
-    emp => emp.role === user?.role && emp.email.includes(user?.role.toLowerCase())
-  );
+  useEffect(() => {
+    const loadUserDetails = async () => {
+      if (user?.role) {
+        try {
+          const employees = await employeeService.getEmployeesByRole(user.role);
+          const userDetail = employees.find(
+            emp => emp.email.includes(user?.role.toLowerCase())
+          );
+          setUserDetails(userDetail);
+        } catch (error) {
+          console.error('Error loading user details:', error);
+        }
+      }
+    };
+
+    loadUserDetails();
+  }, [user]);
 
   const handleLogout = () => {
     logout();

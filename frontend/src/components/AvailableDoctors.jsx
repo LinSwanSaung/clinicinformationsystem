@@ -1,8 +1,30 @@
 import { Star, Clock, Users } from 'lucide-react';
-import { doctors } from '../data/dummyDoctorsData';
+import { useState, useEffect } from 'react';
+import doctorService from '../services/doctorService';
 
 export default function AvailableDoctors({ onAppointDoctor }) {
-  const availableDoctors = doctors.filter(doctor => doctor.status === 'available');
+  const [availableDoctors, setAvailableDoctors] = useState([]);
+  const [isLoading, setIsLoading] = useState(true);
+
+  useEffect(() => {
+    const loadAvailableDoctors = async () => {
+      try {
+        setIsLoading(true);
+        const doctors = await doctorService.getAvailableDoctors();
+        setAvailableDoctors(doctors);
+        setIsLoading(false);
+      } catch (error) {
+        console.error('Error loading available doctors:', error);
+        setIsLoading(false);
+      }
+    };
+
+    loadAvailableDoctors();
+  }, []);
+
+  if (isLoading) {
+    return <div className="p-4">Loading available doctors...</div>;
+  }
 
   return (
     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 p-4">

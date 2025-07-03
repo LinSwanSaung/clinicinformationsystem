@@ -21,7 +21,7 @@ import PatientVitalsDisplay from '../../components/medical/PatientVitalsDisplay'
 import MedicalInformationPanel from '../../components/medical/MedicalInformationPanel';
 import ClinicalNotesDisplay from '../../components/medical/ClinicalNotesDisplay';
 import PatientDocumentManager from '../../components/medical/PatientDocumentManager';
-import { nursePatientsData } from '../../data/dummyNurseData';
+import { patientService } from '../../services/patientService';
 
 const ElectronicMedicalRecords = () => {
   const location = useLocation();

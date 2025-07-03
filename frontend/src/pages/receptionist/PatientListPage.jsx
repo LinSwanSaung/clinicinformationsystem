@@ -1,23 +1,42 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Search, Plus, UserCircle, Calendar, FileText } from "lucide-react";
-import { dummyPatients } from "@/data/dummyReceptionistData";
+import { patientService } from "@/services/patientService";
 import { Link, useNavigate } from "react-router-dom";
 import PageLayout from "@/components/PageLayout";
 
 export default function PatientListPage() {
   const [searchTerm, setSearchTerm] = useState("");
-  const [filteredPatients, setFilteredPatients] = useState(dummyPatients);
+  const [filteredPatients, setFilteredPatients] = useState([]);
+  const [allPatients, setAllPatients] = useState([]);
+  const [isLoading, setIsLoading] = useState(true);
   const navigate = useNavigate();
+
+  useEffect(() => {
+    const loadPatients = async () => {
+      try {
+        setIsLoading(true);
+        const patients = await patientService.getAllPatients();
+        setAllPatients(patients);
+        setFilteredPatients(patients);
+        setIsLoading(false);
+      } catch (error) {
+        console.error('Error loading patients:', error);
+        setIsLoading(false);
+      }
+    };
+
+    loadPatients();
+  }, []);
 
   const handleSearch = (e) => {
     const term = e.target.value.toLowerCase();
     setSearchTerm(term);
     
-    const filtered = dummyPatients.filter(
+    const filtered = allPatients.filter(
       (patient) =>
         patient.name.toLowerCase().includes(term) ||
         patient.id.toLowerCase().includes(term) ||

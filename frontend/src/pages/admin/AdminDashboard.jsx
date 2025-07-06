@@ -59,19 +59,19 @@ const AdminDashboard = () => {
       title: "Department Overview",
       description: "View and manage departments",
       icon: BarChart3,
-      action: () => console.log("Department Overview")
+      action: () => {} // TODO: Implement department management
     },
     {
       title: "Patient Statistics",
       description: "View patient visit analytics",
       icon: FileText,
-      action: () => console.log("Patient Statistics")
+      action: () => {} // TODO: Implement analytics
     },
     {
       title: "Doctor Schedules",
       description: "Manage doctor availability",
       icon: Stethoscope,
-      action: () => console.log("Doctor Schedules")
+      action: () => {} // TODO: Implement schedule management
     }
   ];
 

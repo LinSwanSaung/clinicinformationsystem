@@ -8,6 +8,7 @@ import ReceptionistDashboard from './pages/receptionist/ReceptionistDashboard';
 import RegisterPatient from './pages/receptionist/RegisterPatient';
 import AppointmentsPage from './pages/receptionist/AppointmentsPage';
 import PatientListPage from './pages/receptionist/PatientListPage';
+import PatientDetailPage from './pages/receptionist/PatientDetailPage';
 import NurseDashboard from './pages/nurse/NurseDashboard';
 import ElectronicMedicalRecords from './pages/nurse/ElectronicMedicalRecords';
 import DoctorDashboard from './pages/doctor/DoctorDashboard';
@@ -24,11 +25,11 @@ const ProtectedRoute = ({ children, allowedRoles = [] }) => {
   
   if (allowedRoles.length > 0 && !allowedRoles.includes(user.role)) {
     // Redirect based on user role
-    if (user.role === 'Admin') {
+    if (user.role === 'admin') {
       return <Navigate to="/admin/dashboard" replace />;
-    } else if (user.role === 'Receptionist') {
+    } else if (user.role === 'receptionist') {
       return <Navigate to="/receptionist/dashboard" replace />;
-    } else if (user.role === 'Nurse') {
+    } else if (user.role === 'nurse') {
       return <Navigate to="/nurse/dashboard" replace />;
     } else {
       return <Navigate to="/" replace />;
@@ -44,13 +45,13 @@ const PublicRoute = ({ children }) => {
   
   if (user) {
     // Redirect based on user role
-    if (user.role === 'Admin') {
+    if (user.role === 'admin') {
       return <Navigate to="/admin/dashboard" replace />;
-    } else if (user.role === 'Receptionist') {
+    } else if (user.role === 'receptionist') {
       return <Navigate to="/receptionist/dashboard" replace />;
-    } else if (user.role === 'Nurse') {
+    } else if (user.role === 'nurse') {
       return <Navigate to="/nurse/dashboard" replace />;
-    } else if (user.role === 'Doctor') {
+    } else if (user.role === 'doctor') {
       return <Navigate to="/doctor/dashboard" replace />;
     } else {
       return <Navigate to="/" replace />;
@@ -74,7 +75,7 @@ function AppRoutes() {
       <Route 
         path="/admin/dashboard" 
         element={
-          <ProtectedRoute allowedRoles={['Admin']}>
+          <ProtectedRoute allowedRoles={['admin']}>
             <AdminDashboard />
           </ProtectedRoute>
         } 
@@ -82,7 +83,7 @@ function AppRoutes() {
       <Route 
         path="/admin/employees" 
         element={
-          <ProtectedRoute allowedRoles={['Admin']}>
+          <ProtectedRoute allowedRoles={['admin']}>
             <EmployeeManagement />
           </ProtectedRoute>
         } 
@@ -92,7 +93,7 @@ function AppRoutes() {
       <Route 
         path="/receptionist/dashboard" 
         element={
-          <ProtectedRoute allowedRoles={['Receptionist']}>
+          <ProtectedRoute allowedRoles={['receptionist']}>
             <ReceptionistDashboard />
           </ProtectedRoute>
         } 
@@ -100,7 +101,7 @@ function AppRoutes() {
       <Route 
         path="/receptionist/register-patient" 
         element={
-          <ProtectedRoute allowedRoles={['Receptionist']}>
+          <ProtectedRoute allowedRoles={['receptionist']}>
             <RegisterPatient />
           </ProtectedRoute>
         } 
@@ -108,7 +109,7 @@ function AppRoutes() {
       <Route 
         path="/receptionist/appointments" 
         element={
-          <ProtectedRoute allowedRoles={['Receptionist']}>
+          <ProtectedRoute allowedRoles={['receptionist']}>
             <AppointmentsPage />
           </ProtectedRoute>
         } 
@@ -116,7 +117,7 @@ function AppRoutes() {
       <Route 
         path="/receptionist/patients" 
         element={
-          <ProtectedRoute allowedRoles={['Receptionist']}>
+          <ProtectedRoute allowedRoles={['receptionist']}>
             <PatientListPage />
           </ProtectedRoute>
         } 
@@ -126,7 +127,7 @@ function AppRoutes() {
       <Route 
         path="/nurse/dashboard" 
         element={
-          <ProtectedRoute allowedRoles={['Nurse']}>
+          <ProtectedRoute allowedRoles={['nurse']}>
             <NurseDashboard />
           </ProtectedRoute>
         } 
@@ -134,7 +135,7 @@ function AppRoutes() {
       <Route 
         path="/nurse/emr" 
         element={
-          <ProtectedRoute allowedRoles={['Nurse']}>
+          <ProtectedRoute allowedRoles={['nurse']}>
             <ElectronicMedicalRecords />
           </ProtectedRoute>
         } 
@@ -144,7 +145,7 @@ function AppRoutes() {
       <Route 
         path="/doctor/dashboard" 
         element={
-          <ProtectedRoute allowedRoles={['Doctor']}>
+          <ProtectedRoute allowedRoles={['doctor']}>
             <DoctorDashboard />
           </ProtectedRoute>
         } 
@@ -152,7 +153,7 @@ function AppRoutes() {
       <Route 
         path="/doctor/patient-record" 
         element={
-          <ProtectedRoute allowedRoles={['Doctor']}>
+          <ProtectedRoute allowedRoles={['doctor']}>
             <PatientMedicalRecord />
           </ProtectedRoute>
         } 
@@ -167,11 +168,11 @@ function AppRoutes() {
 function App() {
   return (
     <Router>
-      <AuthProvider>
-        <div className="App">
+      <div className="App">
+        <AuthProvider>
           <AppRoutes />
-        </div>
-      </AuthProvider>
+        </AuthProvider>
+      </div>
     </Router>
   );
 }

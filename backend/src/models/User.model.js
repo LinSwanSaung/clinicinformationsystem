@@ -52,6 +52,22 @@ export class UserModel extends BaseModel {
   }
 
   /**
+   * Override updateById to handle user-specific updates
+   * Removes sensitive fields and ensures proper validation
+   */
+  async updateById(id, data) {
+    try {
+      // Remove any fields that shouldn't be directly updated
+      const { password, password_hash, ...updateData } = data;
+      
+      // Call parent updateById method
+      return await super.updateById(id, updateData);
+    } catch (error) {
+      throw error;
+    }
+  }
+
+  /**
    * Get users by role
    */
   async findByRole(role, options = {}) {
@@ -101,6 +117,30 @@ export class UserModel extends BaseModel {
     }
 
     return data;
+  }
+
+  /**
+   * Update last login timestamp
+   */
+  async updateLastLogin(userId) {
+    const { error } = await this.supabase
+      .from(this.tableName)
+      .update({ 
+        last_login: new Date().toISOString(),
+        updated_at: new Date().toISOString()
+      })
+      .eq('id', userId);
+
+    if (error) {
+      throw error;
+    }
+  }
+
+  /**
+   * Soft delete user (deactivate instead of actual deletion)
+   */
+  async softDelete(userId) {
+    return this.updateById(userId, { is_active: false });
   }
 }
 

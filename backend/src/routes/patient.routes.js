@@ -13,31 +13,46 @@ const router = express.Router();
  */
 router.get('/',
   authenticate,
+  authorize('admin', 'receptionist', 'doctor', 'nurse'),
   asyncHandler(async (req, res) => {
-    const { page = 1, limit = 20, search, role } = req.query;
+    const { page = 1, limit = 100, search } = req.query;
     
     const options = {
       limit: Math.min(parseInt(limit), 100),
-      offset: (parseInt(page) - 1) * parseInt(limit)
+      offset: (parseInt(page) - 1) * parseInt(limit),
+      orderBy: 'created_at',
+      ascending: false // Show newest patients first
     };
 
-    let patients;
+    let result;
     
-    if (search) {
-      patients = await PatientService.searchPatients(search, options);
-    } else {
-      patients = await PatientService.getAllPatients(options);
-    }
-    
-    res.status(200).json({
-      success: true,
-      data: patients,
-      pagination: {
-        page: parseInt(page),
-        limit: parseInt(limit),
-        total: patients.length
+    try {
+      if (search) {
+        result = await PatientService.searchPatients(search, options);
+      } else {
+        result = await PatientService.getAllPatients(options);
       }
-    });
+      
+      // Ensure result is always an array
+      const patients = Array.isArray(result) ? result : [];
+      
+      res.status(200).json({
+        success: true,
+        data: patients,
+        total: patients.length,
+        pagination: {
+          page: parseInt(page),
+          limit: parseInt(limit),
+          total: patients.length
+        }
+      });
+    } catch (error) {
+      console.error('Error in GET /patients:', error);
+      res.status(error.status || 500).json({
+        success: false,
+        message: error.message || 'Failed to fetch patients'
+      });
+    }
   })
 );
 

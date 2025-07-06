@@ -1,5 +1,5 @@
 // API Base Configuration
-const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:3000/api';
+const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:3001/api';
 
 class ApiService {
   constructor() {
@@ -26,14 +26,19 @@ class ApiService {
     try {
       const response = await fetch(url, config);
       
-      if (!response.ok) {
-        throw new Error(`HTTP error! status: ${response.status}`);
+      let data;
+      try {
+        data = await response.json();
+      } catch (e) {
+        data = { message: response.statusText };
       }
 
-      const data = await response.json();
+      if (!response.ok) {
+        throw new Error(data.message || `HTTP error! status: ${response.status}`);
+      }
+
       return data;
     } catch (error) {
-      console.error('API Request failed:', error);
       throw error;
     }
   }
@@ -55,6 +60,14 @@ class ApiService {
   async put(endpoint, data) {
     return this.request(endpoint, {
       method: 'PUT',
+      body: JSON.stringify(data),
+    });
+  }
+
+  // PATCH request
+  async patch(endpoint, data) {
+    return this.request(endpoint, {
+      method: 'PATCH',
       body: JSON.stringify(data),
     });
   }

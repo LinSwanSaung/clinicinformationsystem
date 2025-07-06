@@ -12,9 +12,9 @@ import {
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import doctorService from '@/services/doctorService';
-import { patientService } from '@/services/patientService';
-import { appointments } from '@/data/mockData';
+import userService from '@/services/userService';
+import patientService from '@/services/patientService';
+import appointmentService from '@/services/appointmentService';
 import { useAuth } from '@/contexts/AuthContext';
 import PageLayout from '@/components/PageLayout';
 
@@ -34,25 +34,31 @@ const ReceptionistDashboard = () => {
       try {
         setIsLoading(true);
         
-        // Get today's appointments
-        const today = new Date().toDateString();
-        const todayAppts = appointments.filter(
-          app => new Date(app.date).toDateString() === today
-        ).length;
-
-        // Get available doctors and patients
-        const [doctorsResponse, patientsResponse] = await Promise.all([
-          doctorService.getAvailableDoctors(),
+        // Get all required data
+        const [appointmentsResponse, doctorsResponse, patientsResponse] = await Promise.all([
+          appointmentService.getAllAppointments(),
+          userService.getUsersByRole('doctor'),
           patientService.getAllPatients()
         ]);
-        
+
+        // Calculate today's appointments
+        const today = new Date().toDateString();
+        const todayAppts = appointmentsResponse.success 
+          ? appointmentsResponse.data.filter(
+              app => new Date(app.appointment_date).toDateString() === today
+            ).length 
+          : 0;
+
         setStats({
           todayAppointments: todayAppts,
-          availableDoctorCount: doctorsResponse.length,
-          totalPatients: patientsResponse.length
+          availableDoctorCount: doctorsResponse.success ? doctorsResponse.data.length : 0,
+          totalPatients: patientsResponse.success ? patientsResponse.data.length : 0
         });
         
-        setAvailableDoctors(doctorsResponse);
+        if (doctorsResponse.success) {
+          setAvailableDoctors(doctorsResponse.data);
+        }
+        
         setIsLoading(false);
       } catch (error) {
         console.error('Error loading dashboard data:', error);

@@ -1,25 +1,45 @@
 /**
  * Employee Service
  * Handles all employee-related API calls and data management
+ * Now using real backend API through userService
  */
-
-// For now, using mock data until backend is ready
-import { employees, roles } from '../data/mockData.js';
+import userService from './userService.js';
 
 class EmployeeService {
   constructor() {
-    this.employees = [...employees];
-    this.roles = [...roles];
+    // Define available roles
+    this.availableRoles = [
+      { value: 'admin', label: 'Administrator' },
+      { value: 'doctor', label: 'Doctor' },
+      { value: 'nurse', label: 'Nurse' },
+      { value: 'receptionist', label: 'Receptionist' }
+    ];
   }
 
   /**
-   * Get all employees
+   * Get all employees (users)
    * @returns {Promise<Array>} List of employees
    */
   async getAllEmployees() {
-    // Simulate API delay
-    await new Promise(resolve => setTimeout(resolve, 300));
-    return this.employees;
+    try {
+      const response = await userService.getAllUsers();
+      
+      if (response.success) {
+        // Ensure we return an array
+        const data = response.data;
+        if (Array.isArray(data)) {
+          return data;
+        } else {
+          console.warn('Expected array but got:', typeof data, data);
+          return [];
+        }
+      } else {
+        throw new Error(response.message || 'Failed to fetch employees');
+      }
+    } catch (error) {
+      console.error('Failed to fetch employees:', error);
+      throw error;
+    }
   }
 
   /**
@@ -28,8 +48,17 @@ class EmployeeService {
    * @returns {Promise<Object|null>} Employee object or null if not found
    */
   async getEmployeeById(id) {
-    await new Promise(resolve => setTimeout(resolve, 200));
-    return this.employees.find(emp => emp.id === id) || null;
+    try {
+      const response = await userService.getUserById(id);
+      if (response.success) {
+        return response.data;
+      } else {
+        throw new Error(response.message || 'Employee not found');
+      }
+    } catch (error) {
+      console.error(`Failed to fetch employee ${id}:`, error);
+      throw error;
+    }
   }
 
   /**
@@ -38,33 +67,37 @@ class EmployeeService {
    * @returns {Promise<Object>} Created employee
    */
   async addEmployee(employeeData) {
-    await new Promise(resolve => setTimeout(resolve, 300));
-    
-    const newEmployee = {
-      id: `EMP${String(this.employees.length + 1).padStart(3, '0')}`,
-      ...employeeData,
-      hireDate: new Date().toISOString().split('T')[0],
-      status: 'Active'
-    };
-    
-    this.employees.push(newEmployee);
-    return newEmployee;
+    try {
+      const response = await userService.createUser(employeeData);
+      if (response.success) {
+        return response.data;
+      } else {
+        throw new Error(response.message || 'Failed to create employee');
+      }
+    } catch (error) {
+      console.error('Failed to create employee:', error);
+      throw error;
+    }
   }
 
   /**
    * Update employee
    * @param {string} id - Employee ID
-   * @param {Object} updates - Employee updates
-   * @returns {Promise<Object|null>} Updated employee or null if not found
+   * @param {Object} updates - Updated employee data
+   * @returns {Promise<Object>} Updated employee
    */
   async updateEmployee(id, updates) {
-    await new Promise(resolve => setTimeout(resolve, 300));
-    
-    const index = this.employees.findIndex(emp => emp.id === id);
-    if (index === -1) return null;
-    
-    this.employees[index] = { ...this.employees[index], ...updates };
-    return this.employees[index];
+    try {
+      const response = await userService.updateUser(id, updates);
+      if (response.success) {
+        return response.data;
+      } else {
+        throw new Error(response.message || 'Failed to update employee');
+      }
+    } catch (error) {
+      console.error(`Failed to update employee ${id}:`, error);
+      throw error;
+    }
   }
 
   /**
@@ -73,35 +106,86 @@ class EmployeeService {
    * @returns {Promise<boolean>} Success status
    */
   async deleteEmployee(id) {
-    await new Promise(resolve => setTimeout(resolve, 300));
-    
-    const index = this.employees.findIndex(emp => emp.id === id);
-    if (index === -1) return false;
-    
-    this.employees.splice(index, 1);
-    return true;
+    try {
+      const response = await userService.deleteUser(id);
+      if (response.success) {
+        return true;
+      } else {
+        throw new Error(response.message || 'Failed to delete employee');
+      }
+    } catch (error) {
+      console.error(`Failed to delete employee ${id}:`, error);
+      throw error;
+    }
   }
 
   /**
-   * Get all available roles
+   * Get available roles
    * @returns {Promise<Array>} List of roles
    */
   async getRoles() {
-    await new Promise(resolve => setTimeout(resolve, 100));
-    return this.roles;
+    // Return locally defined roles
+    return this.availableRoles;
   }
 
   /**
    * Get employees by role
-   * @param {string} role - Role name
-   * @returns {Promise<Array>} List of employees with specified role
+   * @param {string} role - Role to filter by
+   * @returns {Promise<Array>} Filtered employees
    */
   async getEmployeesByRole(role) {
-    await new Promise(resolve => setTimeout(resolve, 200));
-    return this.employees.filter(emp => emp.role === role);
+    try {
+      const response = await userService.getUsersByRole(role);
+      if (response.success) {
+        return response.data;
+      } else {
+        throw new Error(response.message || 'Failed to fetch employees by role');
+      }
+    } catch (error) {
+      console.error(`Failed to fetch employees with role ${role}:`, error);
+      throw error;
+    }
+  }
+
+  /**
+   * Toggle employee active status
+   * @param {string} id - Employee ID
+   * @param {boolean} isActive - New active status
+   * @returns {Promise<Object>} Updated employee
+   */
+  async toggleEmployeeStatus(id, isActive) {
+    try {
+      const response = await userService.toggleUserStatus(id, isActive);
+      if (response.success) {
+        return response.data;
+      } else {
+        throw new Error(response.message || 'Failed to update employee status');
+      }
+    } catch (error) {
+      console.error(`Failed to toggle status for employee ${id}:`, error);
+      throw error;
+    }
+  }
+
+  /**
+   * Reset employee password (admin only)
+   * @param {string} id - Employee ID
+   * @param {string} newPassword - New password
+   * @returns {Promise<boolean>} Success status
+   */
+  async resetEmployeePassword(id, newPassword) {
+    try {
+      const response = await userService.resetUserPassword(id, newPassword);
+      if (response.success) {
+        return true;
+      } else {
+        throw new Error(response.message || 'Failed to reset password');
+      }
+    } catch (error) {
+      console.error(`Failed to reset password for employee ${id}:`, error);
+      throw error;
+    }
   }
 }
 
-// Export singleton instance
-export const employeeService = new EmployeeService();
-export default employeeService;
+export default new EmployeeService();

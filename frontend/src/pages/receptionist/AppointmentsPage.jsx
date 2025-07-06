@@ -18,15 +18,6 @@ import {
 } from '@/components/ui/card';
 import { Calendar } from '@/components/ui/calendar';
 import { Badge } from '@/components/ui/badge';
-import {
-  Table,
-  TableHeader,
-  TableBody,
-  TableFooter,
-  TableHead,
-  TableRow,
-  TableCell,
-} from '@/components/ui/table';
 import { 
   Select,
   SelectContent,
@@ -34,15 +25,15 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
+import { SearchableSelect } from '@/components/ui/SearchableSelect';
 import { Textarea } from '@/components/ui/textarea';
-import { 
-  patients as dummyPatients, 
-  appointments,
-  doctors
-} from '@/data/mockData';
-import doctorService from '@/services/doctorService';
+import appointmentService from '@/services/appointmentService';
+import patientService from '@/services/patientService';
+import userService from '@/services/userService';
 import Alert from '@/components/Alert';
 import PageLayout from '@/components/PageLayout';
+import AppointmentCard from '@/components/AppointmentCard';
+import AppointmentDetailModal from '@/components/AppointmentDetailModal';
 
 const AppointmentsPage = () => {
   const navigate = useNavigate();
@@ -52,7 +43,12 @@ const AppointmentsPage = () => {
   const [showNewAppointment, setShowNewAppointment] = useState(false);
   const [showAlert, setShowAlert] = useState(false);
   const [availableDoctors, setAvailableDoctors] = useState([]);
+  const [patients, setPatients] = useState([]);
+  const [appointments, setAppointments] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState('');
+  const [selectedAppointment, setSelectedAppointment] = useState(null);
+  const [showDetailModal, setShowDetailModal] = useState(false);
   const [newAppointment, setNewAppointment] = useState({
     patientId: location.state?.patient?.id || '',
     doctorId: location.state?.doctor?.id || '',
@@ -76,42 +72,56 @@ const AppointmentsPage = () => {
     }
   }, [location.state]);
 
-  useEffect(() => {
-    const loadAvailableDoctors = async () => {
-      try {
-        setIsLoading(true);
-        const doctors = await doctorService.getAvailableDoctors();
-        setAvailableDoctors(doctors);
-      } catch (error) {
-        console.error('Failed to load available doctors:', error);
-      } finally {
-        setIsLoading(false);
-      }
-    };
+  const loadData = async () => {
+    try {
+      setIsLoading(true);
+      setError('');
+      
+      const [doctorsData, patientsData, appointmentsData] = await Promise.all([
+        userService.getUsersByRole('doctor'),
+        patientService.getAllPatients(),
+        appointmentService.getAllAppointments()
+      ]);
 
-    loadAvailableDoctors();
+      setAvailableDoctors(doctorsData?.data || []);
+      setPatients(patientsData?.data || []);
+      setAppointments(appointmentsData?.data || []);
+    } catch (error) {
+      setError('Failed to load data. Please try again.');
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    loadData();
   }, []);
 
   // Filter appointments based on date and search term
   const filteredAppointments = appointments.filter(appointment => {
-    const appointmentDate = new Date(appointment.date);
-    const isSameDate = 
-      appointmentDate.getFullYear() === selectedDate.getFullYear() &&
-      appointmentDate.getMonth() === selectedDate.getMonth() &&
-      appointmentDate.getDate() === selectedDate.getDate();
-    
+    // Check if date matches - handle both 'date' and 'appointment_date' fields
+    const appointmentDate = new Date(appointment.appointment_date || appointment.date);
+    const isSameDate = appointmentDate.toDateString() === selectedDate.toDateString();
     if (!isSameDate) return false;
     
-    if (searchTerm === '') return true;
+    // If no search term, return all appointments for the date
+    if (!searchTerm) return true;
     
-    const patient = dummyPatients.find(p => p.id === appointment.patientId);
-    const doctor = availableDoctors.find(d => d.id === appointment.doctorId);
+    const searchLower = searchTerm.toLowerCase();
+    const patient = patients.find(p => p.id === appointment.patient_id);
+    const doctor = availableDoctors.find(d => d.id === appointment.doctor_id);
     
-    return (
-      patient?.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      doctor?.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      appointment.type.toLowerCase().includes(searchTerm.toLowerCase())
-    );
+    const searchFields = [
+      `${patient?.first_name} ${patient?.last_name}`,
+      `${doctor?.first_name} ${doctor?.last_name}`,
+      doctor?.specialty,
+      appointment.appointment_type,
+      patient?.patient_number, // Added patient ID/number search
+      patient?.phone, // Added phone number search
+      patient?.email // Added email search
+    ].filter(Boolean).map(field => field.toLowerCase());
+    
+    return searchFields.some(field => field.includes(searchLower));
   });
 
   const generateTimeSlots = () => {
@@ -126,30 +136,71 @@ const AppointmentsPage = () => {
     return slots;
   };
 
-  const handleNewAppointment = () => {
-    // Here we would normally save the appointment to the database
-    const appointment = {
-      ...newAppointment,
-      id: Math.random().toString(36).substr(2, 9),
-      date: selectedDate,
-      createdAt: new Date(),
-    };
-    
-    console.log('New appointment:', appointment);
-    setShowAlert(true);
-    setTimeout(() => {
-      setShowAlert(false);
-      setShowNewAppointment(false);
-      // Reset form
-      setNewAppointment({
-        patientId: '',
-        doctorId: '',
-        date: new Date(),
-        time: '09:00',
-        type: 'Regular Checkup',
-        notes: ''
-      });
-    }, 2000);
+    const handleNewAppointment = async () => {
+    try {
+      const appointmentData = {
+        patient_id: newAppointment.patientId,
+        doctor_id: newAppointment.doctorId,
+        appointment_date: selectedDate.toISOString().split('T')[0],
+        appointment_time: newAppointment.time,
+        appointment_type: newAppointment.type,
+        notes: newAppointment.notes,
+        status: 'scheduled'
+      };
+
+      const result = await appointmentService.createAppointment(appointmentData);
+      
+      if (result.success) {
+        setShowAlert(true);
+        setNewAppointment({
+          patientId: '',
+          doctorId: '',
+          date: new Date(),
+          time: '09:00',
+          type: 'Regular Checkup',
+          notes: ''
+        });
+        
+        // Refresh appointments
+        loadData();
+        
+        setTimeout(() => {
+          setShowAlert(false);
+          setShowNewAppointment(false);
+        }, 2000);
+      } else {
+        setError('Failed to schedule appointment. Please try again.');
+      }
+    } catch (error) {
+      setError('Failed to schedule appointment. Please try again.');
+    }
+  };
+
+  const handleStatusChange = async (appointmentId, newStatus) => {
+    try {
+      console.log('Frontend: Updating status for appointment', appointmentId, 'to', newStatus);
+      const result = await appointmentService.updateAppointmentStatus(appointmentId, newStatus);
+      console.log('Frontend: API response:', result);
+      
+      if (result.success) {
+        // Update the appointment in the local state
+        setAppointments(prev => prev.map(apt => 
+          apt.id === appointmentId ? { ...apt, status: newStatus } : apt
+        ));
+        console.log('Frontend: Status updated successfully');
+      } else {
+        console.error('Frontend: API returned failure:', result);
+        setError('Failed to update appointment status.');
+      }
+    } catch (error) {
+      console.error('Frontend: Error in handleStatusChange:', error);
+      setError('Failed to update appointment status.');
+    }
+  };
+
+  const handleViewDetails = (appointment) => {
+    setSelectedAppointment(appointment);
+    setShowDetailModal(true);
   };
 
   return (
@@ -164,6 +215,14 @@ const AppointmentsPage = () => {
             type="success"
             message="Appointment scheduled successfully!"
             onClose={() => setShowAlert(false)}
+          />
+        )}
+
+        {error && (
+          <Alert 
+            type="error"
+            message={error}
+            onClose={() => setError('')}
           />
         )}
 
@@ -190,44 +249,51 @@ const AppointmentsPage = () => {
                   <div className="space-y-4">
                     <div>
                       <label className="text-lg font-medium block mb-2">Patient</label>
-                      <Select
+                      <SearchableSelect
+                        options={patients}
                         value={newAppointment.patientId}
                         onValueChange={(value) => 
                           setNewAppointment(prev => ({ ...prev, patientId: value }))
                         }
-                      >
-                        <SelectTrigger className="h-12 text-lg">
-                          <SelectValue placeholder="Select patient" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          {dummyPatients.map((patient) => (
-                            <SelectItem key={patient.id} value={patient.id} className="text-lg py-3">
-                              {patient.name}
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
+                        placeholder="Select patient..."
+                        searchPlaceholder="Search patients..."
+                        displayField="first_name"
+                        secondaryField="last_name"
+                        valueField="id"
+                        clearable={true}
+                        customDisplayRenderer={(option) => 
+                          `${option.first_name} ${option.last_name}`
+                        }
+                        customSearchRenderer={(option, searchTerm) => 
+                          `${option.first_name} ${option.last_name}`.toLowerCase().includes(searchTerm)
+                        }
+                        className="w-full"
+                      />
                     </div>
 
                     <div>
                       <label className="text-lg font-medium block mb-2">Doctor</label>
-                      <Select
+                      <SearchableSelect
+                        options={availableDoctors}
                         value={newAppointment.doctorId}
                         onValueChange={(value) => 
                           setNewAppointment(prev => ({ ...prev, doctorId: value }))
                         }
-                      >
-                        <SelectTrigger className="h-12 text-lg">
-                          <SelectValue placeholder="Select doctor" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          {availableDoctors.map((doctor) => (
-                            <SelectItem key={doctor.id} value={doctor.id} className="text-lg py-3">
-                              {doctor.name} - {doctor.specialization}
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
+                        placeholder="Select doctor..."
+                        searchPlaceholder="Search doctors..."
+                        displayField="first_name"
+                        secondaryField="last_name"
+                        valueField="id"
+                        clearable={true}
+                        customDisplayRenderer={(option) => 
+                          `Dr. ${option.first_name} ${option.last_name}${option.specialty ? ` - ${option.specialty}` : ''}`
+                        }
+                        customSearchRenderer={(option, searchTerm) => {
+                          const fullText = `${option.first_name} ${option.last_name} ${option.specialty || ''}`.toLowerCase();
+                          return fullText.includes(searchTerm);
+                        }}
+                        className="w-full"
+                      />
                     </div>
 
                     <div>
@@ -320,94 +386,98 @@ const AppointmentsPage = () => {
             </CardContent>
           </Card>
         ) : (
-          <div className="space-y-6">
-            <Card className="bg-card p-6">
-              <div className="flex flex-col md:flex-row gap-6">
-                <div className="flex-1">
-                  <div className="relative">
-                    <Search className="absolute left-4 top-4 h-6 w-6 text-muted-foreground" />
-                    <Input
-                      placeholder="Search appointments..."
-                      value={searchTerm}
-                      onChange={(e) => setSearchTerm(e.target.value)}
-                      className="pl-14 h-14 text-lg"
-                    />
+            <div className="space-y-6">
+              <Card className="bg-card p-6">
+                <CardHeader className="px-0 pt-0">
+                  <CardTitle className="text-xl">
+                    Appointments for {selectedDate.toLocaleDateString('en-US', { 
+                      weekday: 'long', 
+                      year: 'numeric', 
+                      month: 'long', 
+                      day: 'numeric' 
+                    })}
+                  </CardTitle>
+                  <CardDescription>
+                    {filteredAppointments.length} appointment{filteredAppointments.length !== 1 ? 's' : ''} found
+                  </CardDescription>
+                </CardHeader>
+                
+                <div className="flex flex-col md:flex-row gap-6">
+                  <div className="flex-1">
+                    <div className="relative">
+                      <Search className="absolute left-4 top-4 h-6 w-6 text-muted-foreground" />
+                      <Input
+                        placeholder="Search by patient name, patient ID, phone, doctor, or appointment type..."
+                        value={searchTerm}
+                        onChange={(e) => setSearchTerm(e.target.value)}
+                        className="pl-14 h-14 text-lg"
+                      />
+                    </div>
+                  </div>
+                  <div className="flex-shrink-0">
+                    <div className="border rounded-lg p-4 bg-background">
+                      <Calendar
+                        mode="single"
+                        selected={selectedDate}
+                        onSelect={(date) => setSelectedDate(date)}
+                        className="rounded-md"
+                      />
+                    </div>
                   </div>
                 </div>
-                <div className="flex-shrink-0">
-                  <div className="border rounded-lg p-4 bg-background">
-                    <Calendar
-                      mode="single"
-                      selected={selectedDate}
-                      onSelect={(date) => setSelectedDate(date)}
-                      className="rounded-md"
-                    />
-                  </div>
-                </div>
-              </div>
-            </Card>
+              </Card>
 
-            <Card className="bg-card">
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead className="text-lg py-4">Time</TableHead>
-                    <TableHead className="text-lg py-4">Patient</TableHead>
-                    <TableHead className="text-lg py-4">Doctor</TableHead>
-                    <TableHead className="text-lg py-4">Type</TableHead>
-                    <TableHead className="text-lg py-4">Status</TableHead>
-                    <TableHead className="text-lg py-4">Actions</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {filteredAppointments.map((appointment) => {
-                    const patient = dummyPatients.find(p => p.id === appointment.patientId);
-                    const doctor = availableDoctors.find(d => d.id === appointment.doctorId);
-                    
-                    return (
-                      <TableRow key={appointment.id}>
-                        <TableCell className="text-base py-4">{appointment.time}</TableCell>
-                        <TableCell className="text-base py-4">{patient?.name || 'Unknown'}</TableCell>
-                        <TableCell className="text-base py-4">{doctor?.name || 'Unknown'}</TableCell>
-                        <TableCell className="text-base py-4">
-                          <Badge variant="outline" className="text-base px-4 py-1">
-                            {appointment.type}
-                          </Badge>
-                        </TableCell>
-                        <TableCell className="text-base py-4">
-                          <Badge 
-                            className={`text-base px-4 py-1 ${
-                              appointment.status === 'Scheduled' 
-                                ? 'bg-green-100 text-green-800'
-                                : appointment.status === 'In Progress'
-                                ? 'bg-blue-100 text-blue-800'
-                                : 'bg-red-100 text-red-800'
-                            }`}
-                          >
-                            {appointment.status}
-                          </Badge>
-                        </TableCell>
-                        <TableCell className="text-base py-4">
-                          <Button variant="ghost" size="lg" className="text-base">
-                            View Details
-                          </Button>
-                        </TableCell>
-                      </TableRow>
-                    );
-                  })}
-                  {filteredAppointments.length === 0 && (
-                    <TableRow>
-                      <TableCell colSpan={6} className="text-center text-lg py-8 text-muted-foreground">
-                        No appointments found for this date.
-                      </TableCell>
-                    </TableRow>
-                  )}
-                </TableBody>
-              </Table>
-            </Card>
-          </div>
+              {isLoading ? (
+                <Card className="bg-card p-8">
+                  <div className="text-center">
+                    <div className="text-lg text-muted-foreground">Loading appointments...</div>
+                  </div>
+                </Card>
+              ) : filteredAppointments.length === 0 ? (
+                <Card className="bg-card p-8">
+                  <div className="text-center">
+                    <div className="text-lg text-muted-foreground">
+                      {searchTerm 
+                        ? 'No appointments found matching your search.'
+                        : 'No appointments scheduled for this date.'
+                      }
+                    </div>
+                  </div>
+                </Card>
+              ) : (
+                <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+                  {filteredAppointments
+                    .sort((a, b) => a.appointment_time.localeCompare(b.appointment_time))
+                    .map((appointment) => {
+                      const patient = patients.find(p => p.id === appointment.patient_id);
+                      const doctor = availableDoctors.find(d => d.id === appointment.doctor_id);
+                      
+                      return (
+                        <AppointmentCard
+                          key={appointment.id}
+                          appointment={appointment}
+                          patient={patient}
+                          doctor={doctor}
+                          onStatusChange={handleStatusChange}
+                          onViewDetails={handleViewDetails}
+                          userRole="receptionist"
+                        />
+                      );
+                    })}
+                </div>
+              )}
+            </div>
         )}
       </div>
+
+      {/* Appointment Detail Modal */}
+      <AppointmentDetailModal
+        appointment={selectedAppointment}
+        patient={selectedAppointment ? patients.find(p => p.id === selectedAppointment.patient_id) : null}
+        doctor={selectedAppointment ? availableDoctors.find(d => d.id === selectedAppointment.doctor_id) : null}
+        isOpen={showDetailModal}
+        onClose={() => setShowDetailModal(false)}
+      />
     </PageLayout>
   );
 };

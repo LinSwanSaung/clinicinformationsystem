@@ -79,7 +79,7 @@ CREATE TABLE IF NOT EXISTS appointments (
     created_at TIMESTAMPTZ DEFAULT NOW(),
     updated_at TIMESTAMPTZ DEFAULT NOW(),
     
-    CONSTRAINT valid_status CHECK (status IN ('scheduled', 'confirmed', 'in_progress', 'completed', 'cancelled', 'no_show')),
+    CONSTRAINT valid_status CHECK (status IN ('scheduled', 'waiting', 'ready_for_doctor', 'consulting', 'completed', 'cancelled', 'no_show')),
     CONSTRAINT valid_duration CHECK (duration_minutes > 0 AND duration_minutes <= 480)
 );
 

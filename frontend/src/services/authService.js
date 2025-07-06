@@ -7,109 +7,34 @@ class AuthService {
 
   // Login user
   async login(credentials) {
-    if (this.isDevelopment) {
-      // Dummy authentication for development
-      const { email, password } = credentials;
-      
-      // Simple dummy validation
-      if (email === 'admin@clinic.com' && password === 'admin123') {
-        const userData = {
-          id: 1,
-          email: 'admin@clinic.com',
-          name: 'Administrator',
-          role: 'admin',
-          token: 'dummy-admin-token'
-        };
-        
-        localStorage.setItem('authToken', userData.token);
-        localStorage.setItem('user', JSON.stringify(userData));
-        
-        return Promise.resolve({
-          success: true,
-          data: userData
-        });
-      }
-      
-      if (email === 'nurse@clinic.com' && password === 'nurse123') {
-        const userData = {
-          id: 2,
-          email: 'nurse@clinic.com',
-          name: 'Nurse Johnson',
-          role: 'nurse',
-          token: 'dummy-nurse-token'
-        };
-        
-        localStorage.setItem('authToken', userData.token);
-        localStorage.setItem('user', JSON.stringify(userData));
-        
-        return Promise.resolve({
-          success: true,
-          data: userData
-        });
-      }
-      
-      if (email === 'doctor@clinic.com' && password === 'doctor123') {
-        const userData = {
-          id: 3,
-          email: 'doctor@clinic.com',
-          name: 'Dr. Smith',
-          role: 'doctor',
-          token: 'dummy-doctor-token'
-        };
-        
-        localStorage.setItem('authToken', userData.token);
-        localStorage.setItem('user', JSON.stringify(userData));
-        
-        return Promise.resolve({
-          success: true,
-          data: userData
-        });
-      }
-      
-      if (email === 'receptionist@clinic.com' && password === 'receptionist123') {
-        const userData = {
-          id: 4,
-          email: 'receptionist@clinic.com',
-          name: 'Receptionist Mary',
-          role: 'receptionist',
-          token: 'dummy-receptionist-token'
-        };
-        
-        localStorage.setItem('authToken', userData.token);
-        localStorage.setItem('user', JSON.stringify(userData));
-        
-        return Promise.resolve({
-          success: true,
-          data: userData
-        });
-      }
-      
-      return Promise.reject(new Error('Invalid credentials'));
-    }
-    
     try {
       const response = await apiService.post('/auth/login', credentials);
       
-      if (response.success && response.data.token) {
-        localStorage.setItem('authToken', response.data.token);
-        localStorage.setItem('user', JSON.stringify(response.data));
+      if (response.success) {
+        const { token, user } = response.data;
+        
+        // Store token and user data
+        localStorage.setItem('authToken', token);
+        localStorage.setItem('user', JSON.stringify(user));
+        
+        return {
+          success: true,
+          data: { ...user, token }
+        };
       }
       
-      return response;
+      throw new Error(response.message || 'Login failed');
     } catch (error) {
-      console.error('Login failed:', error);
-      throw error;
+      console.error('Login error:', error);
+      return {
+        success: false,
+        message: error.message || 'Login failed'
+      };
     }
   }
 
   // Logout user
   async logout() {
-    if (this.isDevelopment) {
-      localStorage.removeItem('authToken');
-      localStorage.removeItem('user');
-      return Promise.resolve({ success: true });
-    }
-    
     try {
       await apiService.post('/auth/logout');
       localStorage.removeItem('authToken');
@@ -120,7 +45,7 @@ class AuthService {
       // Clear local storage even if API call fails
       localStorage.removeItem('authToken');
       localStorage.removeItem('user');
-      throw error;
+      return { success: true };
     }
   }
 
@@ -153,11 +78,6 @@ class AuthService {
 
   // Change password
   async changePassword(currentPassword, newPassword) {
-    if (this.isDevelopment) {
-      console.log('Development mode: Password change requested');
-      return Promise.resolve({ success: true });
-    }
-    
     try {
       const response = await apiService.put('/auth/change-password', {
         currentPassword,
@@ -167,6 +87,34 @@ class AuthService {
     } catch (error) {
       console.error('Password change failed:', error);
       throw error;
+    }
+  }
+
+  // Refresh token
+  async refreshToken() {
+    try {
+      const response = await apiService.post('/auth/refresh');
+      if (response.success) {
+        const { token } = response.data;
+        localStorage.setItem('authToken', token);
+        return { success: true };
+      }
+      throw new Error('Token refresh failed');
+    } catch (error) {
+      console.error('Token refresh failed:', error);
+      this.logout();
+      throw error;
+    }
+  }
+
+  // Verify token
+  async verifyToken() {
+    try {
+      const response = await apiService.get('/auth/verify');
+      return response.success;
+    } catch (error) {
+      console.error('Token verification failed:', error);
+      return false;
     }
   }
 }

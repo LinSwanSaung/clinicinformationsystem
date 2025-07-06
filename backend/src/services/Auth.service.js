@@ -42,6 +42,9 @@ class AuthService {
       { expiresIn: config.jwt.expiresIn }
     );
 
+    // Update last login timestamp
+    await UserModel.updateLastLogin(user.id);
+
     // Remove sensitive data
     const { password_hash, ...userWithoutPassword } = user;
 

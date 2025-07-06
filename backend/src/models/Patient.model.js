@@ -13,16 +13,12 @@ export class PatientModel extends BaseModel {
    * Create a new patient
    */
   async create(patientData) {
-    // Calculate age from date of birth
-    const age = this.calculateAge(patientData.date_of_birth);
-    
-    // Generate initials from name
-    const initials = this.generateInitials(patientData.name);
+    // Generate unique patient number
+    const patientNumber = await this.generatePatientNumber();
     
     const newPatient = {
       ...patientData,
-      age,
-      initials,
+      patient_number: patientNumber,
       created_at: new Date().toISOString(),
       updated_at: new Date().toISOString()
     };
@@ -31,14 +27,44 @@ export class PatientModel extends BaseModel {
   }
 
   /**
-   * Search patients by name, ID number, or contact
+   * Generate unique patient number
+   */
+  async generatePatientNumber() {
+    const year = new Date().getFullYear();
+    const prefix = `P${year}`;
+    
+    // Find the highest existing patient number for this year
+    const { data, error } = await this.supabase
+      .from(this.tableName)
+      .select('patient_number')
+      .like('patient_number', `${prefix}%`)
+      .order('patient_number', { ascending: false })
+      .limit(1);
+
+    if (error) {
+      throw error;
+    }
+
+    let nextNumber = 1;
+    if (data && data.length > 0) {
+      const lastNumber = data[0].patient_number;
+      const numPart = parseInt(lastNumber.replace(prefix, ''));
+      nextNumber = numPart + 1;
+    }
+
+    // Format with leading zeros (e.g., P2025001, P2025002, etc.)
+    return `${prefix}${nextNumber.toString().padStart(3, '0')}`;
+  }
+
+  /**
+   * Search patients by name, patient number, or contact
    */
   async search(searchTerm, options = {}) {
     const { data, error } = await this.supabase
       .from(this.tableName)
       .select('*')
-      .or(`name.ilike.%${searchTerm}%,id_number.ilike.%${searchTerm}%,contact.ilike.%${searchTerm}%`)
-      .order('name')
+      .or(`first_name.ilike.%${searchTerm}%,last_name.ilike.%${searchTerm}%,patient_number.ilike.%${searchTerm}%,phone.ilike.%${searchTerm}%`)
+      .order('first_name')
       .limit(options.limit || 20);
 
     if (error) {
@@ -49,10 +75,10 @@ export class PatientModel extends BaseModel {
   }
 
   /**
-   * Find patient by ID number
+   * Find patient by patient number
    */
-  async findByIdNumber(idNumber) {
-    return this.findOne({ id_number: idNumber });
+  async findByPatientNumber(patientNumber) {
+    return this.findOne({ patient_number: patientNumber });
   }
 
   /**

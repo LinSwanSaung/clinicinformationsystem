@@ -1,13 +1,9 @@
 import express from 'express';
 import cors from 'cors';
-import helmet from 'helmet';
-import morgan from 'morgan';
-import compression from 'compression';
 import dotenv from 'dotenv';
 
 // Import middleware
 import { errorHandler } from './middleware/errorHandler.js';
-import { rateLimiter } from './middleware/rateLimiter.js';
 import { requestLogger } from './middleware/requestLogger.js';
 
 // Import routes
@@ -23,23 +19,12 @@ import documentRoutes from './routes/document.routes.js';
 dotenv.config();
 
 const app = express();
-const PORT = process.env.PORT || 5000;
+const PORT = process.env.PORT || 3001;
 
-// Security middleware
-app.use(helmet());
-app.use(rateLimiter);
+// Simple CORS - Allow everything in development
+app.use(cors());
 
-// CORS configuration
-app.use(cors({
-  origin: process.env.CLIENT_URL || 'http://localhost:5173',
-  credentials: true,
-  methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH'],
-  allowedHeaders: ['Content-Type', 'Authorization']
-}));
-
-// General middleware
-app.use(compression());
-app.use(morgan('combined'));
+// Basic middleware
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true, limit: '10mb' }));
 app.use(requestLogger);

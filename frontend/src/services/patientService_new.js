@@ -1,56 +1,68 @@
 import apiService from './api.js';
 
 class PatientService {
+  // Get all patients
   async getAllPatients() {
     try {
       const response = await apiService.get('/patients');
       return response;
     } catch (error) {
+      console.error('Failed to fetch patients:', error);
       throw error;
     }
   }
 
+  // Get patient by ID
   async getPatientById(id) {
     try {
       const response = await apiService.get(`/patients/${id}`);
       return response;
     } catch (error) {
+      console.error(`Failed to fetch patient ${id}:`, error);
       throw error;
     }
   }
 
+  // Create new patient
   async createPatient(patientData) {
     try {
       const response = await apiService.post('/patients', patientData);
       return response;
     } catch (error) {
+      console.error('Failed to create patient:', error);
       throw error;
     }
   }
 
+  // Update patient
   async updatePatient(id, patientData) {
     try {
       const response = await apiService.put(`/patients/${id}`, patientData);
       return response;
     } catch (error) {
+      console.error(`Failed to update patient ${id}:`, error);
       throw error;
     }
   }
 
+  // Delete patient
   async deletePatient(id) {
     try {
       const response = await apiService.delete(`/patients/${id}`);
       return response;
     } catch (error) {
+      console.error(`Failed to delete patient ${id}:`, error);
       throw error;
     }
   }
 
+  // Search patients
   async searchPatients(searchTerm) {
     try {
       const response = await apiService.get(`/patients/search?q=${encodeURIComponent(searchTerm)}`);
       return response;
     } catch (error) {
+      console.error('Failed to search patients:', error);
       throw error;
     }
   }
@@ -133,7 +145,4 @@ class PatientService {
   }
 }
 
-// Export singleton instance
-const patientService = new PatientService();
-export { patientService };
-export default patientService;
+export default new PatientService();

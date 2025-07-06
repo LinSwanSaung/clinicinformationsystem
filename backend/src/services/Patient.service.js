@@ -10,8 +10,18 @@ class PatientService {
    * Get all patients
    */
   async getAllPatients(options = {}) {
-    const { data, count } = await PatientModel.findAll(options);
-    return { patients: data, total: count };
+    const defaultOptions = {
+      orderBy: 'created_at',
+      ascending: false,
+      ...options
+    };
+    
+    try {
+      const { data } = await PatientModel.findAll(defaultOptions);
+      return data || [];
+    } catch (error) {
+      throw new AppError('Failed to fetch patients', 500);
+    }
   }
 
   /**
@@ -31,20 +41,18 @@ class PatientService {
    * Create new patient
    */
   async createPatient(patientData, createdBy) {
-    // Check if patient with same ID number already exists
-    if (patientData.id_number) {
-      const existingPatient = await PatientModel.findByIdNumber(patientData.id_number);
+    // Check if patient with same phone number already exists (optional check)
+    if (patientData.phone) {
+      const existingPatient = await PatientModel.findOne({ phone: patientData.phone });
       
       if (existingPatient) {
-        throw new AppError('Patient with this ID number already exists', 409);
+        console.warn('Patient with this phone number already exists:', patientData.phone);
+        // Don't throw error, allow duplicate phone numbers for now
       }
     }
 
-    // Create patient
-    const patient = await PatientModel.create({
-      ...patientData,
-      created_by: createdBy
-    });
+    // Create patient (don't include created_by since it's not in the schema)
+    const patient = await PatientModel.create(patientData);
 
     return patient;
   }

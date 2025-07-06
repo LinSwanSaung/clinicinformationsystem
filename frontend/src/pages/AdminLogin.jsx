@@ -9,20 +9,25 @@ const AdminLogin = () => {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [isLoading, setIsLoading] = useState(false);
+  const [error, setError] = useState('');
   const { login } = useAuth();
 
   const handleLogin = async (e) => {
     e.preventDefault();
     setIsLoading(true);
+    setError('');
     
-    // Simulate login delay
-    setTimeout(() => {
-      const success = login(email, password);
-      if (!success) {
-        alert('Invalid credentials. Use admin@clinic.com / admin123 or receptionist.brown@clinic.com / clinic123');
+    try {
+      const result = await login(email, password);
+      if (!result.success) {
+        setError(result.message || 'Login failed. Please check your credentials.');
       }
+    } catch (error) {
+      setError('Login failed. Please try again.');
+      console.error('Login error:', error);
+    } finally {
       setIsLoading(false);
-    }, 1000);
+    }
   };
 
   return (
@@ -53,6 +58,12 @@ const AdminLogin = () => {
           </CardHeader>
           <CardContent>
             <form onSubmit={handleLogin} className="space-y-4">
+              {error && (
+                <div className="bg-red-50 border border-red-200 text-red-600 px-4 py-3 rounded-md text-sm">
+                  {error}
+                </div>
+              )}
+              
               <div className="space-y-2">
                 <label htmlFor="email" className="text-sm font-medium text-gray-700">
                   Email Address
@@ -106,6 +117,17 @@ const AdminLogin = () => {
                 )}
               </Button>
             </form>
+            
+            {/* Development helper */}
+            <div className="mt-6 p-4 bg-gray-50 rounded-md border">
+              <p className="text-sm font-medium text-gray-700 mb-2">Test Credentials:</p>
+              <div className="text-xs text-gray-600 space-y-1">
+                <div><strong>Admin:</strong> admin@clinic.com / admin123</div>
+                <div><strong>Doctor:</strong> dr.smith@clinic.com / doctor123</div>
+                <div><strong>Nurse:</strong> nurse.williams@clinic.com / nurse123</div>
+                <div><strong>Receptionist:</strong> reception@clinic.com / reception123</div>
+              </div>
+            </div>
           </CardContent>
         </Card>
       </div>

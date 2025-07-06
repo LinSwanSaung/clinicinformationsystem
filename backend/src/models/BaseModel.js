@@ -59,13 +59,13 @@ export class BaseModel {
       .from(this.tableName)
       .select(select)
       .eq('id', id)
-      .single();
+      .maybeSingle();
 
     if (error) {
       throw error;
     }
 
-    return data;
+    return data; // Will be null if no record is found
   }
 
   /**
@@ -80,30 +80,37 @@ export class BaseModel {
       query = query.eq(key, value);
     });
 
-    const { data, error } = await query.single();
+    // Use maybeSingle() instead of single() to avoid errors when no rows are found
+    const { data, error } = await query.maybeSingle();
 
     if (error) {
       throw error;
     }
 
-    return data;
+    return data; // Will be null if no record is found
   }
 
   /**
    * Create a new record
    */
   async create(data) {
-    const { data: result, error } = await this.supabase
-      .from(this.tableName)
-      .insert(data)
-      .select()
-      .single();
+    try {
+      const { data: result, error } = await this.supabase
+        .from(this.tableName)
+        .insert(data)
+        .select()
+        .maybeSingle();
 
-    if (error) {
+      if (error) {
+        console.error(`Error creating ${this.tableName}:`, error);
+        throw error;
+      }
+
+      return result;
+    } catch (error) {
+      console.error(`Exception creating ${this.tableName}:`, error);
       throw error;
     }
-
-    return result;
   }
 
   /**
@@ -115,18 +122,29 @@ export class BaseModel {
       updated_at: new Date().toISOString()
     };
 
-    const { data: result, error } = await this.supabase
-      .from(this.tableName)
-      .update(updateData)
-      .eq('id', id)
-      .select()
-      .single();
+    try {
+      const { data: result, error } = await this.supabase
+        .from(this.tableName)
+        .update(updateData)
+        .eq('id', id)
+        .select('*')
+        .maybeSingle();
 
-    if (error) {
+      if (error) {
+        console.error(`Error updating ${this.tableName}:`, error);
+        throw error;
+      }
+
+      // If no rows match the ID, result will be null
+      if (!result) {
+        return null;
+      }
+
+      return result;
+    } catch (error) {
+      console.error(`Exception updating ${this.tableName}:`, error);
       throw error;
     }
-
-    return result;
   }
 
   /**

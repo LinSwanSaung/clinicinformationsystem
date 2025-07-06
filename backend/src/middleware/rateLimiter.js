@@ -5,8 +5,8 @@ import config from '../config/app.config.js';
  * General rate limiter for all routes
  */
 export const rateLimiter = rateLimit({
-  windowMs: config.rateLimit.windowMs,
-  max: config.rateLimit.max,
+  windowMs: process.env.NODE_ENV === 'development' ? 1 * 60 * 1000 : config.rateLimit.windowMs, // 1 minute in dev
+  max: process.env.NODE_ENV === 'development' ? 1000 : config.rateLimit.max, // 1000 requests in dev
   message: {
     success: false,
     message: 'Too many requests from this IP, please try again later.',
@@ -21,7 +21,7 @@ export const rateLimiter = rateLimit({
  */
 export const authRateLimiter = rateLimit({
   windowMs: 15 * 60 * 1000, // 15 minutes
-  max: 5, // limit each IP to 5 auth requests per windowMs
+  max: process.env.NODE_ENV === 'development' ? 100 : 5, // 100 in dev, 5 in production
   message: {
     success: false,
     message: 'Too many authentication attempts, please try again later.',

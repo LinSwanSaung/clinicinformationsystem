@@ -1,5 +1,6 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
+import authService from '../services/authService';
 
 const AuthContext = createContext(null);
 
@@ -10,53 +11,70 @@ export const AuthProvider = ({ children }) => {
 
   useEffect(() => {
     // Check for authentication on mount
-    const isAuthenticated = localStorage.getItem('isAuthenticated') === 'true';
-    const userRole = localStorage.getItem('userRole');
-    
-    if (isAuthenticated && userRole) {
-      setUser({ role: userRole });
+    const currentUser = authService.getCurrentUser();
+    if (currentUser && authService.isAuthenticated()) {
+      setUser(currentUser);
     }
     setLoading(false);
   }, []);
 
-  const login = (email, password) => {
-    if (email === 'admin@clinic.com' && password === 'admin123') {
-      const userData = { role: 'Admin' };
-      setUser(userData);
-      localStorage.setItem('userRole', 'Admin');
-      localStorage.setItem('isAuthenticated', 'true');
-      navigate('/admin/dashboard');
-      return true;
-    } else if (email === 'receptionist.brown@clinic.com' && password === 'clinic123') {
-      const userData = { role: 'Receptionist' };
-      setUser(userData);
-      localStorage.setItem('userRole', 'Receptionist');
-      localStorage.setItem('isAuthenticated', 'true');
-      navigate('/receptionist/dashboard');
-      return true;
-    } else if (email === 'nurse@clinic.com' && password === 'nurse123') {
-      const userData = { role: 'Nurse' };
-      setUser(userData);
-      localStorage.setItem('userRole', 'Nurse');
-      localStorage.setItem('isAuthenticated', 'true');
-      navigate('/nurse/dashboard');
-      return true;
-    } else if (email === 'doctor@clinic.com' && password === 'doctor123') {
-      const userData = { role: 'Doctor' };
-      setUser(userData);
-      localStorage.setItem('userRole', 'Doctor');
-      localStorage.setItem('isAuthenticated', 'true');
-      navigate('/doctor/dashboard');
-      return true;
+  const login = async (email, password) => {
+    try {
+      const result = await authService.login({ email, password });
+      
+      if (result.success) {
+        setUser(result.data);
+        
+        // Navigate based on role
+        const role = result.data.role.toLowerCase();
+        switch (role) {
+          case 'admin':
+            navigate('/admin/dashboard');
+            break;
+          case 'doctor':
+            navigate('/doctor/dashboard');
+            break;
+          case 'nurse':
+            navigate('/nurse/dashboard');
+            break;
+          case 'receptionist':
+            navigate('/receptionist/dashboard');
+            break;
+          default:
+            navigate('/admin/dashboard'); // Default fallback
+        }
+        
+        return { success: true };
+      } else {
+        return { success: false, message: result.message };
+      }
+    } catch (error) {
+      console.error('Login failed:', error);
+      return { success: false, message: 'Login failed. Please try again.' };
     }
-    return false;
   };
 
-  const logout = () => {
-    setUser(null);
-    localStorage.removeItem('userRole');
-    localStorage.removeItem('isAuthenticated');
-    navigate('/');
+  const logout = async () => {
+    try {
+      await authService.logout();
+      setUser(null);
+      navigate('/');
+    } catch (error) {
+      console.error('Logout failed:', error);
+      // Still clear local state even if API call fails
+      setUser(null);
+      navigate('/');
+    }
+  };
+
+  // Get current user role
+  const getUserRole = () => {
+    return user?.role || null;
+  };
+
+  // Check if user is authenticated
+  const isAuthenticated = () => {
+    return authService.isAuthenticated();
   };
 
   if (loading) {
@@ -68,7 +86,13 @@ export const AuthProvider = ({ children }) => {
   }
 
   return (
-    <AuthContext.Provider value={{ user, login, logout }}>
+    <AuthContext.Provider value={{ 
+      user, 
+      login, 
+      logout, 
+      getUserRole, 
+      isAuthenticated: isAuthenticated()
+    }}>
       {children}
     </AuthContext.Provider>
   );

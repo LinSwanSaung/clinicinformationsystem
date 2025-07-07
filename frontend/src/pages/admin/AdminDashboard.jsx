@@ -68,10 +68,10 @@ const AdminDashboard = () => {
       action: () => {} // TODO: Implement analytics
     },
     {
-      title: "Doctor Schedules",
-      description: "Manage doctor availability",
+      title: "Doctor Availability",
+      description: "Manage doctor working hours",
       icon: Stethoscope,
-      action: () => {} // TODO: Implement schedule management
+      action: () => navigate('/admin/schedules')
     }
   ];
 

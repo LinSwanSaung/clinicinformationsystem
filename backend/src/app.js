@@ -14,6 +14,7 @@ import appointmentRoutes from './routes/appointment.routes.js';
 import vitalsRoutes from './routes/vitals.routes.js';
 import medicalRecordRoutes from './routes/medicalRecord.routes.js';
 import documentRoutes from './routes/document.routes.js';
+import doctorAvailabilityRoutes from './routes/doctorAvailability.routes.js';
 
 // Load environment variables
 dotenv.config();
@@ -47,6 +48,7 @@ app.use('/api/appointments', appointmentRoutes);
 app.use('/api/vitals', vitalsRoutes);
 app.use('/api/medical-records', medicalRecordRoutes);
 app.use('/api/documents', documentRoutes);
+app.use('/api/doctor-availability', doctorAvailabilityRoutes);
 
 // 404 handler
 app.use('*', (req, res) => {

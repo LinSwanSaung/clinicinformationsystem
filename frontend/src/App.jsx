@@ -4,6 +4,7 @@ import { AuthProvider } from './contexts/AuthContext';
 import AdminLogin from './pages/AdminLogin';
 import AdminDashboard from './pages/admin/AdminDashboard';
 import EmployeeManagement from './pages/admin/EmployeeManagement';
+import DoctorAvailability from './pages/admin/DoctorAvailability';
 import ReceptionistDashboard from './pages/receptionist/ReceptionistDashboard';
 import RegisterPatient from './pages/receptionist/RegisterPatient';
 import AppointmentsPage from './pages/receptionist/AppointmentsPage';
@@ -85,6 +86,14 @@ function AppRoutes() {
         element={
           <ProtectedRoute allowedRoles={['admin']}>
             <EmployeeManagement />
+          </ProtectedRoute>
+        } 
+      />
+      <Route 
+        path="/admin/schedules" 
+        element={
+          <ProtectedRoute allowedRoles={['admin']}>
+            <DoctorAvailability />
           </ProtectedRoute>
         } 
       />

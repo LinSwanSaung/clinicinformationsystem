@@ -230,6 +230,73 @@ CREATE TABLE IF NOT EXISTS audit_logs (
 );
 
 -- ===============================================
+-- DOCTOR AVAILABILITY TABLE
+-- ===============================================
+CREATE TABLE IF NOT EXISTS doctor_availability (
+    id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
+    doctor_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    day_of_week VARCHAR(10) NOT NULL,
+    start_time TIME NOT NULL,
+    end_time TIME NOT NULL,
+    is_active BOOLEAN DEFAULT true,
+    created_at TIMESTAMPTZ DEFAULT NOW(),
+    updated_at TIMESTAMPTZ DEFAULT NOW(),
+    
+    CONSTRAINT valid_day_of_week CHECK (day_of_week IN ('Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday')),
+    CONSTRAINT valid_time_range CHECK (end_time > start_time),
+    UNIQUE(doctor_id, day_of_week, start_time, end_time)
+);
+
+-- ===============================================
+-- QUEUE TOKENS TABLE
+-- ===============================================
+CREATE TABLE IF NOT EXISTS queue_tokens (
+    id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
+    token_number INTEGER NOT NULL,
+    patient_id UUID NOT NULL REFERENCES patients(id) ON DELETE CASCADE,
+    doctor_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    appointment_id UUID REFERENCES appointments(id) ON DELETE SET NULL,
+    issued_date DATE DEFAULT CURRENT_DATE,
+    issued_time TIMESTAMPTZ DEFAULT NOW(),
+    status VARCHAR(20) DEFAULT 'waiting',
+    priority INTEGER DEFAULT 1,
+    estimated_wait_time INTEGER, -- in minutes
+    called_at TIMESTAMPTZ,
+    served_at TIMESTAMPTZ,
+    created_by UUID REFERENCES users(id),
+    created_at TIMESTAMPTZ DEFAULT NOW(),
+    updated_at TIMESTAMPTZ DEFAULT NOW(),
+    
+    CONSTRAINT valid_token_status CHECK (status IN ('waiting', 'called', 'serving', 'completed', 'missed', 'cancelled')),
+    CONSTRAINT valid_priority CHECK (priority >= 1 AND priority <= 5),
+    CONSTRAINT valid_token_number CHECK (token_number > 0),
+    UNIQUE(doctor_id, issued_date, token_number)
+);
+
+-- ===============================================
+-- APPOINTMENT QUEUE TABLE
+-- ===============================================
+CREATE TABLE IF NOT EXISTS appointment_queue (
+    id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
+    appointment_id UUID NOT NULL REFERENCES appointments(id) ON DELETE CASCADE,
+    doctor_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    patient_id UUID NOT NULL REFERENCES patients(id) ON DELETE CASCADE,
+    queue_position INTEGER NOT NULL,
+    estimated_start_time TIMESTAMPTZ,
+    actual_start_time TIMESTAMPTZ,
+    actual_end_time TIMESTAMPTZ,
+    status VARCHAR(20) DEFAULT 'queued',
+    priority INTEGER DEFAULT 1,
+    notes TEXT,
+    created_at TIMESTAMPTZ DEFAULT NOW(),
+    updated_at TIMESTAMPTZ DEFAULT NOW(),
+    
+    CONSTRAINT valid_queue_status CHECK (status IN ('queued', 'in_progress', 'completed', 'skipped', 'cancelled')),
+    CONSTRAINT valid_queue_priority CHECK (priority >= 1 AND priority <= 5),
+    CONSTRAINT valid_queue_position CHECK (queue_position > 0)
+);
+
+-- ===============================================
 -- INDEXES FOR PERFORMANCE
 -- ===============================================
 
@@ -264,6 +331,26 @@ CREATE INDEX IF NOT EXISTS idx_vitals_recorded_at ON vitals(recorded_at);
 CREATE INDEX IF NOT EXISTS idx_prescriptions_patient_id ON prescriptions(patient_id);
 CREATE INDEX IF NOT EXISTS idx_prescriptions_doctor_id ON prescriptions(doctor_id);
 CREATE INDEX IF NOT EXISTS idx_prescriptions_status ON prescriptions(status);
+
+-- Doctor Availability indexes
+CREATE INDEX IF NOT EXISTS idx_doctor_availability_doctor_id ON doctor_availability(doctor_id);
+CREATE INDEX IF NOT EXISTS idx_doctor_availability_day ON doctor_availability(day_of_week);
+CREATE INDEX IF NOT EXISTS idx_doctor_availability_active ON doctor_availability(is_active);
+
+-- Queue Tokens indexes
+CREATE INDEX IF NOT EXISTS idx_queue_tokens_patient_id ON queue_tokens(patient_id);
+CREATE INDEX IF NOT EXISTS idx_queue_tokens_doctor_id ON queue_tokens(doctor_id);
+CREATE INDEX IF NOT EXISTS idx_queue_tokens_date ON queue_tokens(issued_date);
+CREATE INDEX IF NOT EXISTS idx_queue_tokens_status ON queue_tokens(status);
+CREATE INDEX IF NOT EXISTS idx_queue_tokens_number ON queue_tokens(doctor_id, issued_date, token_number);
+
+-- Appointment Queue indexes
+CREATE INDEX IF NOT EXISTS idx_appointment_queue_appointment_id ON appointment_queue(appointment_id);
+CREATE INDEX IF NOT EXISTS idx_appointment_queue_doctor_id ON appointment_queue(doctor_id);
+CREATE INDEX IF NOT EXISTS idx_appointment_queue_patient_id ON appointment_queue(patient_id);
+CREATE INDEX IF NOT EXISTS idx_appointment_queue_status ON appointment_queue(status);
+CREATE INDEX IF NOT EXISTS idx_appointment_queue_position ON appointment_queue(doctor_id, queue_position);
+CREATE INDEX IF NOT EXISTS idx_appointment_queue_created_date ON appointment_queue(doctor_id, created_at);
 
 -- ===============================================
 -- HELPER FUNCTIONS
@@ -325,19 +412,239 @@ BEGIN
 END;
 $$ language 'plpgsql';
 
+-- Auto-generate queue token numbers
+CREATE OR REPLACE FUNCTION generate_token_number()
+RETURNS TRIGGER AS $$
+DECLARE
+    next_token INTEGER;
+BEGIN
+    SELECT COALESCE(MAX(token_number), 0) + 1
+    INTO next_token
+    FROM queue_tokens 
+    WHERE doctor_id = NEW.doctor_id 
+    AND issued_date = NEW.issued_date;
+    
+    NEW.token_number := next_token;
+    
+    RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
+
+-- Auto-calculate queue position
+CREATE OR REPLACE FUNCTION calculate_queue_position()
+RETURNS TRIGGER AS $$
+DECLARE
+    next_position INTEGER;
+    queue_date DATE;
+BEGIN
+    queue_date := DATE(NEW.created_at);
+    
+    SELECT COALESCE(MAX(queue_position), 0) + 1
+    INTO next_position
+    FROM appointment_queue 
+    WHERE doctor_id = NEW.doctor_id 
+    AND DATE(created_at) = queue_date
+    AND status IN ('queued', 'in_progress');
+    
+    NEW.queue_position := next_position;
+    
+    RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
+
+-- Function to check doctor availability
+CREATE OR REPLACE FUNCTION is_doctor_available(
+    p_doctor_id UUID,
+    p_day_of_week VARCHAR,
+    p_time TIME
+) RETURNS BOOLEAN AS $$
+BEGIN
+    RETURN EXISTS (
+        SELECT 1 
+        FROM doctor_availability 
+        WHERE doctor_id = p_doctor_id 
+        AND day_of_week = p_day_of_week 
+        AND start_time <= p_time 
+        AND end_time > p_time 
+        AND is_active = true
+    );
+END;
+$$ LANGUAGE plpgsql;
+
+-- Function to validate doctor availability (ensures only doctors can have availability records)
+CREATE OR REPLACE FUNCTION validate_doctor_availability()
+RETURNS TRIGGER AS $$
+BEGIN
+    -- Check if the user is actually a doctor
+    IF NOT EXISTS (
+        SELECT 1 FROM users 
+        WHERE id = NEW.doctor_id 
+        AND role = 'doctor' 
+        AND is_active = true
+    ) THEN
+        RAISE EXCEPTION 'Doctor availability can only be set for active users with doctor role';
+    END IF;
+    
+    RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
+
+-- Function to convert 12-hour time format to 24-hour format
+CREATE OR REPLACE FUNCTION convert_12hr_to_24hr(
+    p_time_str VARCHAR,
+    p_am_pm VARCHAR
+) RETURNS TIME AS $$
+DECLARE
+    time_parts TEXT[];
+    hour_part INTEGER;
+    minute_part INTEGER;
+    result_time TIME;
+BEGIN
+    -- Split the time string by ':'
+    time_parts := string_to_array(p_time_str, ':');
+    
+    -- Extract hour and minute
+    hour_part := time_parts[1]::INTEGER;
+    minute_part := COALESCE(time_parts[2]::INTEGER, 0);
+    
+    -- Validate input
+    IF hour_part < 1 OR hour_part > 12 THEN
+        RAISE EXCEPTION 'Hour must be between 1 and 12 for 12-hour format';
+    END IF;
+    
+    IF minute_part < 0 OR minute_part > 59 THEN
+        RAISE EXCEPTION 'Minutes must be between 0 and 59';
+    END IF;
+    
+    -- Convert to 24-hour format
+    IF UPPER(p_am_pm) = 'AM' THEN
+        IF hour_part = 12 THEN
+            hour_part := 0; -- 12 AM = 00:xx
+        END IF;
+    ELSIF UPPER(p_am_pm) = 'PM' THEN
+        IF hour_part != 12 THEN
+            hour_part := hour_part + 12; -- PM hours except 12 PM
+        END IF;
+    ELSE
+        RAISE EXCEPTION 'AM/PM indicator must be either AM or PM';
+    END IF;
+    
+    -- Create time
+    result_time := make_time(hour_part, minute_part, 0);
+    
+    RETURN result_time;
+END;
+$$ LANGUAGE plpgsql;
+
+-- Function to convert 24-hour time format to 12-hour format with AM/PM
+CREATE OR REPLACE FUNCTION convert_24hr_to_12hr(p_time TIME)
+RETURNS TEXT AS $$
+DECLARE
+    hour_24 INTEGER;
+    minute_part INTEGER;
+    hour_12 INTEGER;
+    am_pm TEXT;
+    result TEXT;
+BEGIN
+    -- Extract hour and minute from time
+    hour_24 := EXTRACT(HOUR FROM p_time);
+    minute_part := EXTRACT(MINUTE FROM p_time);
+    
+    -- Convert to 12-hour format
+    IF hour_24 = 0 THEN
+        hour_12 := 12;
+        am_pm := 'AM';
+    ELSIF hour_24 < 12 THEN
+        hour_12 := hour_24;
+        am_pm := 'AM';
+    ELSIF hour_24 = 12 THEN
+        hour_12 := 12;
+        am_pm := 'PM';
+    ELSE
+        hour_12 := hour_24 - 12;
+        am_pm := 'PM';
+    END IF;
+    
+    -- Format the result
+    result := hour_12::TEXT || ':' || LPAD(minute_part::TEXT, 2, '0') || ' ' || am_pm;
+    
+    RETURN result;
+END;
+$$ LANGUAGE plpgsql;
+
+-- Helper function to get all availability for a doctor in 12-hour format
+CREATE OR REPLACE FUNCTION get_doctor_availability_12hr(p_doctor_id UUID)
+RETURNS TABLE (
+    id UUID,
+    doctor_id UUID,
+    day_of_week VARCHAR,
+    start_time_12hr TEXT,
+    end_time_12hr TEXT,
+    start_time_24hr TIME,
+    end_time_24hr TIME,
+    is_active BOOLEAN
+) AS $$
+BEGIN
+    RETURN QUERY
+    SELECT 
+        da.id,
+        da.doctor_id,
+        da.day_of_week,
+        convert_24hr_to_12hr(da.start_time) AS start_time_12hr,
+        convert_24hr_to_12hr(da.end_time) AS end_time_12hr,
+        da.start_time AS start_time_24hr,
+        da.end_time AS end_time_24hr,
+        da.is_active
+    FROM doctor_availability da
+    WHERE da.doctor_id = p_doctor_id
+    ORDER BY 
+        CASE da.day_of_week
+            WHEN 'Monday' THEN 1
+            WHEN 'Tuesday' THEN 2
+            WHEN 'Wednesday' THEN 3
+            WHEN 'Thursday' THEN 4
+            WHEN 'Friday' THEN 5
+            WHEN 'Saturday' THEN 6
+            WHEN 'Sunday' THEN 7
+        END,
+        da.start_time;
+END;
+$$ LANGUAGE plpgsql;
+
 -- ===============================================
 -- TRIGGERS
 -- ===============================================
 
 -- Update timestamp triggers
+DROP TRIGGER IF EXISTS update_users_updated_at ON users;
 CREATE TRIGGER update_users_updated_at BEFORE UPDATE ON users FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
+
+DROP TRIGGER IF EXISTS update_patients_updated_at ON patients;
 CREATE TRIGGER update_patients_updated_at BEFORE UPDATE ON patients FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
+
+DROP TRIGGER IF EXISTS update_appointments_updated_at ON appointments;
 CREATE TRIGGER update_appointments_updated_at BEFORE UPDATE ON appointments FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
+
+DROP TRIGGER IF EXISTS update_visits_updated_at ON visits;
 CREATE TRIGGER update_visits_updated_at BEFORE UPDATE ON visits FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
+
+DROP TRIGGER IF EXISTS update_prescriptions_updated_at ON prescriptions;
 CREATE TRIGGER update_prescriptions_updated_at BEFORE UPDATE ON prescriptions FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
+
+DROP TRIGGER IF EXISTS update_doctor_notes_updated_at ON doctor_notes;
 CREATE TRIGGER update_doctor_notes_updated_at BEFORE UPDATE ON doctor_notes FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
 
+DROP TRIGGER IF EXISTS update_doctor_availability_updated_at ON doctor_availability;
+CREATE TRIGGER update_doctor_availability_updated_at BEFORE UPDATE ON doctor_availability FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
+
+DROP TRIGGER IF EXISTS update_queue_tokens_updated_at ON queue_tokens;
+CREATE TRIGGER update_queue_tokens_updated_at BEFORE UPDATE ON queue_tokens FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
+
+DROP TRIGGER IF EXISTS update_appointment_queue_updated_at ON appointment_queue;
+CREATE TRIGGER update_appointment_queue_updated_at BEFORE UPDATE ON appointment_queue FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
+
 -- Auto-generate patient numbers
+DROP TRIGGER IF EXISTS auto_generate_patient_number ON patients;
 CREATE TRIGGER auto_generate_patient_number
     BEFORE INSERT ON patients
     FOR EACH ROW
@@ -345,10 +652,34 @@ CREATE TRIGGER auto_generate_patient_number
     EXECUTE FUNCTION generate_patient_number();
 
 -- Auto-calculate BMI
+DROP TRIGGER IF EXISTS calculate_vitals_bmi ON vitals;
 CREATE TRIGGER calculate_vitals_bmi 
     BEFORE INSERT OR UPDATE ON vitals 
     FOR EACH ROW 
     EXECUTE FUNCTION calculate_bmi();
+
+-- Auto-generate token numbers
+DROP TRIGGER IF EXISTS auto_generate_token_number ON queue_tokens;
+CREATE TRIGGER auto_generate_token_number
+    BEFORE INSERT ON queue_tokens
+    FOR EACH ROW
+    WHEN (NEW.token_number IS NULL OR NEW.token_number = 0)
+    EXECUTE FUNCTION generate_token_number();
+
+-- Auto-calculate queue position
+DROP TRIGGER IF EXISTS auto_calculate_queue_position ON appointment_queue;
+CREATE TRIGGER auto_calculate_queue_position
+    BEFORE INSERT ON appointment_queue
+    FOR EACH ROW
+    WHEN (NEW.queue_position IS NULL OR NEW.queue_position = 0)
+    EXECUTE FUNCTION calculate_queue_position();
+
+-- Validate doctor role for availability
+DROP TRIGGER IF EXISTS validate_doctor_availability_trigger ON doctor_availability;
+CREATE TRIGGER validate_doctor_availability_trigger
+    BEFORE INSERT OR UPDATE ON doctor_availability
+    FOR EACH ROW
+    EXECUTE FUNCTION validate_doctor_availability();
 
 -- ===============================================
 -- ROW LEVEL SECURITY (RLS)
@@ -364,17 +695,46 @@ ALTER TABLE prescriptions ENABLE ROW LEVEL SECURITY;
 ALTER TABLE doctor_notes ENABLE ROW LEVEL SECURITY;
 ALTER TABLE medical_documents ENABLE ROW LEVEL SECURITY;
 ALTER TABLE audit_logs ENABLE ROW LEVEL SECURITY;
+ALTER TABLE doctor_availability ENABLE ROW LEVEL SECURITY;
+ALTER TABLE queue_tokens ENABLE ROW LEVEL SECURITY;
+ALTER TABLE appointment_queue ENABLE ROW LEVEL SECURITY;
 
 -- Basic policies (can be customized later)
+DROP POLICY IF EXISTS "Healthcare staff can access all data" ON users;
 CREATE POLICY "Healthcare staff can access all data" ON users FOR ALL USING (true);
+
+DROP POLICY IF EXISTS "Healthcare staff can access all data" ON patients;
 CREATE POLICY "Healthcare staff can access all data" ON patients FOR ALL USING (true);
+
+DROP POLICY IF EXISTS "Healthcare staff can access all data" ON appointments;
 CREATE POLICY "Healthcare staff can access all data" ON appointments FOR ALL USING (true);
+
+DROP POLICY IF EXISTS "Healthcare staff can access all data" ON visits;
 CREATE POLICY "Healthcare staff can access all data" ON visits FOR ALL USING (true);
+
+DROP POLICY IF EXISTS "Healthcare staff can access all data" ON vitals;
 CREATE POLICY "Healthcare staff can access all data" ON vitals FOR ALL USING (true);
+
+DROP POLICY IF EXISTS "Healthcare staff can access all data" ON prescriptions;
 CREATE POLICY "Healthcare staff can access all data" ON prescriptions FOR ALL USING (true);
+
+DROP POLICY IF EXISTS "Healthcare staff can access all data" ON doctor_notes;
 CREATE POLICY "Healthcare staff can access all data" ON doctor_notes FOR ALL USING (true);
+
+DROP POLICY IF EXISTS "Healthcare staff can access all data" ON medical_documents;
 CREATE POLICY "Healthcare staff can access all data" ON medical_documents FOR ALL USING (true);
+
+DROP POLICY IF EXISTS "Admins can access audit logs" ON audit_logs;
 CREATE POLICY "Admins can access audit logs" ON audit_logs FOR ALL USING (true);
+
+DROP POLICY IF EXISTS "Healthcare staff can access all data" ON doctor_availability;
+CREATE POLICY "Healthcare staff can access all data" ON doctor_availability FOR ALL USING (true);
+
+DROP POLICY IF EXISTS "Healthcare staff can access all data" ON queue_tokens;
+CREATE POLICY "Healthcare staff can access all data" ON queue_tokens FOR ALL USING (true);
+
+DROP POLICY IF EXISTS "Healthcare staff can access all data" ON appointment_queue;
+CREATE POLICY "Healthcare staff can access all data" ON appointment_queue FOR ALL USING (true);
 
 -- ===============================================
 -- SAMPLE DATA
@@ -464,6 +824,7 @@ INSERT INTO users (
 
 -- Insert sample patients
 INSERT INTO patients (
+    patient_number,
     first_name, 
     last_name, 
     date_of_birth, 
@@ -482,20 +843,237 @@ INSERT INTO patients (
     is_active
 ) VALUES 
 (
+    'P000001',
     'Alice', 'Anderson', '1985-03-15', 'Female', '+1234567801', 'alice.anderson@email.com', 
     '123 Main St, City, State 12345', 'Bob Anderson', '+1234567802', 'Spouse', 
     'A+', 'Penicillin', 'Hypertension', 'Health Insurance Co', 'HIC123456', true
 ),
 (
+    'P000002',
     'Robert', 'Wilson', '1990-07-22', 'Male', '+1234567803', 'robert.wilson@email.com', 
     '456 Oak Ave, City, State 12345', 'Mary Wilson', '+1234567804', 'Mother', 
     'O-', 'None known', 'Diabetes Type 2', 'Medical Plus', 'MP789012', true
 ),
 (
+    'P000003',
     'Maria', 'Garcia', '1978-11-08', 'Female', '+1234567805', 'maria.garcia@email.com', 
     '789 Pine Rd, City, State 12345', 'Carlos Garcia', '+1234567806', 'Husband', 
     'B+', 'Shellfish', 'None', 'Family Health', 'FH345678', true
-);
+) ON CONFLICT (patient_number) DO NOTHING;
+
+-- Insert sample doctor availability (for Dr. Smith) - More realistic and varied times
+-- Using the conversion function to store proper 24-hour format in database
+INSERT INTO doctor_availability (
+    doctor_id, 
+    day_of_week, 
+    start_time, 
+    end_time, 
+    is_active
+) VALUES
+-- Monday - Morning shift
+(
+    (SELECT id FROM users WHERE email = 'dr.smith@clinic.com'),
+    'Monday',
+    convert_12hr_to_24hr('9:00', 'AM'),
+    convert_12hr_to_24hr('12:30', 'PM'),
+    true
+),
+-- Monday - Afternoon shift
+(
+    (SELECT id FROM users WHERE email = 'dr.smith@clinic.com'),
+    'Monday',
+    convert_12hr_to_24hr('2:00', 'PM'),
+    convert_12hr_to_24hr('6:00', 'PM'),
+    true
+),
+-- Tuesday - Morning shift
+(
+    (SELECT id FROM users WHERE email = 'dr.smith@clinic.com'),
+    'Tuesday',
+    convert_12hr_to_24hr('8:30', 'AM'),
+    convert_12hr_to_24hr('1:00', 'PM'),
+    true
+),
+-- Tuesday - Evening shift
+(
+    (SELECT id FROM users WHERE email = 'dr.smith@clinic.com'),
+    'Tuesday',
+    convert_12hr_to_24hr('3:00', 'PM'),
+    convert_12hr_to_24hr('7:30', 'PM'),
+    true
+),
+-- Wednesday - Full day
+(
+    (SELECT id FROM users WHERE email = 'dr.smith@clinic.com'),
+    'Wednesday',
+    convert_12hr_to_24hr('9:00', 'AM'),
+    convert_12hr_to_24hr('5:00', 'PM'),
+    true
+),
+-- Thursday - Morning only
+(
+    (SELECT id FROM users WHERE email = 'dr.smith@clinic.com'),
+    'Thursday',
+    convert_12hr_to_24hr('10:00', 'AM'),
+    convert_12hr_to_24hr('2:00', 'PM'),
+    true
+),
+-- Friday - Afternoon/Evening
+(
+    (SELECT id FROM users WHERE email = 'dr.smith@clinic.com'),
+    'Friday',
+    convert_12hr_to_24hr('1:00', 'PM'),
+    convert_12hr_to_24hr('8:00', 'PM'),
+    true
+),
+-- Saturday - Half day
+(
+    (SELECT id FROM users WHERE email = 'dr.smith@clinic.com'),
+    'Saturday',
+    convert_12hr_to_24hr('9:00', 'AM'),
+    convert_12hr_to_24hr('1:00', 'PM'),
+    true
+)
+ON CONFLICT (doctor_id, day_of_week, start_time, end_time) DO NOTHING;
+
+-- Insert sample appointments for testing
+INSERT INTO appointments (
+    patient_id,
+    doctor_id,
+    appointment_date,
+    appointment_time,
+    duration_minutes,
+    appointment_type,
+    reason_for_visit,
+    status,
+    created_by
+) VALUES 
+(
+    (SELECT id FROM patients WHERE email = 'alice.anderson@email.com'),
+    (SELECT id FROM users WHERE email = 'dr.smith@clinic.com'),
+    CURRENT_DATE,
+    '09:00',
+    30,
+    'Follow-up',
+    'Hypertension check-up',
+    'scheduled',
+    (SELECT id FROM users WHERE email = 'admin@clinic.com')
+),
+(
+    (SELECT id FROM patients WHERE email = 'robert.wilson@email.com'),
+    (SELECT id FROM users WHERE email = 'dr.smith@clinic.com'),
+    CURRENT_DATE,
+    '09:30',
+    30,
+    'Regular Check-up',
+    'Diabetes monitoring',
+    'scheduled',
+    (SELECT id FROM users WHERE email = 'admin@clinic.com')
+),
+(
+    (SELECT id FROM patients WHERE email = 'maria.garcia@email.com'),
+    (SELECT id FROM users WHERE email = 'dr.smith@clinic.com'),
+    CURRENT_DATE,
+    '10:00',
+    30,
+    'Consultation',
+    'General health assessment',
+    'scheduled',
+    (SELECT id FROM users WHERE email = 'admin@clinic.com')
+)
+ON CONFLICT DO NOTHING;
+
+-- Insert sample queue tokens
+INSERT INTO queue_tokens (
+    token_number, 
+    patient_id, 
+    doctor_id, 
+    appointment_id, 
+    issued_date, 
+    issued_time, 
+    status, 
+    priority, 
+    estimated_wait_time, 
+    called_at, 
+    served_at, 
+    created_by
+) VALUES 
+(
+    1, 
+    (SELECT id FROM patients WHERE email = 'alice.anderson@email.com'), 
+    (SELECT id FROM users WHERE email = 'dr.smith@clinic.com'), 
+    NULL, 
+    CURRENT_DATE, 
+    NOW(), 
+    'waiting', 
+    1, 
+    15, 
+    NULL, 
+    NULL, 
+    (SELECT id FROM users WHERE email = 'admin@clinic.com')
+),
+(
+    2, 
+    (SELECT id FROM patients WHERE email = 'robert.wilson@email.com'), 
+    (SELECT id FROM users WHERE email = 'dr.smith@clinic.com'), 
+    NULL, 
+    CURRENT_DATE, 
+    NOW(), 
+    'waiting', 
+    1, 
+    10, 
+    NULL, 
+    NULL, 
+    (SELECT id FROM users WHERE email = 'admin@clinic.com')
+),
+(
+    3, 
+    (SELECT id FROM patients WHERE email = 'maria.garcia@email.com'), 
+    (SELECT id FROM users WHERE email = 'dr.smith@clinic.com'), 
+    NULL, 
+    CURRENT_DATE, 
+    NOW(), 
+    'waiting', 
+    1, 
+    20, 
+    NULL, 
+    NULL, 
+    (SELECT id FROM users WHERE email = 'admin@clinic.com')
+) ON CONFLICT (doctor_id, issued_date, token_number) DO NOTHING;
+
+-- Insert sample appointment queue
+INSERT INTO appointment_queue (
+    appointment_id, 
+    doctor_id, 
+    patient_id, 
+    queue_position, 
+    estimated_start_time, 
+    actual_start_time, 
+    actual_end_time, 
+    status, 
+    priority, 
+    notes
+) 
+SELECT 
+    a.id,
+    a.doctor_id,
+    a.patient_id,
+    ROW_NUMBER() OVER (ORDER BY a.appointment_time),
+    a.appointment_date::timestamp + a.appointment_time + (ROW_NUMBER() OVER (ORDER BY a.appointment_time) - 1) * INTERVAL '5 minutes',
+    NULL,
+    NULL,
+    'queued',
+    1,
+    CASE ROW_NUMBER() OVER (ORDER BY a.appointment_time)
+        WHEN 1 THEN 'First in queue'
+        WHEN 2 THEN 'Second in queue'
+        WHEN 3 THEN 'Third in queue'
+        ELSE 'In queue'
+    END
+FROM appointments a
+WHERE a.appointment_date = CURRENT_DATE
+AND a.doctor_id = (SELECT id FROM users WHERE email = 'dr.smith@clinic.com')
+ON CONFLICT DO NOTHING;
 
 -- ===============================================
 -- COMPLETION MESSAGE
@@ -517,6 +1095,9 @@ BEGIN
     RAISE NOTICE '   • doctor_notes (clinical notes)';
     RAISE NOTICE '   • medical_documents (file uploads)';
     RAISE NOTICE '   • audit_logs (security tracking)';
+    RAISE NOTICE '   • doctor_availability (doctor schedules)';
+    RAISE NOTICE '   • queue_tokens (patient queue management)';
+    RAISE NOTICE '   • appointment_queue (appointment scheduling queue)';
     RAISE NOTICE '';
     RAISE NOTICE '✅ Sample Users Created:';
     RAISE NOTICE '   • admin@clinic.com (password: admin123)';
@@ -528,6 +1109,21 @@ BEGIN
     RAISE NOTICE '   • Alice Anderson (Patient P000001)';
     RAISE NOTICE '   • Robert Wilson (Patient P000002)';
     RAISE NOTICE '   • Maria Garcia (Patient P000003)';
+    RAISE NOTICE '';
+    RAISE NOTICE '✅ Doctor Availability Features:';
+    RAISE NOTICE '   • Dynamic time input with AM/PM support';
+    RAISE NOTICE '   • Automatic 12hr to 24hr conversion';
+    RAISE NOTICE '   • Flexible scheduling for any time';
+    RAISE NOTICE '   • Multiple shifts per day supported';
+    RAISE NOTICE '';
+    RAISE NOTICE '🔧 Time Conversion Functions Available:';
+    RAISE NOTICE '   • convert_12hr_to_24hr(time_str, am_pm)';
+    RAISE NOTICE '   • convert_24hr_to_12hr(time)';
+    RAISE NOTICE '   • get_doctor_availability_12hr(doctor_id)';
+    RAISE NOTICE '';
+    RAISE NOTICE '📝 Usage Examples:';
+    RAISE NOTICE '   SELECT convert_12hr_to_24hr(''2:30'', ''PM''); -- Returns 14:30:00';
+    RAISE NOTICE '   SELECT convert_24hr_to_12hr(''14:30''::TIME); -- Returns "2:30 PM"';
     RAISE NOTICE '';
     RAISE NOTICE '🔧 Next Steps:';
     RAISE NOTICE '   1. Test backend connection: npm run db:test';

@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../../components/ui/card';
 import { Button } from '../../components/ui/button';
 import { Input } from '../../components/ui/input';
+import PageLayout from '../../components/PageLayout';
 import { 
   Users, 
   Search, 
@@ -451,35 +452,26 @@ const EmployeeManagement = () => {
   };
 
   return (
-    <div className="min-h-screen bg-gray-50">
-      {/* Header */}
-      <header className="bg-card shadow-sm border-b border-border">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex justify-between items-center h-16">
-            <div className="flex items-center gap-4">
-              <Button 
-                variant="ghost" 
-                size="sm"
-                onClick={() => navigate('/admin/dashboard')}
-                className="flex items-center gap-2 text-card-foreground hover:bg-accent hover:text-accent-foreground"
-              >
-                <ArrowLeft className="h-4 w-4" />
-                Back to Dashboard
-              </Button>
-              <div className="flex items-center">
-                <Users className="h-6 w-6 text-primary mr-3" />
-                <h1 className="text-xl font-semibold text-card-foreground">
-                  Employee Management
-                </h1>
-              </div>
-            </div>
-          </div>
+    <PageLayout
+      title="Employee Management"
+      subtitle="Manage clinic staff and their roles"
+      fullWidth
+    >
+      <div className="space-y-6">
+        {/* Back button */}
+        <div className="flex items-center gap-4">
+          <Button 
+            variant="outline"
+            onClick={() => navigate('/admin/dashboard')}
+            className="flex items-center gap-2"
+          >
+            <ArrowLeft className="h-4 w-4" />
+            Back to Dashboard
+          </Button>
         </div>
-      </header>
 
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        {/* Page Header */}
-        <div className="mb-8">
+        {/* Page Content */}
+        <div className="space-y-8">
           <h2 className="text-3xl font-bold text-foreground">Manage Employees</h2>
           <p className="text-muted-foreground mt-2">Add, edit, and manage clinic staff members</p>
         </div>
@@ -652,8 +644,8 @@ const EmployeeManagement = () => {
             </CardContent>
           </Card>
         )}
-      </div>
-    </div>
+        </div>
+    </PageLayout>
   );
 };
 

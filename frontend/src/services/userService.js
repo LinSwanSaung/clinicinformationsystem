@@ -84,27 +84,6 @@ class UserService {
     }
   }
 
-  // Toggle user status (activate/deactivate)
-  async toggleUserStatus(id, isActive) {
-    try {
-      const response = await apiService.patch(`/users/${id}/status`, { 
-        is_active: isActive 
-      });
-      return response;
-    } catch (error) {
-      throw error;
-    }
-  }
-
-  async getUsersByRole(role) {
-    try {
-      const response = await apiService.get(`/users?role=${role}`);
-      return response;
-    } catch (error) {
-      throw error;
-    }
-  }
-
   async resetUserPassword(id, newPassword) {
     try {
       const response = await apiService.post(`/users/${id}/reset-password`, { 

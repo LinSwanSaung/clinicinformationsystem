@@ -6,26 +6,60 @@ class ApiService {
     this.baseURL = API_BASE_URL;
   }
 
+  // Health check against server root /health
+  async health() {
+    // Derive API origin (strip trailing /api if present)
+    let base = this.baseURL;
+    if (base.endsWith('/api')) {
+      base = base.slice(0, -4);
+    }
+    const res = await fetch(`${base}/health`);
+    if (!res.ok) throw new Error(`Health check failed: ${res.status}`);
+    return res.json();
+  }
+
   async request(endpoint, options = {}) {
-    const url = `${this.baseURL}${endpoint}`;
+    // Support optional params object to be serialized into query string
+    const { params, ...rest } = options;
+    let url = `${this.baseURL}${endpoint}`;
+    if (params && typeof params === 'object') {
+      const qs = new URLSearchParams();
+      Object.entries(params).forEach(([key, value]) => {
+        if (value !== undefined && value !== null) {
+          qs.append(key, String(value));
+        }
+      });
+      const qsStr = qs.toString();
+      if (qsStr) {
+        url += (url.includes('?') ? '&' : '?') + qsStr;
+      }
+    }
     
     const config = {
       headers: {
         'Content-Type': 'application/json',
-        ...options.headers,
+        ...rest.headers,
       },
-      ...options,
+      ...rest,
     };
 
     // Add auth token if available
     const token = localStorage.getItem('authToken');
     if (token) {
       config.headers.Authorization = `Bearer ${token}`;
+    } else if (import.meta.env.DEV) {
+      // In development mode, use a test token if no auth token is present
+      config.headers.Authorization = `Bearer test-token`;
     }
 
     try {
       const response = await fetch(url, config);
       
+      // Handle 204 No Content gracefully
+      if (response.status === 204) {
+        return { success: true };
+      }
+
       let data;
       try {
         data = await response.json();
@@ -44,8 +78,8 @@ class ApiService {
   }
 
   // GET request
-  async get(endpoint) {
-    return this.request(endpoint, { method: 'GET' });
+  async get(endpoint, options = {}) {
+    return this.request(endpoint, { method: 'GET', ...options });
   }
 
   // POST request
@@ -73,8 +107,8 @@ class ApiService {
   }
 
   // DELETE request
-  async delete(endpoint) {
-    return this.request(endpoint, { method: 'DELETE' });
+  async delete(endpoint, options = {}) {
+    return this.request(endpoint, { method: 'DELETE', ...options });
   }
 }
 

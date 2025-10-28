@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../../components/ui/card';
 import { Button } from '../../components/ui/button';
@@ -13,9 +13,28 @@ import {
   UserPlus
 } from 'lucide-react';
 import PageLayout from '@/components/PageLayout';
+import api from '@/services/api';
 
 const AdminDashboard = () => {
   const navigate = useNavigate();
+  const [health, setHealth] = useState({ status: 'UNKNOWN', db: { connected: false } });
+  const [healthLoading, setHealthLoading] = useState(true);
+  const [healthError, setHealthError] = useState('');
+
+  useEffect(() => {
+    let mounted = true;
+    (async () => {
+      try {
+        const h = await api.health();
+        if (mounted) setHealth(h);
+      } catch (e) {
+        if (mounted) setHealthError(e.message || 'Health check failed');
+      } finally {
+        if (mounted) setHealthLoading(false);
+      }
+    })();
+    return () => { mounted = false; };
+  }, []);
 
   const statsCards = [
     {
@@ -162,12 +181,24 @@ const AdminDashboard = () => {
               <CardContent>
                 <div className="space-y-6">
                   <div className="flex items-center justify-between p-4 bg-accent rounded-lg">
-                    <span className="text-lg font-medium text-foreground">Server Load</span>
-                    <span className="text-lg font-bold text-primary">23%</span>
+                    <span className="text-lg font-medium text-foreground">API Status</span>
+                    {healthLoading ? (
+                      <span className="text-lg text-muted-foreground">Checking…</span>
+                    ) : healthError ? (
+                      <span className="text-lg font-bold text-red-500">Unavailable</span>
+                    ) : (
+                      <span className="text-lg font-bold text-green-500">{health.status}</span>
+                    )}
                   </div>
                   <div className="flex items-center justify-between p-4 bg-accent rounded-lg">
                     <span className="text-lg font-medium text-foreground">Database Status</span>
-                    <span className="text-lg font-bold text-green-500">Healthy</span>
+                    {healthLoading ? (
+                      <span className="text-lg text-muted-foreground">Checking…</span>
+                    ) : (
+                      <span className={`text-lg font-bold ${health?.db?.connected ? 'text-green-500' : 'text-red-500'}`}>
+                        {health?.db?.connected ? 'Healthy' : 'Unavailable'}
+                      </span>
+                    )}
                   </div>
                   <div className="flex items-center justify-between p-4 bg-accent rounded-lg">
                     <span className="text-lg font-medium text-foreground">Last Backup</span>

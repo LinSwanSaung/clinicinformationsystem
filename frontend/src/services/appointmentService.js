@@ -64,6 +64,20 @@ class AppointmentService {
       throw error;
     }
   }
+
+  async checkPatientActiveAppointments(patientId) {
+    try {
+      const today = new Date().toISOString().split('T')[0];
+      // Only check for appointments that are actively in today's queue
+      // 'waiting' = patient is in queue waiting to be seen
+      // 'in-progress' = patient is currently being seen
+      // We exclude 'scheduled' because those might be future appointments
+      const response = await apiService.get(`/appointments?patient_id=${patientId}&date=${today}&status=waiting,in-progress`);
+      return response;
+    } catch (error) {
+      throw error;
+    }
+  }
 }
 
 export default new AppointmentService();

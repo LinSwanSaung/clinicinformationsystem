@@ -24,8 +24,9 @@ CREATE TABLE IF NOT EXISTS users (
     last_login TIMESTAMPTZ,
     created_at TIMESTAMPTZ DEFAULT NOW(),
     updated_at TIMESTAMPTZ DEFAULT NOW(),
+    deleted_at TIMESTAMPTZ,
     
-    CONSTRAINT valid_role CHECK (role IN ('admin', 'doctor', 'nurse', 'receptionist')),
+    CONSTRAINT valid_role CHECK (role IN ('admin', 'doctor', 'nurse', 'receptionist', 'cashier', 'pharmacist')),
     CONSTRAINT valid_email CHECK (email ~* '^[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}$')
 );
 
@@ -70,7 +71,7 @@ CREATE TABLE IF NOT EXISTS appointments (
     doctor_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
     appointment_date DATE NOT NULL,
     appointment_time TIME NOT NULL,
-    duration_minutes INTEGER DEFAULT 30,
+    duration_minutes INTEGER DEFAULT 10,
     appointment_type VARCHAR(100),
     reason_for_visit TEXT,
     status VARCHAR(20) DEFAULT 'scheduled',
@@ -258,11 +259,19 @@ CREATE TABLE IF NOT EXISTS queue_tokens (
     appointment_id UUID REFERENCES appointments(id) ON DELETE SET NULL,
     issued_date DATE DEFAULT CURRENT_DATE,
     issued_time TIMESTAMPTZ DEFAULT NOW(),
-    status VARCHAR(20) DEFAULT 'waiting',
+    -- Queue lifecycle
+    status VARCHAR(20) DEFAULT 'waiting', -- waiting|called|serving|completed|missed|cancelled
     priority INTEGER DEFAULT 1,
-    estimated_wait_time INTEGER, -- in minutes
+    estimated_wait_time INTEGER DEFAULT 7, -- minutes patient has to arrive
+    -- Extended lifecycle timestamps (alignment with scheduling and consult)
+    checkin_time TIMESTAMPTZ,
+    ready_at TIMESTAMPTZ,
     called_at TIMESTAMPTZ,
     served_at TIMESTAMPTZ,
+    in_consult_at TIMESTAMPTZ,
+    done_at TIMESTAMPTZ,
+    late_at TIMESTAMPTZ,
+    consult_expected_minutes INTEGER DEFAULT 15, -- target consult duration
     created_by UUID REFERENCES users(id),
     created_at TIMESTAMPTZ DEFAULT NOW(),
     updated_at TIMESTAMPTZ DEFAULT NOW(),
@@ -272,6 +281,31 @@ CREATE TABLE IF NOT EXISTS queue_tokens (
     CONSTRAINT valid_token_number CHECK (token_number > 0),
     UNIQUE(doctor_id, issued_date, token_number)
 );
+
+-- Ensure extended queue columns exist for idempotency (if older deployments)
+DO $$
+BEGIN
+    IF NOT EXISTS (
+        SELECT 1 FROM information_schema.columns
+        WHERE table_schema='public' AND table_name='queue_tokens' AND column_name='checkin_time'
+    ) THEN
+        ALTER TABLE queue_tokens
+            ADD COLUMN checkin_time TIMESTAMPTZ,
+            ADD COLUMN ready_at TIMESTAMPTZ,
+            ADD COLUMN in_consult_at TIMESTAMPTZ,
+            ADD COLUMN done_at TIMESTAMPTZ,
+            ADD COLUMN late_at TIMESTAMPTZ,
+            ADD COLUMN consult_expected_minutes INTEGER DEFAULT 15;
+    END IF;
+
+    -- Make sure estimated_wait_time has default 7
+    IF EXISTS (
+        SELECT 1 FROM information_schema.columns
+        WHERE table_schema='public' AND table_name='queue_tokens' AND column_name='estimated_wait_time'
+    ) THEN
+        ALTER TABLE queue_tokens ALTER COLUMN estimated_wait_time SET DEFAULT 7;
+    END IF;
+END $$;
 
 -- ===============================================
 -- APPOINTMENT QUEUE TABLE
@@ -295,6 +329,21 @@ CREATE TABLE IF NOT EXISTS appointment_queue (
     CONSTRAINT valid_queue_priority CHECK (priority >= 1 AND priority <= 5),
     CONSTRAINT valid_queue_position CHECK (queue_position > 0)
 );
+
+-- ===============================================
+-- CLINIC SETTINGS (global thresholds)
+-- ===============================================
+CREATE TABLE IF NOT EXISTS clinic_settings (
+    key TEXT PRIMARY KEY,
+    late_threshold_minutes INTEGER NOT NULL DEFAULT 7,     -- minutes before marking late/no-show
+    consult_expected_minutes INTEGER NOT NULL DEFAULT 15,  -- target consult length in minutes
+    updated_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+-- Ensure the single global row exists
+INSERT INTO clinic_settings (key)
+VALUES ('global')
+ON CONFLICT (key) DO NOTHING;
 
 -- ===============================================
 -- INDEXES FOR PERFORMANCE
@@ -343,6 +392,12 @@ CREATE INDEX IF NOT EXISTS idx_queue_tokens_doctor_id ON queue_tokens(doctor_id)
 CREATE INDEX IF NOT EXISTS idx_queue_tokens_date ON queue_tokens(issued_date);
 CREATE INDEX IF NOT EXISTS idx_queue_tokens_status ON queue_tokens(status);
 CREATE INDEX IF NOT EXISTS idx_queue_tokens_number ON queue_tokens(doctor_id, issued_date, token_number);
+-- New helpful indexes for lifecycle
+CREATE INDEX IF NOT EXISTS idx_queue_tokens_doctor_status ON queue_tokens(doctor_id, status);
+-- Only one active consult per doctor at a time (status = 'serving')
+CREATE UNIQUE INDEX IF NOT EXISTS uq_queue_one_serving_per_doctor
+    ON queue_tokens(doctor_id)
+    WHERE status = 'serving';
 
 -- Appointment Queue indexes
 CREATE INDEX IF NOT EXISTS idx_appointment_queue_appointment_id ON appointment_queue(appointment_id);
@@ -698,6 +753,7 @@ ALTER TABLE audit_logs ENABLE ROW LEVEL SECURITY;
 ALTER TABLE doctor_availability ENABLE ROW LEVEL SECURITY;
 ALTER TABLE queue_tokens ENABLE ROW LEVEL SECURITY;
 ALTER TABLE appointment_queue ENABLE ROW LEVEL SECURITY;
+ALTER TABLE clinic_settings ENABLE ROW LEVEL SECURITY;
 
 -- Basic policies (can be customized later)
 DROP POLICY IF EXISTS "Healthcare staff can access all data" ON users;
@@ -735,6 +791,8 @@ CREATE POLICY "Healthcare staff can access all data" ON queue_tokens FOR ALL USI
 
 DROP POLICY IF EXISTS "Healthcare staff can access all data" ON appointment_queue;
 CREATE POLICY "Healthcare staff can access all data" ON appointment_queue FOR ALL USING (true);
+DROP POLICY IF EXISTS "Healthcare staff can access all data" ON clinic_settings;
+CREATE POLICY "Healthcare staff can access all data" ON clinic_settings FOR ALL USING (true);
 
 -- ===============================================
 -- SAMPLE DATA
@@ -1007,7 +1065,7 @@ INSERT INTO queue_tokens (
     NOW(), 
     'waiting', 
     1, 
-    15, 
+    DEFAULT, 
     NULL, 
     NULL, 
     (SELECT id FROM users WHERE email = 'admin@clinic.com')
@@ -1021,7 +1079,7 @@ INSERT INTO queue_tokens (
     NOW(), 
     'waiting', 
     1, 
-    10, 
+    DEFAULT, 
     NULL, 
     NULL, 
     (SELECT id FROM users WHERE email = 'admin@clinic.com')
@@ -1035,7 +1093,7 @@ INSERT INTO queue_tokens (
     NOW(), 
     'waiting', 
     1, 
-    20, 
+    DEFAULT, 
     NULL, 
     NULL, 
     (SELECT id FROM users WHERE email = 'admin@clinic.com')
@@ -1074,6 +1132,22 @@ FROM appointments a
 WHERE a.appointment_date = CURRENT_DATE
 AND a.doctor_id = (SELECT id FROM users WHERE email = 'dr.smith@clinic.com')
 ON CONFLICT DO NOTHING;
+
+DO $$
+BEGIN
+  IF EXISTS (
+    SELECT 1 FROM information_schema.tables 
+    WHERE table_schema = 'public' AND table_name = 'users'
+  ) THEN
+    BEGIN
+      ALTER TABLE public.users
+        ADD COLUMN IF NOT EXISTS deleted_at TIMESTAMPTZ;
+    EXCEPTION WHEN others THEN
+      -- ignore if race condition
+      NULL;
+    END;
+  END IF;
+END $$;
 
 -- ===============================================
 -- COMPLETION MESSAGE
@@ -1132,3 +1206,740 @@ BEGIN
     RAISE NOTICE '';
     RAISE NOTICE 'Happy coding! 🏥✨';
 END $$;
+
+-- ===============================================
+-- EMR ENHANCEMENTS MIGRATION
+-- Adds dedicated tables for allergies and diagnoses
+-- Enhances prescriptions table
+-- Run this in Supabase SQL Editor
+-- ===============================================
+
+-- ===============================================
+-- PATIENT ALLERGIES TABLE
+-- ===============================================
+CREATE TABLE IF NOT EXISTS patient_allergies (
+    id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
+    patient_id UUID NOT NULL REFERENCES patients(id) ON DELETE CASCADE,
+    
+    -- Allergy details
+    allergy_name VARCHAR(200) NOT NULL,
+    allergen_type VARCHAR(50), -- medication, food, environmental, other
+    severity VARCHAR(20), -- mild, moderate, severe, life-threatening
+    reaction TEXT, -- description of reaction (e.g., "rash", "anaphylaxis")
+    
+    -- Clinical tracking
+    diagnosed_date DATE,
+    diagnosed_by UUID REFERENCES users(id),
+    verified_date DATE,
+    verified_by UUID REFERENCES users(id),
+    
+    -- Status and notes
+    notes TEXT,
+    is_active BOOLEAN DEFAULT true,
+    
+    -- Timestamps
+    created_at TIMESTAMPTZ DEFAULT NOW(),
+    updated_at TIMESTAMPTZ DEFAULT NOW(),
+    deleted_at TIMESTAMPTZ,
+    
+    -- Constraints
+    CONSTRAINT valid_allergen_type CHECK (
+        allergen_type IN ('medication', 'food', 'environmental', 'latex', 'insect', 'animal', 'other')
+    ),
+    CONSTRAINT valid_severity CHECK (
+        severity IN ('mild', 'moderate', 'severe', 'life-threatening')
+    )
+);
+
+-- Indexes for patient allergies
+CREATE INDEX IF NOT EXISTS idx_patient_allergies_patient_id ON patient_allergies(patient_id);
+CREATE INDEX IF NOT EXISTS idx_patient_allergies_active ON patient_allergies(is_active);
+CREATE INDEX IF NOT EXISTS idx_patient_allergies_severity ON patient_allergies(severity);
+CREATE INDEX IF NOT EXISTS idx_patient_allergies_name ON patient_allergies(allergy_name);
+
+-- ===============================================
+-- PATIENT DIAGNOSES TABLE
+-- ===============================================
+CREATE TABLE IF NOT EXISTS patient_diagnoses (
+    id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
+    patient_id UUID NOT NULL REFERENCES patients(id) ON DELETE CASCADE,
+    visit_id UUID REFERENCES visits(id) ON DELETE SET NULL,
+    diagnosed_by UUID NOT NULL REFERENCES users(id),
+    
+    -- Diagnosis information
+    diagnosis_code VARCHAR(20), -- ICD-10 code
+    diagnosis_name VARCHAR(500) NOT NULL,
+    diagnosis_type VARCHAR(50), -- primary, secondary, differential, rule_out
+    
+    -- Clinical details
+    severity VARCHAR(20), -- mild, moderate, severe, critical
+    status VARCHAR(20) DEFAULT 'active', -- active, resolved, chronic, in_remission, recurring
+    
+    -- Date tracking
+    diagnosed_date DATE NOT NULL,
+    onset_date DATE, -- when symptoms started
+    resolved_date DATE, -- when condition was resolved
+    
+    -- Clinical notes
+    notes TEXT,
+    symptoms TEXT,
+    treatment_plan TEXT,
+    
+    -- Follow-up
+    follow_up_required BOOLEAN DEFAULT false,
+    follow_up_date DATE,
+    
+    -- Timestamps
+    created_at TIMESTAMPTZ DEFAULT NOW(),
+    updated_at TIMESTAMPTZ DEFAULT NOW(),
+    deleted_at TIMESTAMPTZ,
+    
+    -- Constraints
+    CONSTRAINT valid_diagnosis_type CHECK (
+        diagnosis_type IN ('primary', 'secondary', 'differential', 'rule_out', 'chronic', 'acute')
+    ),
+    CONSTRAINT valid_severity CHECK (
+        severity IN ('mild', 'moderate', 'severe', 'critical')
+    ),
+    CONSTRAINT valid_status CHECK (
+        status IN ('active', 'resolved', 'chronic', 'in_remission', 'recurring', 'ruled_out')
+    ),
+    CONSTRAINT valid_date_order CHECK (
+        resolved_date IS NULL OR 
+        onset_date IS NULL OR 
+        resolved_date >= onset_date
+    )
+);
+
+-- Indexes for patient diagnoses
+CREATE INDEX IF NOT EXISTS idx_patient_diagnoses_patient_id ON patient_diagnoses(patient_id);
+CREATE INDEX IF NOT EXISTS idx_patient_diagnoses_visit ON patient_diagnoses(visit_id);
+CREATE INDEX IF NOT EXISTS idx_patient_diagnoses_status ON patient_diagnoses(status);
+CREATE INDEX IF NOT EXISTS idx_patient_diagnoses_date ON patient_diagnoses(diagnosed_date);
+CREATE INDEX IF NOT EXISTS idx_patient_diagnoses_code ON patient_diagnoses(diagnosis_code);
+CREATE INDEX IF NOT EXISTS idx_patient_diagnoses_doctor ON patient_diagnoses(diagnosed_by);
+
+-- ===============================================
+-- ENHANCE PRESCRIPTIONS TABLE
+-- ===============================================
+-- Add optional columns if they don't exist
+DO $$
+BEGIN
+    -- Medication category
+    IF NOT EXISTS (
+        SELECT 1 FROM information_schema.columns
+        WHERE table_schema='public' 
+        AND table_name='prescriptions' 
+        AND column_name='medication_category'
+    ) THEN
+        ALTER TABLE prescriptions 
+        ADD COLUMN medication_category VARCHAR(100);
+    END IF;
+    
+    -- Route of administration
+    IF NOT EXISTS (
+        SELECT 1 FROM information_schema.columns
+        WHERE table_schema='public' 
+        AND table_name='prescriptions' 
+        AND column_name='route_of_administration'
+    ) THEN
+        ALTER TABLE prescriptions 
+        ADD COLUMN route_of_administration VARCHAR(50);
+    END IF;
+    
+    -- Is current flag
+    IF NOT EXISTS (
+        SELECT 1 FROM information_schema.columns
+        WHERE table_schema='public' 
+        AND table_name='prescriptions' 
+        AND column_name='is_current'
+    ) THEN
+        ALTER TABLE prescriptions 
+        ADD COLUMN is_current BOOLEAN DEFAULT true;
+    END IF;
+    
+    -- Discontinuation tracking
+    IF NOT EXISTS (
+        SELECT 1 FROM information_schema.columns
+        WHERE table_schema='public' 
+        AND table_name='prescriptions' 
+        AND column_name='discontinued_date'
+    ) THEN
+        ALTER TABLE prescriptions 
+        ADD COLUMN discontinued_date DATE,
+        ADD COLUMN discontinued_by UUID REFERENCES users(id),
+        ADD COLUMN discontinuation_reason TEXT;
+    END IF;
+END $$;
+
+-- Add indexes for enhanced prescription fields
+CREATE INDEX IF NOT EXISTS idx_prescriptions_current ON prescriptions(is_current);
+CREATE INDEX IF NOT EXISTS idx_prescriptions_category ON prescriptions(medication_category);
+CREATE INDEX IF NOT EXISTS idx_prescriptions_route ON prescriptions(route_of_administration);
+
+-- ===============================================
+-- UPDATE FUNCTIONS
+-- ===============================================
+
+-- Function to automatically update updated_at timestamp
+CREATE OR REPLACE FUNCTION update_updated_at_column()
+RETURNS TRIGGER AS $$
+BEGIN
+    NEW.updated_at = NOW();
+    RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
+
+-- Apply trigger to patient_allergies
+DROP TRIGGER IF EXISTS update_patient_allergies_updated_at ON patient_allergies;
+CREATE TRIGGER update_patient_allergies_updated_at
+    BEFORE UPDATE ON patient_allergies
+    FOR EACH ROW
+    EXECUTE FUNCTION update_updated_at_column();
+
+-- Apply trigger to patient_diagnoses
+DROP TRIGGER IF EXISTS update_patient_diagnoses_updated_at ON patient_diagnoses;
+CREATE TRIGGER update_patient_diagnoses_updated_at
+    BEFORE UPDATE ON patient_diagnoses
+    FOR EACH ROW
+    EXECUTE FUNCTION update_updated_at_column();
+
+-- ===============================================
+-- ROW LEVEL SECURITY (RLS) POLICIES
+-- ===============================================
+
+-- Enable RLS on new tables
+ALTER TABLE patient_allergies ENABLE ROW LEVEL SECURITY;
+ALTER TABLE patient_diagnoses ENABLE ROW LEVEL SECURITY;
+
+-- Patient Allergies Policies
+-- Allow authenticated users to read allergies
+CREATE POLICY "Allow authenticated users to read allergies"
+    ON patient_allergies
+    FOR SELECT
+    USING (auth.role() = 'authenticated');
+
+-- Allow doctors and nurses to insert allergies
+CREATE POLICY "Allow doctors and nurses to insert allergies"
+    ON patient_allergies
+    FOR INSERT
+    WITH CHECK (auth.role() = 'authenticated');
+
+-- Allow doctors and nurses to update allergies
+CREATE POLICY "Allow doctors and nurses to update allergies"
+    ON patient_allergies
+    FOR UPDATE
+    USING (auth.role() = 'authenticated');
+
+-- Patient Diagnoses Policies
+-- Allow authenticated users to read diagnoses
+CREATE POLICY "Allow authenticated users to read diagnoses"
+    ON patient_diagnoses
+    FOR SELECT
+    USING (auth.role() = 'authenticated');
+
+-- Allow doctors to insert diagnoses
+CREATE POLICY "Allow doctors to insert diagnoses"
+    ON patient_diagnoses
+    FOR INSERT
+    WITH CHECK (auth.role() = 'authenticated');
+
+-- Allow doctors to update diagnoses
+CREATE POLICY "Allow doctors to update diagnoses"
+    ON patient_diagnoses
+    FOR UPDATE
+    USING (auth.role() = 'authenticated');
+
+-- ===============================================
+-- HELPER VIEWS
+-- ===============================================
+
+-- View for active patient allergies
+CREATE OR REPLACE VIEW active_patient_allergies AS
+SELECT 
+    pa.*,
+    p.first_name || ' ' || p.last_name AS patient_name,
+    p.patient_number,
+    u.first_name || ' ' || u.last_name AS diagnosed_by_name
+FROM patient_allergies pa
+JOIN patients p ON pa.patient_id = p.id
+LEFT JOIN users u ON pa.diagnosed_by = u.id
+WHERE pa.is_active = true
+  AND pa.deleted_at IS NULL;
+
+-- View for active patient diagnoses
+CREATE OR REPLACE VIEW active_patient_diagnoses AS
+SELECT 
+    pd.*,
+    p.first_name || ' ' || p.last_name AS patient_name,
+    p.patient_number,
+    u.first_name || ' ' || u.last_name AS diagnosed_by_name
+FROM patient_diagnoses pd
+JOIN patients p ON pd.patient_id = p.id
+LEFT JOIN users u ON pd.diagnosed_by = u.id
+WHERE pd.status IN ('active', 'chronic')
+  AND pd.deleted_at IS NULL;
+
+-- View for current medications
+CREATE OR REPLACE VIEW current_patient_medications AS
+SELECT 
+    pr.*,
+    p.first_name || ' ' || p.last_name AS patient_name,
+    p.patient_number,
+    u.first_name || ' ' || u.last_name AS prescribed_by_name
+FROM prescriptions pr
+JOIN patients p ON pr.patient_id = p.id
+LEFT JOIN users u ON pr.doctor_id = u.id
+WHERE pr.is_current = true
+  AND pr.status = 'active';
+
+-- ===============================================
+-- SAMPLE DATA (Optional - for testing)
+-- ===============================================
+
+-- Uncomment below to insert sample data
+
+/*
+-- Sample allergy for existing patient
+INSERT INTO patient_allergies (patient_id, allergy_name, allergen_type, severity, reaction, diagnosed_date)
+SELECT 
+    id,
+    'Penicillin',
+    'medication',
+    'severe',
+    'Anaphylactic reaction - severe breathing difficulty and hives',
+    '2023-01-15'
+FROM patients
+WHERE patient_number = 'P2024-0001'
+LIMIT 1;
+
+-- Sample diagnosis for existing patient
+INSERT INTO patient_diagnoses (patient_id, diagnosis_name, diagnosed_by, diagnosed_date, status, severity)
+SELECT 
+    p.id,
+    'Type 2 Diabetes Mellitus',
+    u.id,
+    '2023-06-20',
+    'chronic',
+    'moderate'
+FROM patients p
+CROSS JOIN users u
+WHERE p.patient_number = 'P2024-0001'
+  AND u.role = 'doctor'
+LIMIT 1;
+*/
+
+-- ===============================================
+-- MIGRATION COMPLETE
+-- ===============================================
+-- Run this script in Supabase SQL Editor
+-- Then create corresponding models, services, and routes in backend
+-- ===============================================
+
+
+-- Migration: Add visit_id to queue_tokens table
+-- Purpose: Link each queue token to its specific visit for proper vitals tracking
+-- Date: 2025-10-15
+
+-- Add visit_id column to queue_tokens
+ALTER TABLE queue_tokens
+ADD COLUMN IF NOT EXISTS visit_id UUID REFERENCES visits(id) ON DELETE SET NULL;
+
+CREATE INDEX IF NOT EXISTS idx_queue_tokens_visit_id ON queue_tokens(visit_id);
+
+ALTER TABLE visits
+ADD COLUMN IF NOT EXISTS visit_start_time TIMESTAMPTZ,
+ADD COLUMN IF NOT EXISTS visit_end_time TIMESTAMPTZ;
+
+CREATE INDEX IF NOT EXISTS idx_visits_start_time ON visits(visit_start_time);
+CREATE INDEX IF NOT EXISTS idx_visits_end_time ON visits(visit_end_time);
+
+-- Add visit_id column to patient_allergies
+ALTER TABLE patient_allergies
+ADD COLUMN IF NOT EXISTS visit_id UUID REFERENCES visits(id);
+
+-- Create index for better query performance
+CREATE INDEX IF NOT EXISTS idx_patient_allergies_visit_id ON patient_allergies(visit_id);
+
+-- Add comment
+COMMENT ON COLUMN patient_allergies.visit_id IS 'Links the allergy to the specific visit when it was recorded';
+
+-- Add category column to patient_diagnoses
+ALTER TABLE patient_diagnoses
+ADD COLUMN IF NOT EXISTS category VARCHAR(50) DEFAULT 'primary';
+
+-- Add comment
+COMMENT ON COLUMN patient_diagnoses.category IS 'Category of diagnosis: primary, secondary, comorbidity, rule-out, working, differential';
+
+-- Add diagnosis_date column to patient_diagnoses
+ALTER TABLE patient_diagnoses
+ADD COLUMN IF NOT EXISTS diagnosis_date TIMESTAMPTZ DEFAULT NOW();
+
+-- Add comment
+COMMENT ON COLUMN patient_diagnoses.diagnosis_date IS 'Date when the diagnosis was made';
+
+-- ===============================================
+-- PURCHASING/BILLING SYSTEM - New Tables
+-- Run this SQL in your Supabase SQL Editor
+-- ===============================================
+
+-- ===============================================
+-- SERVICES TABLE
+-- Available services that can be billed (consultations, procedures, tests, etc.)
+-- ===============================================
+CREATE TABLE IF NOT EXISTS services (
+    id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
+    service_code VARCHAR(20) UNIQUE NOT NULL,
+    service_name VARCHAR(255) NOT NULL,
+    description TEXT,
+    category VARCHAR(50) NOT NULL, -- consultation, procedure, laboratory, imaging, other
+    default_price DECIMAL(10, 2) NOT NULL DEFAULT 0.00,
+    is_active BOOLEAN DEFAULT true,
+    created_at TIMESTAMPTZ DEFAULT NOW(),
+    updated_at TIMESTAMPTZ DEFAULT NOW(),
+    
+    CONSTRAINT valid_category CHECK (category IN ('consultation', 'procedure', 'laboratory', 'imaging', 'pharmacy', 'other'))
+);
+
+-- ===============================================
+-- INVOICES TABLE
+-- Main invoice/bill for each visit
+-- ===============================================
+CREATE TABLE IF NOT EXISTS invoices (
+    id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
+    invoice_number VARCHAR(50) UNIQUE NOT NULL,
+    visit_id UUID NOT NULL REFERENCES visits(id) ON DELETE CASCADE,
+    patient_id UUID NOT NULL REFERENCES patients(id) ON DELETE CASCADE,
+    
+    -- Financial details
+    subtotal DECIMAL(10, 2) NOT NULL DEFAULT 0.00,
+    discount_amount DECIMAL(10, 2) DEFAULT 0.00,
+    discount_percentage DECIMAL(5, 2) DEFAULT 0.00,
+    tax_amount DECIMAL(10, 2) DEFAULT 0.00,
+    total_amount DECIMAL(10, 2) NOT NULL DEFAULT 0.00,
+    paid_amount DECIMAL(10, 2) DEFAULT 0.00,
+    balance DECIMAL(10, 2) DEFAULT 0.00,
+    
+    -- Status and metadata
+    status VARCHAR(20) DEFAULT 'pending', -- pending, partial, paid, cancelled
+    payment_method VARCHAR(50), -- cash, card, insurance, mobile_payment
+    payment_notes TEXT,
+    
+    -- Audit fields
+    created_by UUID REFERENCES users(id),
+    created_at TIMESTAMPTZ DEFAULT NOW(),
+    completed_by UUID REFERENCES users(id), -- cashier who completed
+    completed_at TIMESTAMPTZ,
+    cancelled_by UUID REFERENCES users(id),
+    cancelled_at TIMESTAMPTZ,
+    cancelled_reason TEXT,
+    updated_at TIMESTAMPTZ DEFAULT NOW(),
+    
+    CONSTRAINT valid_invoice_status CHECK (status IN ('pending', 'partial', 'paid', 'cancelled')),
+    CONSTRAINT valid_payment_method CHECK (payment_method IN ('cash', 'card', 'insurance', 'mobile_payment', 'mixed'))
+);
+
+-- ===============================================
+-- INVOICE ITEMS TABLE
+-- Individual line items on an invoice (services, medicines, etc.)
+-- ===============================================
+CREATE TABLE IF NOT EXISTS invoice_items (
+    id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
+    invoice_id UUID NOT NULL REFERENCES invoices(id) ON DELETE CASCADE,
+    
+    -- Item details
+    item_type VARCHAR(20) NOT NULL, -- service, medicine, other
+    item_id UUID, -- Reference to service_id or prescription_id
+    item_name VARCHAR(255) NOT NULL,
+    item_description TEXT,
+    
+    -- Pricing
+    quantity DECIMAL(10, 2) NOT NULL DEFAULT 1.00,
+    unit_price DECIMAL(10, 2) NOT NULL DEFAULT 0.00,
+    discount_amount DECIMAL(10, 2) DEFAULT 0.00,
+    total_price DECIMAL(10, 2) NOT NULL DEFAULT 0.00,
+    
+    -- Metadata
+    added_by UUID REFERENCES users(id), -- doctor or cashier who added
+    added_at TIMESTAMPTZ DEFAULT NOW(),
+    notes TEXT,
+    
+    CONSTRAINT valid_item_type CHECK (item_type IN ('service', 'medicine', 'other'))
+);
+
+-- ===============================================
+-- PAYMENT TRANSACTIONS TABLE
+-- Track individual payments made against an invoice
+-- ===============================================
+CREATE TABLE IF NOT EXISTS payment_transactions (
+    id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
+    invoice_id UUID NOT NULL REFERENCES invoices(id) ON DELETE CASCADE,
+    
+    -- Payment details
+    amount DECIMAL(10, 2) NOT NULL,
+    payment_method VARCHAR(50) NOT NULL,
+    payment_reference VARCHAR(100), -- receipt number, transaction ID, etc.
+    payment_notes TEXT,
+    
+    -- Audit
+    received_by UUID REFERENCES users(id), -- cashier
+    received_at TIMESTAMPTZ DEFAULT NOW(),
+    
+    CONSTRAINT valid_payment_method_tx CHECK (payment_method IN ('cash', 'card', 'insurance', 'mobile_payment'))
+);
+
+-- ===============================================
+-- NOTE: Medicine Inventory - NOT IMPLEMENTED
+-- Medicine prices will be manually entered by cashier
+-- No inventory tracking per user requirement
+-- ===============================================
+
+-- ===============================================
+-- INDEXES for Performance
+-- ===============================================
+CREATE INDEX idx_invoices_visit_id ON invoices(visit_id);
+CREATE INDEX idx_invoices_patient_id ON invoices(patient_id);
+CREATE INDEX idx_invoices_status ON invoices(status);
+CREATE INDEX idx_invoices_invoice_number ON invoices(invoice_number);
+CREATE INDEX idx_invoice_items_invoice_id ON invoice_items(invoice_id);
+CREATE INDEX idx_payment_transactions_invoice_id ON payment_transactions(invoice_id);
+CREATE INDEX idx_services_category ON services(category);
+CREATE INDEX idx_services_is_active ON services(is_active);
+
+-- ===============================================
+-- TRIGGERS for updated_at
+-- ===============================================
+CREATE TRIGGER update_services_updated_at BEFORE UPDATE ON services 
+    FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
+
+CREATE TRIGGER update_invoices_updated_at BEFORE UPDATE ON invoices 
+    FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
+
+-- ===============================================
+-- FUNCTION: Auto-generate Invoice Number
+-- ===============================================
+CREATE OR REPLACE FUNCTION generate_invoice_number()
+RETURNS VARCHAR AS $$
+DECLARE
+    new_number VARCHAR;
+    sequence_num INTEGER;
+BEGIN
+    -- Get the next sequence number for today
+    SELECT COUNT(*) + 1 INTO sequence_num
+    FROM invoices
+    WHERE DATE(created_at) = CURRENT_DATE;
+    
+    -- Format: INV-YYYYMMDD-0001
+    new_number := 'INV-' || TO_CHAR(CURRENT_DATE, 'YYYYMMDD') || '-' || LPAD(sequence_num::TEXT, 4, '0');
+    
+    RETURN new_number;
+END;
+$$ LANGUAGE plpgsql;
+
+-- ===============================================
+-- TRIGGER: Auto-generate invoice number on insert
+-- ===============================================
+CREATE OR REPLACE FUNCTION set_invoice_number()
+RETURNS TRIGGER AS $$
+BEGIN
+    IF NEW.invoice_number IS NULL THEN
+        NEW.invoice_number := generate_invoice_number();
+    END IF;
+    RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
+
+CREATE TRIGGER trigger_set_invoice_number
+    BEFORE INSERT ON invoices
+    FOR EACH ROW
+    EXECUTE FUNCTION set_invoice_number();
+
+-- ===============================================
+-- ENABLE ROW LEVEL SECURITY
+-- ===============================================
+ALTER TABLE services ENABLE ROW LEVEL SECURITY;
+ALTER TABLE invoices ENABLE ROW LEVEL SECURITY;
+ALTER TABLE invoice_items ENABLE ROW LEVEL SECURITY;
+ALTER TABLE payment_transactions ENABLE ROW LEVEL SECURITY;
+
+-- ===============================================
+-- RLS POLICIES (Allow all for authenticated users during development)
+-- ===============================================
+DROP POLICY IF EXISTS "Healthcare staff can access all data" ON services;
+CREATE POLICY "Healthcare staff can access all data" ON services FOR ALL USING (true);
+
+DROP POLICY IF EXISTS "Healthcare staff can access all data" ON invoices;
+CREATE POLICY "Healthcare staff can access all data" ON invoices FOR ALL USING (true);
+
+DROP POLICY IF EXISTS "Healthcare staff can access all data" ON invoice_items;
+CREATE POLICY "Healthcare staff can access all data" ON invoice_items FOR ALL USING (true);
+
+DROP POLICY IF EXISTS "Healthcare staff can access all data" ON payment_transactions;
+CREATE POLICY "Healthcare staff can access all data" ON payment_transactions FOR ALL USING (true);
+
+-- ===============================================
+-- SAMPLE DATA - Common Services
+-- ===============================================
+INSERT INTO services (service_code, service_name, description, category, default_price) VALUES
+('CONS-GEN', 'General Consultation', 'General medical consultation with doctor', 'consultation', 50.00),
+('CONS-SPEC', 'Specialist Consultation', 'Consultation with specialist doctor', 'consultation', 100.00),
+('CONS-FOLL', 'Follow-up Consultation', 'Follow-up visit', 'consultation', 30.00),
+('LAB-CBC', 'Complete Blood Count', 'CBC laboratory test', 'laboratory', 25.00),
+('LAB-URIN', 'Urinalysis', 'Complete urinalysis', 'laboratory', 15.00),
+('LAB-GLUC', 'Blood Glucose Test', 'Fasting blood glucose', 'laboratory', 20.00),
+('IMG-XRAY', 'X-Ray', 'Digital X-Ray imaging', 'imaging', 75.00),
+('PROC-INJ', 'Injection/IV', 'Medication injection or IV administration', 'procedure', 10.00),
+('PROC-DRESS', 'Wound Dressing', 'Wound cleaning and dressing', 'procedure', 20.00),
+('PROC-SUTUR', 'Suturing', 'Minor wound suturing', 'procedure', 50.00);
+
+-- ===============================================
+-- VERIFICATION QUERIES
+-- ===============================================
+-- Run these to verify the tables were created successfully:
+
+-- Check services
+-- SELECT * FROM services ORDER BY category, service_name;
+
+-- Check table structure
+-- SELECT table_name FROM information_schema.tables 
+-- WHERE table_schema = 'public' 
+-- AND table_name IN ('services', 'invoices', 'invoice_items', 'payment_transactions')
+-- ORDER BY table_name;
+
+-- Create notifications table
+CREATE TABLE IF NOT EXISTS notifications (
+  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  user_id UUID REFERENCES users(id) ON DELETE CASCADE,
+  title VARCHAR(255) NOT NULL,
+  message TEXT NOT NULL,
+  type VARCHAR(50) DEFAULT 'info', -- info, success, warning, error
+  related_entity_type VARCHAR(50), -- visit, appointment, patient, etc.
+  related_entity_id UUID,
+  is_read BOOLEAN DEFAULT FALSE,
+  created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+  read_at TIMESTAMP WITH TIME ZONE
+);
+
+-- Create index for faster queries
+CREATE INDEX IF NOT EXISTS idx_notifications_user_id ON notifications(user_id);
+CREATE INDEX IF NOT EXISTS idx_notifications_is_read ON notifications(is_read);
+CREATE INDEX IF NOT EXISTS idx_notifications_created_at ON notifications(created_at DESC);
+
+-- Enable RLS
+ALTER TABLE notifications ENABLE ROW LEVEL SECURITY;
+
+-- Policy: Users can only see their own notifications
+CREATE POLICY "Users can view own notifications" ON notifications
+  FOR SELECT USING (auth.uid() = user_id);
+
+-- Policy: System can create notifications
+CREATE POLICY "System can create notifications" ON notifications
+  FOR INSERT WITH CHECK (true);
+
+-- Policy: Users can update their own notifications (mark as read)
+CREATE POLICY "Users can update own notifications" ON notifications
+  FOR UPDATE USING (auth.uid() = user_id);
+
+COMMENT ON TABLE notifications IS 'User notifications for various system events';
+COMMENT ON COLUMN notifications.type IS 'Type of notification: info, success, warning, error';
+COMMENT ON COLUMN notifications.related_entity_type IS 'Entity type the notification relates to';
+COMMENT ON COLUMN notifications.related_entity_id IS 'ID of the related entity';
+
+
+-- ===============================================
+-- PAYMENT HOLDS & PARTIAL PAYMENTS MIGRATION
+-- Add support for partial payments and payment holds
+-- ===============================================
+
+-- Step 1: Create payment_transactions table for tracking multiple payments per invoice
+CREATE TABLE IF NOT EXISTS payment_transactions (
+    id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
+    invoice_id UUID NOT NULL REFERENCES invoices(id) ON DELETE CASCADE,
+    
+    -- Payment details
+    payment_date TIMESTAMPTZ DEFAULT NOW(),
+    amount DECIMAL(10, 2) NOT NULL CHECK (amount > 0),
+    payment_method VARCHAR(50),
+    payment_notes TEXT,
+    
+    -- Tracking
+    processed_by UUID REFERENCES users(id),
+    created_at TIMESTAMPTZ DEFAULT NOW(),
+    updated_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+-- Step 2: Add payment tracking columns to invoices table
+ALTER TABLE invoices 
+ADD COLUMN IF NOT EXISTS amount_paid DECIMAL(10, 2) DEFAULT 0,
+ADD COLUMN IF NOT EXISTS balance_due DECIMAL(10, 2) DEFAULT 0,
+ADD COLUMN IF NOT EXISTS on_hold BOOLEAN DEFAULT false,
+ADD COLUMN IF NOT EXISTS hold_reason TEXT,
+ADD COLUMN IF NOT EXISTS hold_date TIMESTAMPTZ,
+ADD COLUMN IF NOT EXISTS payment_due_date DATE;
+
+-- Step 3: Initialize existing invoices
+UPDATE invoices
+SET 
+    amount_paid = CASE WHEN status = 'paid' THEN total_amount ELSE 0 END,
+    balance_due = CASE WHEN status = 'paid' THEN 0 ELSE total_amount END,
+    on_hold = CASE WHEN status != 'paid' THEN true ELSE false END
+WHERE amount_paid IS NULL OR balance_due IS NULL;
+
+-- Step 4: Update invoice status constraint to include partial_paid
+ALTER TABLE invoices DROP CONSTRAINT IF EXISTS valid_invoice_status;
+ALTER TABLE invoices ADD CONSTRAINT valid_invoice_status 
+    CHECK (status IN ('draft', 'pending', 'partial_paid', 'paid', 'cancelled', 'refunded'));
+
+-- Step 5: Create indexes for better performance
+CREATE INDEX IF NOT EXISTS idx_payment_transactions_invoice ON payment_transactions(invoice_id);
+CREATE INDEX IF NOT EXISTS idx_payment_transactions_date ON payment_transactions(payment_date DESC);
+CREATE INDEX IF NOT EXISTS idx_invoices_on_hold ON invoices(on_hold) WHERE on_hold = true;
+CREATE INDEX IF NOT EXISTS idx_invoices_balance_due ON invoices(patient_id, balance_due) WHERE balance_due > 0;
+CREATE INDEX IF NOT EXISTS idx_invoices_payment_due ON invoices(payment_due_date) WHERE payment_due_date IS NOT NULL;
+
+-- Step 6: Enable RLS on payment_transactions
+ALTER TABLE payment_transactions ENABLE ROW LEVEL SECURITY;
+
+-- Step 7: Create RLS policies for payment_transactions
+DROP POLICY IF EXISTS "Users can view payment transactions" ON payment_transactions;
+CREATE POLICY "Users can view payment transactions" ON payment_transactions
+    FOR SELECT USING (true);
+
+DROP POLICY IF EXISTS "Cashiers can create payment transactions" ON payment_transactions;
+CREATE POLICY "Cashiers can create payment transactions" ON payment_transactions
+    FOR INSERT WITH CHECK (true);
+
+DROP POLICY IF EXISTS "Admins can update payment transactions" ON payment_transactions;
+CREATE POLICY "Admins can update payment transactions" ON payment_transactions
+    FOR UPDATE USING (true);
+
+-- Step 8: Create helper view for outstanding invoices
+CREATE OR REPLACE VIEW outstanding_invoices AS
+SELECT 
+    i.id,
+    i.invoice_number,
+    i.patient_id,
+    p.first_name,
+    p.last_name,
+    p.patient_number,
+    i.visit_id,
+    i.total_amount,
+    i.amount_paid,
+    i.balance_due,
+    i.on_hold,
+    i.hold_reason,
+    i.payment_due_date,
+    i.created_at,
+    i.hold_date,
+    COUNT(pt.id) as payment_count,
+    MAX(pt.payment_date) as last_payment_date
+FROM invoices i
+LEFT JOIN patients p ON i.patient_id = p.id
+LEFT JOIN payment_transactions pt ON i.id = pt.invoice_id
+WHERE i.balance_due > 0
+GROUP BY i.id, p.id
+ORDER BY i.created_at DESC;
+
+COMMENT ON TABLE payment_transactions IS 'Track individual payment transactions for invoices (supports partial payments)';
+COMMENT ON VIEW outstanding_invoices IS 'View of all invoices with outstanding balance';
+

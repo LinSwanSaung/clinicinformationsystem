@@ -15,6 +15,18 @@ import vitalsRoutes from './routes/vitals.routes.js';
 import medicalRecordRoutes from './routes/medicalRecord.routes.js';
 import documentRoutes from './routes/document.routes.js';
 import doctorAvailabilityRoutes from './routes/doctorAvailability.routes.js';
+import clinicSettingsRoutes from './routes/clinicSettings.routes.js';
+import queueRoutes from './routes/queue.routes.js';
+import patientAllergyRoutes from './routes/patientAllergy.routes.js';
+import patientDiagnosisRoutes from './routes/patientDiagnosis.routes.js';
+import visitRoutes from './routes/visit.routes.js';
+import prescriptionRoutes from './routes/prescription.routes.js';
+import doctorNoteRoutes from './routes/doctorNote.routes.js';
+import serviceRoutes from './routes/service.routes.js';
+import invoiceRoutes from './routes/invoice.routes.js';
+import paymentRoutes from './routes/payment.routes.js';
+import notificationRoutes from './routes/notification.routes.js';
+import { testConnection } from './config/database.js';
 
 // Load environment variables
 dotenv.config();
@@ -30,13 +42,17 @@ app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true, limit: '10mb' }));
 app.use(requestLogger);
 
-// Health check endpoint
-app.get('/health', (req, res) => {
+// Health check endpoint (includes DB connectivity)
+app.get('/health', async (req, res) => {
+  const dbConnected = await testConnection();
   res.status(200).json({
     status: 'OK',
     message: 'RealCIS API is running',
     timestamp: new Date().toISOString(),
-    environment: process.env.NODE_ENV
+    environment: process.env.NODE_ENV,
+    db: {
+      connected: dbConnected
+    }
   });
 });
 
@@ -49,6 +65,17 @@ app.use('/api/vitals', vitalsRoutes);
 app.use('/api/medical-records', medicalRecordRoutes);
 app.use('/api/documents', documentRoutes);
 app.use('/api/doctor-availability', doctorAvailabilityRoutes);
+app.use('/api/clinic-settings', clinicSettingsRoutes);
+app.use('/api/queue', queueRoutes);
+app.use('/api/patient-allergies', patientAllergyRoutes);
+app.use('/api/patient-diagnoses', patientDiagnosisRoutes);
+app.use('/api/visits', visitRoutes);
+app.use('/api/prescriptions', prescriptionRoutes);
+app.use('/api/doctor-notes', doctorNoteRoutes);
+app.use('/api/services', serviceRoutes);
+app.use('/api/invoices', invoiceRoutes);
+app.use('/api/payments', paymentRoutes);
+app.use('/api/notifications', notificationRoutes);
 
 // 404 handler
 app.use('*', (req, res) => {

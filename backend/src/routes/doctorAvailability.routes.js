@@ -12,8 +12,8 @@ const doctorAvailabilityService = new DoctorAvailabilityService();
  * @access  Public (for development) - TODO: Re-enable auth when ready
  */
 router.get('/',
-  // authenticate,
-  // authorize(['admin', 'receptionist', 'doctor']),
+  authenticate,
+  authorize(['admin', 'receptionist', 'doctor']),
   asyncHandler(async (req, res) => {
     const { doctor_id } = req.query;
     
@@ -35,8 +35,8 @@ router.get('/',
  * @access  Public (for development) - TODO: Re-enable auth when ready
  */
 router.get('/doctor/:doctorId',
-  // authenticate,
-  // authorize(['admin', 'receptionist', 'doctor']),
+  authenticate,
+  authorize(['admin', 'receptionist', 'doctor']),
   asyncHandler(async (req, res) => {
     const { doctorId } = req.params;
     
@@ -56,8 +56,8 @@ router.get('/doctor/:doctorId',
  * @access  Public (for development) - TODO: Re-enable auth when ready
  */
 router.get('/available-doctors',
-  // authenticate,
-  // authorize(['admin', 'receptionist']),
+  authenticate,
+  authorize(['admin', 'receptionist']),
   asyncHandler(async (req, res) => {
     const { day_of_week, time } = req.query;
 
@@ -87,8 +87,8 @@ router.get('/available-doctors',
  * @access  Public (for development) - TODO: Re-enable auth when ready
  */
 router.get('/check-availability',
-  // authenticate,
-  // authorize(['admin', 'receptionist']),
+  authenticate,
+  authorize(['admin', 'receptionist']),
   asyncHandler(async (req, res) => {
     const { doctor_id, day_of_week, time } = req.query;
 
@@ -114,13 +114,71 @@ router.get('/check-availability',
 );
 
 /**
+ * @route   GET /api/doctor-availability/:doctorId/check-slot
+ * @desc    Check if a specific time slot is available for booking
+ * @access  Private (Receptionist, Admin)
+ */
+router.get('/:doctorId/check-slot',
+  authenticate,
+  authorize(['admin', 'receptionist']),
+  asyncHandler(async (req, res) => {
+    const { doctorId } = req.params;
+    const { date, time } = req.query;
+
+    if (!date || !time) {
+      return res.status(400).json({
+        success: false,
+        message: 'date and time parameters are required'
+      });
+    }
+
+    const result = await doctorAvailabilityService.checkTimeSlotAvailability(doctorId, date, time);
+
+    res.status(200).json({
+      success: true,
+      message: 'Time slot availability checked successfully',
+      data: result
+    });
+  })
+);
+
+/**
+ * @route   GET /api/doctor-availability/:doctorId/available-slots
+ * @desc    Get all available time slots for a doctor on a specific date
+ * @access  Private (Receptionist, Admin)
+ */
+router.get('/:doctorId/available-slots',
+  authenticate,
+  authorize(['admin', 'receptionist']),
+  asyncHandler(async (req, res) => {
+    const { doctorId } = req.params;
+    const { date } = req.query;
+
+    if (!date) {
+      return res.status(400).json({
+        success: false,
+        message: 'date parameter is required'
+      });
+    }
+
+    const result = await doctorAvailabilityService.getAvailableTimeSlots(doctorId, date);
+
+    res.status(200).json({
+      success: true,
+      message: 'Available time slots retrieved successfully',
+      data: result
+    });
+  })
+);
+
+/**
  * @route   POST /api/doctor-availability
  * @desc    Create new doctor availability record
  * @access  Public (for development) - TODO: Re-enable auth when ready
  */
 router.post('/',
-  // authenticate,
-  // authorize(['admin']),
+  authenticate,
+  authorize(['admin']),
   asyncHandler(async (req, res) => {
     const availability = await doctorAvailabilityService.createAvailability(req.body);
 
@@ -138,8 +196,8 @@ router.post('/',
  * @access  Public (for development) - TODO: Re-enable auth when ready
  */
 router.put('/:id',
-  // authenticate,
-  // authorize(['admin']),
+  authenticate,
+  authorize(['admin']),
   asyncHandler(async (req, res) => {
     const { id } = req.params;
     
@@ -159,8 +217,8 @@ router.put('/:id',
  * @access  Public (for development) - TODO: Re-enable auth when ready
  */
 router.delete('/:id',
-  // authenticate,
-  // authorize(['admin']),
+  authenticate,
+  authorize(['admin']),
   asyncHandler(async (req, res) => {
     const { id } = req.params;
     

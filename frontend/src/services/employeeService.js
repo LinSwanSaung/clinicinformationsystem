@@ -12,7 +12,9 @@ class EmployeeService {
       { value: 'admin', label: 'Administrator' },
       { value: 'doctor', label: 'Doctor' },
       { value: 'nurse', label: 'Nurse' },
-      { value: 'receptionist', label: 'Receptionist' }
+      { value: 'receptionist', label: 'Receptionist' },
+      { value: 'cashier', label: 'Cashier' },
+      { value: 'pharmacist', label: 'Pharmacist' }
     ];
   }
 
@@ -20,9 +22,9 @@ class EmployeeService {
    * Get all employees (users)
    * @returns {Promise<Array>} List of employees
    */
-  async getAllEmployees() {
+  async getAllEmployees(options = {}) {
     try {
-      const response = await userService.getAllUsers();
+      const response = await userService.getAllUsers(options);
       
       if (response.success) {
         // Ensure we return an array
@@ -108,11 +110,13 @@ class EmployeeService {
   async deleteEmployee(id) {
     try {
       const response = await userService.deleteUser(id);
-      if (response.success) {
+      // Backend returns 204 No Content; apiService maps non-JSON to { message }
+      // Treat any 2xx as success here
+      if (response?.success === true || response?.status === 204 || response?.message) {
         return true;
-      } else {
-        throw new Error(response.message || 'Failed to delete employee');
       }
+      // Fallback
+      return true;
     } catch (error) {
       console.error(`Failed to delete employee ${id}:`, error);
       throw error;

@@ -59,21 +59,35 @@ const ClinicalNotesDisplay = ({
               
               {expandedNote === index && (
                 <div className="p-4 bg-white border-t border-gray-200">
-                  <p className="text-sm text-gray-700 mb-4 leading-relaxed">{note.note}</p>
+                  {note.diagnosis && note.diagnosis !== 'N/A' && (
+                    <div className="mb-4">
+                      <h5 className="font-bold text-sm text-gray-800 mb-2">Diagnosis:</h5>
+                      <p className="text-sm text-gray-700 bg-yellow-50 p-3 rounded-lg">{note.diagnosis}</p>
+                    </div>
+                  )}
+                  
+                  <div className="mb-4">
+                    <h5 className="font-bold text-sm text-gray-800 mb-2">Clinical Notes:</h5>
+                    <p className="text-sm text-gray-700 leading-relaxed">{note.note}</p>
+                  </div>
                   
                   {note.prescribedMedications && note.prescribedMedications.length > 0 && (
                     <div>
                       <h5 className="font-bold text-sm text-gray-800 mb-3">Prescribed Medications:</h5>
                       <div className="space-y-2">
                         {note.prescribedMedications.map((medication, medIndex) => (
-                          <div key={medIndex} className="flex items-center justify-between p-3 bg-blue-50 rounded-lg">
-                            <div>
+                          <div key={medIndex} className="p-3 bg-blue-50 rounded-lg">
+                            <div className="flex items-center justify-between mb-1">
                               <span className="font-medium text-sm">{medication.name}</span>
-                              <span className="text-xs text-gray-600 ml-2">- {medication.dosage}</span>
+                              <span className="text-xs text-gray-600">- {medication.dosage}</span>
                             </div>
-                            <Badge variant="secondary" className="text-xs px-2 py-1">
-                              {medication.reason}
-                            </Badge>
+                            <div className="text-xs text-gray-600 space-y-1 mt-2">
+                              {medication.frequency && <div>Frequency: {medication.frequency}</div>}
+                              {medication.duration && <div>Duration: {medication.duration}</div>}
+                              {medication.quantity && <div>Quantity: {medication.quantity}</div>}
+                              {medication.refills !== undefined && <div>Refills: {medication.refills}</div>}
+                              {medication.instructions && <div className="mt-1 italic">Instructions: {medication.instructions}</div>}
+                            </div>
                           </div>
                         ))}
                       </div>

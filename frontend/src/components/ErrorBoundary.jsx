@@ -31,10 +31,10 @@ class ErrorBoundary extends React.Component {
               <details className="text-left bg-gray-100 p-4 rounded text-sm">
                 <summary className="cursor-pointer font-medium">Error Details</summary>
                 <div className="mt-2">
-                  <p><strong>Error:</strong> {this.state.error && this.state.error.toString()}</p>
+                  <p><strong>Error:</strong> {this.state.error ? this.state.error.toString() : 'Unknown error'}</p>
                   <p><strong>Stack:</strong></p>
                   <pre className="whitespace-pre-wrap text-xs mt-1">
-                    {this.state.errorInfo.componentStack}
+                    {(this.state.errorInfo && this.state.errorInfo.componentStack) || (this.state.error && this.state.error.stack) || 'No stack available'}
                   </pre>
                 </div>
               </details>

@@ -10,61 +10,40 @@ import RegisterPatient from './pages/receptionist/RegisterPatient';
 import AppointmentsPage from './pages/receptionist/AppointmentsPage';
 import PatientListPage from './pages/receptionist/PatientListPage';
 import PatientDetailPage from './pages/receptionist/PatientDetailPage';
+import LiveQueuePage from './pages/receptionist/LiveQueuePage';
+import DoctorQueueDetailPage from './pages/receptionist/DoctorQueueDetailPage';
 import NurseDashboard from './pages/nurse/NurseDashboard';
 import ElectronicMedicalRecords from './pages/nurse/ElectronicMedicalRecords';
+import NursePatientQueuePage from './pages/nurse/NursePatientQueuePage';
 import DoctorDashboard from './pages/doctor/DoctorDashboard';
 import PatientMedicalRecord from './pages/doctor/PatientMedicalRecord';
+import PatientMedicalRecordManagement from './pages/doctor/PatientMedicalRecordManagement';
+import CashierDashboard from './pages/cashier/CashierDashboard';
+import InvoiceManagement from './pages/cashier/InvoiceManagement';
 import { useAuth } from './contexts/AuthContext';
 
 // Protected Route Component
 const ProtectedRoute = ({ children, allowedRoles = [] }) => {
   const { user } = useAuth();
-  
-  if (!user) {
-    return <Navigate to="/" replace />;
-  }
-  
+  if (!user) return <Navigate to="/" replace />;
   if (allowedRoles.length > 0 && !allowedRoles.includes(user.role)) {
-    // Redirect based on user role
-    if (user.role === 'admin') {
-      return <Navigate to="/admin/dashboard" replace />;
-    } else if (user.role === 'receptionist') {
-      return <Navigate to="/receptionist/dashboard" replace />;
-    } else if (user.role === 'nurse') {
-      return <Navigate to="/nurse/dashboard" replace />;
-    } else {
-      return <Navigate to="/" replace />;
-    }
+    return <Navigate to="/dashboard" replace />;
   }
-  
   return children;
 };
 
 // Public Route Component (redirects if already authenticated)
 const PublicRoute = ({ children }) => {
   const { user } = useAuth();
-  
-  if (user) {
-    // Redirect based on user role
-    if (user.role === 'admin') {
-      return <Navigate to="/admin/dashboard" replace />;
-    } else if (user.role === 'receptionist') {
-      return <Navigate to="/receptionist/dashboard" replace />;
-    } else if (user.role === 'nurse') {
-      return <Navigate to="/nurse/dashboard" replace />;
-    } else if (user.role === 'doctor') {
-      return <Navigate to="/doctor/dashboard" replace />;
-    } else {
-      return <Navigate to="/" replace />;
-    }
-  }
-  
+  if (user) return <Navigate to="/dashboard" replace />;
   return children;
 };
 
 function AppRoutes() {
   return (
     <Routes>
+      {/* Role-aware Dashboard Redirect */}
+      <Route path="/dashboard" element={<RoleAwareDashboard />} />
       {/* Public Routes */}
       <Route path="/" element={
         <PublicRoute>
@@ -131,6 +110,30 @@ function AppRoutes() {
           </ProtectedRoute>
         } 
       />
+      <Route 
+        path="/receptionist/live-queue" 
+        element={
+          <ProtectedRoute allowedRoles={['receptionist']}>
+            <LiveQueuePage />
+          </ProtectedRoute>
+        } 
+      />
+      <Route 
+        path="/receptionist/queue/:doctorId" 
+        element={
+          <ProtectedRoute allowedRoles={['receptionist']}>
+            <DoctorQueueDetailPage />
+          </ProtectedRoute>
+        } 
+      />
+      <Route 
+        path="/receptionist/patients/:id" 
+        element={
+          <ProtectedRoute allowedRoles={['receptionist']}>
+            <PatientDetailPage />
+          </ProtectedRoute>
+        } 
+      />
       
       {/* Protected Nurse Routes */}
       <Route 
@@ -146,6 +149,14 @@ function AppRoutes() {
         element={
           <ProtectedRoute allowedRoles={['nurse']}>
             <ElectronicMedicalRecords />
+          </ProtectedRoute>
+        } 
+      />
+      <Route 
+        path="/nurse/queue/:doctorId" 
+        element={
+          <ProtectedRoute allowedRoles={['nurse']}>
+            <NursePatientQueuePage />
           </ProtectedRoute>
         } 
       />
@@ -167,11 +178,66 @@ function AppRoutes() {
           </ProtectedRoute>
         } 
       />
+      <Route 
+        path="/doctor/medical-records" 
+        element={
+          <ProtectedRoute allowedRoles={['doctor']}>
+            <PatientMedicalRecordManagement />
+          </ProtectedRoute>
+        } 
+      />
+
+      {/* Protected Cashier/Pharmacist Routes */}
+      <Route 
+        path="/cashier" 
+        element={
+          <ProtectedRoute allowedRoles={['cashier', 'pharmacist']}>
+            <CashierDashboard />
+          </ProtectedRoute>
+        } 
+      />
+      <Route 
+        path="/cashier/dashboard" 
+        element={
+          <ProtectedRoute allowedRoles={['cashier', 'pharmacist']}>
+            <CashierDashboard />
+          </ProtectedRoute>
+        } 
+      />
+      <Route 
+        path="/cashier/invoice/:id" 
+        element={
+          <ProtectedRoute allowedRoles={['cashier', 'pharmacist']}>
+            <InvoiceManagement />
+          </ProtectedRoute>
+        } 
+      />
 
       {/* Fallback Route */}
       <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>
   );
+}
+
+// Redirects user to their role-specific dashboard
+function RoleAwareDashboard() {
+  const { user } = useAuth();
+  if (!user) return <Navigate to="/" replace />;
+  switch (user.role) {
+    case 'admin':
+      return <Navigate to="/admin/dashboard" replace />;
+    case 'receptionist':
+      return <Navigate to="/receptionist/dashboard" replace />;
+    case 'nurse':
+      return <Navigate to="/nurse/dashboard" replace />;
+    case 'doctor':
+      return <Navigate to="/doctor/dashboard" replace />;
+    case 'cashier':
+    case 'pharmacist':
+      return <Navigate to="/cashier/dashboard" replace />;
+    default:
+      return <Navigate to="/" replace />;
+  }
 }
 
 function App() {

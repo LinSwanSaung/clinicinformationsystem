@@ -12,46 +12,54 @@ class AuthService {
    * User login
    */
   async login(email, password) {
-    // Find user by email
-    const user = await UserModel.findByEmail(email);
-    
-    if (!user) {
-      throw new AppError('Invalid credentials', 401);
+    try {
+      // Find user by email
+      const user = await UserModel.findByEmail(email);
+
+      if (!user) {
+        throw new AppError('Invalid credentials', 401);
+      }
+
+      // Check if user is active
+      if (!user.is_active) {
+        throw new AppError('Account is deactivated', 401);
+      }
+
+      // Verify password
+      const isValidPassword = await UserModel.verifyPassword(password, user.password_hash);
+
+      if (!isValidPassword) {
+        throw new AppError('Invalid credentials', 401);
+      }
+
+      // Generate JWT token
+      const token = jwt.sign(
+        {
+          userId: user.id,
+          email: user.email,
+          role: user.role
+        },
+        config.jwt.secret,
+        { expiresIn: config.jwt.expiresIn }
+      );
+
+      // Update last login timestamp
+      await UserModel.updateLastLogin(user.id);
+
+      // Remove sensitive data
+      const { password_hash, ...userWithoutPassword } = user;
+
+      return {
+        token,
+        user: userWithoutPassword
+      };
+    } catch (err) {
+      // Surface connectivity issues distinctly
+      if (typeof err.message === 'string' && err.message.toLowerCase().includes('fetch failed')) {
+        throw new AppError('Authentication service unavailable', 503);
+      }
+      throw err;
     }
-
-    // Check if user is active
-    if (!user.is_active) {
-      throw new AppError('Account is deactivated', 401);
-    }
-
-    // Verify password
-    const isValidPassword = await UserModel.verifyPassword(password, user.password_hash);
-    
-    if (!isValidPassword) {
-      throw new AppError('Invalid credentials', 401);
-    }
-
-    // Generate JWT token
-    const token = jwt.sign(
-      { 
-        userId: user.id, 
-        email: user.email, 
-        role: user.role 
-      },
-      config.jwt.secret,
-      { expiresIn: config.jwt.expiresIn }
-    );
-
-    // Update last login timestamp
-    await UserModel.updateLastLogin(user.id);
-
-    // Remove sensitive data
-    const { password_hash, ...userWithoutPassword } = user;
-
-    return {
-      token,
-      user: userWithoutPassword
-    };
   }
 
   /**

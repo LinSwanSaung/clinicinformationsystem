@@ -17,6 +17,7 @@ const SearchableSelect = ({
   customDisplayRenderer = null,
   customSearchRenderer = null,
   className = "",
+  triggerClassName = "",
   disabled = false,
   clearable = false
 }) => {
@@ -87,42 +88,42 @@ const SearchableSelect = ({
           variant="outline"
           role="combobox"
           aria-expanded={open}
-          className={`w-full justify-between h-12 text-lg px-4 ${className}`}
+          className={`w-full justify-between h-10 text-sm px-3 ${triggerClassName} ${className}`}
           disabled={disabled}
         >
           <span className={`truncate ${!selectedOption ? 'text-muted-foreground' : ''}`}>
             {getDisplayText(selectedOption)}
           </span>
-          <div className="flex items-center space-x-2">
+          <div className="flex items-center space-x-1 sm:space-x-2">
             {clearable && selectedOption && (
               <X 
-                className="h-4 w-4 opacity-50 hover:opacity-100 cursor-pointer" 
+                className="h-3 w-3 sm:h-4 sm:w-4 opacity-50 hover:opacity-100 cursor-pointer" 
                 onClick={handleClear}
               />
             )}
-            <ChevronDown className="h-4 w-4 opacity-50" />
+            <ChevronDown className="h-3 w-3 sm:h-4 sm:w-4 opacity-50" />
           </div>
         </Button>
       </PopoverTrigger>
       <PopoverContent className="w-full p-0" align="start">
         <Card className="border-0 shadow-lg">
-          <div className="p-3 border-b">
+          <div className="p-2 sm:p-3 border-b">
             <div className="relative">
-              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+              <Search className="absolute left-2 sm:left-3 top-1/2 transform -translate-y-1/2 h-3 w-3 sm:h-4 sm:w-4 text-muted-foreground" />
               <Input
                 ref={searchInputRef}
                 placeholder={searchPlaceholder}
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
-                className="pl-10 h-10"
+                className="pl-8 sm:pl-10 h-8 sm:h-10 text-xs sm:text-sm"
               />
             </div>
           </div>
           
-          <div className="max-h-60 overflow-y-auto p-1">
+          <div className="max-h-48 sm:max-h-60 overflow-y-auto p-1">
             {filteredOptions.length === 0 ? (
-              <div className="flex items-center justify-center py-4">
-                <div className="text-sm text-muted-foreground">
+              <div className="flex items-center justify-center py-3 sm:py-4">
+                <div className="text-xs sm:text-sm text-muted-foreground">
                   {searchTerm ? 'No results found' : 'No options available'}
                 </div>
               </div>
@@ -134,7 +135,7 @@ const SearchableSelect = ({
                   <div
                     key={option[valueField]}
                     className={`
-                      relative flex cursor-pointer select-none items-center rounded-sm px-3 py-2 text-sm 
+                      relative flex cursor-pointer select-none items-center rounded-sm px-2 sm:px-3 py-1.5 sm:py-2 text-xs sm:text-sm 
                       hover:bg-accent hover:text-accent-foreground
                       ${isSelected ? 'bg-accent text-accent-foreground' : ''}
                     `}
@@ -149,7 +150,7 @@ const SearchableSelect = ({
                             {option[displayField]}
                           </div>
                           {secondaryField && option[secondaryField] && (
-                            <div className="text-xs text-muted-foreground">
+                            <div className="text-[10px] sm:text-xs text-muted-foreground">
                               {option[secondaryField]}
                             </div>
                           )}
@@ -157,7 +158,7 @@ const SearchableSelect = ({
                       )}
                     </div>
                     {isSelected && (
-                      <Check className="h-4 w-4 ml-2" />
+                      <Check className="h-3 w-3 sm:h-4 sm:w-4 ml-1 sm:ml-2" />
                     )}
                   </div>
                 );

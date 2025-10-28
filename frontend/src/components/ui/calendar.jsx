@@ -1,5 +1,5 @@
 import * as React from "react"
-import { Calendar as CalendarIcon } from "lucide-react"
+import { ChevronLeft, ChevronRight } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { Button } from "@/components/ui/button"
 
@@ -10,52 +10,105 @@ export function Calendar({
   onSelect,
   ...props
 }) {
+  const [currentMonth, setCurrentMonth] = React.useState(() => new Date(2025, 9, 1)); // October 2025
+
+  const navigateMonth = (direction) => {
+    const newMonth = new Date(currentMonth);
+    newMonth.setMonth(newMonth.getMonth() + direction);
+    
+    // Prevent going to months before October 2025
+    const minMonth = new Date(2025, 9, 1); // October 2025
+    if (newMonth < minMonth) return;
+    
+    setCurrentMonth(newMonth);
+  };
+
+  const goToToday = () => {
+    const today = new Date(2025, 9, 28); // October 28, 2025
+    setCurrentMonth(new Date(today.getFullYear(), today.getMonth(), 1));
+    if (onSelect) onSelect(today);
+  };
+
+  const generateCalendarDays = () => {
+    const year = currentMonth.getFullYear();
+    const month = currentMonth.getMonth();
+    const firstDay = new Date(year, month, 1);
+    const lastDay = new Date(year, month + 1, 0);
+    const startDate = new Date(firstDay);
+    startDate.setDate(firstDay.getDate() - firstDay.getDay());
+    
+    const days = [];
+    for (let i = 0; i < 42; i++) {
+      const date = new Date(startDate);
+      date.setDate(startDate.getDate() + i);
+      days.push(date);
+    }
+    return days;
+  };
+
+  const days = generateCalendarDays();
+  const canGoBack = currentMonth > new Date(2025, 9, 1);
+
   return (
-    <div className={cn("p-0", className)} {...props}>
-      <div className="space-y-4">
+    <div className={cn("p-1 sm:p-2 md:p-3 lg:p-4", className)} {...props}>
+      <div className="space-y-2 sm:space-y-3 md:space-y-4">
         {/* Month/Year Navigation */}
         <div className="flex items-center justify-between">
           <Button
             variant="outline"
-            className="h-7 w-7 bg-transparent p-0 opacity-50 hover:opacity-100"
-            onClick={() => onSelect && onSelect(new Date())}
+            size="sm"
+            className="h-6 w-6 sm:h-7 sm:w-7 md:h-8 md:w-8 lg:h-10 lg:w-10 p-0"
+            onClick={() => navigateMonth(-1)}
+            disabled={!canGoBack}
           >
-            <CalendarIcon className="h-4 w-4" />
-            <span className="sr-only">Go to today</span>
+            <ChevronLeft className="h-2.5 w-2.5 sm:h-3 sm:w-3 md:h-4 md:w-4 lg:h-5 lg:w-5" />
+          </Button>
+          <h2 className="text-xs sm:text-sm md:text-base lg:text-lg font-medium sm:font-semibold leading-tight">
+            {currentMonth.toLocaleDateString('en-US', { month: 'long', year: 'numeric' })}
+          </h2>
+          <Button
+            variant="outline"
+            size="sm"
+            className="h-6 w-6 sm:h-7 sm:w-7 md:h-8 md:w-8 lg:h-10 lg:w-10 p-0"
+            onClick={() => navigateMonth(1)}
+          >
+            <ChevronRight className="h-2.5 w-2.5 sm:h-3 sm:w-3 md:h-4 md:w-4 lg:h-5 lg:w-5" />
           </Button>
         </div>
         
         {/* Calendar Grid */}
-        <div className="grid grid-cols-7 text-center text-sm">
-          {["Su", "Mo", "Tu", "We", "Th", "Fr", "Sa"].map((day) => (
-            <div key={day} className="p-0 text-muted-foreground">
-              {day}
+        <div className="grid grid-cols-7 text-center text-[10px] sm:text-xs md:text-sm lg:text-base">
+          {['S', 'M', 'T', 'W', 'T', 'F', 'S'].map((day, idx) => (
+            <div key={idx} className="p-0 text-muted-foreground font-medium h-5 sm:h-6 md:h-9 lg:h-10 flex items-center justify-center">
+              <span className="hidden sm:inline">{['Su', 'Mo', 'Tu', 'We', 'Th', 'Fr', 'Sa'][idx]}</span>
+              <span className="sm:hidden">{day}</span>
             </div>
           ))}
         </div>
-        <div className="grid grid-cols-7 text-center text-sm">
-          {Array(35)
-            .fill(null)
-            .map((_, i) => {
-              const date = new Date(2025, 5, i + 1);
-              const isSelected = selected?.toDateString() === date.toDateString();
-              const isToday = new Date().toDateString() === date.toDateString();
+        <div className="grid grid-cols-7 text-center text-[10px] sm:text-xs md:text-sm lg:text-base gap-0.5 sm:gap-1">
+          {days.map((date, i) => {
+            const isSelected = selected?.toDateString() === date.toDateString();
+            const isToday = date.toDateString() === new Date(2025, 9, 28).toDateString();
+            const isCurrentMonth = date.getMonth() === currentMonth.getMonth();
+            const isPast = date < new Date(2025, 9, 28);
 
-              return (
-                <Button
-                  key={i}
-                  variant="ghost"
-                  className={cn(
-                    "h-9 w-9 p-0 font-normal aria-selected:opacity-100",
-                    isToday && "text-primary",
-                    isSelected && "bg-primary text-primary-foreground"
-                  )}
-                  onClick={() => onSelect && onSelect(date)}
-                >
-                  <time dateTime={date.toISOString()}>{date.getDate()}</time>
-                </Button>
-              );
-            })}
+            return (
+              <Button
+                key={i}
+                variant="ghost"
+                className={cn(
+                  "h-6 w-full sm:h-7 md:h-9 lg:h-12 p-0 font-normal border-0 sm:border",
+                  !isCurrentMonth && "text-muted-foreground opacity-50",
+                  isToday && "bg-primary/10 text-primary font-semibold",
+                  isSelected && "bg-primary text-primary-foreground hover:bg-primary/90",
+                  isPast && isCurrentMonth && "opacity-60"
+                )}
+                onClick={() => onSelect && onSelect(date)}
+              >
+                {date.getDate()}
+              </Button>
+            );
+          })}
         </div>
       </div>
     </div>

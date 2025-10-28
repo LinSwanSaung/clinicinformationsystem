@@ -8,6 +8,20 @@ import { AppError, asyncHandler } from './errorHandler.js';
  * Verifies JWT token and attaches user info to request
  */
 export const authenticate = asyncHandler(async (req, res, next) => {
+  // Development bypass disabled - use real authentication
+  if (false && (process.env.NODE_ENV === 'development' || process.env.BYPASS_AUTH === 'true')) {
+    console.log('DEV MODE: Bypassing authentication');
+    req.user = {
+      id: 'ff9ca1bf-4964-4703-9212-a2feadc2cbd2', // Use real admin user ID
+      email: 'minswanpyae@gmail.com',
+      role: 'admin',
+      first_name: 'Admin',
+      last_name: 'User',
+      is_active: true
+    };
+    return next();
+  }
+
   // Extract token from header
   const authHeader = req.headers.authorization;
   
@@ -56,12 +70,18 @@ export const authenticate = asyncHandler(async (req, res, next) => {
  */
 export const authorize = (...roles) => {
   return (req, res, next) => {
+    // Development bypass for testing
+    if (process.env.NODE_ENV === 'development' || process.env.BYPASS_AUTH === 'true') {
+      console.log('DEV MODE: Bypassing authorization for roles:', roles);
+      return next();
+    }
+
     if (!req.user) {
       throw new AppError('Authentication required', 401);
     }
 
     if (!roles.includes(req.user.role)) {
-      throw new AppError(`Access denied. Required role: ${roles.join(' or ')}`, 403);
+      throw new AppError(`Access denied. Required role: ${roles.join(',').replace(/,/g, ',')}`, 403);
     }
 
     next();

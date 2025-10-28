@@ -24,26 +24,8 @@ export const AuthProvider = ({ children }) => {
       
       if (result.success) {
         setUser(result.data);
-        
-        // Navigate based on role
-        const role = result.data.role.toLowerCase();
-        switch (role) {
-          case 'admin':
-            navigate('/admin/dashboard');
-            break;
-          case 'doctor':
-            navigate('/doctor/dashboard');
-            break;
-          case 'nurse':
-            navigate('/nurse/dashboard');
-            break;
-          case 'receptionist':
-            navigate('/receptionist/dashboard');
-            break;
-          default:
-            navigate('/admin/dashboard'); // Default fallback
-        }
-        
+        // Centralize role-based redirect via /dashboard
+        navigate('/dashboard');
         return { success: true };
       } else {
         return { success: false, message: result.message };
@@ -91,7 +73,7 @@ export const AuthProvider = ({ children }) => {
       login, 
       logout, 
       getUserRole, 
-      isAuthenticated: isAuthenticated()
+      isAuthenticated
     }}>
       {children}
     </AuthContext.Provider>

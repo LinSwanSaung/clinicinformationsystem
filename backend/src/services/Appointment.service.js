@@ -10,7 +10,12 @@ class AppointmentService {
    */
   async getAllAppointments(filters = {}) {
     try {
-      const { date, patient_id, doctor_id } = filters;
+      const { date, patient_id, doctor_id, status } = filters;
+
+      // If we have multiple filters, use the combined method
+      if ((patient_id && date) || status) {
+        return await this.appointmentModel.getWithFilters(filters);
+      }
 
       if (date) {
         return await this.appointmentModel.getByDate(date);
@@ -50,6 +55,8 @@ class AppointmentService {
    */
   async createAppointment(appointmentData) {
     try {
+      console.log('[AppointmentService] Creating appointment:', appointmentData);
+
       // Validate required fields
       const requiredFields = ['patient_id', 'doctor_id', 'appointment_date', 'appointment_time'];
       for (const field of requiredFields) {
@@ -58,16 +65,35 @@ class AppointmentService {
         }
       }
 
-      // Check for conflicts
-      const hasConflict = await this.appointmentModel.checkConflicts(
+      // Prevent same-day appointments
+      const appointmentDate = new Date(appointmentData.appointment_date);
+      const today = new Date(2025, 9, 28); // October 28, 2025
+      today.setHours(0, 0, 0, 0);
+      appointmentDate.setHours(0, 0, 0, 0);
+      
+      if (appointmentDate.getTime() === today.getTime()) {
+        throw new Error('Same-day appointments are not allowed. Please schedule for tomorrow or later.');
+      }
+      
+      if (appointmentDate < today) {
+        throw new Error('Cannot schedule appointments in the past.');
+      }
+
+      // Check doctor availability using DoctorAvailabilityService
+      const DoctorAvailabilityService = (await import('./DoctorAvailability.service.js')).default;
+      const doctorAvailabilityService = new DoctorAvailabilityService();
+      
+      const availability = await doctorAvailabilityService.checkTimeSlotAvailability(
         appointmentData.doctor_id,
         appointmentData.appointment_date,
         appointmentData.appointment_time
       );
 
-      if (hasConflict) {
-        throw new Error('Doctor already has an appointment at this time');
+      if (!availability.isAvailable) {
+        throw new Error(`Cannot book appointment: ${availability.reason}`);
       }
+
+      console.log('[AppointmentService] Time slot is available, proceeding with creation');
 
       // Set default values
       const appointmentToCreate = {
@@ -142,8 +168,6 @@ class AppointmentService {
    */
   async updateAppointmentStatus(id, status) {
     try {
-      console.log('Service: Updating appointment status:', { id, status }); // Debug log
-      
       // Validate status
       const validStatuses = ['scheduled', 'waiting', 'ready_for_doctor', 'consulting', 'completed', 'cancelled', 'no_show'];
       if (!validStatuses.includes(status)) {
@@ -155,13 +179,11 @@ class AppointmentService {
         throw new Error('Appointment not found');
       }
 
-      console.log('Service: Found existing appointment, updating status...'); // Debug log
       const updatedAppointment = await this.appointmentModel.updateStatus(id, status);
-      console.log('Service: Status updated successfully'); // Debug log
       
       return updatedAppointment;
     } catch (error) {
-      console.error('Service Error:', error.message); // Debug log
+      console.error('Service Error:', error.message);
       throw error;
     }
   }
@@ -198,6 +220,121 @@ class AppointmentService {
         const end = new Date(endDate);
         return aptDate >= start && aptDate <= end;
       });
+    } catch (error) {
+      throw error;
+    }
+  }
+
+  // ===============================================
+  // QUEUE INTEGRATION METHODS
+  // ===============================================
+
+  /**
+   * Check in appointment (mark as waiting and ready for queue)
+   */
+  async checkInAppointment(appointmentId) {
+    try {
+      const appointment = await this.appointmentModel.findById(appointmentId);
+      if (!appointment) {
+        throw new Error('Appointment not found');
+      }
+
+      if (appointment.status !== 'scheduled') {
+        throw new Error('Only scheduled appointments can be checked in');
+      }
+
+      const updatedAppointment = await this.appointmentModel.update(appointmentId, {
+        status: 'waiting'
+      });
+
+      return {
+        success: true,
+        appointment: updatedAppointment,
+        message: 'Appointment checked in successfully'
+      };
+    } catch (error) {
+      throw error;
+    }
+  }
+
+  /**
+   * Get appointments ready for queue processing
+   */
+  async getAppointmentsForQueue(doctorId, date = null) {
+    try {
+      const appointmentDate = date || new Date().toISOString().split('T')[0];
+      
+      const appointments = await this.appointmentModel.getByDate(appointmentDate);
+      const doctorAppointments = appointments.filter(apt => 
+        apt.doctor_id === doctorId && 
+        ['scheduled', 'waiting'].includes(apt.status)
+      );
+
+      return doctorAppointments.sort((a, b) => 
+        a.appointment_time.localeCompare(b.appointment_time)
+      );
+    } catch (error) {
+      throw error;
+    }
+  }
+
+  /**
+   * Get today's appointment statistics for a doctor
+   */
+  async getTodayStats(doctorId) {
+    try {
+      const today = new Date().toISOString().split('T')[0];
+      const appointments = await this.appointmentModel.getByDate(today);
+      const doctorAppointments = appointments.filter(apt => apt.doctor_id === doctorId);
+
+      const stats = {
+        total: doctorAppointments.length,
+        scheduled: doctorAppointments.filter(apt => apt.status === 'scheduled').length,
+        waiting: doctorAppointments.filter(apt => apt.status === 'waiting').length,
+        consulting: doctorAppointments.filter(apt => apt.status === 'consulting').length,
+        completed: doctorAppointments.filter(apt => apt.status === 'completed').length,
+        cancelled: doctorAppointments.filter(apt => apt.status === 'cancelled').length,
+        noShow: doctorAppointments.filter(apt => apt.status === 'no_show').length
+      };
+
+      return stats;
+    } catch (error) {
+      throw error;
+    }
+  }
+
+  /**
+   * Reschedule appointment
+   */
+  async rescheduleAppointment(appointmentId, newDate, newTime) {
+    try {
+      const appointment = await this.appointmentModel.findById(appointmentId);
+      if (!appointment) {
+        throw new Error('Appointment not found');
+      }
+
+      // Check for conflicts at new time
+      const hasConflict = await this.appointmentModel.checkConflicts(
+        appointment.doctor_id,
+        newDate,
+        newTime
+      );
+
+      if (hasConflict) {
+        throw new Error('Doctor already has an appointment at this time');
+      }
+
+      const updatedAppointment = await this.appointmentModel.update(appointmentId, {
+        appointment_date: newDate,
+        appointment_time: newTime,
+        status: 'scheduled' // Reset to scheduled when rescheduled
+      });
+
+      return {
+        success: true,
+        appointment: updatedAppointment,
+        message: 'Appointment rescheduled successfully'
+      };
     } catch (error) {
       throw error;
     }

@@ -14,11 +14,22 @@ router.get('/',
   authenticate,
   authorize('admin', 'receptionist'),
   asyncHandler(async (req, res) => {
-    const { role } = req.query;
+    const { role, is_active, includeDeleted } = req.query;
     
     const filters = {};
     if (role) {
       filters.role = role;
+    }
+
+    // Respect explicit is_active filter if provided ("true"/"false")
+    if (typeof is_active === 'string') {
+      if (is_active.toLowerCase() === 'true') filters.is_active = true;
+      else if (is_active.toLowerCase() === 'false') filters.is_active = false;
+    }
+
+    // Exclude deleted by default unless includeDeleted=true
+    if (includeDeleted !== 'true') {
+      filters.deleted_at = null;
     }
 
     // For receptionists, only allow viewing doctors or active employees
@@ -30,7 +41,8 @@ router.get('/',
     
     const result = await userModel.findAll({ 
       filters,
-      select: 'id, first_name, last_name, phone, role, specialty, is_active'
+      // Include meta fields used by the UI (created_at, last_login, deleted_at)
+      select: 'id, email, first_name, last_name, phone, role, specialty, is_active, created_at, last_login, deleted_at'
     });
     
     // Ensure we have a proper data structure
@@ -143,10 +155,19 @@ router.put('/:id',
   asyncHandler(async (req, res) => {
     const { id } = req.params;
     const updateData = req.body;
-    
+
+    // Fetch to ensure not deleted
+    const current = await userModel.findById(id, 'id, deleted_at');
+    if (!current) {
+      return res.status(404).json({ success: false, message: 'User not found' });
+    }
+    if (current.deleted_at) {
+      return res.status(410).json({ success: false, message: 'User was deleted and cannot be modified' });
+    }
+
     // Remove sensitive fields that shouldn't be updated via this endpoint
-    const { password, password_hash, id: bodyId, created_at, ...allowedFields } = updateData;
-    
+    const { password, password_hash, id: bodyId, created_at, deleted_at, ...allowedFields } = updateData;
+
     // Validate required fields
     if (!allowedFields.first_name || !allowedFields.last_name || !allowedFields.email || !allowedFields.role) {
       return res.status(400).json({
@@ -154,7 +175,7 @@ router.put('/:id',
         message: 'First name, last name, email, and role are required'
       });
     }
-    
+
     // Check if email is already taken by another user
     const existingUser = await userModel.findByEmail(allowedFields.email);
     if (existingUser && existingUser.id !== id) {
@@ -163,16 +184,16 @@ router.put('/:id',
         message: 'Email is already taken by another user'
       });
     }
-    
+
     const updatedUser = await userModel.updateById(id, allowedFields);
-    
+
     if (!updatedUser) {
       return res.status(404).json({
         success: false,
         message: 'User not found'
       });
     }
-    
+
     res.status(200).json({
       success: true,
       message: 'User updated successfully',
@@ -192,7 +213,7 @@ router.patch('/:id/status',
   asyncHandler(async (req, res) => {
     const { id } = req.params;
     const { is_active } = req.body;
-    
+
     // Don't allow deactivating your own account
     if (id === req.user.id && is_active === false) {
       return res.status(400).json({
@@ -200,18 +221,22 @@ router.patch('/:id/status',
         message: 'Cannot deactivate your own account'
       });
     }
-    
-    const updatedUser = await userModel.updateById(id, {
-      is_active: is_active
-    });
-    
-    if (!updatedUser) {
-      return res.status(404).json({
-        success: false,
-        message: 'User not found'
-      });
+
+    // Block re-activating or deactivating deleted users
+    const current = await userModel.findById(id, 'id, deleted_at');
+    if (!current) {
+      return res.status(404).json({ success: false, message: 'User not found' });
     }
-    
+    if (current.deleted_at) {
+      return res.status(410).json({ success: false, message: 'User was deleted and cannot be modified' });
+    }
+
+    const updatedUser = await userModel.updateById(id, { is_active });
+
+    if (!updatedUser) {
+      return res.status(404).json({ success: false, message: 'User not found' });
+    }
+
     res.status(200).json({
       success: true,
       message: `User ${is_active ? 'activated' : 'deactivated'} successfully`,
@@ -222,7 +247,7 @@ router.patch('/:id/status',
 
 /**
  * @route   DELETE /api/users/:id
- * @desc    Delete user (soft delete - set is_active to false)
+ * @desc    Permanently soft delete user (tombstone: set deleted_at and is_active=false)
  * @access  Private (Admin only)
  */
 router.delete('/:id',
@@ -238,20 +263,18 @@ router.delete('/:id',
         message: 'Cannot delete your own account'
       });
     }
-    
-    const deletedUser = await userModel.softDelete(id);
-    
-    if (!deletedUser) {
-      return res.status(404).json({
-        success: false,
-        message: 'User not found'
-      });
-    }
-    
-    res.status(200).json({
-      success: true,
-      message: 'User deleted successfully'
+
+    // Mark tombstone: cannot be edited/activated again
+    const updated = await userModel.updateById(id, {
+      is_active: false,
+      deleted_at: new Date().toISOString()
     });
+
+    if (!updated) {
+      return res.status(404).json({ success: false, message: 'User not found' });
+    }
+
+    res.status(204).send();
   })
 );
 

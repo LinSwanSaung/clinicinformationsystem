@@ -193,6 +193,26 @@ class PatientService {
     
     return true;
   }
+
+  /**
+   * Get patients assigned to a specific doctor
+   */
+  async getDoctorPatients(doctorId, options = {}) {
+    try {
+      // For now, return all patients since we don't have doctor assignment in schema
+      // In a real system, you'd filter by assigned doctor
+      const defaultOptions = {
+        orderBy: 'created_at',
+        ascending: false,
+        ...options
+      };
+      
+      const { data } = await PatientModel.findAll(defaultOptions);
+      return data || [];
+    } catch (error) {
+      throw new AppError('Failed to fetch doctor patients', 500);
+    }
+  }
 }
 
 export default new PatientService();

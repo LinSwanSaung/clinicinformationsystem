@@ -1,8 +1,21 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import PageLayout from '../../components/PageLayout';
 import { Card } from '../../components/ui/card';
 import { Button } from '../../components/ui/button';
+import VisitHistoryCard from '../../components/medical/VisitHistoryCard';
+import LoadingState from '../../components/LoadingState';
+import PatientInformationHeader from '../../components/medical/PatientInformationHeader';
+import NavigationTabs from '../../components/ui/NavigationTabs';
+import PatientVitalsDisplay from '../../components/medical/PatientVitalsDisplay';
+import MedicalInformationPanel from '../../components/medical/MedicalInformationPanel';
+import ClinicalNotesDisplay from '../../components/medical/ClinicalNotesDisplay';
+import PatientDocumentManager from '../../components/medical/PatientDocumentManager';
+import PatientSearchInterface from '../../components/medical/PatientSearchInterface';
+import { allergyService } from '../../services/allergyService';
+import { diagnosisService } from '../../services/diagnosisService';
+import { visitService } from '../../services/visitService';
+import patientService from '../../services/patientService';
 import { 
   User,
   Activity,
@@ -13,16 +26,6 @@ import {
   ArrowLeft
 } from 'lucide-react';
 
-// Import our new reusable components
-import PatientSearchInterface from '../../components/medical/PatientSearchInterface';
-import PatientInformationHeader from '../../components/medical/PatientInformationHeader';
-import NavigationTabs from '../../components/ui/NavigationTabs';
-import PatientVitalsDisplay from '../../components/medical/PatientVitalsDisplay';
-import MedicalInformationPanel from '../../components/medical/MedicalInformationPanel';
-import ClinicalNotesDisplay from '../../components/medical/ClinicalNotesDisplay';
-import PatientDocumentManager from '../../components/medical/PatientDocumentManager';
-import { patientService } from '../../services/patientService';
-
 const ElectronicMedicalRecords = () => {
   const location = useLocation();
   const navigate = useNavigate();
@@ -31,12 +34,13 @@ const ElectronicMedicalRecords = () => {
   const [selectedPatient, setSelectedPatient] = useState(location.state?.patient || null);
   const [activeTab, setActiveTab] = useState('overview');
   const [expandedVisit, setExpandedVisit] = useState(null);
-
-  // Modal states for add functionality
-  const [isAllergyModalOpen, setIsAllergyModalOpen] = useState(false);
-  const [isDiagnosisModalOpen, setIsDiagnosisModalOpen] = useState(false);
-  const [newAllergy, setNewAllergy] = useState('');
-  const [newDiagnosis, setNewDiagnosis] = useState({ condition: '', date: '' });
+  
+  // Data state
+  const [allergies, setAllergies] = useState([]);
+  const [diagnoses, setDiagnoses] = useState([]);
+  const [visitHistory, setVisitHistory] = useState([]);
+  const [patientsData, setPatientsData] = useState([]);
+  const [loading, setLoading] = useState(false);
 
   // Tab configuration
   const tabs = [
@@ -46,7 +50,59 @@ const ElectronicMedicalRecords = () => {
     { id: 'files', label: 'Files & Images', icon: Calendar }
   ];
 
-  // Dummy data
+  // Load patients data on component mount
+  useEffect(() => {
+    const loadPatients = async () => {
+      try {
+        const response = await patientService.getAllPatients();
+        if (response.success) {
+          setPatientsData(response.data);
+        }
+      } catch (error) {
+        console.error('Error loading patients:', error);
+        setPatientsData([]);
+      }
+    };
+
+    loadPatients();
+  }, []);
+
+  // Load allergies and diagnoses when patient is selected
+  useEffect(() => {
+    if (selectedPatient?.id) {
+      loadPatientMedicalData();
+    }
+  }, [selectedPatient?.id]);
+
+  const loadPatientMedicalData = async () => {
+    if (!selectedPatient?.id) {
+      console.warn('No patient selected or patient has no ID');
+      return;
+    }
+    
+    setLoading(true);
+    try {
+      // Load allergies, diagnoses, and visit history in parallel
+      const [patientAllergies, patientDiagnoses, patientVisitHistory] = await Promise.all([
+        allergyService.getAllergiesByPatient(selectedPatient.id),
+        diagnosisService.getDiagnosesByPatient(selectedPatient.id),
+        visitService.getPatientVisitHistory(selectedPatient.id, { limit: 20, includeCompleted: true })
+      ]);
+      
+      setAllergies(Array.isArray(patientAllergies) ? patientAllergies : []);
+      setDiagnoses(Array.isArray(patientDiagnoses) ? patientDiagnoses : []);
+      setVisitHistory(Array.isArray(patientVisitHistory) ? patientVisitHistory : []);
+    } catch (error) {
+      console.error('Error loading patient medical data:', error);
+      setAllergies([]);
+      setDiagnoses([]);
+      setVisitHistory([]);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Dummy data for doctor notes and files (these can be implemented later)
   const doctorNotes = [
     {
       date: "2024-01-15",
@@ -74,76 +130,53 @@ const ElectronicMedicalRecords = () => {
   // Event handlers
   const handlePatientSelect = (patient) => {
     setSelectedPatient(patient);
+    setAllergies([]);
+    setDiagnoses([]);
   };
 
   const handleClearSelection = () => {
     setSelectedPatient(null);
     setActiveTab('overview');
+    setAllergies([]);
+    setDiagnoses([]);
   };
 
   const handleBackToSearch = () => {
     setSelectedPatient(null);
     setActiveTab('overview');
+    setAllergies([]);
+    setDiagnoses([]);
   };
 
-  // Medical action handlers (these would integrate with your backend)
+  // Medical action handlers - NURSES CANNOT ADD DIAGNOSIS/ALLERGY
   const handleAddVitals = () => {
     console.log('Add vitals for patient:', selectedPatient?.id);
+    // TODO: Navigate to vitals entry or open modal
   };
 
   const handleEditVitals = () => {
     console.log('Edit vitals for patient:', selectedPatient?.id);
+    // TODO: Navigate to vitals entry or open modal
   };
 
   const handleAddAllergy = () => {
-    setIsAllergyModalOpen(true);
-  };
-
-  const handleSaveAllergy = () => {
-    if (newAllergy.trim()) {
-      // In a real app, this would update the database
-      console.log('Adding allergy:', newAllergy, 'for patient:', selectedPatient?.id);
-      // Update local state
-      if (selectedPatient) {
-        selectedPatient.allergies = selectedPatient.allergies || [];
-        selectedPatient.allergies.push(newAllergy.trim());
-      }
-      setNewAllergy('');
-      setIsAllergyModalOpen(false);
-    }
+    alert('Only doctors can add allergies. Please ask a doctor to add this information.');
   };
 
   const handleAddDiagnosis = () => {
-    setIsDiagnosisModalOpen(true);
-  };
-
-  const handleSaveDiagnosis = () => {
-    if (newDiagnosis.condition.trim() && newDiagnosis.date.trim()) {
-      // In a real app, this would update the database
-      console.log('Adding diagnosis:', newDiagnosis, 'for patient:', selectedPatient?.id);
-      // Update local state
-      if (selectedPatient) {
-        selectedPatient.diagnosisHistory = selectedPatient.diagnosisHistory || [];
-        selectedPatient.diagnosisHistory.push({
-          condition: newDiagnosis.condition.trim(),
-          date: newDiagnosis.date.trim()
-        });
-      }
-      setNewDiagnosis({ condition: '', date: '' });
-      setIsDiagnosisModalOpen(false);
-    }
+    alert('Only doctors can add diagnoses. Please ask a doctor to add this information.');
   };
 
   const handleAddMedication = () => {
-    console.log('Add medication for patient:', selectedPatient?.id);
+    alert('Only doctors can prescribe medications. Please ask a doctor to add this information.');
   };
 
   const handleAddNote = () => {
-    console.log('Add doctor note for patient:', selectedPatient?.id);
+    alert('Only doctors can add clinical notes. Please ask a doctor to add this information.');
   };
 
   const handleEditNote = (note, index) => {
-    console.log('Edit doctor note:', note, 'at index:', index);
+    alert('Only doctors can edit clinical notes.');
   };
 
   const handleUploadFile = () => {
@@ -166,85 +199,31 @@ const ElectronicMedicalRecords = () => {
         <h3 className="text-xl font-bold">Patient Visit History</h3>
       </div>
       
-      {selectedPatient.visitHistory && selectedPatient.visitHistory.length > 0 ? (
+      {loading ? (
+        <LoadingState message="Loading visit history..." />
+      ) : visitHistory && visitHistory.length > 0 ? (
         <div className="space-y-4">
-          {selectedPatient.visitHistory.map((visit, index) => (
-            <div key={index} className="border border-gray-200 rounded-lg overflow-hidden">
-              <div 
-                className="p-4 bg-gray-50 cursor-pointer hover:bg-gray-100 transition-colors flex items-center justify-between"
-                onClick={() => setExpandedVisit(expandedVisit === index ? null : index)}
-              >
-                <div className="flex items-center space-x-3">
-                  {expandedVisit === index ? 
-                    <ChevronDown size={16} className="text-gray-500" /> : 
-                    <ChevronRight size={16} className="text-gray-500" />
-                  }
-                  <span className="text-base font-semibold">Visit on {visit.date} - {visit.type}</span>
-                </div>
-              </div>
-              
-              {expandedVisit === index && (
-                <div className="p-4 bg-white border-t border-gray-200">
-                  <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                    {/* Nurse's Notes */}
-                    <div>
-                      <div className="flex items-center space-x-2 mb-3">
-                        <Activity size={16} className="text-blue-500" />
-                        <h5 className="font-semibold text-base text-gray-800">Nurse's Notes:</h5>
-                      </div>
-                      {visit.nurseNotes && (
-                        <div className="space-y-2 text-sm">
-                          <div><span className="font-medium">BP:</span> {visit.nurseNotes.bp}</div>
-                          <div><span className="font-medium">BPM:</span> {visit.nurseNotes.bpm}</div>
-                          <div><span className="font-medium">Weight:</span> {visit.nurseNotes.weight}</div>
-                          <div><span className="font-medium">Temp:</span> {visit.nurseNotes.temp}</div>
-                          <div><span className="font-medium">Observations:</span> {visit.nurseNotes.observations}</div>
-                        </div>
-                      )}
-                    </div>
-                    
-                    {/* Doctor's Notes */}
-                    <div>
-                      <div className="flex items-center space-x-2 mb-3">
-                        <FileText size={16} className="text-purple-500" />
-                        <h5 className="font-semibold text-base text-gray-800">Doctor's Notes:</h5>
-                      </div>
-                      <div className="text-sm text-gray-700 mb-3">
-                        <span className="font-medium">Doctor:</span> {visit.doctor}
-                      </div>
-                      {visit.doctorNotes && (
-                        <div className="space-y-2 text-sm">
-                          <div><span className="font-medium">Diagnosis:</span> {visit.doctorNotes.diagnosis}</div>
-                          <div><span className="font-medium">Comments:</span> {visit.doctorNotes.comments}</div>
-                          {visit.doctorNotes.prescribedMedications && visit.doctorNotes.prescribedMedications.length > 0 && (
-                            <div>
-                              <span className="font-medium">Prescribed Medications:</span>
-                              <ul className="mt-1 space-y-1">
-                                {visit.doctorNotes.prescribedMedications.map((med, medIndex) => (
-                                  <li key={medIndex} className="bg-blue-50 p-2 rounded text-xs">
-                                    <span className="font-medium">{med.name}</span> - {med.dosage} | {med.frequency}
-                                  </li>
-                                ))}
-                              </ul>
-                            </div>
-                          )}
-                        </div>
-                      )}
-                    </div>
-                  </div>
-                </div>
-              )}
-            </div>
+          {visitHistory.map((visit, index) => (
+            <VisitHistoryCard
+              key={visit.id || `visit-${visit.visit_date}-${index}`}
+              visit={visit}
+              isExpanded={expandedVisit === index}
+              onToggleExpand={(expanded) => setExpandedVisit(expanded ? index : null)}
+              showDetailsButton={true}
+            />
           ))}
         </div>
-      ) : (
-        <div className="text-center py-8">
-          <Activity size={32} className="mx-auto text-gray-400 mb-3" />
-          <p className="text-gray-500 text-base">No visit history available</p>
-        </div>
-      )}
-    </Card>
-  );
+        ) : (
+          <div className="text-center py-12">
+            <Activity size={48} className="mx-auto text-gray-300 mb-4" />
+            <p className="text-gray-500 text-base">No visit history available</p>
+            <p className="text-gray-400 text-sm mt-2">
+              Visit history will appear here once the patient completes visits
+            </p>
+          </div>
+        )}
+      </Card>
+    );
 
   // Empty state component
   const EmptyState = () => (
@@ -262,7 +241,7 @@ const ElectronicMedicalRecords = () => {
   );
 
   return (
-    <PageLayout title="Electronic Medical Records" subtitle="Patient medical record management system" fullWidth={true}>
+    <PageLayout title="Electronic Medical Records" subtitle="Patient medical record viewing (Nurse Access - View Only)" fullWidth={true}>
       <div className="space-y-6 w-full">
         {/* Patient Search */}
         {!selectedPatient && (
@@ -280,7 +259,7 @@ const ElectronicMedicalRecords = () => {
             </div>
             
             <PatientSearchInterface 
-              patients={nursePatientsData}
+              patients={patientsData}
               onPatientSelect={handlePatientSelect}
             />
           </div>
@@ -317,7 +296,14 @@ const ElectronicMedicalRecords = () => {
                   />
                   
                   <MedicalInformationPanel 
-                    patient={selectedPatient}
+                    patient={{
+                      ...selectedPatient,
+                      allergies: (allergies || []).map(a => a?.allergy_name || 'Unknown').filter(Boolean),
+                      diagnosisHistory: (diagnoses || []).map(d => ({
+                        condition: d?.diagnosis_name || 'Unknown',
+                        date: d?.diagnosed_date || 'Unknown'
+                      })).filter(item => item.condition !== 'Unknown')
+                    }}
                     onAddAllergy={handleAddAllergy}
                     onAddDiagnosis={handleAddDiagnosis}
                     onAddMedication={handleAddMedication}
@@ -354,95 +340,6 @@ const ElectronicMedicalRecords = () => {
         {/* Empty State */}
         {!selectedPatient && <EmptyState />}
       </div>
-
-      {/* Allergy Modal */}
-      {isAllergyModalOpen && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-[9999]">
-          <div className="bg-white rounded-lg shadow-xl w-full max-w-md">
-            <div className="flex justify-between items-center p-4 border-b">
-              <h3 className="text-lg font-medium">Add New Allergy</h3>
-              <button onClick={() => setIsAllergyModalOpen(false)} className="text-gray-500 hover:text-gray-700">
-                <FileText size={20} />
-              </button>
-            </div>
-            <div className="p-4">
-              <label className="block text-sm font-medium mb-2">Allergy Name</label>
-              <input
-                type="text"
-                placeholder="e.g., Penicillin, Peanuts, etc."
-                value={newAllergy}
-                onChange={(e) => setNewAllergy(e.target.value)}
-                className="w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-              />
-              <div className="flex space-x-2 mt-4">
-                <button 
-                  onClick={() => setIsAllergyModalOpen(false)}
-                  className="flex-1 px-4 py-2 border border-gray-300 rounded-md text-sm hover:bg-gray-50"
-                >
-                  Cancel
-                </button>
-                <button 
-                  onClick={handleSaveAllergy}
-                  disabled={!newAllergy.trim()}
-                  className="flex-1 px-4 py-2 bg-blue-500 text-white rounded-md text-sm hover:bg-blue-600 disabled:opacity-50"
-                >
-                  Add Allergy
-                </button>
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Diagnosis Modal */}
-      {isDiagnosisModalOpen && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-[9999]">
-          <div className="bg-white rounded-lg shadow-xl w-full max-w-md">
-            <div className="flex justify-between items-center p-4 border-b">
-              <h3 className="text-lg font-medium">Add New Diagnosis</h3>
-              <button onClick={() => setIsDiagnosisModalOpen(false)} className="text-gray-500 hover:text-gray-700">
-                <FileText size={20} />
-              </button>
-            </div>
-            <div className="p-4 space-y-4">
-              <div>
-                <label className="block text-sm font-medium mb-2">Condition</label>
-                <input
-                  type="text"
-                  placeholder="e.g., Hypertension, Diabetes, etc."
-                  value={newDiagnosis.condition}
-                  onChange={(e) => setNewDiagnosis({...newDiagnosis, condition: e.target.value})}
-                  className="w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                />
-              </div>
-              <div>
-                <label className="block text-sm font-medium mb-2">Date</label>
-                <input
-                  type="date"
-                  value={newDiagnosis.date}
-                  onChange={(e) => setNewDiagnosis({...newDiagnosis, date: e.target.value})}
-                  className="w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                />
-              </div>
-              <div className="flex space-x-2">
-                <button 
-                  onClick={() => setIsDiagnosisModalOpen(false)}
-                  className="flex-1 px-4 py-2 border border-gray-300 rounded-md text-sm hover:bg-gray-50"
-                >
-                  Cancel
-                </button>
-                <button 
-                  onClick={handleSaveDiagnosis}
-                  disabled={!newDiagnosis.condition.trim() || !newDiagnosis.date.trim()}
-                  className="flex-1 px-4 py-2 bg-blue-500 text-white rounded-md text-sm hover:bg-blue-600 disabled:opacity-50"
-                >
-                  Add Diagnosis
-                </button>
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
     </PageLayout>
   );
 };

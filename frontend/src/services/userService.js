@@ -1,9 +1,10 @@
 import apiService from './api.js';
 
 class UserService {
-  async getAllUsers() {
+  // Get all users, optionally with query params (e.g., { params: { is_active: true, role: 'doctor' } })
+  async getAllUsers(options = {}) {
     try {
-      const response = await apiService.get('/users');
+      const response = await apiService.get('/users', options);
       return response;
     } catch (error) {
       throw error;
@@ -40,7 +41,8 @@ class UserService {
   async deleteUser(id) {
     try {
       const response = await apiService.delete(`/users/${id}`);
-      return response;
+      // apiService returns {} for 204; normalize to a success flag
+      return { success: true, ...response };
     } catch (error) {
       throw error;
     }

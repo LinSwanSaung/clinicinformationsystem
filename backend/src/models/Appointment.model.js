@@ -237,6 +237,67 @@ class AppointmentModel extends BaseModel {
 
     return data;
   }
+
+  /**
+   * Get appointments with combined filters
+   */
+  async getWithFilters(filters = {}) {
+    const { date, patient_id, doctor_id, status } = filters;
+
+    let query = this.supabase
+      .from(this.tableName)
+      .select(`
+        *,
+        patient:patients!patient_id (
+          id,
+          patient_number,
+          first_name,
+          last_name,
+          phone,
+          email
+        ),
+        doctor:users!doctor_id (
+          id,
+          first_name,
+          last_name,
+          email,
+          specialty
+        )
+      `);
+
+    // Apply filters
+    if (date) {
+      query = query.eq('appointment_date', date);
+    }
+
+    if (patient_id) {
+      query = query.eq('patient_id', patient_id);
+    }
+
+    if (doctor_id) {
+      query = query.eq('doctor_id', doctor_id);
+    }
+
+    if (status) {
+      // Handle multiple statuses separated by comma
+      const statusArray = status.split(',').map(s => s.trim());
+      if (statusArray.length === 1) {
+        query = query.eq('status', statusArray[0]);
+      } else {
+        query = query.in('status', statusArray);
+      }
+    }
+
+    query = query.order('appointment_time');
+
+    const { data, error } = await query;
+
+    if (error) {
+      throw new Error(`Failed to fetch appointments with filters: ${error.message}`);
+    }
+
+    return data;
+  }
 }
 
 export default AppointmentModel;

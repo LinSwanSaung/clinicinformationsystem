@@ -8,7 +8,6 @@ const MedicalInformationPanel = ({
   patient, 
   onAddAllergy,
   onAddDiagnosis,
-  onAddMedication,
   className = "",
   showActionButtons = true
 }) => {
@@ -82,13 +81,8 @@ const MedicalInformationPanel = ({
           <div className="flex items-center justify-between mb-4">
             <h4 className="font-bold text-gray-800 flex items-center text-sm">
               <Pill size={18} className="mr-2 text-green-500" />
-              Current Medications
+              Current Medications/Prescriptions
             </h4>
-            {showActionButtons && onAddMedication && (
-              <Button variant="outline" size="sm" className="text-xs px-3 py-1" onClick={onAddMedication}>
-                + Add Medication
-              </Button>
-            )}
           </div>
           <div className="bg-green-50 p-4 rounded-lg border border-green-200">
             {patient.currentMedications && patient.currentMedications.length > 0 ? (

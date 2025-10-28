@@ -42,6 +42,7 @@ const Dialog = ({ isOpen, onClose, title, children }) => {
 const PatientCard = ({ 
   patient, 
   onMarkReady, 
+  onUnmarkReady,
   onDelayPatient, 
   onSaveVitals,
   onRemoveDelay,
@@ -81,10 +82,14 @@ const PatientCard = ({
 
   const statusColors = {
     waiting: "bg-amber-100 text-amber-800",
-    delayed: "bg-red-100 text-red-800",
-    ready: "bg-emerald-100 text-emerald-800",
+    delayed: "bg-red-100 text-red-800", 
+    ready: "bg-green-100 text-green-800",
+    called: "bg-green-100 text-green-800", // Waiting for doctor - green like ready
     seeing_doctor: "bg-blue-100 text-blue-800",
-    completed: "bg-purple-100 text-purple-800"
+    serving: "bg-blue-100 text-blue-800", // In consultation - blue
+    completed: "bg-purple-100 text-purple-800",
+    missed: "bg-gray-100 text-gray-800",
+    cancelled: "bg-gray-100 text-gray-800"
   };
   
   const urgencyColors = {
@@ -98,9 +103,13 @@ const PatientCard = ({
     switch (status) {
       case 'waiting': return 'Waiting';
       case 'delayed': return 'Delayed';
-      case 'ready': return 'Ready for Doctor';
-      case 'seeing_doctor': return 'With Doctor';
+      case 'ready': return 'Waiting for Doctor';
+      case 'called': return 'Waiting for Doctor'; // Nurse marked ready
+      case 'seeing_doctor': return 'In Consultation';
+      case 'serving': return 'In Consultation'; // Same as seeing_doctor
       case 'completed': return 'Completed';
+      case 'missed': return 'Missed';
+      case 'cancelled': return 'Cancelled';
       default: return 'Unknown';
     }
   };
@@ -123,30 +132,53 @@ const PatientCard = ({
     );
 
     if (userRole === 'nurse' && !readOnly) {
-      // Nurse-specific buttons
-      if (!readyTab && !patient.vitalsRecorded) {
-        buttons.unshift(
-          <Button 
-            key="add-vitals"
-            variant="outline" 
-            className="w-full flex justify-center items-center border-blue-200 text-blue-700 hover:bg-blue-50 h-11 text-base font-medium"
-            onClick={() => setIsVitalsModalOpen(true)}
-          >
-            <FileText size={18} className="mr-2" /> Add Vitals & Notes
-          </Button>
-        );
-      }
-
-      if (!readyTab && patient.vitalsRecorded) {
+      // Nurse-specific buttons based on patient status
+      if (patient.status === 'waiting') {
+        // For waiting patients, first they need vitals, then can be marked ready
+        if (!patient.vitalsRecorded) {
+          buttons.unshift(
+            <Button 
+              key="add-vitals"
+              variant="outline" 
+              className="w-full flex justify-center items-center border-blue-200 text-blue-700 hover:bg-blue-50 h-11 text-base font-medium"
+              onClick={() => setIsVitalsModalOpen(true)}
+            >
+              <FileText size={18} className="mr-2" /> Add Vitals & Notes
+            </Button>
+          );
+        } else {
+          buttons.unshift(
+            <>
+              <Button 
+                key="mark-ready"
+                variant="default" 
+                className="w-full flex justify-center items-center bg-emerald-600 hover:bg-emerald-700 text-white h-11 text-base font-medium"
+                onClick={() => onMarkReady(patient.id)}
+              >
+                <ClipboardCheck size={18} className="mr-2" /> Mark Ready for Doctor
+              </Button>
+              <Button 
+                key="edit-vitals"
+                variant="outline" 
+                className="w-full flex justify-center items-center border-orange-200 text-orange-700 hover:bg-orange-50 h-11 text-base font-medium"
+                onClick={() => setIsVitalsModalOpen(true)}
+              >
+                <FileText size={18} className="mr-2" /> Edit Vitals & Notes
+              </Button>
+            </>
+          );
+        }
+      } else if (patient.status === 'ready' || patient.status === 'called') {
+        // Patient is ready - nurse can unmark ready or edit vitals
         buttons.unshift(
           <>
             <Button 
-              key="mark-ready"
-              variant="default" 
-              className="w-full flex justify-center items-center bg-emerald-600 hover:bg-emerald-700 text-white h-11 text-base font-medium"
-              onClick={() => onMarkReady(patient.id)}
+              key="unmark-ready"
+              variant="outline" 
+              className="w-full flex justify-center items-center border-yellow-200 text-yellow-700 hover:bg-yellow-50 h-11 text-base font-medium"
+              onClick={() => onUnmarkReady?.(patient.id)}
             >
-              <ClipboardCheck size={18} className="mr-2" /> Mark Ready for Doctor
+              <X size={18} className="mr-2" /> Unmark Ready
             </Button>
             <Button 
               key="edit-vitals"
@@ -160,7 +192,8 @@ const PatientCard = ({
         );
       }
 
-      if (patient.status !== 'delayed') {
+      // Delay functionality for any non-delayed status
+      if (patient.status !== 'delayed' && patient.status !== 'serving' && patient.status !== 'completed') {
         buttons.push(
           <Button 
             key="delay"
@@ -171,7 +204,7 @@ const PatientCard = ({
             <AlertCircle size={18} className="mr-2" /> Delay Patient
           </Button>
         );
-      } else {
+      } else if (patient.status === 'delayed') {
         buttons.push(
           <>
             <Button 
@@ -195,7 +228,7 @@ const PatientCard = ({
       }
     } else if (userRole === 'doctor') {
       // Doctor-specific buttons
-      if (patient.status === 'ready' || patient.status === 'delayed') {
+      if (patient.status === 'ready' || patient.status === 'called' || patient.status === 'delayed') {
         buttons.unshift(
           <Button 
             key="start-consultation"
@@ -208,7 +241,7 @@ const PatientCard = ({
         );
       }
 
-      if (patient.status === 'seeing_doctor') {
+      if (patient.status === 'seeing_doctor' || patient.status === 'serving') {
         buttons.unshift(
           <Button 
             key="complete-visit"
@@ -225,15 +258,52 @@ const PatientCard = ({
     return buttons;
   };
 
+  // Check if patient is high priority (priority >= 4)
+  const isHighPriority = patient.priority >= 4;
+  const isUrgent = patient.priority === 5;
+
   return (
-    <Card className="overflow-hidden hover:shadow-lg transition-shadow duration-200">
-      <div className="p-5 md:p-6 flex flex-col h-full">
+    <Card className={`overflow-hidden hover:shadow-lg transition-all duration-200 flex flex-col ${
+      isUrgent 
+        ? 'border-2 border-red-500 shadow-red-100 ring-2 ring-red-200' 
+        : isHighPriority 
+        ? 'border-2 border-orange-400 shadow-orange-100 ring-2 ring-orange-200' 
+        : ''
+    }`}>
+      {/* Priority Badge Banner - Compact */}
+      {isHighPriority && (
+        <div className={`${
+          isUrgent ? 'bg-red-500' : 'bg-orange-500'
+        } text-white text-center py-0.5 px-2 font-semibold text-xs flex items-center justify-center gap-1.5`}>
+          <span className="text-sm">⭐</span>
+          <span>{isUrgent ? 'URGENT' : 'PRIORITY'}</span>
+        </div>
+      )}
+      <div className={`p-5 md:p-6 flex flex-col flex-1 ${
+        isUrgent ? 'bg-red-50/30' : isHighPriority ? 'bg-orange-50/30' : ''
+      }`}>
         {/* Header section */}
         <div className="flex items-start justify-between mb-4">
           <div className="flex-1 min-w-0">
-            <h3 className="text-xl font-semibold text-gray-900 truncate mb-2">
-              {patient.name}
-            </h3>
+            <div className="flex items-center gap-2 mb-2">
+              {isHighPriority && (
+                <span className="text-xl">⭐</span>
+              )}
+              <h3 className="text-xl font-semibold text-gray-900 truncate">
+                {patient.name}
+              </h3>
+              {patient.tokenNumber && (
+                <Badge className={`text-lg font-bold px-2 py-1 ${
+                  isUrgent 
+                    ? 'bg-red-100 text-red-800 border-red-300' 
+                    : isHighPriority 
+                    ? 'bg-orange-100 text-orange-800 border-orange-300'
+                    : 'bg-blue-100 text-blue-800'
+                }`}>
+                  #{patient.tokenNumber}
+                </Badge>
+              )}
+            </div>
             <div className="flex flex-wrap gap-2 items-center mb-2">
               <Badge variant="outline" className="text-sm">
                 <Clock size={14} className="mr-1" />
@@ -386,13 +456,13 @@ const PatientCard = ({
                   Priority Level
                 </label>
                 <select
-                  value={vitalsForm.urgency || 'Normal'}
-                  onChange={(e) => setVitalsForm(prev => ({ ...prev, urgency: e.target.value }))}
+                  value={vitalsForm.priorityLevel || vitalsForm.urgency || 'normal'}
+                  onChange={(e) => setVitalsForm(prev => ({ ...prev, priorityLevel: e.target.value }))}
                   className="w-full p-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                 >
-                  <option value="Normal">Normal</option>
-                  <option value="Priority">Priority</option>
-                  <option value="Urgent">Urgent</option>
+                  <option value="normal">Normal</option>
+                  <option value="high">High Priority</option>
+                  <option value="urgent">Urgent</option>
                 </select>
               </div>
 

@@ -1,9 +1,11 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
+import useDebounce from '../../utils/useDebounce';
 import { useNavigate } from 'react-router-dom';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../../components/ui/card';
 import { Button } from '../../components/ui/button';
 import { Input } from '../../components/ui/input';
 import PageLayout from '../../components/PageLayout';
+import { Badge } from '../../components/ui/badge';
 import { 
   Users, 
   Search, 
@@ -26,18 +28,26 @@ const EmployeeManagement = () => {
   const [roles, setRoles] = useState([]);
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedRole, setSelectedRole] = useState('all');
+  const [selectedStatus, setSelectedStatus] = useState('active');
+  const debouncedSearch = useDebounce(searchTerm, 250);
   const [showAddForm, setShowAddForm] = useState(false);
   const [editingEmployee, setEditingEmployee] = useState(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState('');
+  // showDeleted replaced by selectedStatus
 
-  useEffect(() => {
-    const loadData = async () => {
+  const loadData = useCallback(async () => {
       try {
         setIsLoading(true);
         setError('');
+  let params = {};
+  if (selectedStatus === 'active') params = { is_active: true };
+  else if (selectedStatus === 'inactive') params = { is_active: false };
+  else if (selectedStatus === 'deleted') params = { includeDeleted: true };
+  else if (selectedStatus === 'all') params = { includeDeleted: true };
         const [employeesData, rolesData] = await Promise.all([
-          employeeService.getAllEmployees(),
+          // When showDeleted is on, include deleted and do not restrict by is_active
+          employeeService.getAllEmployees({ params }),
           employeeService.getRoles()
         ]);
         setEmployees(employeesData);
@@ -48,26 +58,46 @@ const EmployeeManagement = () => {
       } finally {
         setIsLoading(false);
       }
-    };
+  }, [selectedStatus]);
 
+  useEffect(() => {
     loadData();
-  }, []);
+  }, [loadData]);
 
-  // Filter employees based on search and role
-  const filteredEmployees = Array.isArray(employees) ? employees.filter(employee => {
-    const fullName = `${employee.first_name} ${employee.last_name}`;
-    const matchesSearch = fullName.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                         employee.email.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                         (employee.specialty && employee.specialty.toLowerCase().includes(searchTerm.toLowerCase()));
-    const matchesRole = selectedRole === 'all' || employee.role === selectedRole;
-    return matchesSearch && matchesRole;
-  }) : [];
+  // Filter employees based on search and role (null-safe)
+  const filteredEmployees = (Array.isArray(employees) ? employees : []).filter((employee = {}) => {
+    const term = (debouncedSearch ?? '').toString().toLowerCase();
+    const fullName = `${employee?.first_name ?? ''} ${employee?.last_name ?? ''}`.toLowerCase();
+    const email = (employee?.email ?? '').toString().toLowerCase();
+    const specialty = (employee?.specialty ?? '').toString().toLowerCase();
+    const role = (employee?.role ?? '').toString().toLowerCase();
+
+    const matchesSearch = term === ''
+      ? true
+      : fullName.includes(term) || email.includes(term) || specialty.includes(term);
+
+    const selectedRoleValue = (selectedRole ?? 'all').toString().toLowerCase();
+    const matchesRole = selectedRoleValue === 'all' || role === selectedRoleValue;
+    let matchesStatus = true;
+    if (selectedStatus === 'active') {
+      matchesStatus = !employee?.deleted_at && employee?.is_active === true;
+    } else if (selectedStatus === 'inactive') {
+      matchesStatus = !employee?.deleted_at && employee?.is_active === false;
+    } else if (selectedStatus === 'deleted') {
+      matchesStatus = !!employee?.deleted_at;
+    } else if (selectedStatus === 'all') {
+      matchesStatus = true;
+    }
+
+    return matchesSearch && matchesRole && matchesStatus;
+  });
 
   const handleDeleteEmployee = async (id) => {
     if (confirm('Are you sure you want to delete this employee?')) {
       try {
         await employeeService.deleteEmployee(id);
-        setEmployees(Array.isArray(employees) ? employees.filter(emp => emp.id !== id) : []);
+        // Re-fetch to reflect server truth (tombstone)
+        await loadData();
       } catch (error) {
         console.error('Error deleting employee:', error);
         setError('Failed to delete employee. Please try again.');
@@ -507,6 +537,19 @@ const EmployeeManagement = () => {
                   ))}
                 </select>
               </div>
+              <div className="flex items-center gap-2">
+                <label className="text-sm text-gray-700 select-none">Status</label>
+                <select
+                  className="flex h-10 rounded-md border border-input bg-background px-3 py-2 text-sm"
+                  value={selectedStatus}
+                  onChange={(e) => setSelectedStatus(e.target.value)}
+                >
+                  <option value="active">Active</option>
+                  <option value="inactive">Inactive</option>
+                  <option value="deleted">Deleted</option>
+                  <option value="all">All</option>
+                </select>
+              </div>
               <Button 
                 onClick={() => setShowAddForm(!showAddForm)}
                 className="flex items-center gap-2"
@@ -532,7 +575,7 @@ const EmployeeManagement = () => {
         ) : (
           <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-6">
             {filteredEmployees.map((employee) => (
-              <Card key={employee.id} className="hover:shadow-lg transition-shadow">
+              <Card key={employee.id} className={`hover:shadow-lg transition-shadow ${employee.deleted_at ? 'opacity-75' : ''}`}>
                 <CardHeader className="pb-3">
                   <div className="flex items-start justify-between">
                     <div className="flex items-center gap-3">
@@ -542,8 +585,11 @@ const EmployeeManagement = () => {
                         </span>
                       </div>
                       <div>
-                        <CardTitle className="text-lg">
+                        <CardTitle className="text-lg flex items-center gap-2">
                           {employee.first_name} {employee.last_name}
+                          {employee.deleted_at && (
+                            <Badge variant="destructive">Deleted</Badge>
+                          )}
                         </CardTitle>
                         <p className="text-sm text-gray-600 capitalize">{employee.role}</p>
                       </div>
@@ -598,6 +644,7 @@ const EmployeeManagement = () => {
                       variant="outline"
                       onClick={() => handleEditEmployee(employee)}
                       className="flex-1"
+                      disabled={!!employee.deleted_at}
                     >
                       <Edit className="h-3 w-3 mr-1" />
                       Edit
@@ -607,6 +654,7 @@ const EmployeeManagement = () => {
                       variant="outline"
                       onClick={() => handleToggleActive(employee.id)}
                       className="flex-1"
+                      disabled={!!employee.deleted_at}
                     >
                       {employee.is_active ? 'Deactivate' : 'Activate'}
                     </Button>
@@ -614,6 +662,7 @@ const EmployeeManagement = () => {
                       size="sm" 
                       variant="destructive"
                       onClick={() => handleDeleteEmployee(employee.id)}
+                      disabled={!!employee.deleted_at}
                     >
                       <Trash2 className="h-3 w-3" />
                     </Button>

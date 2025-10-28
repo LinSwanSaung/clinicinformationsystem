@@ -57,6 +57,45 @@ router.get('/',
 );
 
 /**
+ * @route   GET /api/patients/doctor
+ * @desc    Get patients assigned to the current doctor
+ * @access  Private (Doctor only)
+ */
+router.get('/doctor',
+  authenticate,
+  authorize('doctor'),
+  asyncHandler(async (req, res) => {
+    const doctorId = req.user.id;
+    const { page = 1, limit = 100 } = req.query;
+    
+    const options = {
+      limit: Math.min(parseInt(limit), 100),
+      offset: (parseInt(page) - 1) * parseInt(limit),
+      orderBy: 'created_at',
+      ascending: false
+    };
+
+    try {
+      // Get patients assigned to this doctor
+      const patients = await PatientService.getDoctorPatients(doctorId, options);
+      
+      res.status(200).json({
+        success: true,
+        data: Array.isArray(patients) ? patients : [],
+        total: Array.isArray(patients) ? patients.length : 0
+      });
+    } catch (error) {
+      console.error('Error in GET /patients/doctor:', error);
+      res.status(500).json({
+        success: false,
+        message: 'Failed to fetch doctor patients',
+        error: error.message
+      });
+    }
+  })
+);
+
+/**
  * @route   GET /api/patients/:id
  * @desc    Get patient by ID
  * @access  Private (All roles)

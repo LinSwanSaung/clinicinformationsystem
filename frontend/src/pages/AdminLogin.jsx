@@ -126,6 +126,8 @@ const AdminLogin = () => {
                 <div><strong>Doctor:</strong> dr.smith@clinic.com / doctor123</div>
                 <div><strong>Nurse:</strong> nurse.williams@clinic.com / nurse123</div>
                 <div><strong>Receptionist:</strong> reception@clinic.com / reception123</div>
+                <div><strong>Cashier:</strong> cashier@clinic.com / cashier123</div>
+                <div><strong>Pharmacist:</strong> pharmacy@clinic.com / pharmacy123</div>
               </div>
             </div>
           </CardContent>

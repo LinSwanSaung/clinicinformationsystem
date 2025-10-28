@@ -4,7 +4,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../..
 import { Button } from '../../components/ui/button';
 import { Input } from '../../components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../../components/ui/select';
-import { Dialog } from '../../components/ui/dialog';
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from '../../components/ui/dialog';
 import PageLayout from '../../components/PageLayout';
 import { 
   ArrowLeft,
@@ -35,6 +35,15 @@ const DoctorAvailability = () => {
       setIsLoading(true);
       setError('');
       
+      // Check authentication status
+      const token = localStorage.getItem('authToken');
+      const user = localStorage.getItem('user');
+      
+      if (!token || !user) {
+        setError('Authentication required. Please log in again.');
+        return;
+      }
+      
       // Get all doctors
       const doctorsData = await userService.getUsersByRole('doctor');
       const doctorsList = doctorsData?.data || [];
@@ -56,8 +65,10 @@ const DoctorAvailability = () => {
         }
         setAvailability(availabilityByDoctor);
       } catch (availError) {
-        console.error('Error loading availability (backend might not be ready):', availError);
-        // Don't set error state, just continue with empty availability
+        console.error('Error loading availability (using fallback):', availError);
+        
+        // Instead of failing, set empty availability and continue
+        console.log('Using empty availability due to backend issues');
         setAvailability({});
       }
     } catch (error) {
@@ -116,7 +127,7 @@ const DoctorAvailability = () => {
         <div className="flex items-center gap-4">
           <Button 
             variant="outline" 
-            onClick={() => navigate('/admin')}
+            onClick={() => navigate('/admin/dashboard')}
             className="flex items-center gap-2"
           >
             <ArrowLeft className="h-4 w-4" />
@@ -347,112 +358,115 @@ const ScheduleDialog = ({ isOpen, onClose, doctor, onScheduleAdded }) => {
   };
 
   return (
-    <Dialog 
-      isOpen={isOpen} 
-      onClose={onClose}
-      title={`Set Availability for Dr. ${doctor?.first_name} ${doctor?.last_name}`}
-      className="max-w-lg"
-    >
-      <form onSubmit={handleSubmit} className="space-y-4">
-        {formError && (
-          <div className="p-3 bg-red-50 border border-red-200 rounded-md">
-            <p className="text-sm text-red-600">{formError}</p>
-          </div>
-        )}
-
-        <div>
-          <label className="block text-sm font-medium text-gray-700 mb-2">
-            Day of Week
-          </label>
-          <Select
-            value={formData.day_of_week}
-            onValueChange={(value) => setFormData({ ...formData, day_of_week: value })}
-          >
-            <SelectTrigger>
-              <SelectValue placeholder="Select day" />
-            </SelectTrigger>
-            <SelectContent>
-              {daysOfWeek.map((day) => (
-                <SelectItem key={day} value={day}>
-                  {day}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-        </div>
-
-        <div className="grid grid-cols-2 gap-4">
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">
-              Start Time
-            </label>
-            <div className="flex gap-2">
-              <Input
-                type="text"
-                placeholder="9:00"
-                value={formData.start_time}
-                onChange={(e) => setFormData({ ...formData, start_time: e.target.value })}
-                className="flex-1"
-              />
-              <Select
-                value={formData.start_period}
-                onValueChange={(value) => setFormData({ ...formData, start_period: value })}
-              >
-                <SelectTrigger className="w-20">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="AM">AM</SelectItem>
-                  <SelectItem value="PM">PM</SelectItem>
-                </SelectContent>
-              </Select>
+    <Dialog open={isOpen} onOpenChange={onClose}>
+      <DialogContent className="max-w-lg">
+        <DialogHeader>
+          <DialogTitle>
+            Set Availability for Dr. {doctor?.first_name} {doctor?.last_name}
+          </DialogTitle>
+        </DialogHeader>
+        
+        <form onSubmit={handleSubmit} className="space-y-4">
+          {formError && (
+            <div className="p-3 bg-red-50 border border-red-200 rounded-md">
+              <p className="text-sm text-red-600">{formError}</p>
             </div>
-            <p className="text-xs text-gray-500 mt-1">Format: H:MM (e.g., 9:00, 10:30)</p>
-          </div>
+          )}
 
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-2">
-              End Time
+              Day of Week
             </label>
-            <div className="flex gap-2">
-              <Input
-                type="text"
-                placeholder="5:00"
-                value={formData.end_time}
-                onChange={(e) => setFormData({ ...formData, end_time: e.target.value })}
-                className="flex-1"
-              />
-              <Select
-                value={formData.end_period}
-                onValueChange={(value) => setFormData({ ...formData, end_period: value })}
-              >
-                <SelectTrigger className="w-20">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="AM">AM</SelectItem>
-                  <SelectItem value="PM">PM</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-            <p className="text-xs text-gray-500 mt-1">Format: H:MM (e.g., 9:00, 10:30)</p>
+            <Select
+              value={formData.day_of_week}
+              onValueChange={(value) => setFormData({ ...formData, day_of_week: value })}
+            >
+              <SelectTrigger>
+                <SelectValue placeholder="Select day" />
+              </SelectTrigger>
+              <SelectContent>
+                {daysOfWeek.map((day) => (
+                  <SelectItem key={day} value={day}>
+                    {day}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
           </div>
-        </div>
 
-        <div className="flex gap-2 pt-4">
-          <Button type="submit" disabled={isSubmitting} className="flex-1">
-            {isSubmitting ? 'Setting...' : 'Set Availability'}
-          </Button>
-          <Button 
-            type="button" 
-            variant="outline" 
-            onClick={onClose}
-            disabled={isSubmitting}
-          >
-            Cancel
-          </Button>
-        </div>
-      </form>
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                Start Time
+              </label>
+              <div className="flex gap-2">
+                <Input
+                  type="text"
+                  placeholder="9:00"
+                  value={formData.start_time}
+                  onChange={(e) => setFormData({ ...formData, start_time: e.target.value })}
+                  className="flex-1"
+                />
+                <Select
+                  value={formData.start_period}
+                  onValueChange={(value) => setFormData({ ...formData, start_period: value })}
+                >
+                  <SelectTrigger className="w-20">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="AM">AM</SelectItem>
+                    <SelectItem value="PM">PM</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <p className="text-xs text-gray-500 mt-1">Format: H:MM (e.g., 9:00, 10:30)</p>
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                End Time
+              </label>
+              <div className="flex gap-2">
+                <Input
+                  type="text"
+                  placeholder="5:00"
+                  value={formData.end_time}
+                  onChange={(e) => setFormData({ ...formData, end_time: e.target.value })}
+                  className="flex-1"
+                />
+                <Select
+                  value={formData.end_period}
+                  onValueChange={(value) => setFormData({ ...formData, end_period: value })}
+                >
+                  <SelectTrigger className="w-20">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="AM">AM</SelectItem>
+                    <SelectItem value="PM">PM</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <p className="text-xs text-gray-500 mt-1">Format: H:MM (e.g., 9:00, 10:30)</p>
+            </div>
+          </div>
+
+          <div className="flex gap-2 pt-4">
+            <Button type="submit" disabled={isSubmitting} className="flex-1">
+              {isSubmitting ? 'Setting...' : 'Set Availability'}
+            </Button>
+            <Button 
+              type="button" 
+              variant="outline" 
+              onClick={onClose}
+              disabled={isSubmitting}
+            >
+              Cancel
+            </Button>
+          </div>
+        </form>
+      </DialogContent>
     </Dialog>
   );
 };

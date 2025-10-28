@@ -38,6 +38,16 @@ export const errorHandler = (error, req, res, next) => {
     statusCode = 404;
     message = 'Resource not found';
   }
+  // Network/Fetch failures (e.g., database host unreachable)
+  if (
+    message?.toLowerCase().includes('fetch failed') ||
+    message?.toLowerCase().includes('getaddrinfo') ||
+    message?.toLowerCase().includes('econnrefused') ||
+    message?.toLowerCase().includes('etimedout')
+  ) {
+    statusCode = 503; // Service Unavailable
+    message = 'Upstream service unavailable';
+  }
 
   if (error.code === '23505') { // Unique constraint violation
     statusCode = 409;

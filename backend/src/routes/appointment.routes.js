@@ -128,8 +128,6 @@ router.put('/:id/status',
     const { id } = req.params;
     const { status } = req.body;
 
-    console.log('Status update request received:', { id, status }); // Debug log
-
     if (!status) {
       return res.status(400).json({
         success: false,

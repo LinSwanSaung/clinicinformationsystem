@@ -8,6 +8,7 @@ class AuthService {
   // Login user
   async login(credentials) {
     try {
+      // Use real API authentication (both development and production)
       const response = await apiService.post('/auth/login', credentials);
       
       if (response.success) {

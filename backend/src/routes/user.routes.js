@@ -2,6 +2,7 @@ import express from 'express';
 import { authenticate, authorize } from '../middleware/auth.js';
 import { asyncHandler, AppError } from '../middleware/errorHandler.js';
 import userModel from '../models/User.model.js';
+import { logAuditEvent } from '../utils/auditLogger.js';
 
 const router = express.Router();
 
@@ -113,6 +114,19 @@ router.post('/',
       message: 'User created successfully',
       data: newUser
     });
+    // Log admin user creation
+    try {
+      logAuditEvent({
+        userId: req.user?.id || null,
+        role: req.user?.role || null,
+        action: 'CREATE',
+        entity: 'users',
+        recordId: newUser?.id || null,
+        result: 'success',
+        meta: { role: newUser?.role },
+        ip: req.ip
+      });
+    } catch (e) {}
   })
 );
 
@@ -157,7 +171,7 @@ router.put('/:id',
     const updateData = req.body;
 
     // Fetch to ensure not deleted
-    const current = await userModel.findById(id, 'id, deleted_at');
+    const current = await userModel.findById(id, 'id, deleted_at, role');
     if (!current) {
       return res.status(404).json({ success: false, message: 'User not found' });
     }
@@ -194,10 +208,61 @@ router.put('/:id',
       });
     }
 
+    // Log user update (role changes)
+    try {
+      logAuditEvent({
+        userId: req.user?.id || null,
+        role: req.user?.role || null,
+        action: 'UPDATE',
+        entity: 'users',
+        recordId: id,
+        result: 'success',
+        meta: { old_role: current?.role || null, new_role: updatedUser?.role || null, changed_fields: Object.keys(allowedFields) },
+        ip: req.ip
+      });
+    } catch (e) {}
+
     res.status(200).json({
       success: true,
       message: 'User updated successfully',
       data: updatedUser
+    });
+  })
+);
+
+/**
+ * @route   POST /api/users/:id/reset-password
+ * @desc    Reset user password (admin initiated)
+ * @access  Private (Admin only)
+ */
+router.post('/:id/reset-password',
+  authenticate,
+  authorize('admin'),
+  asyncHandler(async (req, res) => {
+    const { id } = req.params;
+    const { new_password: newPassword } = req.body;
+
+    if (!newPassword || typeof newPassword !== 'string' || newPassword.length < 6) {
+      return res.status(400).json({
+        success: false,
+        message: 'New password must be at least 6 characters long'
+      });
+    }
+
+    const targetUser = await userModel.findById(id, 'id, deleted_at');
+    if (!targetUser) {
+      return res.status(404).json({ success: false, message: 'User not found' });
+    }
+
+    if (targetUser.deleted_at) {
+      return res.status(410).json({ success: false, message: 'User was deleted and cannot be modified' });
+    }
+
+    await userModel.updatePassword(id, newPassword);
+
+    res.status(200).json({
+      success: true,
+      message: 'Password reset successfully'
     });
   })
 );
@@ -242,6 +307,20 @@ router.patch('/:id/status',
       message: `User ${is_active ? 'activated' : 'deactivated'} successfully`,
       data: updatedUser
     });
+
+    // Log activation/deactivation
+    try {
+      logAuditEvent({
+        userId: req.user?.id || null,
+        role: req.user?.role || null,
+        action: is_active ? 'ACTIVATE' : 'DEACTIVATE',
+        entity: 'users',
+        recordId: id,
+        result: 'success',
+        meta: { previous_status: !is_active },
+        ip: req.ip
+      });
+    } catch (e) {}
   })
 );
 
@@ -275,6 +354,18 @@ router.delete('/:id',
     }
 
     res.status(204).send();
+    // Log deletion/tombstone
+    try {
+      logAuditEvent({
+        userId: req.user?.id || null,
+        role: req.user?.role || null,
+        action: 'DELETE',
+        entity: 'users',
+        recordId: id,
+        result: 'success',
+        ip: req.ip
+      });
+    } catch (e) {}
   })
 );
 

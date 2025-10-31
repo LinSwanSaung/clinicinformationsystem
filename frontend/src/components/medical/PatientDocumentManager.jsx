@@ -60,12 +60,19 @@ const PatientDocumentManager = ({
                   </div>
                   <div>
                     <p className="font-bold text-gray-900 text-sm">{file.name}</p>
-                    <p className="text-xs text-gray-500">{file.type} • {file.size}</p>
+                    <p className="text-xs text-gray-500">
+                      <span className="capitalize">{file.type?.replace('_', ' ')}</span> • {file.size}
+                    </p>
                     {file.uploadDate && (
                       <div className="flex items-center mt-1">
                         <Calendar size={12} className="text-gray-400 mr-1" />
                         <span className="text-xs text-gray-400">{file.uploadDate}</span>
                       </div>
+                    )}
+                    {file.uploadedBy && (
+                      <p className="text-xs text-gray-400 mt-1">
+                        Uploaded by: {file.uploadedBy}
+                      </p>
                     )}
                   </div>
                 </div>

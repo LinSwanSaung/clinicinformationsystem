@@ -20,7 +20,7 @@ class ApiService {
 
   async request(endpoint, options = {}) {
     // Support optional params object to be serialized into query string
-    const { params, ...rest } = options;
+    const { params, headers: customHeaders, ...rest } = options;
     let url = `${this.baseURL}${endpoint}`;
     if (params && typeof params === 'object') {
       const qs = new URLSearchParams();
@@ -34,13 +34,32 @@ class ApiService {
         url += (url.includes('?') ? '&' : '?') + qsStr;
       }
     }
+
+    const method = (rest.method ? rest.method.toUpperCase() : 'GET');
+    const { method: _ignored, ...restWithoutMethod } = rest;
+    const fetchOptions = { ...restWithoutMethod, method };
+
+    if (method === 'GET') {
+      const cacheBuster = `_=${Date.now()}`;
+      url += (url.includes('?') ? '&' : '?') + cacheBuster;
+    }
+    
+    // Build headers - don't set Content-Type for FormData (browser will set it with boundary)
+    const headers = {
+      'Cache-Control': 'no-cache',
+      Pragma: 'no-cache',
+      ...customHeaders,
+    };
+    
+    // Only set Content-Type to application/json if body is not FormData
+    if (fetchOptions.body && !(fetchOptions.body instanceof FormData)) {
+      headers['Content-Type'] = 'application/json';
+    }
     
     const config = {
-      headers: {
-        'Content-Type': 'application/json',
-        ...rest.headers,
-      },
-      ...rest,
+      cache: 'no-store',
+      headers,
+      ...fetchOptions,
     };
 
     // Add auth token if available
@@ -86,7 +105,7 @@ class ApiService {
   async post(endpoint, data) {
     return this.request(endpoint, {
       method: 'POST',
-      body: JSON.stringify(data),
+      body: data instanceof FormData ? data : JSON.stringify(data),
     });
   }
 

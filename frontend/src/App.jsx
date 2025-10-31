@@ -4,7 +4,9 @@ import { AuthProvider } from './contexts/AuthContext';
 import AdminLogin from './pages/AdminLogin';
 import AdminDashboard from './pages/admin/AdminDashboard';
 import EmployeeManagement from './pages/admin/EmployeeManagement';
+import PatientAccountRegistration from './pages/admin/PatientAccountRegistration';
 import DoctorAvailability from './pages/admin/DoctorAvailability';
+import AuditLogs from './pages/admin/AuditLogs';
 import ReceptionistDashboard from './pages/receptionist/ReceptionistDashboard';
 import RegisterPatient from './pages/receptionist/RegisterPatient';
 import AppointmentsPage from './pages/receptionist/AppointmentsPage';
@@ -20,6 +22,9 @@ import PatientMedicalRecord from './pages/doctor/PatientMedicalRecord';
 import PatientMedicalRecordManagement from './pages/doctor/PatientMedicalRecordManagement';
 import CashierDashboard from './pages/cashier/CashierDashboard';
 import InvoiceManagement from './pages/cashier/InvoiceManagement';
+import PatientPortalDashboard from './pages/patient/PatientPortalDashboard';
+import PatientLiveQueue from './pages/patient/PatientLiveQueue';
+import PatientMedicalRecords from './pages/patient/PatientMedicalRecords';
 import { useAuth } from './contexts/AuthContext';
 
 // Protected Route Component
@@ -73,6 +78,22 @@ function AppRoutes() {
         element={
           <ProtectedRoute allowedRoles={['admin']}>
             <DoctorAvailability />
+          </ProtectedRoute>
+        } 
+      />
+      <Route 
+        path="/admin/patient-accounts" 
+        element={
+          <ProtectedRoute allowedRoles={['admin']}>
+            <PatientAccountRegistration />
+          </ProtectedRoute>
+        } 
+      />
+      <Route 
+        path="/admin/audit-logs" 
+        element={
+          <ProtectedRoute allowedRoles={['admin']}>
+            <AuditLogs />
           </ProtectedRoute>
         } 
       />
@@ -213,6 +234,32 @@ function AppRoutes() {
         } 
       />
 
+      {/* Protected Patient Routes */}
+      <Route 
+        path="/patient/dashboard" 
+        element={
+          <ProtectedRoute allowedRoles={['patient']}>
+            <PatientPortalDashboard />
+          </ProtectedRoute>
+        } 
+      />
+      <Route 
+        path="/patient/queue" 
+        element={
+          <ProtectedRoute allowedRoles={['patient']}>
+            <PatientLiveQueue />
+          </ProtectedRoute>
+        } 
+      />
+      <Route 
+        path="/patient/medical-records" 
+        element={
+          <ProtectedRoute allowedRoles={['patient']}>
+            <PatientMedicalRecords />
+          </ProtectedRoute>
+        } 
+      />
+
       {/* Fallback Route */}
       <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>
@@ -235,6 +282,8 @@ function RoleAwareDashboard() {
     case 'cashier':
     case 'pharmacist':
       return <Navigate to="/cashier/dashboard" replace />;
+    case 'patient':
+      return <Navigate to="/patient/dashboard" replace />;
     default:
       return <Navigate to="/" replace />;
   }

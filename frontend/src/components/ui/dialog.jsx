@@ -1,5 +1,4 @@
 import React from "react"
-import { X } from "lucide-react"
 import { cn } from "@/lib/utils"
 
 const Dialog = ({ open, onOpenChange, children }) => {
@@ -82,6 +81,25 @@ const DialogDescription = React.forwardRef(({ className, ...props }, ref) => (
 ))
 DialogDescription.displayName = "DialogDescription"
 
+const DialogTrigger = React.forwardRef(({ asChild = false, children, onClick }, ref) => {
+  const child = React.Children.only(children)
+  if (asChild) {
+    return React.cloneElement(child, {
+      ref,
+      onClick: (event) => {
+        child.props?.onClick?.(event)
+        onClick?.(event)
+      }
+    })
+  }
+  return (
+    <button ref={ref} onClick={onClick}>
+      {children}
+    </button>
+  )
+})
+DialogTrigger.displayName = "DialogTrigger"
+
 export {
   Dialog,
   DialogContent,
@@ -89,4 +107,5 @@ export {
   DialogFooter,
   DialogHeader,
   DialogTitle,
+  DialogTrigger,
 }

@@ -21,14 +21,19 @@ CREATE TABLE IF NOT EXISTS users (
     specialty VARCHAR(100),
     license_number VARCHAR(100),
     is_active BOOLEAN DEFAULT true,
+    patient_id UUID,
     last_login TIMESTAMPTZ,
     created_at TIMESTAMPTZ DEFAULT NOW(),
     updated_at TIMESTAMPTZ DEFAULT NOW(),
     deleted_at TIMESTAMPTZ,
     
-    CONSTRAINT valid_role CHECK (role IN ('admin', 'doctor', 'nurse', 'receptionist', 'cashier', 'pharmacist')),
+    CONSTRAINT valid_role CHECK (
+        role IN ('admin', 'doctor', 'nurse', 'receptionist', 'cashier', 'pharmacist', 'patient')
+    ),
     CONSTRAINT valid_email CHECK (email ~* '^[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}$')
 );
+
+COMMENT ON COLUMN users.patient_id IS 'Links a patient portal account to the patients table';
 
 -- ===============================================
 -- PATIENTS TABLE
@@ -260,7 +265,7 @@ CREATE TABLE IF NOT EXISTS queue_tokens (
     issued_date DATE DEFAULT CURRENT_DATE,
     issued_time TIMESTAMPTZ DEFAULT NOW(),
     -- Queue lifecycle
-    status VARCHAR(20) DEFAULT 'waiting', -- waiting|called|serving|completed|missed|cancelled
+    status VARCHAR(20) DEFAULT 'waiting', -- waiting|called|serving|completed|missed|cancelled|delayed
     priority INTEGER DEFAULT 1,
     estimated_wait_time INTEGER DEFAULT 7, -- minutes patient has to arrive
     -- Extended lifecycle timestamps (alignment with scheduling and consult)
@@ -272,11 +277,16 @@ CREATE TABLE IF NOT EXISTS queue_tokens (
     done_at TIMESTAMPTZ,
     late_at TIMESTAMPTZ,
     consult_expected_minutes INTEGER DEFAULT 15, -- target consult duration
+    -- Delay tracking fields
+    delay_reason TEXT, -- reason why patient was delayed
+    delayed_at TIMESTAMPTZ, -- timestamp when patient was marked as delayed
+    undelayed_at TIMESTAMPTZ, -- timestamp when patient was undelayed
+    previous_status VARCHAR(20), -- status before being delayed
     created_by UUID REFERENCES users(id),
     created_at TIMESTAMPTZ DEFAULT NOW(),
     updated_at TIMESTAMPTZ DEFAULT NOW(),
     
-    CONSTRAINT valid_token_status CHECK (status IN ('waiting', 'called', 'serving', 'completed', 'missed', 'cancelled')),
+    CONSTRAINT valid_token_status CHECK (status IN ('waiting', 'called', 'serving', 'completed', 'missed', 'cancelled', 'delayed')),
     CONSTRAINT valid_priority CHECK (priority >= 1 AND priority <= 5),
     CONSTRAINT valid_token_number CHECK (token_number > 0),
     UNIQUE(doctor_id, issued_date, token_number)
@@ -319,13 +329,17 @@ CREATE TABLE IF NOT EXISTS appointment_queue (
     estimated_start_time TIMESTAMPTZ,
     actual_start_time TIMESTAMPTZ,
     actual_end_time TIMESTAMPTZ,
-    status VARCHAR(20) DEFAULT 'queued',
+    status VARCHAR(20) DEFAULT 'queued', -- queued, in_progress, completed, skipped, cancelled, delayed
     priority INTEGER DEFAULT 1,
     notes TEXT,
+    delay_reason TEXT,
+    delayed_at TIMESTAMPTZ,
+    undelayed_at TIMESTAMPTZ,
+    previous_queue_position INTEGER,
     created_at TIMESTAMPTZ DEFAULT NOW(),
     updated_at TIMESTAMPTZ DEFAULT NOW(),
     
-    CONSTRAINT valid_queue_status CHECK (status IN ('queued', 'in_progress', 'completed', 'skipped', 'cancelled')),
+    CONSTRAINT valid_queue_status CHECK (status IN ('queued', 'in_progress', 'completed', 'skipped', 'cancelled', 'delayed')),
     CONSTRAINT valid_queue_priority CHECK (priority >= 1 AND priority <= 5),
     CONSTRAINT valid_queue_position CHECK (queue_position > 0)
 );
@@ -1320,6 +1334,45 @@ CREATE INDEX IF NOT EXISTS idx_patient_diagnoses_code ON patient_diagnoses(diagn
 CREATE INDEX IF NOT EXISTS idx_patient_diagnoses_doctor ON patient_diagnoses(diagnosed_by);
 
 -- ===============================================
+-- PATIENT DOCUMENTS TABLE
+-- ===============================================
+CREATE TABLE IF NOT EXISTS patient_documents (
+    id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
+    patient_id UUID NOT NULL REFERENCES patients(id) ON DELETE CASCADE,
+    
+    -- Document metadata
+    document_type VARCHAR(50) DEFAULT 'other',
+    file_name VARCHAR(255) NOT NULL,
+    file_path TEXT NOT NULL,
+    file_url TEXT,
+    file_size INTEGER,
+    file_type VARCHAR(100),
+    
+    -- Upload tracking
+    uploaded_by UUID REFERENCES users(id),
+    
+    -- Timestamps
+    created_at TIMESTAMPTZ DEFAULT NOW(),
+    updated_at TIMESTAMPTZ DEFAULT NOW(),
+    
+    -- Constraints
+    CONSTRAINT valid_document_type CHECK (
+        document_type IN ('lab_result', 'x_ray', 'prescription', 'medical_report', 'consent_form', 'insurance', 'other')
+    )
+);
+
+-- Indexes for patient documents
+CREATE INDEX IF NOT EXISTS idx_patient_documents_patient_id ON patient_documents(patient_id);
+CREATE INDEX IF NOT EXISTS idx_patient_documents_created_at ON patient_documents(created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_patient_documents_type ON patient_documents(document_type);
+CREATE INDEX IF NOT EXISTS idx_patient_documents_uploader ON patient_documents(uploaded_by);
+
+COMMENT ON TABLE patient_documents IS 'Stores metadata for patient documents uploaded to Supabase Storage';
+COMMENT ON COLUMN patient_documents.document_type IS 'Type of document: lab_result, x_ray, prescription, medical_report, consent_form, insurance, other';
+COMMENT ON COLUMN patient_documents.file_path IS 'Path in Supabase Storage';
+COMMENT ON COLUMN patient_documents.file_url IS 'Public URL to access the document';
+
+-- ===============================================
 -- ENHANCE PRESCRIPTIONS TABLE
 -- ===============================================
 -- Add optional columns if they don't exist
@@ -1449,6 +1502,32 @@ CREATE POLICY "Allow doctors to update diagnoses"
     ON patient_diagnoses
     FOR UPDATE
     USING (auth.role() = 'authenticated');
+
+-- Patient Documents Policies
+-- Enable RLS on patient_documents
+ALTER TABLE patient_documents ENABLE ROW LEVEL SECURITY;
+
+-- Allow authenticated users to read documents
+CREATE POLICY "Allow authenticated users to read documents"
+    ON patient_documents
+    FOR SELECT
+    USING (auth.role() = 'authenticated');
+
+-- Allow authenticated users to upload documents
+CREATE POLICY "Allow authenticated users to upload documents"
+    ON patient_documents
+    FOR INSERT
+    WITH CHECK (auth.role() = 'authenticated');
+
+-- Allow admins and doctors to delete documents
+CREATE POLICY "Allow admins and doctors to delete documents"
+    ON patient_documents
+    FOR DELETE
+    USING (
+        auth.uid() IN (
+            SELECT id FROM users WHERE role IN ('admin', 'doctor')
+        )
+    );
 
 -- ===============================================
 -- HELPER VIEWS

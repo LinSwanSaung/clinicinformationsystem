@@ -20,6 +20,7 @@ import {
 import { motion, AnimatePresence } from 'framer-motion';
 import employeeService from '@/services/employeeService';
 import NotificationBell from '@/components/NotificationBell';
+import LanguageSwitcher from '@/components/LanguageSwitcher';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -163,6 +164,29 @@ const Navbar = () => {
         }
       ];
     }
+
+    if (user?.role === 'patient') {
+      return [
+        {
+          icon: Home,
+          label: 'Dashboard',
+          path: '/patient/dashboard',
+          isActive: location.pathname === '/patient/dashboard'
+        },
+        {
+          icon: Activity,
+          label: 'Live Queue',
+          path: '/patient/queue',
+          isActive: location.pathname === '/patient/queue'
+        },
+        {
+          icon: FileText,
+          label: 'Medical Records',
+          path: '/patient/medical-records',
+          isActive: location.pathname === '/patient/medical-records'
+        }
+      ];
+    }
     
     return [];
   };
@@ -183,6 +207,7 @@ const Navbar = () => {
           onClick={() => navigate(
             user?.role === 'admin' ? '/admin/dashboard' : 
             user?.role === 'cashier' || user?.role === 'pharmacist' ? '/cashier/dashboard' :
+            user?.role === 'patient' ? '/patient/dashboard' :
             '/receptionist/dashboard'
           )}
           whileHover={{ scale: 1.05 }}
@@ -276,6 +301,9 @@ const Navbar = () => {
 
           {/* Notifications */}
           <NotificationBell />
+
+          {/* Language Switcher - Only for non-admin roles */}
+          {user?.role !== 'admin' && <LanguageSwitcher />}
 
           {/* Profile Menu */}
           <DropdownMenu>

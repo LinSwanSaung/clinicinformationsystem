@@ -483,7 +483,30 @@ const PatientCard = ({
                   Cancel
                 </Button>
                 <Button onClick={() => {
-                  onSaveVitals(patient.id, vitalsForm, notes);
+                  // The patient object from queue/token has a nested 'patient' object with the actual patient record
+                  // Priority: patient.id (nested patient record) > patient_id (FK) > id (token ID - wrong!)
+                  
+                  // The patient object from queue has patientId (camelCase) field, not patient_id or nested patient
+                  // Priority: patientId (camelCase) > patient_id (snake_case) > patient.id (nested) > id (WRONG!)
+                  const resolvedPatientId = patient?.patientId ?? patient?.patient_id ?? patient?.patient?.id ?? patient?.id;
+                  
+                  console.log('✅ [PatientCard] RESOLVED patient ID:', resolvedPatientId, 'from patientId:', patient?.patientId);
+                  
+                  if (!resolvedPatientId) {
+                    console.error('[PatientCard] Unable to resolve patient ID for vitals save:', patient);
+                    alert('Could not determine patient ID. Please refresh and try again.');
+                    return;
+                  }
+
+                  const visitId = patient?.visit_id ?? patient?.current_visit_id ?? patient?.latestVitals?.visit_id ?? null;
+                  console.log('[PatientCard] 🔍 Resolved visit_id for vitals save:', {
+                    visit_id: patient?.visit_id,
+                    current_visit_id: patient?.current_visit_id,
+                    latestVitals_visit_id: patient?.latestVitals?.visit_id,
+                    finalVisitId: visitId
+                  });
+
+                  onSaveVitals(resolvedPatientId, vitalsForm, notes, visitId);
                   setIsVitalsModalOpen(false);
                 }}>
                   Save Vitals

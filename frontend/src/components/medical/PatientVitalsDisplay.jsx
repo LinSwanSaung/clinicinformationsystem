@@ -1,4 +1,5 @@
 import React from 'react';
+import { useTranslation } from 'react-i18next';
 import { Card } from '../ui/card';
 import { Button } from '../ui/button';
 import { 
@@ -9,37 +10,55 @@ import {
 } from 'lucide-react';
 
 const PatientVitalsDisplay = ({ vitals, onAddVitals, onEditVitals, showAddButton = false, showEditButton = false, className = "" }) => {
+  const { t } = useTranslation();
+  // Helper function to safely get vitals values - handles both snake_case and camelCase
+  const getVitalValue = (snakeCase, camelCase) => {
+    return vitals?.[snakeCase] !== undefined ? vitals[snakeCase] : vitals?.[camelCase];
+  };
+
   const vitalsData = [
     {
       key: 'bp',
-      label: 'Blood Pressure',
+      label: t('patient.vitals.bloodPressure'),
       icon: Heart,
       color: 'text-red-500',
       unit: '',
-      value: vitals?.bp
+      value: (() => {
+        const systolic = getVitalValue('blood_pressure_systolic', 'bloodPressureSystolic');
+        const diastolic = getVitalValue('blood_pressure_diastolic', 'bloodPressureDiastolic');
+        // Also check for legacy 'bp' format
+        if (!systolic && !diastolic && vitals?.bp) {
+          return vitals.bp;
+        }
+        return systolic && diastolic ? `${systolic}/${diastolic}` : null;
+      })()
     },
     {
       key: 'heartRate',
-      label: 'Heart Rate',
+      label: t('patient.vitals.heartRate'),
       icon: Activity,
       color: 'text-green-500',
       unit: 'bpm',
-      value: vitals?.heartRate
+      value: getVitalValue('heart_rate', 'heartRate')
     },
     {
       key: 'temp',
-      label: 'Temperature',
+      label: t('patient.vitals.temperature'),
       icon: ThermometerSnowflake,
       color: 'text-blue-500',
-      unit: '°F',
-      value: vitals?.temp
+      unit: (() => {
+        const unit = getVitalValue('temperature_unit', 'temperatureUnit');
+        // Also check legacy 'temp' property
+        return unit === 'F' || unit === 'f' ? '°F' : '°C';
+      })(),
+      value: getVitalValue('temperature', 'temp')
     },
     {
       key: 'weight',
-      label: 'Weight',
+      label: t('patient.vitals.weight'),
       icon: Scale,
       color: 'text-purple-500',
-      unit: 'kg',
+      unit: getVitalValue('weight_unit', 'weightUnit') || 'kg',
       value: vitals?.weight
     }
   ];
@@ -49,7 +68,7 @@ const PatientVitalsDisplay = ({ vitals, onAddVitals, onEditVitals, showAddButton
       <div className="flex items-center justify-between mb-6">
         <div className="flex items-center space-x-3">
           <Activity size={24} className="text-emerald-600" />
-          <h3 className="text-lg font-bold">Current Vitals</h3>
+          <h3 className="text-lg font-bold">{t('patient.medicalRecords.currentVitals')}</h3>
         </div>
         <div className="flex space-x-2">
           {showAddButton && (
@@ -59,7 +78,7 @@ const PatientVitalsDisplay = ({ vitals, onAddVitals, onEditVitals, showAddButton
               className="text-sm px-4 py-2"
               onClick={onAddVitals}
             >
-              + Add Vitals
+              + {t('patient.medicalRecords.addVitals')}
             </Button>
           )}
           {showEditButton && (
@@ -69,7 +88,7 @@ const PatientVitalsDisplay = ({ vitals, onAddVitals, onEditVitals, showAddButton
               className="text-sm px-4 py-2"
               onClick={onEditVitals}
             >
-              Edit Vitals
+              {t('patient.medicalRecords.editVitals')}
             </Button>
           )}
         </div>
@@ -90,7 +109,7 @@ const PatientVitalsDisplay = ({ vitals, onAddVitals, onEditVitals, showAddButton
           )}
         </div>
       ) : (
-        <p className="text-gray-500 italic text-sm">No vitals recorded yet</p>
+        <p className="text-gray-500 italic text-sm">{t('patient.medicalRecords.noVitalsRecorded')}</p>
       )}
     </Card>
   );

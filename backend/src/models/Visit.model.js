@@ -13,7 +13,7 @@ class VisitModel extends BaseModel {
    * Includes all related data: allergies, diagnoses, prescriptions, vitals, services
    */
   async getPatientVisitHistory(patientId, options = {}) {
-    const { limit = 50, offset = 0, includeInProgress = false } = options;
+    const { limit = 50, offset = 0, includeCompleted = true, includeInProgress = false } = options;
     
     try {
       // Build query
@@ -35,23 +35,31 @@ class VisitModel extends BaseModel {
         `)
         .eq('patient_id', patientId);
 
-      // Only show completed visits by default
+      // Filter by status based on options
+      // If includeInProgress is true, show all visits (no status filter)
+      // Otherwise, show only completed or in_progress based on includeCompleted flag
       if (!includeInProgress) {
-        query = query.eq('status', 'completed');
+        if (includeCompleted) {
+          // Show only completed visits
+          query = query.eq('status', 'completed');
+        } else {
+          // Show only in_progress visits
+          query = query.eq('status', 'in_progress');
+        }
       }
-      // Otherwise show all visits regardless of status
 
       const { data: visits, error } = await query
         .order('visit_date', { ascending: false })
         .range(offset, offset + limit - 1);
 
       if (error) {
+        console.error(`[VISIT MODEL] ❌ Error fetching visits:`, error);
         throw new Error(`Failed to fetch patient visit history: ${error.message}`);
       }
 
       // Enhance each visit with related data
       const enhancedVisits = await Promise.all(
-        visits.map(async (visit) => {
+        (visits || []).map(async (visit) => {
           return await this.enhanceVisitWithRelatedData(visit);
         })
       );

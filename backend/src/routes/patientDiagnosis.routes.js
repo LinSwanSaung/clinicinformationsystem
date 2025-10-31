@@ -1,6 +1,7 @@
 import express from 'express';
 import { authenticate, authorize } from '../middleware/auth.js';
 import patientDiagnosisService from '../services/PatientDiagnosis.service.js';
+import { logAuditEvent } from '../utils/auditLogger.js';
 
 const router = express.Router();
 
@@ -84,6 +85,8 @@ router.get(
         });
       }
       
+      // Note: Viewing is not logged to avoid excessive audit log entries
+
       res.json({
         success: true,
         data: diagnosis
@@ -115,11 +118,9 @@ router.post(
       
       const diagnosis = await patientDiagnosisService.createDiagnosis(diagnosisData);
       
-      res.status(201).json({
-        success: true,
-        data: diagnosis,
-        message: 'Diagnosis created successfully'
-      });
+      // Log diagnosis create
+      try { logAuditEvent({ userId: req.user?.id || null, role: req.user?.role || null, action: 'CREATE', entity: 'diagnosis', recordId: diagnosis?.id || null, patientId: diagnosis?.patient_id || null, result: 'success', ip: req.ip }); } catch (e) {}
+      res.status(201).json({ success: true, data: diagnosis, message: 'Diagnosis created successfully' });
     } catch (error) {
       res.status(400).json({
         success: false,
@@ -142,12 +143,8 @@ router.put(
     try {
       const { id } = req.params;
       const diagnosis = await patientDiagnosisService.updateDiagnosis(id, req.body);
-      
-      res.json({
-        success: true,
-        data: diagnosis,
-        message: 'Diagnosis updated successfully'
-      });
+      try { logAuditEvent({ userId: req.user?.id || null, role: req.user?.role || null, action: 'UPDATE', entity: 'diagnosis', recordId: id, patientId: diagnosis?.patient_id || null, result: 'success', meta: { changed_fields: Object.keys(req.body) }, ip: req.ip }); } catch (e) {}
+      res.json({ success: true, data: diagnosis, message: 'Diagnosis updated successfully' });
     } catch (error) {
       res.status(400).json({
         success: false,
@@ -178,17 +175,9 @@ router.patch(
         });
       }
       
-      const diagnosis = await patientDiagnosisService.updateDiagnosisStatus(
-        id, 
-        status, 
-        resolved_date
-      );
-      
-      res.json({
-        success: true,
-        data: diagnosis,
-        message: 'Diagnosis status updated successfully'
-      });
+      const diagnosis = await patientDiagnosisService.updateDiagnosisStatus(id, status, resolved_date);
+      try { logAuditEvent({ userId: req.user?.id || null, role: req.user?.role || null, action: 'UPDATE', entity: 'diagnosis', recordId: id, patientId: diagnosis?.patient_id || null, result: 'success', meta: { status }, ip: req.ip }); } catch (e) {}
+      res.json({ success: true, data: diagnosis, message: 'Diagnosis status updated successfully' });
     } catch (error) {
       res.status(400).json({
         success: false,
@@ -211,11 +200,8 @@ router.delete(
     try {
       const { id } = req.params;
       await patientDiagnosisService.deleteDiagnosis(id);
-      
-      res.json({
-        success: true,
-        message: 'Diagnosis deleted successfully'
-      });
+      try { logAuditEvent({ userId: req.user?.id || null, role: req.user?.role || null, action: 'DELETE', entity: 'diagnosis', recordId: id, result: 'success', ip: req.ip }); } catch (e) {}
+      res.json({ success: true, message: 'Diagnosis deleted successfully' });
     } catch (error) {
       res.status(500).json({
         success: false,

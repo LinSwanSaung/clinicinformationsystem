@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { Card } from '../ui/card';
 import { Badge } from '../ui/badge';
 import { Button } from '../ui/button';
@@ -11,7 +12,8 @@ import {
   FileText,
   AlertTriangle,
   Activity,
-  Heart
+  Heart,
+  Download
 } from 'lucide-react';
 
 /**
@@ -22,8 +24,10 @@ const VisitHistoryCard = ({
   visit, 
   isExpanded = false, 
   onToggleExpand,
-  showDetailsButton = true 
+  showDetailsButton = true,
+  onDownloadPDF = null 
 }) => {
+  const { t } = useTranslation();
   const [localExpanded, setLocalExpanded] = useState(isExpanded);
 
   const handleToggle = () => {
@@ -117,7 +121,7 @@ const VisitHistoryCard = ({
                   {formatDate(visit.visit_date)}
                 </h3>
                 <p className="text-sm text-gray-600">
-                  {visit.visit_type || 'General Visit'} - Dr. {visit.doctor_name}
+                  {visit.visit_type || t('patient.visit.generalVisit')} - Dr. {visit.doctor_name}
                 </p>
               </div>
             </div>
@@ -132,6 +136,20 @@ const VisitHistoryCard = ({
                 {formatCurrency(visit.total_cost)}
               </Badge>
             )}
+            {onDownloadPDF && (
+              <Button 
+                variant="ghost" 
+                size="sm"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onDownloadPDF(visit.id);
+                }}
+                className="h-8 px-2 hover:bg-blue-50"
+                title={t('patient.visit.downloadVisitSummary')}
+              >
+                <Download size={16} className="text-blue-600" />
+              </Button>
+            )}
           </div>
         </div>
       </div>
@@ -145,7 +163,7 @@ const VisitHistoryCard = ({
             <div>
               <h4 className="font-medium text-gray-700 mb-2 flex items-center">
                 <Activity size={16} className="mr-2 text-green-600" />
-                Primary Diagnosis
+                {t('patient.visit.primaryDiagnosis')}
               </h4>
               <p className="text-gray-600 text-sm bg-green-50 p-3 rounded-md">
                 {visit.diagnosis}
@@ -158,12 +176,12 @@ const VisitHistoryCard = ({
             <div>
               <h4 className="font-medium text-gray-700 mb-3 flex items-center">
                 <Heart size={16} className="mr-2 text-pink-600" />
-                Vital Signs
+                {t('patient.visit.vitalSigns')}
               </h4>
               <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
                 {visit.vitals.blood_pressure_systolic && visit.vitals.blood_pressure_diastolic && (
                   <div className="bg-gray-50 border border-gray-200 rounded-md p-3">
-                    <p className="text-xs text-gray-600 mb-1">Blood Pressure</p>
+                    <p className="text-xs text-gray-600 mb-1">{t('patient.vitals.bloodPressure')}</p>
                     <p className="text-lg font-semibold text-gray-900">
                       {visit.vitals.blood_pressure_systolic}/{visit.vitals.blood_pressure_diastolic}
                     </p>
@@ -172,28 +190,28 @@ const VisitHistoryCard = ({
                 )}
                 {visit.vitals.heart_rate && (
                   <div className="bg-gray-50 border border-gray-200 rounded-md p-3">
-                    <p className="text-xs text-gray-600 mb-1">Heart Rate</p>
+                    <p className="text-xs text-gray-600 mb-1">{t('patient.vitals.heartRate')}</p>
                     <p className="text-lg font-semibold text-gray-900">{visit.vitals.heart_rate}</p>
                     <p className="text-xs text-gray-500">bpm</p>
                   </div>
                 )}
                 {visit.vitals.temperature && (
                   <div className="bg-gray-50 border border-gray-200 rounded-md p-3">
-                    <p className="text-xs text-gray-600 mb-1">Temperature</p>
+                    <p className="text-xs text-gray-600 mb-1">{t('patient.vitals.temperature')}</p>
                     <p className="text-lg font-semibold text-gray-900">{visit.vitals.temperature}</p>
                     <p className="text-xs text-gray-500">°{visit.vitals.temperature_unit || 'F'}</p>
                   </div>
                 )}
                 {visit.vitals.weight && (
                   <div className="bg-gray-50 border border-gray-200 rounded-md p-3">
-                    <p className="text-xs text-gray-600 mb-1">Weight</p>
+                    <p className="text-xs text-gray-600 mb-1">{t('patient.vitals.weight')}</p>
                     <p className="text-lg font-semibold text-gray-900">{visit.vitals.weight}</p>
                     <p className="text-xs text-gray-500">{visit.vitals.weight_unit || 'kg'}</p>
                   </div>
                 )}
                 {visit.vitals.oxygen_saturation && (
                   <div className="bg-gray-50 border border-gray-200 rounded-md p-3">
-                    <p className="text-xs text-gray-600 mb-1">O₂ Saturation</p>
+                    <p className="text-xs text-gray-600 mb-1">{t('patient.vitals.oxygenSaturation')}</p>
                     <p className="text-lg font-semibold text-gray-900">{visit.vitals.oxygen_saturation}</p>
                     <p className="text-xs text-gray-500">%</p>
                   </div>
@@ -207,7 +225,7 @@ const VisitHistoryCard = ({
             <div>
               <h4 className="font-medium text-gray-700 mb-3 flex items-center">
                 <AlertTriangle size={16} className="mr-2 text-red-600" />
-                Allergies Recorded This Visit
+                {t('patient.visit.allergiesRecorded')}
               </h4>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                 {visit.allergies.map((allergy) => (
@@ -220,7 +238,7 @@ const VisitHistoryCard = ({
                         </p>
                         {allergy.diagnosed_date && (
                           <p className="text-xs text-red-500 mt-1">
-                            Recorded: {formatDate(allergy.diagnosed_date)}
+                            {t('patient.visit.recorded')}: {formatDate(allergy.diagnosed_date)}
                           </p>
                         )}
                         {allergy.reaction && (
@@ -242,7 +260,7 @@ const VisitHistoryCard = ({
             <div>
               <h4 className="font-medium text-gray-700 mb-3 flex items-center">
                 <Activity size={16} className="mr-2 text-purple-600" />
-                Diagnoses from This Visit
+                {t('patient.visit.diagnosesFromVisit')}
               </h4>
               <div className="space-y-3">
                 {visit.visit_diagnoses.map((diagnosis) => (
@@ -263,13 +281,13 @@ const VisitHistoryCard = ({
                           </span>
                           {diagnosis.severity && (
                             <span className="text-sm text-purple-600">
-                              Severity: {diagnosis.severity}
+                              {t('patient.visit.severity')}: {diagnosis.severity}
                             </span>
                           )}
                         </div>
                         {diagnosis.diagnosed_date && (
                           <p className="text-xs text-purple-500 mt-1">
-                            Diagnosed: {formatDate(diagnosis.diagnosed_date)}
+                            {t('patient.visit.diagnosed')}: {formatDate(diagnosis.diagnosed_date)}
                           </p>
                         )}
                         {diagnosis.clinical_notes && (
@@ -288,7 +306,7 @@ const VisitHistoryCard = ({
             <div>
               <h4 className="font-medium text-gray-700 mb-3 flex items-center">
                 <Pill size={16} className="mr-2 text-blue-600" />
-                Medications Prescribed
+                {t('patient.visit.medicationsPrescribed')}
               </h4>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                 {visit.prescriptions.map((prescription) => (
@@ -300,7 +318,7 @@ const VisitHistoryCard = ({
                           {prescription.dosage} • {prescription.frequency}
                         </p>
                         {prescription.duration && (
-                          <p className="text-xs text-blue-600">Duration: {prescription.duration}</p>
+                          <p className="text-xs text-blue-600">{t('patient.visit.duration')}: {prescription.duration}</p>
                         )}
                         {prescription.instructions && (
                           <p className="text-xs text-blue-600 mt-1">{prescription.instructions}</p>
@@ -329,7 +347,7 @@ const VisitHistoryCard = ({
                 <div className="space-y-3">
                   {visit.consultation_fee && visit.consultation_fee > 0 && (
                     <div className="flex justify-between text-sm">
-                      <span className="text-gray-600">Consultation Fee:</span>
+                      <span className="text-gray-600">{t('patient.visit.consultationFee')}:</span>
                       <span className="font-medium text-gray-900">{formatCurrency(visit.consultation_fee)}</span>
                     </div>
                   )}
@@ -337,7 +355,7 @@ const VisitHistoryCard = ({
                   {/* Services Detail */}
                   {visit.invoice?.service_items && visit.invoice.service_items.length > 0 && (
                     <div className="space-y-1.5">
-                      <div className="text-sm font-medium text-gray-700">Services ({visit.invoice.service_items.length} items):</div>
+                      <div className="text-sm font-medium text-gray-700">{t('patient.visit.services')} ({visit.invoice.service_items.length} {t('patient.visit.items')}):</div>
                       {visit.invoice.service_items.map((service, idx) => (
                         <div key={idx} className="flex justify-between text-sm pl-3">
                           <span className="text-gray-600">
@@ -353,7 +371,7 @@ const VisitHistoryCard = ({
                   {visit.invoice?.medicine_items && visit.invoice.medicine_items.length > 0 && (
                     <div className="space-y-1.5">
                       <div className="text-sm font-medium text-gray-700">
-                        Medications ({visit.invoice.medicine_items.length} dispensed):
+                        {t('patient.visit.medications')} ({visit.invoice.medicine_items.length} {t('patient.visit.dispensed')}):
                       </div>
                       {visit.invoice.medicine_items.map((med, idx) => (
                         <div key={idx} className="flex justify-between text-sm pl-3">
@@ -371,25 +389,25 @@ const VisitHistoryCard = ({
                    (!visit.invoice?.medicine_items || visit.invoice.medicine_items.length === 0) && (
                     <div className="space-y-1.5">
                       <div className="text-sm font-medium text-gray-700">
-                        Medications Prescribed ({visit.prescriptions.length}):
+                        {t('patient.visit.medicationsPrescribed')} ({visit.prescriptions.length}):
                       </div>
                       {visit.prescriptions.slice(0, 3).map((rx, idx) => (
                         <div key={idx} className="flex justify-between text-sm pl-3">
                           <span className="text-gray-600">• {rx.medication_name}</span>
-                          <span className="text-xs text-gray-500 italic">Not yet dispensed</span>
+                          <span className="text-xs text-gray-500 italic">{t('patient.visit.notYetDispensed')}</span>
                         </div>
                       ))}
                       {visit.prescriptions.length > 3 && (
                         <div className="text-xs text-gray-500 italic pl-3">
-                          ... and {visit.prescriptions.length - 3} more
+                          ... {t('patient.visit.andMore', { count: visit.prescriptions.length - 3 })}
                         </div>
                       )}
                     </div>
                   )}
                   
                   {visit.total_cost && visit.total_cost > 0 && (
-                    <div className="flex justify-between items-center pt-2 border-t border-gray-300">
-                      <span className="font-semibold text-gray-700">Total Amount:</span>
+                    <div className="flex justify-between items-center pt-3 border-t border-gray-300">
+                      <span className="font-semibold text-gray-700">{t('patient.visit.totalCost')}:</span>
                       <div className="flex items-center space-x-2">
                         <span className="text-lg font-bold text-gray-900">{formatCurrency(visit.total_cost)}</span>
                         <Badge className={getPaymentStatusColor(visit.payment_status)}>
@@ -400,7 +418,7 @@ const VisitHistoryCard = ({
                   )}
                   {(!visit.total_cost || visit.total_cost === 0) && visit.payment_status !== 'paid' && (
                     <div className="flex justify-between items-center pt-2 border-t border-gray-300">
-                      <span className="font-semibold text-gray-700">Payment Status:</span>
+                      <span className="font-semibold text-gray-700">{t('patient.visit.paymentStatus')}:</span>
                       <Badge className={getPaymentStatusColor('pending')}>
                         No Invoice Generated
                       </Badge>

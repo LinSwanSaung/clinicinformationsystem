@@ -14,7 +14,23 @@ class AppointmentQueueModel extends BaseModel {
     const { data, error } = await this.supabase
       .from(this.tableName)
       .select(`
-        *,
+        id,
+        appointment_id,
+        doctor_id,
+        patient_id,
+        queue_position,
+        estimated_start_time,
+        actual_start_time,
+        actual_end_time,
+        status,
+        priority,
+        notes,
+        delay_reason,
+        delayed_at,
+        undelayed_at,
+        previous_queue_position,
+        created_at,
+        updated_at,
         appointment:appointments!appointment_id (
           id,
           appointment_date,
@@ -40,6 +56,7 @@ class AppointmentQueueModel extends BaseModel {
       `)
       .eq('doctor_id', doctorId)
       .eq('appointment.appointment_date', queueDate)
+      .in('status', ['queued', 'in_progress', 'delayed']) // Only show active appointments
       .order('queue_position');
 
     if (error) {

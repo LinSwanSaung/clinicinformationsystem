@@ -39,7 +39,8 @@ router.get('/doctor/:doctorId/capacity', authenticate, async (req, res) => {
  */
 router.post('/token', authenticate, validateQueueToken, async (req, res) => {
   try {
-    const result = await queueService.issueToken(req.body);
+    // Pass the current user info to the service for audit logging
+    const result = await queueService.issueToken(req.body, req.user);
     res.status(201).json({
       success: true,
       data: result,
@@ -63,12 +64,7 @@ router.get('/doctor/:doctorId/status', authenticate, async (req, res) => {
     const { doctorId } = req.params;
     const { date } = req.query;
     
-    console.log('=== DOCTOR QUEUE STATUS REQUEST ===');
-    console.log('Doctor ID:', doctorId);
-    console.log('Date:', date);
-    
     const status = await queueService.getQueueStatus(doctorId, date);
-    console.log('Queue status result:', JSON.stringify(status, null, 2));
     
     res.json({
       success: true,
@@ -136,9 +132,6 @@ router.post('/call-next/:doctorId', authenticate, async (req, res) => {
 router.put('/token/:tokenId/mark-ready', authenticate, async (req, res) => {
   try {
     const { tokenId } = req.params;
-    console.log('=== MARK READY ENDPOINT HIT ===');
-    console.log('Mark ready request for token:', tokenId);
-    console.log('User:', req.user);
     
     const result = await queueService.markPatientReady(tokenId);
     res.json({
@@ -163,9 +156,6 @@ router.put('/token/:tokenId/mark-ready', authenticate, async (req, res) => {
 router.put('/token/:tokenId/mark-waiting', authenticate, async (req, res) => {
   try {
     const { tokenId } = req.params;
-    console.log('=== MARK WAITING ENDPOINT HIT ===');
-    console.log('Mark waiting request for token:', tokenId);
-    console.log('User:', req.user);
     
     const result = await queueService.markPatientWaiting(tokenId);
     res.json({
@@ -188,7 +178,6 @@ router.put('/token/:tokenId/mark-waiting', authenticate, async (req, res) => {
  * @access  Private
  */
 router.get('/test', authenticate, async (req, res) => {
-  console.log('=== TEST ENDPOINT HIT ===');
   res.json({
     success: true,
     message: 'Queue routes are working',
@@ -205,9 +194,7 @@ router.put('/token/:tokenId/start-consultation', authenticate, async (req, res) 
   try {
     const { tokenId } = req.params;
     
-    console.log('🏥 Starting consultation for token:', tokenId);
     const result = await queueService.startConsultation(tokenId);
-    console.log('✅ Consultation started successfully:', result);
     
     res.json({
       success: true,
@@ -215,8 +202,7 @@ router.put('/token/:tokenId/start-consultation', authenticate, async (req, res) 
       message: result.message
     });
   } catch (error) {
-    console.error('❌ Failed to start consultation:', error.message);
-    console.error('Full error:', error);
+    console.error('Failed to start consultation:', error);
     res.status(400).json({
       success: false,
       message: error.message
@@ -284,6 +270,102 @@ router.put('/token/:tokenId/cancel', authenticate, async (req, res) => {
       success: true,
       data: result.token,
       message: result.message
+    });
+  } catch (error) {
+    res.status(400).json({
+      success: false,
+      message: error.message
+    });
+  }
+});
+
+/**
+ * @route   PUT /api/queue/token/:tokenId/delay
+ * @desc    Mark patient as delayed (removes from active queue)
+ * @access  Private (Nurse, Receptionist, Admin)
+ */
+router.put('/token/:tokenId/delay', authenticate, async (req, res) => {
+  try {
+    const { tokenId } = req.params;
+    const { reason } = req.body;
+    
+    const result = await queueService.delayToken(tokenId, reason);
+    res.json({
+      success: true,
+      data: result.token,
+      message: result.message
+    });
+  } catch (error) {
+    res.status(400).json({
+      success: false,
+      message: error.message
+    });
+  }
+});
+
+/**
+ * @route   PUT /api/queue/token/:tokenId/undelay
+ * @desc    Undelay patient (adds them back to end of queue)
+ * @access  Private (Nurse, Receptionist, Admin)
+ */
+router.put('/token/:tokenId/undelay', authenticate, async (req, res) => {
+  try {
+    const { tokenId } = req.params;
+    
+    const result = await queueService.undelayToken(tokenId);
+    res.json({
+      success: true,
+      data: result.token,
+      message: result.message,
+      newTokenNumber: result.newTokenNumber
+    });
+  } catch (error) {
+    res.status(400).json({
+      success: false,
+      message: error.message
+    });
+  }
+});
+
+/**
+ * @route   PUT /api/queue/appointment/:appointmentQueueId/delay
+ * @desc    Mark appointment queue patient as delayed (removes from active queue)
+ * @access  Private (Nurse, Receptionist, Admin)
+ */
+router.put('/appointment/:appointmentQueueId/delay', authenticate, async (req, res) => {
+  try {
+    const { appointmentQueueId } = req.params;
+    const { reason } = req.body;
+    
+    const result = await queueService.delayAppointmentQueue(appointmentQueueId, reason);
+    res.json({
+      success: true,
+      data: result.appointmentQueue,
+      message: result.message
+    });
+  } catch (error) {
+    res.status(400).json({
+      success: false,
+      message: error.message
+    });
+  }
+});
+
+/**
+ * @route   PUT /api/queue/appointment/:appointmentQueueId/undelay
+ * @desc    Undelay appointment queue patient (adds them back to end of queue)
+ * @access  Private (Nurse, Receptionist, Admin)
+ */
+router.put('/appointment/:appointmentQueueId/undelay', authenticate, async (req, res) => {
+  try {
+    const { appointmentQueueId } = req.params;
+    
+    const result = await queueService.undelayAppointmentQueue(appointmentQueueId);
+    res.json({
+      success: true,
+      data: result.appointmentQueue,
+      message: result.message,
+      newQueuePosition: result.newQueuePosition
     });
   } catch (error) {
     res.status(400).json({
@@ -572,8 +654,6 @@ router.post('/doctor/:doctorId/force-complete-active', authenticate, async (req,
   try {
     const { doctorId } = req.params;
     
-    console.log('🔧 Force completing active consultation for doctor:', doctorId);
-    
     const result = await queueService.forceCompleteActiveConsultation(doctorId);
     res.json({
       success: true,
@@ -581,7 +661,7 @@ router.post('/doctor/:doctorId/force-complete-active', authenticate, async (req,
       message: result.message
     });
   } catch (error) {
-    console.error('❌ Force complete error:', error);
+    console.error('Force complete error:', error);
     res.status(400).json({
       success: false,
       message: error.message

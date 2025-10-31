@@ -3,7 +3,8 @@ import { authenticate, authorize } from '../middleware/auth.js';
 import { authRateLimiter } from '../middleware/rateLimiter.js';
 import { asyncHandler } from '../middleware/errorHandler.js';
 import AuthService from '../services/Auth.service.js';
-import { validateLogin, validateRegister } from '../validators/auth.validator.js';
+import { logAuditEvent } from '../utils/auditLogger.js';
+import { validateLogin, validateRegister, validatePatientRegister, validatePatientBind } from '../validators/auth.validator.js';
 
 const router = express.Router();
 
@@ -17,13 +18,93 @@ router.post('/login',
   validateLogin,
   asyncHandler(async (req, res) => {
     const { email, password } = req.body;
-    
-    const result = await AuthService.login(email, password);
-    
+
+    try {
+      const result = await AuthService.login(email, password);
+
+      // Log successful login (fire-and-forget)
+      try {
+        logAuditEvent({
+          userId: result.user?.id || null,
+          role: result.user?.role || null,
+          action: 'LOGIN_SUCCESS',
+          entity: 'auth',
+          result: 'success',
+          ip: req.ip
+        });
+      } catch (e) {
+        // ignore
+      }
+
+      res.status(200).json({
+        success: true,
+        message: 'Login successful',
+        data: result
+      });
+    } catch (err) {
+      // Log failed login attempt (avoid storing PHI)
+      try {
+        logAuditEvent({
+          userId: null,
+          role: null,
+          action: 'LOGIN_FAILURE',
+          entity: 'auth',
+          result: 'failure',
+          meta: { reason: err.message ? String(err.message).slice(0, 200) : 'unknown' },
+          ip: req.ip
+        });
+      } catch (e) {}
+
+      throw err; // let asyncHandler handle response
+    }
+  })
+);
+
+/**
+ * @route   POST /api/auth/register-patient
+ * @desc    Patient self-registration
+ * @access  Public
+ */
+router.post('/register-patient',
+  authRateLimiter,
+  validatePatientRegister,
+  asyncHandler(async (req, res) => {
+    const result = await AuthService.registerPatient(req.body);
+
+    res.status(201).json({
+      success: true,
+      message: 'Account created successfully',
+      data: result
+    });
+  })
+);
+
+/**
+ * @route   GET /api/auth/patient-accounts
+ * @desc    List patient portal accounts
+ * @access  Private (Admin)
+ */
+router.get('/patient-accounts',
+  authenticate,
+  authorize('admin'),
+  asyncHandler(async (req, res) => {
+    const { search = '', limit = 50, page = 1 } = req.query;
+    const options = {
+      search,
+      limit: Math.min(parseInt(limit, 10) || 50, 100),
+      offset: ((parseInt(page, 10) || 1) - 1) * (parseInt(limit, 10) || 50)
+    };
+
+    const result = await AuthService.getPatientAccounts(options);
+
     res.status(200).json({
       success: true,
-      message: 'Login successful',
-      data: result
+      data: result.accounts,
+      total: result.total,
+      pagination: {
+        page: parseInt(page, 10) || 1,
+        limit: Math.min(parseInt(limit, 10) || 50, 100)
+      }
     });
   })
 );
@@ -61,6 +142,18 @@ router.post('/logout',
     // In a stateless JWT system, logout is handled client-side
     // But we can add token blacklisting logic here if needed
     
+    // Log logout
+    try {
+      logAuditEvent({
+        userId: req.user?.id || null,
+        role: req.user?.role || null,
+        action: 'LOGOUT',
+        entity: 'auth',
+        result: 'success',
+        ip: req.ip
+      });
+    } catch (e) {}
+
     res.status(200).json({
       success: true,
       message: 'Logout successful'
@@ -100,6 +193,75 @@ router.put('/change-password',
     res.status(200).json({
       success: true,
       message: 'Password changed successfully'
+    });
+  })
+);
+
+/**
+ * @route   POST /api/auth/bind-patient
+ * @desc    Link patient account to clinical record
+ * @access  Private (Patient)
+ */
+router.post('/bind-patient',
+  authenticate,
+  authorize('patient'),
+  validatePatientBind,
+  asyncHandler(async (req, res) => {
+    const { patient_number, date_of_birth } = req.body;
+    
+    const result = await AuthService.bindPatientAccount(req.user.id, patient_number, date_of_birth);
+
+    res.status(200).json({
+      success: true,
+      message: 'Patient record linked successfully',
+      data: result
+    });
+  })
+);
+
+/**
+ * @route   POST /api/auth/patient-accounts/:userId/bind
+ * @desc    Admin bind patient account to patient record
+ * @access  Private (Admin)
+ */
+router.post('/patient-accounts/:userId/bind',
+  authenticate,
+  authorize('admin'),
+  asyncHandler(async (req, res) => {
+    const { patient_id } = req.body;
+
+    if (!patient_id) {
+      return res.status(400).json({
+        success: false,
+        message: 'patient_id is required'
+      });
+    }
+
+    const account = await AuthService.adminBindPatientAccount(req.params.userId, patient_id);
+
+    res.status(200).json({
+      success: true,
+      message: 'Patient account linked successfully',
+      data: account
+    });
+  })
+);
+
+/**
+ * @route   DELETE /api/auth/patient-accounts/:userId/bind
+ * @desc    Admin unbind patient account
+ * @access  Private (Admin)
+ */
+router.delete('/patient-accounts/:userId/bind',
+  authenticate,
+  authorize('admin'),
+  asyncHandler(async (req, res) => {
+    const account = await AuthService.adminUnbindPatientAccount(req.params.userId);
+
+    res.status(200).json({
+      success: true,
+      message: 'Patient account unlinked successfully',
+      data: account
     });
   })
 );

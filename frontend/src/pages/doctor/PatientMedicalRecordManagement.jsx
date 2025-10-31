@@ -19,6 +19,9 @@ import { allergyService } from '../../services/allergyService';
 import { diagnosisService } from '../../services/diagnosisService';
 import { visitService } from '../../services/visitService';
 import patientService from '../../services/patientService';
+import prescriptionService from '../../services/prescriptionService';
+import doctorNotesService from '../../services/doctorNotesService';
+import documentService from '../../services/documentService';
 import { 
   User,
   Activity,
@@ -41,7 +44,12 @@ const PatientMedicalRecordManagement = () => {
   const [diagnoses, setDiagnoses] = useState([]);
   const [visitHistory, setVisitHistory] = useState([]);
   const [patientsData, setPatientsData] = useState([]);
+  const [latestVitals, setLatestVitals] = useState(null);
+  const [prescriptions, setPrescriptions] = useState([]);
+  const [doctorNotes, setDoctorNotes] = useState([]);
+  const [patientFiles, setPatientFiles] = useState([]);
   const [loading, setLoading] = useState(false);
+  const [uploadingFiles, setUploadingFiles] = useState(false);
 
   // Modal states for add functionality (DOCTOR ONLY)
   const [isAllergyModalOpen, setIsAllergyModalOpen] = useState(false);
@@ -63,7 +71,7 @@ const PatientMedicalRecordManagement = () => {
   const tabs = [
     { id: 'overview', label: 'Overview', icon: User },
     { id: 'history', label: 'Visit History', icon: Activity },
-    { id: 'notes', label: "Doctor's Notes", icon: FileText },
+    { id: 'notes', label: "Doctor's Orders", icon: FileText },
     { id: 'files', label: 'Files & Images', icon: Calendar }
   ];
 
@@ -99,56 +107,146 @@ const PatientMedicalRecordManagement = () => {
     
     setLoading(true);
     try {
+      // Use patientId if available, otherwise fall back to id
+      const patientIdToUse = selectedPatient.patientId || selectedPatient.id;
+      
       // Load allergies, diagnoses, and visit history in parallel
       const [patientAllergies, patientDiagnoses, patientVisitHistory] = await Promise.all([
-        allergyService.getAllergiesByPatient(selectedPatient.id),
-        diagnosisService.getDiagnosesByPatient(selectedPatient.id),
-        visitService.getPatientVisitHistory(selectedPatient.id, { limit: 20, includeCompleted: true })
+        allergyService.getAllergiesByPatient(patientIdToUse),
+        diagnosisService.getDiagnosesByPatient(patientIdToUse),
+        visitService.getPatientVisitHistory(patientIdToUse, { limit: 20, includeCompleted: true, includeInProgress: true })
       ]);
       
       setAllergies(Array.isArray(patientAllergies) ? patientAllergies : []);
       setDiagnoses(Array.isArray(patientDiagnoses) ? patientDiagnoses : []);
       setVisitHistory(Array.isArray(patientVisitHistory) ? patientVisitHistory : []);
+      
+      // Extract vitals and prescriptions from the most recent visit
+      if (Array.isArray(patientVisitHistory) && patientVisitHistory.length > 0) {
+        const latestVisit = patientVisitHistory[0];
+        setLatestVitals(latestVisit.vitals || null);
+        
+        // Collect all prescriptions from all visits
+        const allPrescriptions = patientVisitHistory
+          .filter(visit => visit.prescriptions && visit.prescriptions.length > 0)
+          .flatMap(visit => visit.prescriptions);
+        setPrescriptions(allPrescriptions);
+      } else {
+        setLatestVitals(null);
+        setPrescriptions([]);
+      }
+
+      // Fetch doctor notes for this patient
+      try {
+        const notes = await doctorNotesService.getNotesByPatient(patientIdToUse);
+        if (Array.isArray(notes) && notes.length > 0) {
+          // Format notes for display and fetch prescriptions for each note
+          const formattedNotes = await Promise.all(notes.map(async (note) => {
+            // Parse the content to extract diagnosis and clinical notes
+            const content = note.content || '';
+            const diagnosisMatch = content.match(/Diagnosis:\s*(.+?)(?:\n\n|$)/);
+            const notesMatch = content.match(/Clinical Notes:\s*(.+)/s);
+            
+            // Fetch prescriptions for this note's visit and doctor
+            let prescriptions = [];
+            if (note.visit_id) {
+              try {
+                const visitPrescriptions = await prescriptionService.getPrescriptionsByVisit(note.visit_id);
+                
+                // Filter prescriptions to only those by the same doctor and around the same time
+                const noteTime = new Date(note.created_at).getTime();
+                const timeWindow = 5 * 60 * 1000; // 5 minutes window
+                
+                prescriptions = Array.isArray(visitPrescriptions) 
+                  ? visitPrescriptions
+                      .filter(p => {
+                        // Match by doctor ID
+                        if (p.doctor_id !== note.doctor_id) return false;
+                        
+                        // Match by time window (prescriptions created within 5 minutes of note)
+                        const prescriptionTime = new Date(p.created_at || p.prescribed_date).getTime();
+                        const timeDiff = Math.abs(noteTime - prescriptionTime);
+                        
+                        return timeDiff <= timeWindow;
+                      })
+                      .map(p => ({
+                        name: p.medication_name,
+                        dosage: p.dosage,
+                        frequency: p.frequency,
+                        duration: p.duration,
+                        quantity: p.quantity,
+                        refills: p.refills,
+                        instructions: p.instructions
+                      }))
+                  : [];
+              } catch (error) {
+                console.error('Error fetching prescriptions for visit:', note.visit_id, error);
+              }
+            }
+            
+            return {
+              date: new Date(note.created_at).toLocaleDateString(),
+              note: notesMatch ? notesMatch[1].trim() : content,
+              diagnosis: diagnosisMatch ? diagnosisMatch[1].trim() : 'N/A',
+              prescribedMedications: prescriptions
+            };
+          }));
+          setDoctorNotes(formattedNotes);
+        } else {
+          setDoctorNotes([]);
+        }
+      } catch (error) {
+        console.error('Failed to fetch doctor notes:', error);
+        setDoctorNotes([]);
+      }
+
+      // Fetch patient documents
+      try {
+        const documents = await documentService.getPatientDocuments(patientIdToUse);
+        const formattedDocs = Array.isArray(documents) ? documents.map(doc => ({
+          id: doc.id,
+          name: doc.document_name || doc.file_name || 'Unnamed Document',
+          type: doc.document_type || 'other',
+          size: doc.file_size ? `${(doc.file_size / 1024).toFixed(1)} KB` : 'Unknown',
+          uploadDate: doc.created_at ? new Date(doc.created_at).toLocaleDateString('en-US', {
+            year: 'numeric',
+            month: 'short',
+            day: 'numeric',
+            hour: '2-digit',
+            minute: '2-digit'
+          }) : 'Unknown',
+          uploadedBy: doc.uploader ? `${doc.uploader.first_name} ${doc.uploader.last_name} (${doc.uploader.role})` : 'Unknown',
+          file_path: doc.file_path,
+          mime_type: doc.mime_type
+        })) : [];
+        setPatientFiles(formattedDocs);
+      } catch (error) {
+        console.error('Failed to fetch patient documents:', error);
+        setPatientFiles([]);
+      }
     } catch (error) {
       console.error('Error loading patient medical data:', error);
       setAllergies([]);
       setDiagnoses([]);
       setVisitHistory([]);
+      setLatestVitals(null);
+      setPrescriptions([]);
+      setDoctorNotes([]);
+      setPatientFiles([]);
     } finally {
       setLoading(false);
     }
   };
-
-  // Dummy data for doctor notes and files (these can be implemented later)
-  const doctorNotes = [
-    {
-      date: "2024-01-15",
-      note: "Patient presents with mild symptoms of seasonal allergies. No significant changes since last visit. Vital signs stable and within normal range. Continue current medication regimen. Patient reports good adherence to treatment plan.",
-      prescribedMedications: [
-        { name: "Loratadine", dosage: "10mg", reason: "Seasonal allergies" },
-        { name: "Nasal spray", dosage: "2 sprays daily", reason: "Congestion relief" }
-      ]
-    },
-    {
-      date: "2023-12-10",
-      note: "Routine follow-up visit. Patient feeling well overall. Blood pressure slightly elevated, will monitor closely. Recommended lifestyle modifications including diet and exercise.",
-      prescribedMedications: [
-        { name: "Lisinopril", dosage: "5mg", reason: "Blood pressure management" }
-      ]
-    }
-  ];
-
-  const patientFiles = [
-    { name: "Blood Test Results - Jan 2024", type: "PDF", size: "2.1 MB" },
-    { name: "Chest X-Ray - Dec 2023", type: "DICOM", size: "15.8 MB" },
-    { name: "Prescription History", type: "PDF", size: "1.2 MB" }
-  ];
 
   // Event handlers
   const handlePatientSelect = (patient) => {
     setSelectedPatient(patient);
     setAllergies([]);
     setDiagnoses([]);
+    setLatestVitals(null);
+    setPrescriptions([]);
+    setDoctorNotes([]);
+    setPatientFiles([]);
   };
 
   const handleClearSelection = () => {
@@ -156,6 +254,10 @@ const PatientMedicalRecordManagement = () => {
     setActiveTab('overview');
     setAllergies([]);
     setDiagnoses([]);
+    setLatestVitals(null);
+    setPrescriptions([]);
+    setDoctorNotes([]);
+    setPatientFiles([]);
   };
 
   const handleBackToSearch = () => {
@@ -163,6 +265,10 @@ const PatientMedicalRecordManagement = () => {
     setActiveTab('overview');
     setAllergies([]);
     setDiagnoses([]);
+    setLatestVitals(null);
+    setPrescriptions([]);
+    setDoctorNotes([]);
+    setPatientFiles([]);
   };
 
   // Medical action handlers - DOCTOR CAN ADD DIAGNOSIS AND ALLERGY
@@ -194,8 +300,9 @@ const PatientMedicalRecordManagement = () => {
 
     try {
       setLoading(true);
+      const patientIdToUse = selectedPatient.patientId || selectedPatient.id;
       const allergyData = {
-        patient_id: selectedPatient.id,
+        patient_id: patientIdToUse,
         allergy_name: newAllergy.allergy_name.trim(),
         allergen_type: newAllergy.allergen_type,
         severity: newAllergy.severity,
@@ -242,8 +349,9 @@ const PatientMedicalRecordManagement = () => {
 
     try {
       setLoading(true);
+      const patientIdToUse = selectedPatient.patientId || selectedPatient.id;
       const diagnosisData = {
-        patient_id: selectedPatient.id,
+        patient_id: patientIdToUse,
         diagnosis_name: newDiagnosis.diagnosis_name.trim(),
         diagnosed_date: newDiagnosis.diagnosed_date,
         status: newDiagnosis.status,
@@ -288,15 +396,79 @@ const PatientMedicalRecordManagement = () => {
   };
 
   const handleUploadFile = () => {
-    console.log('Upload file for patient:', selectedPatient?.id);
+    if (!selectedPatient?.id) {
+      alert('No patient selected');
+      return;
+    }
+
+    // Create a hidden file input element
+    const input = document.createElement('input');
+    input.type = 'file';
+    input.accept = '.pdf,.jpg,.jpeg,.png,.doc,.docx,.dicom';
+    input.multiple = true;
+    
+    input.onchange = async (e) => {
+      const files = Array.from(e.target.files);
+      if (files.length === 0) return;
+      
+      try {
+        setUploadingFiles(true);
+        
+        const patientId = selectedPatient.patientId || selectedPatient.id;
+        const result = await documentService.uploadMultipleDocuments(patientId, files);
+        
+        if (result.success) {
+          alert(`Successfully uploaded ${files.length} file(s)!`);
+          // Reload patient documents
+          await loadPatientMedicalData();
+        }
+        
+      } catch (error) {
+        console.error('Error uploading files:', error);
+        alert(`Failed to upload files: ${error.message || 'Please try again.'}`);
+      } finally {
+        setUploadingFiles(false);
+      }
+    };
+    
+    input.click();
   };
 
   const handleViewFile = (file) => {
-    console.log('View file:', file);
+    // Open document in new tab for viewing
+    const fileUrl = file.file_url || file.url;
+    if (fileUrl) {
+      window.open(fileUrl, '_blank');
+    } else {
+      alert('File URL not available');
+    }
   };
 
-  const handleDownloadFile = (file) => {
-    console.log('Download file:', file);
+  const handleDownloadFile = async (file) => {
+    try {
+      // Use the document download endpoint with audit logging
+      const response = await fetch(`http://localhost:3001/api/documents/${file.id}/download`, {
+        method: 'GET',
+        headers: {
+          'Authorization': `Bearer ${localStorage.getItem('token')}`
+        }
+      });
+
+      if (!response.ok) throw new Error('Download failed');
+
+      const blob = await response.blob();
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = file.document_name || file.name || 'document';
+      document.body.appendChild(a);
+      a.click();
+      window.URL.revokeObjectURL(url);
+      document.body.removeChild(a);
+    } catch (error) {
+      console.error('Download error:', error);
+      alert('Failed to download file: ' + error.message);
+    }
   };
 
   // Render visit history tab content
@@ -396,7 +568,7 @@ const PatientMedicalRecordManagement = () => {
               {activeTab === 'overview' && (
                 <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
                   <PatientVitalsDisplay 
-                    vitals={selectedPatient.vitals}
+                    vitals={latestVitals}
                     onAddVitals={handleAddVitals}
                     onEditVitals={handleEditVitals}
                     showAddButton={false}
@@ -410,7 +582,14 @@ const PatientMedicalRecordManagement = () => {
                       diagnosisHistory: (diagnoses || []).map(d => ({
                         condition: d?.diagnosis_name || 'Unknown',
                         date: d?.diagnosed_date || 'Unknown'
-                      })).filter(item => item.condition !== 'Unknown')
+                      })).filter(item => item.condition !== 'Unknown'),
+                      currentMedications: (prescriptions || [])
+                        .filter(p => p.is_active)
+                        .map(p => ({
+                          name: p.medication_name,
+                          dosage: p.dosage,
+                          frequency: p.frequency
+                        }))
                     }}
                     onAddAllergy={handleAddAllergy}
                     onAddDiagnosis={handleAddDiagnosis}

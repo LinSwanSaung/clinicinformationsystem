@@ -118,6 +118,67 @@ class AuthService {
       return false;
     }
   }
+
+  // Patient self-registration
+  async registerPatientAccount(payload) {
+    try {
+      const response = await apiService.post('/auth/register-patient', payload);
+
+      if (response.success) {
+        const { token, user } = response.data;
+        localStorage.setItem('authToken', token);
+        localStorage.setItem('user', JSON.stringify(user));
+
+        return {
+          success: true,
+          data: { ...user, token }
+        };
+      }
+
+      throw new Error(response.message || 'Registration failed');
+    } catch (error) {
+      console.error('Patient registration error:', error);
+      return {
+        success: false,
+        message: error.message || 'Registration failed'
+      };
+    }
+  }
+
+  // Bind patient account to record
+  async bindPatientAccount(patientNumber, dateOfBirth) {
+    try {
+      const response = await apiService.post('/auth/bind-patient', {
+        patient_number: patientNumber,
+        date_of_birth: dateOfBirth
+      });
+
+      if (response.success) {
+        const { token, user, patient } = response.data;
+
+        if (token) {
+          localStorage.setItem('authToken', token);
+        }
+
+        if (user) {
+          localStorage.setItem('user', JSON.stringify(user));
+        }
+
+        return {
+          success: true,
+          data: { user, patient, token }
+        };
+      }
+
+      throw new Error(response.message || 'Failed to link patient record');
+    } catch (error) {
+      console.error('Bind patient error:', error);
+      return {
+        success: false,
+        message: error.message || 'Failed to link patient record'
+      };
+    }
+  }
 }
 
 export default new AuthService();

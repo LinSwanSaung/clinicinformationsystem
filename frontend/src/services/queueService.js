@@ -16,9 +16,10 @@ class QueueService {
   async checkDoctorCapacity(doctorId) {
     try {
       const response = await api.get(`${this.baseURL}/doctor/${doctorId}/capacity`);
-      return response.data;
+      // API service already returns the parsed JSON payload
+      return response;
     } catch (error) {
-      throw new Error(error.response?.data?.message || 'Failed to check doctor capacity');
+      throw new Error(error.message || 'Failed to check doctor capacity');
     }
   }
 
@@ -28,9 +29,9 @@ class QueueService {
   async issueToken(tokenData) {
     try {
       const response = await api.post(`${this.baseURL}/token`, tokenData);
-      return response.data;
+      return response;
     } catch (error) {
-      throw new Error(error.response?.data?.message || 'Failed to issue queue token');
+      throw new Error(error.message || 'Failed to issue queue token');
     }
   }
 
@@ -488,6 +489,62 @@ class QueueService {
       return response.data;
     } catch (error) {
       throw new Error(error.response?.data?.message || 'Failed to force complete consultation');
+    }
+  }
+
+  // ===============================================
+  // DELAY/UNDELAY FUNCTIONALITY
+  // ===============================================
+
+  /**
+   * Mark an appointment queue patient as delayed (removes from active queue)
+   */
+  async delayAppointmentQueue(appointmentQueueId, reason = null) {
+    try {
+      const response = await api.put(`${this.baseURL}/appointment/${appointmentQueueId}/delay`, {
+        reason
+      });
+      return response.data;
+    } catch (error) {
+      throw new Error(error.response?.data?.message || 'Failed to delay patient');
+    }
+  }
+
+  /**
+   * Undelay an appointment queue patient (adds them back to end of queue)
+   */
+  async undelayAppointmentQueue(appointmentQueueId) {
+    try {
+      const response = await api.put(`${this.baseURL}/appointment/${appointmentQueueId}/undelay`);
+      return response.data;
+    } catch (error) {
+      throw new Error(error.response?.data?.message || 'Failed to undelay patient');
+    }
+  }
+
+  /**
+   * Mark a token-based queue patient as delayed (for walk-ins)
+   */
+  async delayToken(tokenId, reason = null) {
+    try {
+      const response = await api.put(`${this.baseURL}/token/${tokenId}/delay`, {
+        reason
+      });
+      return response.data;
+    } catch (error) {
+      throw new Error(error.response?.data?.message || 'Failed to delay patient');
+    }
+  }
+
+  /**
+   * Undelay a token-based queue patient (for walk-ins)
+   */
+  async undelayToken(tokenId) {
+    try {
+      const response = await api.put(`${this.baseURL}/token/${tokenId}/undelay`);
+      return response.data;
+    } catch (error) {
+      throw new Error(error.response?.data?.message || 'Failed to undelay patient');
     }
   }
 }

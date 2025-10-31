@@ -45,10 +45,11 @@ export class UserModel extends BaseModel {
 
   /**
    * Update user password
-   */
+  */
   async updatePassword(userId, newPassword) {
     const passwordHash = await bcrypt.hash(newPassword, 12);
-    return this.updateById(userId, { password_hash: passwordHash });
+    // Bypass the user-model override so we can update the hashed password
+    return super.updateById(userId, { password_hash: passwordHash });
   }
 
   /**
@@ -99,6 +100,125 @@ export class UserModel extends BaseModel {
    */
   async getProfile(userId) {
     return this.findById(userId, 'id, email, first_name, last_name, role, phone, specialty, is_active, created_at');
+  }
+
+  /**
+   * Get patient portal accounts with optional search/filter
+   */
+  async getPatientAccounts(options = {}) {
+    const {
+      search = '',
+      limit = 50,
+      offset = 0
+    } = options;
+
+    let query = this.supabase
+      .from(this.tableName)
+      .select(`
+        id,
+        email,
+        first_name,
+        last_name,
+        phone,
+        role,
+        is_active,
+        created_at,
+        updated_at,
+        last_login,
+        patient_id,
+        patient:patients!patient_id (
+          id,
+          patient_number,
+          first_name,
+          last_name,
+          date_of_birth,
+          gender,
+          phone
+        )
+      `, { count: 'exact' })
+      .eq('role', 'patient')
+      .order('created_at', { ascending: false })
+      .range(offset, offset + limit - 1);
+
+    if (search && search.trim().length > 0) {
+      const term = search.trim();
+      query = query.or(`email.ilike.%${term}%,first_name.ilike.%${term}%,last_name.ilike.%${term}%`);
+    }
+
+    const { data, error, count } = await query;
+
+    if (error) {
+      throw new Error(`Failed to fetch patient accounts: ${error.message}`);
+    }
+
+    return {
+      accounts: data || [],
+      total: count ?? (data ? data.length : 0)
+    };
+  }
+
+  /**
+   * Get single patient portal account by ID
+   */
+  async getPatientAccountById(userId) {
+    const { data, error } = await this.supabase
+      .from(this.tableName)
+      .select(`
+        id,
+        email,
+        first_name,
+        last_name,
+        phone,
+        role,
+        is_active,
+        created_at,
+        updated_at,
+        last_login,
+        patient_id,
+        patient:patients!patient_id (
+          id,
+          patient_number,
+          first_name,
+          last_name,
+          date_of_birth,
+          gender,
+          phone
+        )
+      `)
+      .eq('id', userId)
+      .maybeSingle();
+
+    if (error) {
+      throw new Error(`Failed to fetch patient account: ${error.message}`);
+    }
+
+    return data;
+  }
+
+  /**
+   * Find user linked to a patient record
+   */
+  async findByPatientId(patientId) {
+    if (!patientId) return null;
+    return this.findOne({ patient_id: patientId });
+  }
+
+  /**
+   * Link a user account to a patient
+   */
+  async linkPatientAccount(userId, patientId) {
+    return this.updateById(userId, {
+      patient_id: patientId
+    });
+  }
+
+  /**
+   * Remove patient linkage from account
+   */
+  async unlinkPatientAccount(userId) {
+    return this.updateById(userId, {
+      patient_id: null
+    });
   }
 
   /**

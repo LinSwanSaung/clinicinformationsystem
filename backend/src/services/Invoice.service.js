@@ -18,8 +18,6 @@ class InvoiceService {
    */
   async createInvoice(visitId, createdBy) {
     try {
-      console.log('[InvoiceService] Attempting to create invoice for visit:', visitId);
-      
       // Get visit details
       const visitResponse = await this.visitService.getVisitDetails(visitId);
       if (!visitResponse || !visitResponse.data) {
@@ -27,16 +25,12 @@ class InvoiceService {
       }
 
       const visit = visitResponse.data;
-      console.log('[InvoiceService] Visit found:', visit.id, 'Patient:', visit.patient_id);
 
       // Check if invoice already exists for this visit
       const existingInvoice = await InvoiceModel.getInvoiceByVisit(visitId);
       if (existingInvoice) {
-        console.log('[InvoiceService] Invoice already exists:', existingInvoice.id);
         return existingInvoice;
       }
-
-      console.log('[InvoiceService] No existing invoice found, creating new one');
 
       // Create invoice
       const invoiceData = {
@@ -49,9 +43,7 @@ class InvoiceService {
         balance: 0.00
       };
 
-      console.log('[InvoiceService] Creating invoice with data:', invoiceData);
       const invoice = await InvoiceModel.createInvoice(invoiceData);
-      console.log('[InvoiceService] Invoice created successfully:', invoice.id);
       
       return invoice;
     } catch (error) {
@@ -80,12 +72,7 @@ class InvoiceService {
    */
   async getInvoiceByVisit(visitId) {
     try {
-      console.log('[InvoiceService] Getting invoice for visit:', visitId);
       const invoice = await InvoiceModel.getInvoiceByVisit(visitId);
-      console.log('[InvoiceService] Invoice found:', invoice ? `Yes (${invoice.id})` : 'No');
-      if (invoice) {
-        console.log('[InvoiceService] Invoice items count:', invoice.invoice_items?.length || 0);
-      }
       return invoice;
     } catch (error) {
       console.error('[InvoiceService] Error getting invoice:', error.message);
@@ -439,8 +426,6 @@ class InvoiceService {
       // Record the payment
       const result = await InvoiceModel.recordPartialPayment(invoiceId, paymentData);
 
-      console.log(`[InvoiceService] Partial payment recorded: $${amountPaid} for invoice ${invoiceId}, new balance: $${result.invoice.balance_due}`);
-
       // Send notification if invoice is fully paid
       if (result.invoice.status === 'paid') {
         try {
@@ -482,7 +467,6 @@ class InvoiceService {
   async putInvoiceOnHold(invoiceId, holdData) {
     try {
       const invoice = await InvoiceModel.putOnHold(invoiceId, holdData);
-      console.log(`[InvoiceService] Invoice ${invoiceId} put on hold: ${holdData.reason}`);
       return invoice;
     } catch (error) {
       throw new Error(`Failed to put invoice on hold: ${error.message}`);
@@ -495,7 +479,6 @@ class InvoiceService {
   async resumeInvoiceFromHold(invoiceId) {
     try {
       const invoice = await InvoiceModel.resumeFromHold(invoiceId);
-      console.log(`[InvoiceService] Invoice ${invoiceId} resumed from hold`);
       return invoice;
     } catch (error) {
       throw new Error(`Failed to resume invoice: ${error.message}`);

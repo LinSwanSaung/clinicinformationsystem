@@ -75,22 +75,22 @@ const AdminDashboard = () => {
       action: () => navigate('/admin/employees')
     },
     {
-      title: "Department Overview",
-      description: "View and manage departments",
-      icon: BarChart3,
-      action: () => {} // TODO: Implement department management
-    },
-    {
-      title: "Patient Statistics",
-      description: "View patient visit analytics",
-      icon: FileText,
-      action: () => {} // TODO: Implement analytics
+      title: "Manage Patient Accounts",
+      description: "Create and link patient portal accounts",
+      icon: UserPlus,
+      action: () => navigate('/admin/patient-accounts')
     },
     {
       title: "Doctor Availability",
       description: "Manage doctor working hours",
       icon: Stethoscope,
       action: () => navigate('/admin/schedules')
+    },
+    {
+      title: "System Audit Logs",
+      description: "View system activities and audit logs",
+      icon: Settings,
+      action: () => navigate('/admin/audit-logs')
     }
   ];
 

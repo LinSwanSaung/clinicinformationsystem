@@ -38,7 +38,7 @@ export const authenticate = asyncHandler(async (req, res, next) => {
     // Get user from database
     const { data: user, error } = await supabase
       .from('users')
-      .select('id, email, role, first_name, last_name, is_active')
+      .select('id, email, role, first_name, last_name, is_active, patient_id')
       .eq('id', decoded.userId)
       .single();
 

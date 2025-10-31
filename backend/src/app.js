@@ -26,6 +26,8 @@ import serviceRoutes from './routes/service.routes.js';
 import invoiceRoutes from './routes/invoice.routes.js';
 import paymentRoutes from './routes/payment.routes.js';
 import notificationRoutes from './routes/notification.routes.js';
+import patientPortalRoutes from './routes/patientPortal.routes.js';
+import auditLogRoutes from './routes/auditLog.routes.js';
 import { testConnection } from './config/database.js';
 
 // Load environment variables
@@ -33,6 +35,17 @@ dotenv.config();
 
 const app = express();
 const PORT = process.env.PORT || 3001;
+
+// Disable HTTP caching for API responses to prevent 304 Not Modified issues
+app.set('etag', false);
+app.use((req, res, next) => {
+  res.set({
+    'Cache-Control': 'no-store, no-cache, must-revalidate, private',
+    Pragma: 'no-cache',
+    Expires: '0'
+  });
+  next();
+});
 
 // Simple CORS - Allow everything in development
 app.use(cors());
@@ -76,6 +89,8 @@ app.use('/api/services', serviceRoutes);
 app.use('/api/invoices', invoiceRoutes);
 app.use('/api/payments', paymentRoutes);
 app.use('/api/notifications', notificationRoutes);
+app.use('/api/me', patientPortalRoutes);
+app.use('/api/audit-logs', auditLogRoutes);
 
 // 404 handler
 app.use('*', (req, res) => {

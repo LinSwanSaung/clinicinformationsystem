@@ -1,6 +1,7 @@
 import VitalsModel from '../models/Vitals.model.js';
 import VisitModel from '../models/Visit.model.js';
 import QueueTokenModel from '../models/QueueToken.model.js';
+import { logAuditEvent } from '../utils/auditLogger.js';
 
 class VitalsService {
   constructor() {
@@ -28,18 +29,12 @@ class VitalsService {
           
           const activeVisits = await this.visitModel.getPatientActiveVisits(vitalsData.patient_id, todayStart, todayEnd);
           
-          console.log(`[VITALS] Looking for active visits for patient ${vitalsData.patient_id}:`, {
-            todayStart: todayStart.toISOString(),
-            todayEnd: todayEnd.toISOString(),
-            foundVisits: activeVisits?.length || 0
-          });
-          
           if (activeVisits && activeVisits.length > 0) {
             // Use the most recent active visit
             visitId = activeVisits[0].id;
-            console.log(`[VITALS] ✅ Found active visit: ${visitId}`);
+
           } else {
-            console.log(`[VITALS] ⚠️ No active visit found - patient should be added to queue first`);
+
           }
         } catch (error) {
           console.warn(`[VITALS] ⚠️ Error finding active visit:`, error.message);
@@ -66,18 +61,30 @@ class VitalsService {
         visit_id: visitId
       };
 
-      console.log(`[VITALS] Saving vitals:`, {
-        patient_id: vitalsRecord.patient_id,
-        visit_id: vitalsRecord.visit_id,
-        priority_level: vitalsData.priority_level,
-        has_bp: !!(vitalsRecord.blood_pressure_systolic && vitalsRecord.blood_pressure_diastolic),
-        has_temp: !!vitalsRecord.temperature,
-        has_heart_rate: !!vitalsRecord.heart_rate
-      });
-
       const vitals = await this.vitalsModel.create(vitalsRecord);
       
-      console.log(`[VITALS] ✅ Vitals saved successfully with ID: ${vitals.id}`);
+
+
+      // Log vitals creation
+      try {
+        await logAuditEvent({
+          userId: recordedBy,
+          role: 'nurse',
+          action: 'CREATE',
+          entity: 'vitals',
+          recordId: vitals.id,
+          patientId: vitalsData.patient_id,
+          result: 'success',
+          meta: {
+            visit_id: visitId,
+            priority_level: vitalsData.priority_level,
+            has_critical_values: (vitalsRecord.blood_pressure_systolic > 180 || vitalsRecord.temperature > 39)
+          },
+          note: 'Nurse recorded patient vitals'
+        });
+      } catch (logError) {
+        console.error('[AUDIT] Failed to log vitals creation:', logError.message);
+      }
       
       // Update queue token priority if priority level is provided
       if (vitalsData.priority_level && visitId) {
@@ -96,16 +103,12 @@ class VitalsService {
             };
 
             const priority = priorityMap[String(vitalsData.priority_level).toLowerCase()] || 3;
-            console.log(`[VITALS] Priority mapping: "${vitalsData.priority_level}" -> ${priority}`);
 
             if (priority >= 4) { // Only update for urgent/high priority
-              const updatedToken = await this.queueTokenModel.updateTokenPriority(token.id, priority);
-              console.log(`[VITALS] ⭐ Updated token #${updatedToken.token_number} priority to ${priority} (${vitalsData.priority_level})`);
-            } else {
-              console.log(`[VITALS] Priority level ${vitalsData.priority_level} (${priority}) is not urgent/high, skipping update`);
+              await this.queueTokenModel.updateTokenPriority(token.id, priority);
             }
           } else {
-            console.log(`[VITALS] ⚠️ No queue token found for visit ${visitId}; skipping priority update.`);
+
           }
         } catch (priorityError) {
           // Don't fail the vitals creation if priority update fails
@@ -203,35 +206,21 @@ class VitalsService {
    */
   async getCurrentVisitVitals(patientId) {
     try {
-      console.log(`[VITALS] Getting current visit vitals for patient: ${patientId}`);
+
       
       // Find the patient's current active visit
       const activeVisit = await this.visitModel.getPatientActiveVisit(patientId);
       
-      console.log(`[VITALS] Active visit found:`, activeVisit ? {
-        id: activeVisit.id,
-        status: activeVisit.status,
-        visit_date: activeVisit.visit_date
-      } : null);
-      
       if (!activeVisit) {
-        console.log(`[VITALS] ⚠️ No active visit found for patient ${patientId}`);
+
         return null; // No active visit, no current visit vitals
       }
       
       // Get vitals for this active visit
       const vitals = await this.vitalsModel.getByVisitId(activeVisit.id);
       
-      console.log(`[VITALS] Vitals found for visit ${activeVisit.id}:`, vitals?.length || 0);
-      
       // Return the most recent vitals for this visit, or null if none exist
       const result = vitals && vitals.length > 0 ? vitals[0] : null;
-      
-      if (result) {
-        console.log(`[VITALS] ✅ Returning vitals ID: ${result.id}`);
-      } else {
-        console.log(`[VITALS] ⚠️ No vitals found for active visit`);
-      }
       
       return result;
     } catch (error) {

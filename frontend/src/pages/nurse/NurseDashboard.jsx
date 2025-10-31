@@ -180,32 +180,60 @@ const NurseDashboard = () => {
         return;
       }
       
-      // Get the tokens from the fresh queue data
+      // Get both tokens (walk-ins) and appointments (scheduled) from the fresh queue data
       const queueTokens = queueResponse.data?.tokens || [];
-      console.log(`📋 [NURSE] Received ${queueTokens.length} tokens from backend`);
+      const queueAppointments = queueResponse.data?.appointments || [];
+      console.log(`📋 [NURSE] Received ${queueTokens.length} tokens and ${queueAppointments.length} appointments from backend`);
+      
+      // Combine both tokens and appointments into a single patient list
+      // Mark each entry with its type so we know which API to call for delay/undelay
+      const allPatients = [
+        ...queueTokens.map(t => ({ ...t, queueType: 'token' })),
+        ...queueAppointments.map(a => ({ 
+          ...a, 
+          queueType: 'appointment',
+          token_number: a.queue_position, // Map queue_position to token_number for display
+          issued_time: a.estimated_start_time || a.created_at
+        }))
+      ];
+      
+      // Deduplicate patients - keep only the most recent token per patient
+      const patientMap = new Map();
+      allPatients.forEach(patient => {
+        const patientId = patient.patient?.id;
+        if (!patientId) return;
+        
+        const existing = patientMap.get(patientId);
+        if (!existing || new Date(patient.created_at) > new Date(existing.created_at)) {
+          patientMap.set(patientId, patient);
+        }
+      });
+      
+      const uniquePatients = Array.from(patientMap.values());
+      console.log(`📋 [NURSE] Deduplicated ${allPatients.length} entries to ${uniquePatients.length} unique patients`);
       
       // Fetch vitals for each patient using the new per-visit logic
-      const tokensWithVitals = await Promise.all(
-        queueTokens.map(async (token) => {
+      const patientsWithVitals = await Promise.all(
+        uniquePatients.map(async (patient) => {
           try {
-            const vitals = await fetchTokenVitals(token);
+            const vitals = await fetchTokenVitals(patient);
             
             return {
-              ...token,
+              ...patient,
               latestVitals: vitals
             };
           } catch (error) {
-            console.log(`No vitals found for patient ${token.patient?.id}`);
+            console.log(`No vitals found for patient ${patient.patient?.id}`);
             return {
-              ...token,
+              ...patient,
               latestVitals: null
             };
           }
         })
       );
       
-      console.log('✅ [NURSE] Patient list updated with fresh vitals');
-      setPatients(tokensWithVitals);
+      console.log('✅ [NURSE] Patient list updated with fresh vitals and appointments');
+      setPatients(patientsWithVitals);
     } catch (error) {
       console.error('Failed to load patients:', error);
       setPatients([]);
@@ -582,7 +610,9 @@ const NurseDashboard = () => {
                       <PatientCard
                         key={`${token.id}-${token.token_number}`}
                         patient={{
-                          id: token.patient?.id || token.id,
+                          id: token.id, // Use token/queue ID for operations
+                          patientId: token.patient?.id, // Store actual patient ID separately
+                          visit_id: token.visit_id, // Add visit_id for vitals linking
                           name: `${token.patient?.first_name || ''} ${token.patient?.last_name || ''}`.trim() || 'Unknown Patient',
                           age: token.patient?.age || token.patient?.date_of_birth 
                             ? new Date().getFullYear() - new Date(token.patient.date_of_birth).getFullYear() 
@@ -617,8 +647,14 @@ const NurseDashboard = () => {
                           vitalsDate: token.latestVitals?.recorded_at ? new Date(token.latestVitals.recorded_at).toLocaleString() : null
                         }}
                         userRole="nurse"
-                        onSaveVitals={async (patientId, vitalsForm, notes) => {
+                        onSaveVitals={async (patientId, vitalsForm, notes, visitId = null) => {
                           try {
+                            if (!patientId || typeof patientId !== 'string') {
+                              console.error('[NURSE] Invalid patient ID provided when saving vitals:', patientId);
+                              alert('Unable to determine the patient record. Please refresh and try again.');
+                              return;
+                            }
+
                             // Parse blood pressure with validation
                             let systolic = null;
                             let diastolic = null;
@@ -690,6 +726,7 @@ const NurseDashboard = () => {
                             // Map the vitals form data to backend format
                             const vitalsData = {
                               patient_id: patientId,
+                              visit_id: visitId || null,
                               temperature: temperature,
                               temperature_unit: temperatureUnit,
                               blood_pressure_systolic: systolic,
@@ -763,13 +800,82 @@ const NurseDashboard = () => {
                             alert('Failed to unmark patient ready. Please try again.');
                           }
                         }}
-                        onDelayPatient={async (patientId, reason) => {
+                        onDelayPatient={async (tokenOrQueueId, reason) => {
                           try {
-                            // Find the token for this patient
-                            const token = patients.find(p => p.patient?.id === patientId || p.id === patientId);
-                            if (token) {
-                              // For now, we'll mark as missed since there's no specific delay endpoint
-                              await queueService.markPatientMissed(token.id);
+                            console.log('🔍 Searching for patient with ID:', tokenOrQueueId);
+                            console.log('🔍 Available patient IDs:', patients.map(p => ({ id: p.id, name: `${p.patient?.first_name} ${p.patient?.last_name}`, token: p.token_number })));
+                            
+                            // Find the token/queue entry by ID (not by patient ID)
+                            const patient = patients.find(p => p.id === tokenOrQueueId);
+                            if (!patient) {
+                              console.error('❌ Patient not found. TokenOrQueueId:', tokenOrQueueId);
+                              console.error('   Available IDs in patients array:', patients.map(p => p.id));
+                              alert('Patient not found in current list. Please refresh the page and try again.');
+                              return;
+                            }
+                            
+                            console.log('🔄 Delaying patient:', patient);
+                            console.log('   Token/Queue ID:', patient.id);
+                            console.log('   Queue Type:', patient.queueType);
+                            console.log('   Has appointment_id:', !!patient.appointment_id);
+                            console.log('   Has token_number vs queue_position:', patient.token_number, patient.queue_position);
+                            console.log('   Current Status:', patient.status);
+                            
+                            // Determine if this is an appointment or token
+                            // Appointments have appointment_id, tokens don't
+                            const isAppointment = patient.queueType === 'appointment' || patient.appointment_id;
+                            
+                            console.log('   → Treating as:', isAppointment ? 'APPOINTMENT' : 'TOKEN');
+                            
+                            // Call the appropriate delay API based on queue type
+                            if (isAppointment) {
+                              // For scheduled appointments
+                              await queueService.delayAppointmentQueue(patient.id, reason);
+                              console.log('✅ Appointment queue patient delayed');
+                              alert('✅ Patient has been marked as delayed');
+                            } else {
+                              // For walk-in tokens
+                              await queueService.delayToken(patient.id, reason);
+                              console.log('✅ Token queue patient delayed');
+                              alert('✅ Patient has been marked as delayed');
+                            }
+                            
+                            // Refresh the patient data
+                            if (selectedDoctor) {
+                              await handleViewPatients(selectedDoctor);
+                            }
+                          } catch (error) {
+                            console.error('❌ Failed to delay patient:', error);
+                            alert('❌ Failed to delay patient: ' + (error.message || 'Please try again.'));
+                          }
+                        }}
+                        onRemoveDelay={async (tokenOrQueueId) => {
+                          try {
+                            // Find the token/queue entry by ID (not by patient ID)
+                            const patient = patients.find(p => p.id === tokenOrQueueId);
+                            if (patient) {
+                              console.log('🔄 Undelaying patient:', patient);
+                              console.log('   Token/Queue ID:', patient.id);
+                              console.log('   Queue Type:', patient.queueType);
+                              console.log('   Has appointment_id:', !!patient.appointment_id);
+                              
+                              // Determine if this is an appointment or token
+                              const isAppointment = patient.queueType === 'appointment' || patient.appointment_id;
+                              
+                              console.log('   → Treating as:', isAppointment ? 'APPOINTMENT' : 'TOKEN');
+                              
+                              // Call the appropriate undelay API based on queue type
+                              if (isAppointment) {
+                                // For scheduled appointments
+                                const result = await queueService.undelayAppointmentQueue(patient.id);
+                                console.log('✅ Appointment queue patient undelayed. New position:', result.newQueuePosition);
+                                alert(`Patient has been added back to the queue at position ${result.newQueuePosition}`);
+                              } else {
+                                // For walk-in tokens
+                                const result = await queueService.undelayToken(patient.id);
+                                console.log('✅ Token queue patient undelayed. New token:', result.newTokenNumber);
+                                alert(`Patient has been added back to the queue with token #${result.newTokenNumber}`);
+                              }
                               
                               // Refresh the patient data
                               if (selectedDoctor) {
@@ -777,16 +883,8 @@ const NurseDashboard = () => {
                               }
                             }
                           } catch (error) {
-                            console.error('Failed to delay patient:', error);
-                            alert('Failed to delay patient. Please try again.');
-                          }
-                        }}
-                        onRemoveDelay={async (patientId) => {
-                          try {
-                            // TODO: Implement remove delay functionality
-                            // await queueService.removeDelay(patientId);
-                          } catch (error) {
                             console.error('Failed to remove delay:', error);
+                            alert('Failed to remove delay: ' + (error.message || 'Please try again.'));
                           }
                         }}
                         readOnly={false}

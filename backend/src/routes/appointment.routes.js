@@ -1,7 +1,8 @@
 import express from 'express';
 import { authenticate, authorize } from '../middleware/auth.js';
-import { asyncHandler } from '../middleware/errorHandler.js';
+import { AppError, asyncHandler } from '../middleware/errorHandler.js';
 import AppointmentService from '../services/Appointment.service.js';
+import { logAuditEvent } from '../utils/auditLogger.js';
 
 const router = express.Router();
 const appointmentService = new AppointmentService();
@@ -15,12 +16,25 @@ router.get('/',
   authenticate,
   asyncHandler(async (req, res) => {
     const { date, patient_id, doctor_id } = req.query;
-    
-    const appointments = await appointmentService.getAllAppointments({
+    const filters = {
       date,
       patient_id,
       doctor_id
-    });
+    };
+
+    if (req.user.role === 'patient') {
+      if (!req.user.patient_id) {
+        throw new AppError('Patient record not linked to account', 400);
+      }
+
+      if (patient_id && patient_id !== req.user.patient_id) {
+        throw new AppError('Access denied to requested appointments', 403);
+      }
+
+      filters.patient_id = req.user.patient_id;
+    }
+
+    const appointments = await appointmentService.getAllAppointments(filters);
 
     res.status(200).json({
       success: true,
@@ -41,6 +55,8 @@ router.get('/:id',
     const { id } = req.params;
     
     const appointment = await appointmentService.getAppointmentById(id);
+
+    // Note: Viewing is not logged to avoid excessive audit log entries
 
     res.status(200).json({
       success: true,
@@ -66,6 +82,20 @@ router.post('/',
 
     const newAppointment = await appointmentService.createAppointment(appointmentData);
 
+    // Log appointment create
+    try {
+      logAuditEvent({
+        userId: req.user?.id || null,
+        role: req.user?.role || null,
+        action: 'CREATE',
+        entity: 'appointments',
+        recordId: newAppointment?.id || null,
+        patientId: newAppointment?.patient_id || appointmentData.patient_id || null,
+        result: 'success',
+        ip: req.ip
+      });
+    } catch (e) {}
+
     res.status(201).json({
       success: true,
       message: 'Appointment created successfully',
@@ -88,6 +118,21 @@ router.put('/:id',
 
     const updatedAppointment = await appointmentService.updateAppointment(id, updateData);
 
+    // Log appointment update
+    try {
+      logAuditEvent({
+        userId: req.user?.id || null,
+        role: req.user?.role || null,
+        action: 'UPDATE',
+        entity: 'appointments',
+        recordId: id,
+        patientId: updatedAppointment?.patient_id || null,
+        result: 'success',
+        meta: { changed_fields: Object.keys(updateData) },
+        ip: req.ip
+      });
+    } catch (e) {}
+
     res.status(200).json({
       success: true,
       message: 'Appointment updated successfully',
@@ -108,6 +153,19 @@ router.delete('/:id',
     const { id } = req.params;
     
     await appointmentService.deleteAppointment(id);
+
+    // Log appointment cancel/delete
+    try {
+      logAuditEvent({
+        userId: req.user?.id || null,
+        role: req.user?.role || null,
+        action: 'CANCEL',
+        entity: 'appointments',
+        recordId: id,
+        result: 'success',
+        ip: req.ip
+      });
+    } catch (e) {}
 
     res.status(200).json({
       success: true,
@@ -136,6 +194,21 @@ router.put('/:id/status',
     }
 
     const updatedAppointment = await appointmentService.updateAppointmentStatus(id, status);
+
+    // Log status change
+    try {
+      logAuditEvent({
+        userId: req.user?.id || null,
+        role: req.user?.role || null,
+        action: 'UPDATE',
+        entity: 'appointments',
+        recordId: id,
+        patientId: updatedAppointment?.patient_id || null,
+        result: 'success',
+        meta: { status: status },
+        ip: req.ip
+      });
+    } catch (e) {}
 
     res.status(200).json({
       success: true,

@@ -131,16 +131,26 @@ const EmployeeManagement = () => {
     setEditingEmployee(null);
   };
 
-  const handleSaveEdit = async (updatedData) => {
+  const handleSaveEdit = async (updatedData, options = {}) => {
+    const { keepEditing = false } = options;
+
     try {
       const updatedEmployee = await employeeService.updateEmployee(editingEmployee.id, updatedData);
       setEmployees(Array.isArray(employees) ? employees.map(emp => 
         emp.id === editingEmployee.id ? updatedEmployee : emp
       ) : []);
-      setEditingEmployee(null);
+
+      if (keepEditing) {
+        setEditingEmployee(prev => (prev ? { ...prev, ...updatedEmployee } : prev));
+      } else {
+        setEditingEmployee(null);
+      }
+
+      return updatedEmployee;
     } catch (error) {
       console.error('Error updating employee:', error);
       setError('Failed to update employee. Please try again.');
+      throw error;
     }
   };
 
@@ -335,7 +345,9 @@ const EmployeeManagement = () => {
       role: editingEmployee?.role || '',
       specialty: editingEmployee?.specialty || '',
       phone: editingEmployee?.phone || '',
-      license_number: editingEmployee?.license_number || ''
+      license_number: editingEmployee?.license_number || '',
+      new_password: '',
+      confirm_password: ''
     });
     const [isSubmitting, setIsSubmitting] = useState(false);
     const [formError, setFormError] = useState('');
@@ -344,9 +356,35 @@ const EmployeeManagement = () => {
       e.preventDefault();
       setIsSubmitting(true);
       setFormError('');
-      
+
+      const {
+        new_password: newPassword,
+        confirm_password: confirmPassword,
+        ...profileUpdates
+      } = formData;
+
+      if (newPassword || confirmPassword) {
+        if (newPassword !== confirmPassword) {
+          setFormError('New password and confirmation do not match.');
+          setIsSubmitting(false);
+          return;
+        }
+        if ((newPassword || '').length < 6) {
+          setFormError('New password must be at least 6 characters long.');
+          setIsSubmitting(false);
+          return;
+        }
+      }
+
       try {
-        await handleSaveEdit(formData);
+        const targetId = editingEmployee?.id;
+        await handleSaveEdit(profileUpdates, { keepEditing: true });
+
+        if (targetId && newPassword) {
+          await employeeService.resetEmployeePassword(targetId, newPassword);
+        }
+
+        setEditingEmployee(null);
       } catch (error) {
         console.error('Error updating employee:', error);
         setFormError(error.message || 'Failed to update employee. Please try again.');
@@ -462,6 +500,44 @@ const EmployeeManagement = () => {
                 />
               </div>
             </div>
+
+            <div className="border border-dashed border-gray-200 rounded-md p-4 bg-muted/30 space-y-3">
+              <div>
+                <h4 className="text-sm font-semibold text-gray-800">Reset Password</h4>
+                <p className="text-xs text-muted-foreground">
+                  Leave the fields below blank to keep the current password. Passwords must be at least 6 characters long.
+                </p>
+              </div>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    New Password
+                  </label>
+                  <Input
+                    type="password"
+                    placeholder="Enter new password"
+                    value={formData.new_password}
+                    onChange={(e) => setFormData({ ...formData, new_password: e.target.value })}
+                    disabled={isSubmitting}
+                    minLength={6}
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Confirm New Password
+                  </label>
+                  <Input
+                    type="password"
+                    placeholder="Confirm new password"
+                    value={formData.confirm_password}
+                    onChange={(e) => setFormData({ ...formData, confirm_password: e.target.value })}
+                    disabled={isSubmitting}
+                    minLength={6}
+                  />
+                </div>
+              </div>
+            </div>
+
             <div className="flex gap-2 pt-4">
               <Button type="submit" disabled={isSubmitting}>
                 {isSubmitting ? 'Updating...' : 'Update Employee'}

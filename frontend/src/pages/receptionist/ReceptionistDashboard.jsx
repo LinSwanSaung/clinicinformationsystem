@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { useTranslation } from 'react-i18next';
 import { 
   Calendar,
   Users,
@@ -58,6 +59,7 @@ import useDebounce from '@/utils/useDebounce';
 const ReceptionistDashboard = () => {
   const navigate = useNavigate();
   const { logout } = useAuth();
+  const { t } = useTranslation();
   const [isLoading, setIsLoading] = useState(true);
   const [todayAppointments, setTodayAppointments] = useState([]);
   const [filteredAppointments, setFilteredAppointments] = useState([]);
@@ -253,9 +255,13 @@ const ReceptionistDashboard = () => {
       const response = await queueService.issueToken(tokenData);
       
       if (response.success) {
+        const tokenResult = response.data || {};
+        const issuedToken = tokenResult.token || null;
+        const tokenMessage = tokenResult.message || response.message;
+
         // Create a new appointment entry for local state
         const newAppointment = {
-          id: response.token?.id || `walkin-${Date.now()}`,
+          id: issuedToken?.id || `walkin-${Date.now()}`,
           patient_name: `${walkInData.patient.first_name} ${walkInData.patient.last_name}`,
           appointment_time: walkInData.appointment_time,
           doctor_name: `Dr. ${walkInData.doctor.first_name} ${walkInData.doctor.last_name}`,
@@ -263,7 +269,8 @@ const ReceptionistDashboard = () => {
           status: walkInData.status,
           notes: walkInData.notes,
           isWalkIn: true,
-          token_number: response.token?.token_number
+          token_number: issuedToken?.token_number || tokenResult.token_number || null,
+          queueMessage: tokenMessage
         };
 
         // Add to the appointment list
@@ -297,8 +304,8 @@ const ReceptionistDashboard = () => {
 
   return (
     <PageLayout
-      title="Reception Dashboard"
-      subtitle="Manage today's appointments and patient arrivals"
+      title={t('receptionist.dashboard.title')}
+      subtitle={t('receptionist.dashboard.subtitle')}
       fullWidth
     >
       <div className="space-y-8 p-8">
@@ -311,28 +318,28 @@ const ReceptionistDashboard = () => {
         >
           {[
             {
-              title: "Total Today",
+              title: t('receptionist.dashboard.totalToday'),
               value: stats.todayAppointments,
               icon: Calendar,
               color: "text-blue-600",
               delay: 0
             },
             {
-              title: "Arrived", 
+              title: t('receptionist.dashboard.arrived'), 
               value: stats.arrived,
               icon: CheckCircle,
               color: "text-green-600",
               delay: 0.1
             },
             {
-              title: "Overdue",
+              title: t('receptionist.dashboard.overdue'),
               value: stats.overdue,
               icon: AlertCircle,
               color: "text-orange-600",
               delay: 0.2
             },
             {
-              title: "No Show",
+              title: t('receptionist.dashboard.noShow'),
               value: stats.noShow,
               icon: XCircle,
               color: "text-red-600",
@@ -380,7 +387,7 @@ const ReceptionistDashboard = () => {
                 <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
                 <Input
                   type="text"
-                  placeholder="Search patients, doctors, or visit types..."
+                  placeholder={t('receptionist.dashboard.searchPlaceholder')}
                   value={searchTerm}
                   onChange={(e) => setSearchTerm(e.target.value)}
                   className="pl-10 pr-4 py-2 w-full"
@@ -392,7 +399,7 @@ const ReceptionistDashboard = () => {
                 className="flex items-center gap-2 bg-green-600 hover:bg-green-700 w-full sm:w-auto text-sm px-3 py-2"
               >
                 <UserPlus className="h-4 w-4" />
-                <span>Walk-in</span>
+                <span>{t('receptionist.dashboard.walkIn')}</span>
               </Button>
             </div>
             
@@ -404,7 +411,7 @@ const ReceptionistDashboard = () => {
                     <SelectValue placeholder="Filter status" />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="needs-action">Needs Action</SelectItem>
+                    <SelectItem value="needs-action">{t('receptionist.dashboard.needsAction')}</SelectItem>
                     <SelectItem value="all">All Status</SelectItem>
                     <SelectItem value="ready">Ready/Checked In</SelectItem>
                     <SelectItem value="late">Late</SelectItem>

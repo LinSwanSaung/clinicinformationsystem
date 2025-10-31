@@ -36,6 +36,32 @@ export const AuthProvider = ({ children }) => {
     }
   };
 
+  const registerPatientAccount = async (formData) => {
+    const result = await authService.registerPatientAccount(formData);
+
+    if (result.success) {
+      setUser(result.data);
+      navigate('/patient/link-record');
+      return { success: true };
+    }
+
+    return { success: false, message: result.message };
+  };
+
+  const bindPatientRecord = async (patientNumber, dateOfBirth) => {
+    const result = await authService.bindPatientAccount(patientNumber, dateOfBirth);
+
+    if (result.success) {
+      const updatedUser = result.data.user ? { ...result.data.user, token: result.data.token } : user;
+      if (updatedUser) {
+        setUser(updatedUser);
+      }
+      return { success: true, patient: result.data.patient };
+    }
+
+    return { success: false, message: result.message };
+  };
+
   const logout = async () => {
     try {
       await authService.logout();
@@ -73,7 +99,9 @@ export const AuthProvider = ({ children }) => {
       login, 
       logout, 
       getUserRole, 
-      isAuthenticated
+      isAuthenticated,
+      registerPatientAccount,
+      bindPatientRecord
     }}>
       {children}
     </AuthContext.Provider>

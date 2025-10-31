@@ -2,6 +2,7 @@ import express from 'express';
 import { authenticate, authorize } from '../middleware/auth.js';
 import { asyncHandler } from '../middleware/errorHandler.js';
 import PatientService from '../services/Patient.service.js';
+import { logAuditEvent } from '../utils/auditLogger.js';
 import { validatePatient, validatePatientUpdate } from '../validators/patient.validator.js';
 
 const router = express.Router();
@@ -104,7 +105,9 @@ router.get('/:id',
   authenticate,
   asyncHandler(async (req, res) => {
     const patient = await PatientService.getPatientById(req.params.id);
-    
+
+    // Note: Viewing is not logged to avoid excessive audit log entries
+
     res.status(200).json({
       success: true,
       data: patient

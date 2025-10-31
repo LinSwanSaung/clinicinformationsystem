@@ -251,9 +251,6 @@ const PatientDetailPage = () => {
               <Calendar className="mr-2 h-4 w-4" />
               Book Appointment
             </Button>
-            <Button variant="outline" size="lg">
-              Edit Patient Info
-            </Button>
           </div>
         </div>
       </PageLayout>

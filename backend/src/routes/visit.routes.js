@@ -1,5 +1,6 @@
 import express from 'express';
 import VisitService from '../services/Visit.service.js';
+import { logAuditEvent } from '../utils/auditLogger.js';
 import { authenticate, authorize } from '../middleware/auth.js';
 import { asyncHandler } from '../middleware/errorHandler.js';
 
@@ -19,13 +20,15 @@ router.get('/patient/:patientId/history',
     const { 
       limit = 50, 
       offset = 0, 
-      includeCompleted = 'true' 
+      includeCompleted = 'true',
+      includeInProgress = 'false'
     } = req.query;
 
     const options = {
       limit: parseInt(limit),
       offset: parseInt(offset),
-      includeCompleted: includeCompleted === 'true'
+      includeCompleted: includeCompleted === 'true',
+      includeInProgress: includeInProgress === 'true'
     };
 
     const result = await visitService.getPatientVisitHistory(patientId, options);
@@ -55,6 +58,8 @@ router.get('/:id/details',
     const { id } = req.params;
     
     const result = await visitService.getVisitDetails(id);
+
+    // Note: Viewing is not logged to avoid excessive audit log entries
 
     res.status(200).json({
       success: true,
@@ -122,6 +127,20 @@ router.post('/',
 
     const result = await visitService.createVisit(visitData);
 
+    // Log create visit
+    try {
+      logAuditEvent({
+        userId: req.user?.id || null,
+        role: req.user?.role || null,
+        action: 'CREATE',
+        entity: 'visits',
+        recordId: result?.data?.id || null,
+        patientId: result?.data?.patient_id || visitData.patient_id || null,
+        result: 'success',
+        ip: req.ip
+      });
+    } catch (e) {}
+
     res.status(201).json({
       success: true,
       message: result.message,
@@ -146,6 +165,21 @@ router.put('/:id',
     };
 
     const result = await visitService.updateVisit(id, updateData);
+
+    // Log update visit
+    try {
+      logAuditEvent({
+        userId: req.user?.id || null,
+        role: req.user?.role || null,
+        action: 'UPDATE',
+        entity: 'visits',
+        recordId: id,
+        patientId: result?.data?.patient_id || null,
+        result: 'success',
+        meta: { changed_fields: Object.keys(updateData) },
+        ip: req.ip
+      });
+    } catch (e) {}
 
     res.status(200).json({
       success: true,
@@ -220,10 +254,90 @@ router.delete('/:id',
     
     const result = await visitService.deleteVisit(id);
 
+    // Log delete visit
+    try {
+      logAuditEvent({
+        userId: req.user?.id || null,
+        role: req.user?.role || null,
+        action: 'DELETE',
+        entity: 'visits',
+        recordId: id,
+        result: 'success',
+        ip: req.ip
+      });
+    } catch (e) {}
+
     res.status(200).json({
       success: true,
       message: result.message
     });
+  })
+);
+
+/**
+ * @route   GET /api/visits/:visitId/export/pdf
+ * @desc    Export single visit summary as PDF
+ * @access  Private (Patient themselves or healthcare staff)
+ */
+router.get('/:visitId/export/pdf', authenticate, asyncHandler(async (req, res) => {
+  const { visitId } = req.params;
+  
+  const result = await visitService.exportSingleVisitPDF(visitId, req.user);
+  
+  res.setHeader('Content-Type', 'application/pdf');
+  res.setHeader('Content-Disposition', `attachment; filename="${result.filename}"`);
+  res.send(result.pdf);
+}));
+
+/**
+ * @route   GET /api/visits/patient/:patientId/export/csv
+ * @desc    Export patient visit history as CSV
+ * @access  Private (Patient themselves or healthcare staff)
+ */
+router.get('/patient/:patientId/export/csv',
+  authenticate,
+  asyncHandler(async (req, res) => {
+    const { patientId } = req.params;
+
+    // Check authorization: patient can only access their own data
+    if (req.user.role === 'patient' && req.user.patient_id !== patientId) {
+      return res.status(403).json({
+        success: false,
+        message: 'Access denied: You can only export your own visit history'
+      });
+    }
+
+    const result = await visitService.exportVisitHistoryCSV(patientId);
+
+    res.setHeader('Content-Type', 'text/csv');
+    res.setHeader('Content-Disposition', `attachment; filename="visit-history-${patientId}-${new Date().toISOString().split('T')[0]}.csv"`);
+    res.status(200).send(result.csv);
+  })
+);
+
+/**
+ * @route   GET /api/visits/patient/:patientId/export/pdf
+ * @desc    Export patient visit history as PDF
+ * @access  Private (Patient themselves or healthcare staff)
+ */
+router.get('/patient/:patientId/export/pdf',
+  authenticate,
+  asyncHandler(async (req, res) => {
+    const { patientId } = req.params;
+
+    // Check authorization: patient can only access their own data
+    if (req.user.role === 'patient' && req.user.patient_id !== patientId) {
+      return res.status(403).json({
+        success: false,
+        message: 'Access denied: You can only export your own visit history'
+      });
+    }
+
+    const result = await visitService.exportVisitHistoryPDF(patientId);
+
+    res.setHeader('Content-Type', 'application/pdf');
+    res.setHeader('Content-Disposition', `attachment; filename="visit-history-${patientId}-${new Date().toISOString().split('T')[0]}.pdf"`);
+    res.status(200).send(result.pdf);
   })
 );
 

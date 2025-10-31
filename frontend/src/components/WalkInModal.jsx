@@ -348,12 +348,19 @@ const getStatusIcon = (status) => {
             details: response.data
           });
         }
+      } else {
+        setDoctorCapacity(null);
+        setCapacityWarning({
+          type: 'error',
+          message: response.message || 'Unable to determine doctor capacity.',
+          details: response.data || null
+        });
       }
     } catch (error) {
       console.error('Error checking doctor capacity:', error);
       setCapacityWarning({
         type: 'error',
-        message: 'Failed to check doctor capacity. Please try again.',
+        message: error.message || 'Failed to check doctor capacity. Please try again.',
         details: null
       });
     } finally {
@@ -433,7 +440,7 @@ const getStatusIcon = (status) => {
         
         alert(`This patient already has an active queue token for this doctor today.${tokenDetails}\n\nPlease:\n1. Check the current queue status, or\n2. Complete/cancel the existing token first, or\n3. Choose a different doctor`);
       } else {
-        alert('Failed to create walk-in appointment. Please try again.');
+        alert(error.message || 'Failed to create walk-in appointment. Please try again.');
       }
     } finally {
       setIsSubmitting(false);

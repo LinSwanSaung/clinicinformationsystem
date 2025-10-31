@@ -40,13 +40,15 @@ class VisitService {
       const { 
         limit = 50, 
         offset = 0, 
-        includeCompleted = true 
+        includeCompleted = true,
+        includeInProgress = false
       } = options;
 
       const params = new URLSearchParams({
         limit: limit.toString(),
         offset: offset.toString(),
-        includeCompleted: includeCompleted.toString()
+        includeCompleted: includeCompleted.toString(),
+        includeInProgress: includeInProgress.toString()
       });
 
       const url = `/visits/patient/${patientId}/history?${params}`;

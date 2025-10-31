@@ -1,4 +1,5 @@
 import React from 'react';
+import { useTranslation } from 'react-i18next';
 import { Card } from '../ui/card';
 import { Button } from '../ui/button';
 import { Badge } from '../ui/badge';
@@ -11,11 +12,13 @@ const MedicalInformationPanel = ({
   className = "",
   showActionButtons = true
 }) => {
+  const { t } = useTranslation();
+  
   return (
     <Card className={`p-6 lg:col-span-2 ${className}`}>
       <div className="flex items-center space-x-3 mb-6">
         <FileText size={24} className="text-blue-600" />
-        <h3 className="text-lg font-bold">Medical Information</h3>
+        <h3 className="text-lg font-bold">{t('patient.medicalRecords.medicalInformation')}</h3>
       </div>
       
       <div className="space-y-6">
@@ -24,11 +27,11 @@ const MedicalInformationPanel = ({
           <div className="flex items-center justify-between mb-4">
             <h4 className="font-bold text-gray-800 flex items-center text-sm">
               <AlertCircle size={18} className="mr-2 text-amber-500" />
-              Known Allergies
+              {t('patient.medicalRecords.knownAllergies')}
             </h4>
             {showActionButtons && onAddAllergy && (
               <Button variant="outline" size="sm" className="text-xs px-3 py-1" onClick={onAddAllergy}>
-                + Add Allergy
+                + {t('patient.medicalRecords.addAllergy')}
               </Button>
             )}
           </div>
@@ -42,7 +45,7 @@ const MedicalInformationPanel = ({
                 ))}
               </div>
             ) : (
-              <p className="text-amber-700 text-base">No known allergies</p>
+              <p className="text-amber-700 text-base">{t('patient.medicalRecords.noKnownAllergies')}</p>
             )}
           </div>
         </div>
@@ -52,11 +55,11 @@ const MedicalInformationPanel = ({
           <div className="flex items-center justify-between mb-4">
             <h4 className="font-bold text-gray-800 flex items-center text-sm">
               <ClipboardList size={18} className="mr-2 text-blue-500" />
-              Diagnosis History
+              {t('patient.medicalRecords.diagnosisHistory')}
             </h4>
             {showActionButtons && onAddDiagnosis && (
               <Button variant="outline" size="sm" className="text-xs px-3 py-1" onClick={onAddDiagnosis}>
-                + Add Diagnosis
+                + {t('patient.medicalRecords.addDiagnosis')}
               </Button>
             )}
           </div>
@@ -71,7 +74,7 @@ const MedicalInformationPanel = ({
                 ))}
               </div>
             ) : (
-              <p className="text-blue-700 text-base">No diagnosis history available</p>
+              <p className="text-blue-700 text-base">{t('patient.medicalRecords.noDiagnosisHistory')}</p>
             )}
           </div>
         </div>
@@ -81,7 +84,7 @@ const MedicalInformationPanel = ({
           <div className="flex items-center justify-between mb-4">
             <h4 className="font-bold text-gray-800 flex items-center text-sm">
               <Pill size={18} className="mr-2 text-green-500" />
-              Current Medications/Prescriptions
+              {t('patient.medicalRecords.currentMedications')}
             </h4>
           </div>
           <div className="bg-green-50 p-4 rounded-lg border border-green-200">
@@ -98,7 +101,7 @@ const MedicalInformationPanel = ({
                 ))}
               </div>
             ) : (
-              <p className="text-green-700 text-base">No current medications</p>
+              <p className="text-green-700 text-base">{t('patient.medicalRecords.noCurrentMedications')}</p>
             )}
           </div>
         </div>

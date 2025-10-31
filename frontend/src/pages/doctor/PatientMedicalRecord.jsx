@@ -31,6 +31,7 @@ import { diagnosisService } from '../../services/diagnosisService';
 import { visitService } from '../../services/visitService';
 import prescriptionService from '../../services/prescriptionService';
 import doctorNotesService from '../../services/doctorNotesService';
+import documentService from '../../services/documentService';
 
 const PatientMedicalRecord = () => {
   const location = useLocation();
@@ -43,6 +44,8 @@ const PatientMedicalRecord = () => {
   const [activeTab, setActiveTab] = useState('overview');
   const [expandedVisit, setExpandedVisit] = useState(null);
   const [activeVisitId, setActiveVisitId] = useState(location.state?.visit_id || null);
+  const [patientFiles, setPatientFiles] = useState([]);
+  const [uploadingFiles, setUploadingFiles] = useState(false);
 
   // Doctor notes management
   const [doctorNotesList, setDoctorNotesList] = useState([
@@ -116,13 +119,6 @@ const PatientMedicalRecord = () => {
     { id: 'notes', label: "Doctor's Orders", icon: FileText },
     { id: 'services', label: 'Services & Billing', icon: DollarSign },
     { id: 'files', label: 'Files & Images', icon: Calendar }
-  ];
-
-  // Patient files dummy data
-  const patientFiles = [
-    { name: "Blood Test Results - Jan 2024", type: "PDF", size: "2.1 MB" },
-    { name: "Chest X-Ray - Dec 2023", type: "DICOM", size: "15.8 MB" },
-    { name: "Prescription History", type: "PDF", size: "1.2 MB" }
   ];
 
   // Fetch full patient data including allergies and diagnoses
@@ -224,6 +220,31 @@ const PatientMedicalRecord = () => {
         // Get prescriptions from most recent visit for "Current Medications" overview
         const mostRecentVisit = Array.isArray(visits) && visits.length > 0 ? visits[0] : null;
         const recentPrescriptions = mostRecentVisit?.prescriptions || [];
+
+        // Fetch patient documents
+        try {
+          const documents = await documentService.getPatientDocuments(selectedPatient.id);
+          const formattedDocs = Array.isArray(documents) ? documents.map(doc => ({
+            id: doc.id,
+            name: doc.document_name || doc.file_name || 'Unnamed Document',
+            type: doc.document_type || 'other',
+            size: doc.file_size ? `${(doc.file_size / 1024).toFixed(1)} KB` : 'Unknown',
+            uploadDate: doc.created_at ? new Date(doc.created_at).toLocaleDateString('en-US', {
+              year: 'numeric',
+              month: 'short',
+              day: 'numeric',
+              hour: '2-digit',
+              minute: '2-digit'
+            }) : 'Unknown',
+            uploadedBy: doc.uploader ? `${doc.uploader.first_name} ${doc.uploader.last_name} (${doc.uploader.role})` : 'Unknown',
+            file_path: doc.file_path,
+            mime_type: doc.mime_type
+          })) : [];
+          setPatientFiles(formattedDocs);
+        } catch (error) {
+          console.error('Failed to fetch patient documents:', error);
+          setPatientFiles([]);
+        }
 
         // Combine all data
         const enrichedPatient = {
@@ -559,6 +580,62 @@ const PatientMedicalRecord = () => {
     }
   };
 
+  // File handlers
+  const handleUploadFile = () => {
+    if (!selectedPatient?.id) {
+      alert('No patient selected');
+      return;
+    }
+
+    const input = document.createElement('input');
+    input.type = 'file';
+    input.accept = '.pdf,.jpg,.jpeg,.png,.doc,.docx,.dicom';
+    input.multiple = true;
+    
+    input.onchange = async (e) => {
+      const files = Array.from(e.target.files);
+      if (files.length === 0) return;
+      
+      try {
+        setUploadingFiles(true);
+        
+        const patientId = selectedPatient.id;
+        const result = await documentService.uploadMultipleDocuments(patientId, files);
+        
+        if (result.success) {
+          alert(`Successfully uploaded ${files.length} file(s)!`);
+          // Reload documents
+          const documents = await documentService.getPatientDocuments(patientId);
+          setPatientFiles(Array.isArray(documents) ? documents : []);
+        }
+        
+      } catch (error) {
+        console.error('Error uploading files:', error);
+        alert(`Failed to upload files: ${error.message || 'Please try again.'}`);
+      } finally {
+        setUploadingFiles(false);
+      }
+    };
+    
+    input.click();
+  };
+
+  const handleViewFile = (file) => {
+    if (file.file_url) {
+      window.open(file.file_url, '_blank');
+    } else {
+      alert('File URL not available');
+    }
+  };
+
+  const handleDownloadFile = (file) => {
+    if (file.file_url) {
+      window.open(file.file_url, '_blank');
+    } else {
+      alert('File URL not available');
+    }
+  };
+
   return (
     <PageLayout 
       title="Electronic Medical Records" 
@@ -647,9 +724,10 @@ const PatientMedicalRecord = () => {
           {activeTab === 'files' && (
             <PatientDocumentManager 
               files={patientFiles}
-              userRole="doctor"
-              canUpload={true}
-              canDownload={true}
+              onUploadFile={handleUploadFile}
+              onViewFile={handleViewFile}
+              onDownloadFile={handleDownloadFile}
+              showUploadButton={true}
             />
           )}
         </div>

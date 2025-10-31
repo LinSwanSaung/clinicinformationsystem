@@ -239,6 +239,39 @@ class AppointmentModel extends BaseModel {
   }
 
   /**
+   * Get upcoming appointments for a patient
+   */
+  async getUpcomingByPatientId(patientId, options = {}) {
+    const limit = Math.min(options.limit || 5, 10);
+    const today = new Date().toISOString().split('T')[0];
+
+    const { data, error } = await this.supabase
+      .from(this.tableName)
+      .select(`
+        *,
+        doctor:users!doctor_id (
+          id,
+          first_name,
+          last_name,
+          email,
+          specialty
+        )
+      `)
+      .eq('patient_id', patientId)
+      .gte('appointment_date', today)
+      .in('status', ['scheduled', 'confirmed', 'pending', 'waiting'])
+      .order('appointment_date', { ascending: true })
+      .order('appointment_time', { ascending: true })
+      .limit(limit);
+
+    if (error) {
+      throw new Error(`Failed to fetch upcoming appointments: ${error.message}`);
+    }
+
+    return data ?? [];
+  }
+
+  /**
    * Get appointments with combined filters
    */
   async getWithFilters(filters = {}) {

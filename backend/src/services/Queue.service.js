@@ -4,6 +4,7 @@ import AppointmentModel from '../models/Appointment.model.js';
 import patientModel from '../models/Patient.model.js';
 import VisitService from './Visit.service.js';
 import { supabase } from '../config/database.js';
+import { logAuditEvent } from '../utils/auditLogger.js';
 
 class QueueService {
   constructor() {
@@ -30,23 +31,15 @@ class QueueService {
       const currentDay = now.toLocaleDateString('en-US', { weekday: 'long' });
       const currentTime = now.toTimeString().slice(0, 5); // HH:MM format
 
-      console.log(`[CAPACITY CHECK] Doctor: ${doctorId}, Day: ${currentDay}, Time: ${currentTime}`);
-
       // Get doctor's availability for today
       const { data: availabilityData, error: availError } = await this.supabase
         .from('doctor_availability')
         .select('*')
         .eq('doctor_id', doctorId)
         .eq('day_of_week', currentDay)
-        .eq('is_available', true);
+        .eq('is_active', true);
 
-      console.log(`[CAPACITY CHECK] Availability data:`, availabilityData);
-      console.log(`[CAPACITY CHECK] Availability error:`, availError);
-
-      const availability = availabilityData?.[0];
-
-      if (availError || !availability) {
-        console.log(`[CAPACITY CHECK] No availability found`);
+      if (availError || !availabilityData || availabilityData.length === 0) {
         return {
           canAccept: false,
           reason: 'Doctor is not available today',
@@ -55,14 +48,23 @@ class QueueService {
         };
       }
 
-      // Check if current time is within doctor's working hours
-      if (currentTime < availability.start_time || currentTime >= availability.end_time) {
-        console.log(`[CAPACITY CHECK] Outside working hours`);
+      // Find the availability slot that matches the current time
+      // Doctor may have multiple shifts in a day
+      const availability = availabilityData.find(slot => {
+        return currentTime >= slot.start_time && currentTime < slot.end_time;
+      });
+
+      if (!availability) {
+        // Get all working hours for display
+        const workingHours = availabilityData
+          .map(slot => `${slot.start_time} - ${slot.end_time}`)
+          .join(', ');
         return {
           canAccept: false,
-          reason: `Doctor's working hours: ${availability.start_time} - ${availability.end_time}`,
+          reason: `Doctor's working hours today: ${workingHours}. Current time: ${currentTime}`,
           currentQueue: 0,
-          availableSlots: 0
+          availableSlots: 0,
+          workingHours
         };
       }
 
@@ -71,8 +73,6 @@ class QueueService {
       const [endHour, endMinute] = availability.end_time.split(':');
       endTime.setHours(parseInt(endHour), parseInt(endMinute), 0);
       const remainingMinutes = Math.floor((endTime - now) / (1000 * 60));
-
-      console.log(`[CAPACITY CHECK] Remaining minutes: ${remainingMinutes}`);
 
       // Get current queue count for this doctor
       const { data: currentQueue, error: queueError } = await this.supabase
@@ -83,7 +83,6 @@ class QueueService {
         .eq('issued_date', now.toISOString().split('T')[0]);
 
       const queueCount = currentQueue?.length || 0;
-      console.log(`[CAPACITY CHECK] Current queue count: ${queueCount}`);
 
       // Calculate total time needed for current queue + new patient
       const totalTimeNeeded = (queueCount + 1) * AVERAGE_CONSULTATION_TIME;
@@ -103,7 +102,6 @@ class QueueService {
         workingHours: `${availability.start_time} - ${availability.end_time}`
       };
 
-      console.log(`[CAPACITY CHECK] Result:`, result);
       return result;
     } catch (error) {
       console.error('Error checking doctor capacity:', error);
@@ -114,7 +112,7 @@ class QueueService {
   /**
    * Issue a new queue token for walk-in or appointment
    */
-  async issueToken(tokenData) {
+  async issueToken(tokenData, currentUser = null) {
     try {
       const { patient_id, doctor_id, appointment_id, priority = 1 } = tokenData;
 
@@ -153,6 +151,28 @@ class QueueService {
         visitRecord = visitResponse.data;
         console.log(`[QUEUE] ✅ Visit record created: ${visitRecord.id}`);
 
+        // Log visit creation (walk-in registration)
+        try {
+          await logAuditEvent({
+            userId: currentUser?.id || null, // Receptionist who created the walk-in
+            role: currentUser?.role || 'system',
+            action: 'CREATE',
+            entity: 'visits',
+            recordId: visitRecord.id,
+            patientId: patient_id,
+            result: 'success',
+            meta: { 
+              visit_type: visitData.visit_type,
+              source: 'walk_in_registration',
+              doctor_id: doctor_id, // Store doctor info in meta
+              created_by: currentUser ? `${currentUser.first_name} ${currentUser.last_name}` : 'System'
+            },
+            note: appointment_id ? 'Visit created from appointment' : 'Walk-in visit created by receptionist'
+          });
+        } catch (logError) {
+          console.error('[AUDIT] Failed to log visit creation:', logError.message);
+        }
+
       } catch (visitError) {
         console.error(`[QUEUE] ⚠️ Failed to create visit record:`, visitError.message);
         // Don't fail the token creation if visit creation fails
@@ -168,8 +188,6 @@ class QueueService {
         status: 'waiting',
         visit_id: visitRecord?.id || null  // Link token to its specific visit
       });
-
-      console.log(`[QUEUE] ✅ Token #${newToken.token_number} created with visit_id: ${visitRecord?.id || 'none'}`);
 
       // If this is linked to an appointment, update appointment status
       if (appointment_id) {
@@ -237,10 +255,7 @@ class QueueService {
    */
   async markPatientReady(tokenId) {
     try {
-      console.log('markPatientReady called with tokenId:', tokenId);
-      
       const token = await this.queueTokenModel.findById(tokenId);
-      console.log('Found token:', token);
       
       if (!token) {
         throw new Error('Token not found');
@@ -250,21 +265,73 @@ class QueueService {
         throw new Error(`Cannot mark patient as ready. Current status: ${token.status}`);
       }
 
+      const now = new Date();
+      const updatePayload = {
+        ready_at: now.toISOString()
+      };
+      let priorityBoosted = false;
+
+      // Boost priority for scheduled patients who arrived after their appointment time
+      if (token.appointment_id) {
+        try {
+          const appointment = await this.appointmentModel.findById(token.appointment_id);
+
+          if (appointment?.appointment_date && appointment?.appointment_time) {
+            const timePart = appointment.appointment_time.length === 5
+              ? `${appointment.appointment_time}:00`
+              : appointment.appointment_time;
+            const scheduledDateTime = new Date(`${appointment.appointment_date}T${timePart}`);
+
+            if (!Number.isNaN(scheduledDateTime.getTime())) {
+              const diffMinutes = (now.getTime() - scheduledDateTime.getTime()) / 60000;
+
+              if (diffMinutes >= 10) {
+                const targetPriority = 4; // Below emergency (5) but ahead of standard queue
+                const currentPriority = token.priority ?? 1;
+
+                if (currentPriority < targetPriority) {
+                  updatePayload.priority = targetPriority;
+                  priorityBoosted = true;
+                }
+              }
+            } else {
+              console.warn(`[QUEUE] Unable to parse scheduled datetime for appointment ${appointment.id}`);
+            }
+          }
+        } catch (appointmentError) {
+          console.warn(`[QUEUE] Failed to evaluate appointment timing for token ${tokenId}:`, appointmentError.message);
+        }
+      }
+
       // Update token status to called (indicating ready for doctor)
-      console.log('Updating token status to called (ready for doctor)...');
-      const updatedToken = await this.queueTokenModel.updateStatus(tokenId, 'called');
-      console.log('Updated token:', updatedToken);
+      const updatedToken = await this.queueTokenModel.updateStatus(tokenId, 'called', updatePayload);
+
+      // Keep appointment queue priority aligned if boosted
+      if (priorityBoosted && token.appointment_id) {
+        try {
+          await this.supabase
+            .from('appointment_queue')
+            .update({
+              priority: updatePayload.priority,
+              updated_at: now.toISOString()
+            })
+            .eq('appointment_id', token.appointment_id)
+            .eq('patient_id', token.patient_id);
+        } catch (queueUpdateError) {
+          console.warn(`[QUEUE] Failed to sync appointment queue priority for token ${tokenId}:`, queueUpdateError.message);
+        }
+      }
       
       // Get the updated token with patient details using the existing method
       const tokensWithDetails = await this.queueTokenModel.getByDoctorAndDate(token.doctor_id, token.issued_date);
       const fullToken = tokensWithDetails.find(t => t.id === tokenId);
-      
-      console.log('Full token with details:', fullToken);
 
       return {
         success: true,
         data: fullToken || updatedToken,
-        message: `Patient (Token #${token.token_number}) is now ready for doctor`
+        message: priorityBoosted
+          ? `Patient (Token #${token.token_number}) is now ready and prioritized for their scheduled slot`
+          : `Patient (Token #${token.token_number}) is now ready for doctor`
       };
     } catch (error) {
       console.error('Error in markPatientReady:', error);
@@ -277,10 +344,7 @@ class QueueService {
    */
   async markPatientWaiting(tokenId) {
     try {
-      console.log('markPatientWaiting called with tokenId:', tokenId);
-      
       const token = await this.queueTokenModel.findById(tokenId);
-      console.log('Found token:', token);
       
       if (!token) {
         throw new Error('Token not found');
@@ -291,9 +355,7 @@ class QueueService {
       }
 
       // Update token status back to waiting
-      console.log('Updating token status to waiting...');
       const updatedToken = await this.queueTokenModel.updateStatus(tokenId, 'waiting');
-      console.log('Updated token:', updatedToken);
       
       // Get the updated token with patient details using the existing method
       const tokensWithDetails = await this.queueTokenModel.getByDoctorAndDate(token.doctor_id, token.issued_date);
@@ -317,11 +379,8 @@ class QueueService {
    */
   async startConsultation(tokenId) {
     try {
-      console.log('🔄 Queue Service: Starting consultation for token:', tokenId);
-      
       // First, get the current token to check its status
       const currentToken = await this.queueTokenModel.findById(tokenId);
-      console.log('📋 Current token status:', currentToken);
       
       if (!currentToken) {
         throw new Error('Token not found');
@@ -373,6 +432,27 @@ class QueueService {
               visit_start_time: new Date().toISOString()
             });
             console.log(`✅ Set visit_start_time for visit: ${visitRecord.id}`);
+
+            // Log consultation start
+            try {
+              await logAuditEvent({
+                userId: updatedToken.doctor_id,
+                role: 'doctor',
+                action: 'UPDATE',
+                entity: 'visits',
+                recordId: visitRecord.id,
+                patientId: updatedToken.patient_id,
+                result: 'success',
+                meta: { 
+                  action_type: 'consultation_started',
+                  token_number: updatedToken.token_number
+                },
+                note: 'Doctor started consultation with patient'
+              });
+            } catch (logError) {
+              console.error('[AUDIT] Failed to log consultation start:', logError.message);
+            }
+
           } catch (updateError) {
             console.warn('⚠️ Failed to set visit_start_time:', updateError.message);
           }
@@ -517,6 +597,248 @@ class QueueService {
     }
   }
 
+  /**
+   * Delay a patient - removes them from active queue
+   * Patient's token number is preserved
+   */
+  async delayToken(tokenId, reason = null) {
+    try {
+      // Get current token
+      const { data: currentToken, error: fetchError } = await this.supabase
+        .from('queue_tokens')
+        .select('*')
+        .eq('id', tokenId)
+        .single();
+
+      if (fetchError || !currentToken) {
+        throw new Error('Token not found');
+      }
+
+      console.log(`[DELAY TOKEN] Token ID: ${tokenId}, Current Status: ${currentToken.status}`);
+      
+      // Can only delay if status is waiting or called
+      if (!['waiting', 'called'].includes(currentToken.status)) {
+        throw new Error(`Cannot delay token with status "${currentToken.status}". Only waiting or called tokens can be delayed.`);
+      }
+
+      // Update token to delayed status
+      const { data: updatedToken, error: updateError } = await this.supabase
+        .from('queue_tokens')
+        .update({
+          status: 'delayed',
+          previous_status: currentToken.status,
+          delay_reason: reason,
+          delayed_at: new Date().toISOString(),
+          updated_at: new Date().toISOString()
+        })
+        .eq('id', tokenId)
+        .select()
+        .single();
+
+      if (updateError) throw updateError;
+
+      return {
+        success: true,
+        token: updatedToken,
+        message: 'Patient marked as delayed'
+      };
+    } catch (error) {
+      console.error('Error delaying token:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Undelay a patient - adds them back to the END of the queue
+   * Token gets the next highest token number for that doctor/date
+   */
+  async undelayToken(tokenId) {
+    try {
+      // Get current token
+      const { data: currentToken, error: fetchError } = await this.supabase
+        .from('queue_tokens')
+        .select('*')
+        .eq('id', tokenId)
+        .single();
+
+      if (fetchError || !currentToken) {
+        throw new Error('Token not found');
+      }
+
+      if (currentToken.status !== 'delayed') {
+        throw new Error('Token is not delayed');
+      }
+
+      // Get the highest token number for this doctor/date
+      const { data: maxTokenData, error: maxError } = await this.supabase
+        .from('queue_tokens')
+        .select('token_number')
+        .eq('doctor_id', currentToken.doctor_id)
+        .eq('issued_date', currentToken.issued_date)
+        .order('token_number', { ascending: false })
+        .limit(1);
+
+      const newTokenNumber = (maxTokenData?.[0]?.token_number || 0) + 1;
+
+      // Update token - move to end of queue with new token number
+      const { data: updatedToken, error: updateError } = await this.supabase
+        .from('queue_tokens')
+        .update({
+          status: 'waiting', // Reset to waiting status
+          token_number: newTokenNumber, // Assign new token number at end of queue
+          undelayed_at: new Date().toISOString(),
+          updated_at: new Date().toISOString()
+        })
+        .eq('id', tokenId)
+        .select()
+        .single();
+
+      if (updateError) throw updateError;
+
+      return {
+        success: true,
+        token: updatedToken,
+        message: `Patient undelayed and moved to position #${newTokenNumber} in queue`,
+        newTokenNumber
+      };
+    } catch (error) {
+      console.error('Error undelaying token:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Mark an appointment queue entry as delayed
+   * Removes patient from active queue by setting status to 'delayed'
+   */
+  async delayAppointmentQueue(appointmentQueueId, reason = null) {
+    try {
+      // Get current appointment queue entry
+      const { data: currentEntry, error: fetchError } = await this.supabase
+        .from('appointment_queue')
+        .select('*')
+        .eq('id', appointmentQueueId)
+        .single();
+
+      if (fetchError || !currentEntry) {
+        throw new Error('Appointment queue entry not found');
+      }
+
+      if (currentEntry.status === 'delayed') {
+        throw new Error('Patient is already marked as delayed');
+      }
+
+      if (['completed', 'cancelled', 'skipped'].includes(currentEntry.status)) {
+        throw new Error(`Cannot delay patient with status: ${currentEntry.status}`);
+      }
+
+      // Update appointment queue entry
+      const { data: updatedEntry, error: updateError } = await this.supabase
+        .from('appointment_queue')
+        .update({
+          status: 'delayed',
+          delay_reason: reason,
+          delayed_at: new Date().toISOString(),
+          previous_queue_position: currentEntry.queue_position,
+          updated_at: new Date().toISOString()
+        })
+        .eq('id', appointmentQueueId)
+        .select()
+        .single();
+
+      if (updateError) throw updateError;
+
+      return {
+        success: true,
+        appointmentQueue: updatedEntry,
+        message: 'Patient marked as delayed and removed from active queue'
+      };
+    } catch (error) {
+      console.error('Error delaying appointment queue entry:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Undelay an appointment queue entry
+   * Moves patient to the end of the queue with new position
+   */
+  async undelayAppointmentQueue(appointmentQueueId) {
+    try {
+      // Get current appointment queue entry
+      const { data: currentEntry, error: fetchError } = await this.supabase
+        .from('appointment_queue')
+        .select(`
+          *,
+          appointment:appointments!appointment_id (
+            appointment_date
+          )
+        `)
+        .eq('id', appointmentQueueId)
+        .single();
+
+      if (fetchError || !currentEntry) {
+        throw new Error('Appointment queue entry not found');
+      }
+
+      if (currentEntry.status !== 'delayed') {
+        throw new Error('Patient is not delayed');
+      }
+
+      // Get the highest queue position for this doctor/date
+      const appointmentDate = currentEntry.appointment?.appointment_date || new Date().toISOString().split('T')[0];
+      
+      const { data: maxPositionData, error: maxError } = await this.supabase
+        .from('appointment_queue')
+        .select('queue_position, appointment:appointments!appointment_id(appointment_date)')
+        .eq('doctor_id', currentEntry.doctor_id)
+        .neq('status', 'delayed') // Exclude delayed patients from position calculation
+        .order('queue_position', { ascending: false })
+        .limit(100); // Get enough to filter by date
+
+      if (maxError) throw maxError;
+
+      // Filter by appointment date and find max position
+      const sameDate = maxPositionData.filter(entry => 
+        entry.appointment?.appointment_date === appointmentDate
+      );
+      const newQueuePosition = (sameDate[0]?.queue_position || 0) + 1;
+
+      // Update appointment queue - move to end of queue with new position
+      const { data: updatedEntry, error: updateError } = await this.supabase
+        .from('appointment_queue')
+        .update({
+          status: 'queued', // Reset to queued status
+          queue_position: newQueuePosition, // Assign new position at end of queue
+          undelayed_at: new Date().toISOString(),
+          updated_at: new Date().toISOString()
+        })
+        .eq('id', appointmentQueueId)
+        .select(`
+          *,
+          patient:patients!patient_id (
+            id,
+            first_name,
+            last_name,
+            patient_number
+          )
+        `)
+        .single();
+
+      if (updateError) throw updateError;
+
+      return {
+        success: true,
+        appointmentQueue: updatedEntry,
+        message: `Patient undelayed and moved to position #${newQueuePosition} in queue`,
+        newQueuePosition
+      };
+    } catch (error) {
+      console.error('Error undelaying appointment queue entry:', error);
+      throw error;
+    }
+  }
+
   // ===============================================
   // QUEUE STATUS AND MONITORING
   // ===============================================
@@ -528,11 +850,19 @@ class QueueService {
     try {
       const queueDate = date || new Date().toISOString().split('T')[0];
 
+      console.log(`[QUEUE STATUS] Fetching for doctor ${doctorId}, date: ${queueDate}`);
+
       // Get token-based queue
       const tokens = await this.queueTokenModel.getByDoctorAndDate(doctorId, queueDate);
+      console.log(`[QUEUE STATUS] Found ${tokens.length} tokens`);
       
       // Get appointment-based queue
       const appointments = await this.appointmentQueueModel.getByDoctorAndDate(doctorId, queueDate);
+      console.log(`[QUEUE STATUS] Found ${appointments.length} appointments`);
+      
+      if (appointments.length > 0) {
+        console.log('[QUEUE STATUS] First appointment sample:', JSON.stringify(appointments[0], null, 2));
+      }
       
       // Get statistics
       const tokenStats = await this.queueTokenModel.getQueueStats(doctorId, queueDate);

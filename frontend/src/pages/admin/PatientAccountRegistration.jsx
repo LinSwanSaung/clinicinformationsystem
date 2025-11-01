@@ -22,7 +22,7 @@ import {
   DialogDescription,
   DialogFooter
 } from '@/components/ui/dialog';
-import { AlertCircle, CheckCircle2, Link as LinkIcon, Unlink, Users, Search, Plus } from 'lucide-react';
+import { AlertCircle, CheckCircle2, Link as LinkIcon, Unlink, Users, Search, Plus, Edit } from 'lucide-react';
 import patientAccountService from '@/services/patientAccountService';
 import api from '@/services/api';
 
@@ -49,6 +49,18 @@ const PatientAccountRegistration = () => {
   const [createSubmitting, setCreateSubmitting] = useState(false);
   const [createSuccess, setCreateSuccess] = useState('');
   const [createError, setCreateError] = useState('');
+
+  const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
+  const [editingAccount, setEditingAccount] = useState(null);
+  const [editForm, setEditForm] = useState({
+    first_name: '',
+    last_name: '',
+    email: '',
+    phone: ''
+  });
+  const [editSubmitting, setEditSubmitting] = useState(false);
+  const [editSuccess, setEditSuccess] = useState('');
+  const [editError, setEditError] = useState('');
 
   const [bindPatientQuery, setBindPatientQuery] = useState('');
   const [bindLookupError, setBindLookupError] = useState('');
@@ -317,6 +329,88 @@ const PatientAccountRegistration = () => {
     setPatientError('');
   };
 
+  const openEditDialog = (account) => {
+    setEditingAccount(account);
+    setEditForm({
+      first_name: account.first_name || '',
+      last_name: account.last_name || '',
+      email: account.email || '',
+      phone: account.phone || '',
+      password: '',
+      confirmPassword: ''
+    });
+    setEditSuccess('');
+    setEditError('');
+    setIsEditDialogOpen(true);
+  };
+
+  const closeEditDialog = () => {
+    setIsEditDialogOpen(false);
+    setEditingAccount(null);
+    setEditForm({
+      first_name: '',
+      last_name: '',
+      email: '',
+      phone: '',
+      password: '',
+      confirmPassword: ''
+    });
+    setEditSuccess('');
+    setEditError('');
+  };
+
+  const handleEditFieldChange = (event) => {
+    const { name, value } = event.target;
+    setEditForm((prev) => ({ ...prev, [name]: value }));
+  };
+
+  const handleEditAccount = async (event) => {
+    event.preventDefault();
+    setEditSuccess('');
+    setEditError('');
+
+    if (!editingAccount) return;
+
+    // Validate password confirmation if password is provided
+    if (editForm.password && editForm.password !== editForm.confirmPassword) {
+      setEditError('Passwords do not match.');
+      return;
+    }
+
+    setEditSubmitting(true);
+    try {
+      const updateData = {
+        first_name: editForm.first_name,
+        last_name: editForm.last_name,
+        email: editForm.email,
+        phone: editForm.phone || null,
+        role: 'patient' // Required by backend validation
+      };
+
+      // Only include password if provided
+      if (editForm.password) {
+        updateData.password = editForm.password;
+      }
+
+      const response = await api.put(`/users/${editingAccount.id}`, updateData);
+
+      const updatedAccount = response?.data;
+      if (updatedAccount) {
+        setAccounts((prev) => prev.map((account) => 
+          account.id === updatedAccount.id ? updatedAccount : account
+        ));
+      }
+
+      setEditSuccess(`Successfully updated account for ${editForm.first_name} ${editForm.last_name}`);
+      closeEditDialog();
+    } catch (err) {
+      console.error('Failed to update patient account:', err);
+      setEditError(err.message || 'Failed to update patient account.');
+    } finally {
+      setEditSubmitting(false);
+    }
+  };
+
   const loadPatients = async (term) => {
     if (!bindDialogOpen) return;
     try {
@@ -410,6 +504,10 @@ const PatientAccountRegistration = () => {
             </span>
           </TableCell>
           <TableCell className="flex gap-2">
+            <Button size="sm" variant="outline" onClick={() => openEditDialog(account)}>
+              <Edit className="h-4 w-4 mr-2" />
+              Edit
+            </Button>
             <Button size="sm" variant="secondary" onClick={() => openBindDialog(account)}>
               <LinkIcon className="h-4 w-4 mr-2" />
               {account.patient ? 'Re-link' : 'Bind'}
@@ -827,6 +925,119 @@ const PatientAccountRegistration = () => {
                 </Button>
               </div>
             </DialogFooter>
+          </DialogContent>
+        </Dialog>
+
+        <Dialog open={isEditDialogOpen} onOpenChange={(open) => { if (!open) closeEditDialog(); }}>
+          <DialogContent className="max-w-lg">
+            <DialogHeader>
+              <DialogTitle>Edit Patient Account</DialogTitle>
+              <DialogDescription>
+                Update account information for <strong>{editingAccount?.first_name} {editingAccount?.last_name}</strong>.
+              </DialogDescription>
+            </DialogHeader>
+
+            <form onSubmit={handleEditAccount} className="space-y-4">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="space-y-1.5">
+                  <Label htmlFor="edit-first-name">First Name</Label>
+                  <Input
+                    id="edit-first-name"
+                    name="first_name"
+                    value={editForm.first_name}
+                    onChange={handleEditFieldChange}
+                    required
+                  />
+                </div>
+                <div className="space-y-1.5">
+                  <Label htmlFor="edit-last-name">Last Name</Label>
+                  <Input
+                    id="edit-last-name"
+                    name="last_name"
+                    value={editForm.last_name}
+                    onChange={handleEditFieldChange}
+                    required
+                  />
+                </div>
+              </div>
+
+              <div className="space-y-1.5">
+                <Label htmlFor="edit-email">Email</Label>
+                <Input
+                  id="edit-email"
+                  name="email"
+                  type="email"
+                  value={editForm.email}
+                  onChange={handleEditFieldChange}
+                  required
+                />
+              </div>
+
+              <div className="space-y-1.5">
+                <Label htmlFor="edit-phone">Phone</Label>
+                <Input
+                  id="edit-phone"
+                  name="phone"
+                  value={editForm.phone}
+                  onChange={handleEditFieldChange}
+                  placeholder="Optional"
+                />
+              </div>
+
+              <div className="space-y-2">
+                <Label>Change Password (Optional)</Label>
+                <p className="text-xs text-muted-foreground">
+                  Leave blank to keep the current password.
+                </p>
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="space-y-1.5">
+                  <Label htmlFor="edit-password">New Password</Label>
+                  <Input
+                    id="edit-password"
+                    name="password"
+                    type="password"
+                    value={editForm.password}
+                    onChange={handleEditFieldChange}
+                    minLength={8}
+                  />
+                </div>
+                <div className="space-y-1.5">
+                  <Label htmlFor="edit-confirm-password">Confirm Password</Label>
+                  <Input
+                    id="edit-confirm-password"
+                    name="confirmPassword"
+                    type="password"
+                    value={editForm.confirmPassword}
+                    onChange={handleEditFieldChange}
+                    minLength={8}
+                  />
+                </div>
+              </div>
+
+              {editError && (
+                <div className="flex items-start gap-2 rounded-md border border-red-200 bg-red-50 p-3 text-sm text-red-700">
+                  <AlertCircle className="h-5 w-5 mt-0.5" />
+                  <span>{editError}</span>
+                </div>
+              )}
+              {editSuccess && (
+                <div className="flex items-start gap-2 rounded-md border border-green-200 bg-green-50 p-3 text-sm text-green-700">
+                  <CheckCircle2 className="h-5 w-5 mt-0.5" />
+                  <span>{editSuccess}</span>
+                </div>
+              )}
+
+              <DialogFooter className="flex gap-2 justify-end">
+                <Button type="button" variant="ghost" onClick={closeEditDialog}>
+                  Cancel
+                </Button>
+                <Button type="submit" disabled={editSubmitting}>
+                  {editSubmitting ? 'Updating...' : 'Update Account'}
+                </Button>
+              </DialogFooter>
+            </form>
           </DialogContent>
         </Dialog>
       </div>

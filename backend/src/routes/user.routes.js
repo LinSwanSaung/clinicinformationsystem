@@ -180,7 +180,19 @@ router.put('/:id',
     }
 
     // Remove sensitive fields that shouldn't be updated via this endpoint
-    const { password, password_hash, id: bodyId, created_at, deleted_at, ...allowedFields } = updateData;
+    // But allow password updates for admins
+    const { password_hash, id: bodyId, created_at, deleted_at, ...allowedFields } = updateData;
+
+    // Handle password separately if provided
+    if (updateData.password) {
+      // Validate password length
+      if (typeof updateData.password !== 'string' || updateData.password.length < 6) {
+        return res.status(400).json({
+          success: false,
+          message: 'Password must be at least 6 characters long'
+        });
+      }
+    }
 
     // Validate required fields
     if (!allowedFields.first_name || !allowedFields.last_name || !allowedFields.email || !allowedFields.role) {
@@ -197,6 +209,11 @@ router.put('/:id',
         success: false,
         message: 'Email is already taken by another user'
       });
+    }
+
+    // Update password if provided
+    if (updateData.password) {
+      await userModel.updatePassword(id, updateData.password);
     }
 
     const updatedUser = await userModel.updateById(id, allowedFields);
@@ -217,7 +234,12 @@ router.put('/:id',
         entity: 'users',
         recordId: id,
         result: 'success',
-        meta: { old_role: current?.role || null, new_role: updatedUser?.role || null, changed_fields: Object.keys(allowedFields) },
+        meta: { 
+          old_role: current?.role || null, 
+          new_role: updatedUser?.role || null, 
+          changed_fields: Object.keys(allowedFields),
+          password_changed: !!updateData.password
+        },
         ip: req.ip
       });
     } catch (e) {}

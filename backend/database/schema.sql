@@ -84,6 +84,8 @@ CREATE TABLE IF NOT EXISTS appointments (
     created_by UUID REFERENCES users(id),
     created_at TIMESTAMPTZ DEFAULT NOW(),
     updated_at TIMESTAMPTZ DEFAULT NOW(),
+    resolved_by_admin BOOLEAN DEFAULT false,
+    resolved_reason TEXT,
     
     CONSTRAINT valid_status CHECK (status IN ('scheduled', 'waiting', 'ready_for_doctor', 'consulting', 'completed', 'cancelled', 'no_show')),
     CONSTRAINT valid_duration CHECK (duration_minutes > 0 AND duration_minutes <= 480)
@@ -109,6 +111,8 @@ CREATE TABLE IF NOT EXISTS visits (
     payment_status VARCHAR(20) DEFAULT 'pending',
     created_at TIMESTAMPTZ DEFAULT NOW(),
     updated_at TIMESTAMPTZ DEFAULT NOW(),
+    resolved_by_admin BOOLEAN DEFAULT false,
+    resolved_reason TEXT,
     
     CONSTRAINT valid_visit_status CHECK (status IN ('in_progress', 'completed', 'cancelled')),
     CONSTRAINT valid_payment_status CHECK (payment_status IN ('pending', 'partial', 'paid', 'insurance_pending'))
@@ -224,16 +228,49 @@ CREATE TABLE IF NOT EXISTS audit_logs (
     id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
     table_name VARCHAR(100) NOT NULL,
     record_id UUID NOT NULL,
-    action VARCHAR(20) NOT NULL,
+    action VARCHAR(50) NOT NULL,
     old_values JSONB,
     new_values JSONB,
     user_id UUID REFERENCES users(id),
+    actor_role VARCHAR(50),
+    status VARCHAR(20) DEFAULT 'success',
+    reason TEXT,
     ip_address INET,
     user_agent TEXT,
     created_at TIMESTAMPTZ DEFAULT NOW(),
     
-    CONSTRAINT valid_action CHECK (action IN ('INSERT', 'UPDATE', 'DELETE'))
+    CONSTRAINT valid_action CHECK (action IN (
+        -- Existing values from database
+        'ACTIVATE', 'CREATE', 'DEACTIVATE', 'DELETE', 
+        'LOGIN_FAILURE', 'LOGIN_SUCCESS', 'LOGOUT', 'UPDATE', 'VIEW',
+        -- Future values for new features
+        'INSERT', 'LOGIN', 'LOGIN_FAILED', 'EXPORT', 'DOWNLOAD',
+        'ADMIN.OVERRIDE', 'ADMIN.RESTORE',
+        'USER.CREATE', 'USER.UPDATE', 'USER.DELETE',
+        'UPDATE_ROLE', 'GRANT_ACCESS', 'REVOKE_ACCESS',
+        'ACCESS', 'MODIFY', 'READ',
+        -- Invoice-specific actions
+        'INVOICE.CREATE', 'INVOICE.COMPLETE', 'INVOICE.CANCEL', 'INVOICE.PAYMENT',
+        -- Payment-specific actions
+        'PAYMENT.RECORD'
+    )),
+    CONSTRAINT valid_status CHECK (status IN ('success', 'failed', 'denied', 'warning'))
 );
+
+-- Add comments for audit_logs columns
+COMMENT ON COLUMN audit_logs.actor_role IS 'Role of the user who performed the action (admin, doctor, nurse, etc.)';
+COMMENT ON COLUMN audit_logs.status IS 'Outcome of the action: success, failed, denied, or warning';
+COMMENT ON COLUMN audit_logs.reason IS 'Optional context or reason for the action (especially for overrides, deletions, access changes)';
+
+-- Create indexes for audit_logs
+CREATE INDEX IF NOT EXISTS idx_audit_logs_table_name ON audit_logs(table_name);
+CREATE INDEX IF NOT EXISTS idx_audit_logs_record_id ON audit_logs(record_id);
+CREATE INDEX IF NOT EXISTS idx_audit_logs_user_id ON audit_logs(user_id);
+CREATE INDEX IF NOT EXISTS idx_audit_logs_actor_role ON audit_logs(actor_role);
+CREATE INDEX IF NOT EXISTS idx_audit_logs_status ON audit_logs(status);
+CREATE INDEX IF NOT EXISTS idx_audit_logs_action_status ON audit_logs(action, status);
+CREATE INDEX IF NOT EXISTS idx_audit_logs_created_at ON audit_logs(created_at DESC);
+
 
 -- ===============================================
 -- DOCTOR AVAILABILITY TABLE
@@ -305,7 +342,9 @@ BEGIN
             ADD COLUMN in_consult_at TIMESTAMPTZ,
             ADD COLUMN done_at TIMESTAMPTZ,
             ADD COLUMN late_at TIMESTAMPTZ,
-            ADD COLUMN consult_expected_minutes INTEGER DEFAULT 15;
+            ADD COLUMN consult_expected_minutes INTEGER DEFAULT 15,
+            ADD COLUMN resolved_by_admin BOOLEAN DEFAULT false,
+            ADD COLUMN resolved_reason TEXT;
     END IF;
 
     -- Make sure estimated_wait_time has default 7
@@ -1713,6 +1752,8 @@ CREATE TABLE IF NOT EXISTS invoices (
     cancelled_at TIMESTAMPTZ,
     cancelled_reason TEXT,
     updated_at TIMESTAMPTZ DEFAULT NOW(),
+    resolved_by_admin BOOLEAN DEFAULT false,
+    resolved_reason TEXT,
     
     CONSTRAINT valid_invoice_status CHECK (status IN ('pending', 'partial', 'paid', 'cancelled')),
     CONSTRAINT valid_payment_method CHECK (payment_method IN ('cash', 'card', 'insurance', 'mobile_payment', 'mixed'))

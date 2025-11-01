@@ -1,56 +1,57 @@
 import { supabase } from '../config/database.js';
 
 /**
- * Log an audit event. This function is non-blocking and failure-safe.
- * Maps application events to the existing audit_logs table structure.
- * 
- * Note: The existing audit_logs table is designed for INSERT/UPDATE/DELETE actions
- * with old_values/new_values. We map application actions (LOGIN, CREATE, UPDATE, etc.)
- * by storing extra context in new_values field.
- * 
- * VIEW actions are intentionally NOT logged to avoid excessive audit log entries.
+ * Log an audit event with enhanced tracking
+ * Supports the full audit trail recommended for healthcare compliance
  */
 export async function logAuditEvent({
   userId = null,
+  actor_id = null,
   role = null,
+  actor_role = null,
   action,
   entity = null,
+  entity_type = null,
   recordId = null,
+  entity_id = null,
+  old_values = null,
+  new_values = null,
+  status = 'success',
+  reason = null,
+  ip = null,
+  userAgent = null,
+  // Legacy parameters for backward compatibility
   patientId = null,
   result = null,
   meta = null,
-  ip = null,
-  note = null,
-  userAgent = null
+  note = null
 }) {
   try {
-    // Map to existing audit_logs table structure
-    // We'll use new_values to store our event context
     const insert = {
-      table_name: entity || 'system',
-      record_id: recordId || '00000000-0000-0000-0000-000000000000', // Required field
-      action: action, // Can be extended beyond INSERT/UPDATE/DELETE
-      old_values: null, // Not applicable for events like LOGIN, VIEW
-      new_values: {
-        role,
-        result,
-        patient_id: patientId,
-        meta,
-        note,
-        event_type: action // Store original action
+      table_name: entity_type || entity || 'system',
+      record_id: entity_id || recordId || '00000000-0000-0000-0000-000000000000',
+      action: action,
+      old_values: old_values,
+      new_values: new_values || {
+        // For backward compatibility, wrap legacy fields
+        ...(result && { result }),
+        ...(patientId && { patient_id: patientId }),
+        ...(meta && { meta }),
+        ...(note && { note })
       },
-      user_id: userId,
+      user_id: actor_id || userId,
+      actor_role: actor_role || role,
+      status: status,
+      reason: reason || note,
       ip_address: ip || null,
       user_agent: userAgent || null
     };
 
-    // Insert asynchronously but don't await at call sites if you want fire-and-forget.
     const { error } = await supabase.from('audit_logs').insert(insert);
     if (error) {
       console.error('[AUDIT] Failed to insert audit log:', error.message || error);
     }
   } catch (err) {
-    // Fail silently
     console.error('[AUDIT] Logging error:', err?.message || err);
   }
 }

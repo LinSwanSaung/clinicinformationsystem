@@ -198,7 +198,8 @@ class VisitService {
       if (end_date) params.append('end_date', end_date);
 
       const response = await api.get(`/visits/statistics?${params}`);
-      return response.data.data;
+      // API returns { success, data: {...} }
+      return response.data || response;
     } catch (error) {
       console.error('Error fetching visit statistics:', error);
       throw error;

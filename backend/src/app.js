@@ -28,6 +28,7 @@ import paymentRoutes from './routes/payment.routes.js';
 import notificationRoutes from './routes/notification.routes.js';
 import patientPortalRoutes from './routes/patientPortal.routes.js';
 import auditLogRoutes from './routes/auditLog.routes.js';
+import adminRoutes from './routes/admin.routes.js';
 import { testConnection } from './config/database.js';
 
 // Load environment variables
@@ -91,6 +92,7 @@ app.use('/api/payments', paymentRoutes);
 app.use('/api/notifications', notificationRoutes);
 app.use('/api/me', patientPortalRoutes);
 app.use('/api/audit-logs', auditLogRoutes);
+app.use('/api/admin', adminRoutes);
 
 // 404 handler
 app.use('*', (req, res) => {

@@ -7,6 +7,8 @@ import EmployeeManagement from './pages/admin/EmployeeManagement';
 import PatientAccountRegistration from './pages/admin/PatientAccountRegistration';
 import DoctorAvailability from './pages/admin/DoctorAvailability';
 import AuditLogs from './pages/admin/AuditLogs';
+import PendingItems from './pages/admin/PendingItems';
+import PaymentTransactions from './pages/admin/PaymentTransactions';
 import ReceptionistDashboard from './pages/receptionist/ReceptionistDashboard';
 import RegisterPatient from './pages/receptionist/RegisterPatient';
 import AppointmentsPage from './pages/receptionist/AppointmentsPage';
@@ -94,6 +96,22 @@ function AppRoutes() {
         element={
           <ProtectedRoute allowedRoles={['admin']}>
             <AuditLogs />
+          </ProtectedRoute>
+        } 
+      />
+      <Route 
+        path="/admin/pending-items" 
+        element={
+          <ProtectedRoute allowedRoles={['admin']}>
+            <PendingItems />
+          </ProtectedRoute>
+        } 
+      />
+      <Route 
+        path="/admin/payment-transactions" 
+        element={
+          <ProtectedRoute allowedRoles={['admin']}>
+            <PaymentTransactions />
           </ProtectedRoute>
         } 
       />

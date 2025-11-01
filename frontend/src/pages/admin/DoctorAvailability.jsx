@@ -21,6 +21,16 @@ import userService from '../../services/userService';
 import doctorAvailabilityService from '../../services/doctorAvailabilityService';
 import { validateTimeFormat, convert12HrTo24Hr, compareTimes12Hr, formatTimeRange } from '../../utils/timeUtils';
 
+const DAYS_OF_WEEK = [
+  'Monday',
+  'Tuesday',
+  'Wednesday',
+  'Thursday',
+  'Friday',
+  'Saturday',
+  'Sunday'
+];
+
 const DoctorAvailability = () => {
   const navigate = useNavigate();
   const [doctors, setDoctors] = useState([]);
@@ -29,6 +39,7 @@ const DoctorAvailability = () => {
   const [error, setError] = useState('');
   const [showScheduleDialog, setShowScheduleDialog] = useState(false);
   const [selectedDoctor, setSelectedDoctor] = useState(null);
+  const [expandedDayByDoctor, setExpandedDayByDoctor] = useState({});
 
   const loadDoctorsAndAvailability = async () => {
     try {
@@ -88,34 +99,6 @@ const DoctorAvailability = () => {
     setShowScheduleDialog(true);
   };
 
-  const getDoctorAvailabilitySummary = (doctorId) => {
-    const doctorAvailability = availability[doctorId] || [];
-    
-    if (doctorAvailability.length === 0) {
-      return "No availability set";
-    }
-    
-    // Group by day and show time ranges
-    const daySchedules = doctorAvailability.reduce((acc, avail) => {
-      const day = avail.day_of_week;
-      if (!acc[day]) {
-        acc[day] = [];
-      }
-      acc[day].push(formatTimeRange(avail.start_time, avail.end_time));
-      return acc;
-    }, {});
-    
-    // Create summary string
-    const days = Object.keys(daySchedules);
-    if (days.length === 1) {
-      return `${days[0]}: ${daySchedules[days[0]].join(', ')}`;
-    } else if (days.length <= 3) {
-      return days.map(day => `${day.slice(0, 3)}: ${daySchedules[day][0]}`).join(', ');
-    } else {
-      return `${days.length} days scheduled`;
-    }
-  };
-
   return (
     <PageLayout
       title="Doctor Availability"
@@ -166,72 +149,172 @@ const DoctorAvailability = () => {
           <>
             {/* Doctors Grid */}
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-              {doctors.map((doctor) => (
-                <Card key={doctor.id} className="hover:shadow-md transition-shadow">
-                  <CardHeader>
-                    <div className="flex items-start justify-between">
-                      <div className="flex items-center gap-3">
-                        <div className="h-10 w-10 rounded-full bg-blue-100 flex items-center justify-center">
-                          <Stethoscope className="h-5 w-5 text-blue-600" />
+              {doctors.map((doctor) => {
+                const doctorAvailability = availability[doctor.id] || [];
+                const availabilityByDay = DAYS_OF_WEEK.reduce((acc, day) => {
+                  acc[day] = [];
+                  return acc;
+                }, {});
+
+                doctorAvailability.forEach((slot) => {
+                  const day = slot.day_of_week;
+                  if (!availabilityByDay[day]) {
+                    availabilityByDay[day] = [];
+                  }
+                  availabilityByDay[day].push(slot);
+                });
+
+                Object.keys(availabilityByDay).forEach((day) => {
+                  availabilityByDay[day] = availabilityByDay[day].sort((a, b) =>
+                    (a.start_time || '').localeCompare(b.start_time || '')
+                  );
+                });
+
+                const activeDayNames = DAYS_OF_WEEK.filter(
+                  (day) => (availabilityByDay[day] || []).length > 0
+                );
+                const activeDayCount = activeDayNames.length;
+                const offDayCount = DAYS_OF_WEEK.length - activeDayCount;
+                const storedExpanded = expandedDayByDoctor[doctor.id];
+                const selectedDay =
+                  storedExpanded === undefined ? activeDayNames[0] || null : storedExpanded;
+                const selectedSlots = selectedDay ? availabilityByDay[selectedDay] || [] : [];
+                const availabilitySummary =
+                  activeDayCount === 0
+                    ? 'No availability set'
+                    : `${activeDayCount} active ${activeDayCount === 1 ? 'day' : 'days'}`;
+                const sortedSelectedSlots = selectedSlots.slice().sort((a, b) =>
+                  (a.start_time || '').localeCompare(b.start_time || '')
+                );
+
+                return (
+                  <Card key={doctor.id} className="hover:shadow-md transition-shadow">
+                    <CardHeader>
+                      <div className="flex items-start justify-between">
+                        <div className="flex items-center gap-3">
+                          <div className="h-10 w-10 rounded-full bg-blue-100 flex items-center justify-center">
+                            <Stethoscope className="h-5 w-5 text-blue-600" />
+                          </div>
+                          <div>
+                            <CardTitle className="text-lg">
+                              Dr. {doctor.first_name} {doctor.last_name}
+                            </CardTitle>
+                            <p className="text-sm text-gray-600">{doctor.specialty || 'General'}</p>
+                          </div>
                         </div>
-                        <div>
-                          <CardTitle className="text-lg">
-                            Dr. {doctor.first_name} {doctor.last_name}
-                          </CardTitle>
-                          <p className="text-sm text-gray-600">{doctor.specialty || 'General'}</p>
+                      </div>
+                    </CardHeader>
+
+                    <CardContent className="space-y-3">
+                      <div className="space-y-2">
+                        <div className="flex items-center gap-2 text-sm text-gray-600">
+                          <Mail className="h-4 w-4" />
+                          <span>{doctor.email}</span>
+                        </div>
+                        <div className="flex items-center gap-2 text-sm text-gray-600">
+                          <Phone className="h-4 w-4" />
+                          <span>{doctor.phone || 'N/A'}</span>
+                        </div>
+                        <div className="flex items-center gap-2 text-sm text-gray-600">
+                          <Calendar className="h-4 w-4" />
+                          <span>Availability: {availabilitySummary}</span>
                         </div>
                       </div>
-                    </div>
-                  </CardHeader>
-                  
-                  <CardContent className="space-y-3">
-                    <div className="space-y-2">
-                      <div className="flex items-center gap-2 text-sm text-gray-600">
-                        <Mail className="h-4 w-4" />
-                        <span>{doctor.email}</span>
+
+                      <div className="mt-3 flex flex-wrap items-center gap-2 text-xs text-gray-500">
+                        <span className="font-medium text-gray-700">
+                          {activeDayCount} active {activeDayCount === 1 ? 'day' : 'days'}
+                        </span>
+                        <span className="text-gray-300">|</span>
+                        <span className="font-medium text-gray-500">
+                          {offDayCount} {offDayCount === 1 ? 'day off' : 'days off'}
+                        </span>
                       </div>
-                      <div className="flex items-center gap-2 text-sm text-gray-600">
-                        <Phone className="h-4 w-4" />
-                        <span>{doctor.phone || 'N/A'}</span>
-                      </div>
-                      <div className="flex items-center gap-2 text-sm text-gray-600">
-                        <Calendar className="h-4 w-4" />
-                        <span>Availability: {getDoctorAvailabilitySummary(doctor.id)}</span>
-                      </div>
-                    </div>
-                    
-                    {/* Current Schedules */}
-                    {availability[doctor.id] && availability[doctor.id].length > 0 && (
-                      <div className="mt-3 pt-3 border-t">
-                        <h4 className="text-sm font-medium text-gray-700 mb-2">Current Schedule:</h4>
-                        <div className="space-y-1">
-                          {availability[doctor.id].map((avail, index) => (
-                            <div key={index} className="flex justify-between items-center text-xs">
-                              <span className="text-gray-600">{avail.day_of_week}</span>
-                              <span className="text-gray-800 font-medium">
-                                {formatTimeRange(avail.start_time, avail.end_time)}
-                              </span>
+
+                      {activeDayCount === 0 ? (
+                        <div className="mt-3 rounded-lg border border-dashed border-gray-200 bg-gray-50 p-3 text-sm text-gray-600">
+                          No availability has been configured. Use the button below to add working hours.
+                        </div>
+                      ) : (
+                        <>
+                          <div className="mt-3 flex flex-wrap gap-2">
+                            {DAYS_OF_WEEK.map((day) => {
+                              const slots = availabilityByDay[day] || [];
+                              const isActive = slots.length > 0;
+                              const isSelected = selectedDay === day && isActive;
+                              const baseClasses =
+                                'px-3 py-1 rounded-full text-sm font-medium border transition-all';
+                              const stateClasses = !isActive
+                                ? 'bg-gray-100 text-gray-400 border-gray-200 cursor-not-allowed'
+                                : isSelected
+                                  ? 'bg-emerald-100 text-emerald-700 border-emerald-200 shadow-sm'
+                                  : 'bg-emerald-50 text-emerald-700 border-emerald-200 hover:bg-emerald-100';
+
+                              return (
+                                <button
+                                  key={day}
+                                  type="button"
+                                  onClick={() => {
+                                    if (!isActive) {
+                                      return;
+                                    }
+                                    setExpandedDayByDoctor((prev) => ({
+                                      ...prev,
+                                      [doctor.id]: prev[doctor.id] === day ? null : day
+                                    }));
+                                  }}
+                                  disabled={!isActive}
+                                  className={`${baseClasses} ${stateClasses}`}
+                                >
+                                  {day.slice(0, 3)}
+                                </button>
+                              );
+                            })}
+                          </div>
+
+                          {selectedDay && sortedSelectedSlots.length > 0 && (
+                            <div className="mt-3 rounded-lg border border-emerald-100 bg-emerald-50/80 p-3">
+                              <div className="flex items-center justify-between text-sm font-medium text-emerald-800">
+                                <div className="flex items-center gap-2">
+                                  <Calendar className="h-4 w-4" />
+                                  <span>{selectedDay}</span>
+                                </div>
+                                <span className="text-xs text-emerald-700">
+                                  {sortedSelectedSlots.length}{' '}
+                                  {sortedSelectedSlots.length === 1 ? 'slot' : 'slots'}
+                                </span>
+                              </div>
+                              <div className="mt-2 flex flex-wrap gap-2">
+                                {sortedSelectedSlots.map((slot, index) => (
+                                  <span
+                                    key={slot.id || `${slot.start_time}-${slot.end_time}-${index}`}
+                                    className="rounded-full border border-emerald-200 bg-white px-3 py-1 text-sm text-emerald-700 shadow-sm"
+                                  >
+                                    {formatTimeRange(slot.start_time, slot.end_time)}
+                                  </span>
+                                ))}
+                              </div>
                             </div>
-                          ))}
+                          )}
+                        </>
+                      )}
+
+                      <div className="pt-3 border-t">
+                        <div className="flex gap-2">
+                          <Button
+                            size="sm"
+                            onClick={() => handleAddSchedule(doctor)}
+                            className="flex-1"
+                          >
+                            <Clock className="h-3 w-3 mr-1" />
+                            Manage Availability
+                          </Button>
                         </div>
                       </div>
-                    )}
-                    
-                    <div className="pt-3 border-t">
-                      <div className="flex gap-2">
-                        <Button 
-                          size="sm" 
-                          onClick={() => handleAddSchedule(doctor)}
-                          className="flex-1"
-                        >
-                          <Clock className="h-3 w-3 mr-1" />
-                          Manage Availability
-                        </Button>
-                      </div>
-                    </div>
-                  </CardContent>
-                </Card>
-              ))}
+                    </CardContent>
+                  </Card>
+                );
+              })}
             </div>
 
             {/* No Doctors State */}
@@ -285,10 +368,7 @@ const ScheduleDialog = ({ isOpen, onClose, doctor, onScheduleAdded }) => {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [formError, setFormError] = useState('');
 
-  const daysOfWeek = [
-    'Monday', 'Tuesday', 'Wednesday', 'Thursday', 
-    'Friday', 'Saturday', 'Sunday'
-  ];
+  const daysOfWeek = DAYS_OF_WEEK;
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -333,7 +413,7 @@ const ScheduleDialog = ({ isOpen, onClose, doctor, onScheduleAdded }) => {
       // Try to save to backend
       try {
         await doctorAvailabilityService.createAvailability(availabilityData);
-        console.log('✅ Availability saved successfully');
+        console.log('Γ£à Availability saved successfully');
       } catch (backendError) {
         console.error('Backend error:', backendError);
         throw new Error('Failed to save availability. Please try again.');

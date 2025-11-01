@@ -1,7 +1,8 @@
 import React, { useState, useEffect } from 'react';
+import PageLayout from '@/components/PageLayout';
 import { Card } from '../../components/ui/card';
 import { Button } from '../../components/ui/button';
-import { Shield, Filter, Download, Calendar, User, Activity } from 'lucide-react';
+import { Filter, Activity } from 'lucide-react';
 import auditLogService from '../../services/auditLogService';
 
 const AuditLogs = () => {
@@ -89,18 +90,12 @@ const AuditLogs = () => {
   };
 
   return (
-    <div className="p-6 space-y-6">
-      {/* Header */}
-      <div className="flex items-center justify-between">
-        <div className="flex items-center space-x-3">
-          <Shield size={32} className="text-red-600" />
-          <div>
-            <h1 className="text-2xl font-bold text-gray-900">System Audit Logs</h1>
-            <p className="text-sm text-gray-500">Monitor system activities and user actions</p>
-          </div>
-        </div>
-      </div>
-
+    <PageLayout
+      title="System Audit Logs"
+      subtitle="Monitor system activities and user actions"
+      fullWidth
+    >
+      <div className="space-y-6">
       {/* Filters */}
       <Card className="p-6">
         <div className="flex items-center space-x-3 mb-4">
@@ -248,7 +243,8 @@ const AuditLogs = () => {
           </>
         )}
       </Card>
-    </div>
+      </div>
+    </PageLayout>
   );
 };
 

@@ -27,10 +27,12 @@ class EmployeeService {
       const response = await userService.getAllUsers(options);
       
       if (response.success) {
-        // Ensure we return an array
+        // Filter out patients - only return staff roles
+        const staffRoles = ['admin', 'doctor', 'nurse', 'receptionist', 'cashier', 'pharmacist'];
         const data = response.data;
         if (Array.isArray(data)) {
-          return data;
+          const employeesOnly = data.filter(user => staffRoles.includes(user.role));
+          return employeesOnly;
         } else {
           console.warn('Expected array but got:', typeof data, data);
           return [];

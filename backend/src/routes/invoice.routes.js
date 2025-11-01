@@ -2,6 +2,7 @@ import express from 'express';
 import { authenticate, authorize } from '../middleware/auth.js';
 import { asyncHandler } from '../middleware/errorHandler.js';
 import InvoiceService from '../services/Invoice.service.js';
+import { logAuditEvent } from '../utils/auditLogger.js';
 
 const router = express.Router();
 
@@ -103,6 +104,18 @@ router.post('/',
     }
 
     const invoice = await InvoiceService.createInvoice(visit_id, req.user.id);
+    
+    // Audit log
+    await logAuditEvent({
+      actor_id: req.user.id,
+      actor_role: req.user.role,
+      action: 'INVOICE.CREATE',
+      entity_type: 'invoices',
+      entity_id: invoice.id,
+      status: 'success',
+      ip: req.ip,
+      userAgent: req.headers['user-agent']
+    });
     
     res.status(201).json({
       success: true,
@@ -258,6 +271,21 @@ router.put('/:id/complete',
     
     const invoice = await InvoiceService.completeInvoice(id, userId);
     
+    // Audit log - CRITICAL: Track who completed the invoice
+    await logAuditEvent({
+      actor_id: userId,
+      actor_role: req.user.role,
+      action: 'INVOICE.COMPLETE',
+      entity_type: 'invoices',
+      entity_id: id,
+      status: 'success',
+      reason: 'Invoice completed and marked as paid',
+      old_values: { status: 'pending' },
+      new_values: { status: 'paid', completed_by: userId, completed_at: new Date() },
+      ip: req.ip,
+      userAgent: req.headers['user-agent']
+    });
+    
     res.status(200).json({
       success: true,
       message: 'Invoice completed successfully. Visit has been marked as completed.',
@@ -279,6 +307,21 @@ router.put('/:id/cancel',
     const { reason } = req.body;
     
     const invoice = await InvoiceService.cancelInvoice(id, req.user.id, reason);
+    
+    // Audit log - Track invoice cancellation with reason
+    await logAuditEvent({
+      actor_id: req.user.id,
+      actor_role: req.user.role,
+      action: 'INVOICE.CANCEL',
+      entity_type: 'invoices',
+      entity_id: id,
+      status: 'success',
+      reason: `Invoice cancelled: ${reason || 'No reason provided'}`,
+      old_values: { status: 'pending' },
+      new_values: { status: 'cancelled', cancelled_by: req.user.id, cancelled_reason: reason },
+      ip: req.ip,
+      userAgent: req.headers['user-agent']
+    });
     
     res.status(200).json({
       success: true,
@@ -393,6 +436,20 @@ router.post('/:id/partial-payment',
     };
 
     const result = await InvoiceService.recordPartialPayment(id, paymentData);
+    
+    // Audit log - Track partial payments
+    await logAuditEvent({
+      actor_id: req.user.id,
+      actor_role: req.user.role,
+      action: 'INVOICE.PAYMENT',
+      entity_type: 'invoices',
+      entity_id: id,
+      status: 'success',
+      reason: `Partial payment recorded: ${amount} via ${payment_method}`,
+      new_values: { amount, payment_method, notes, processed_by: req.user.id },
+      ip: req.ip,
+      userAgent: req.headers['user-agent']
+    });
     
     res.status(200).json({
       success: true,

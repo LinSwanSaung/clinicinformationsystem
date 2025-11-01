@@ -15,7 +15,8 @@ import {
   Users,
   Home,
   Menu,
-  Activity
+  Activity,
+  Stethoscope
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import employeeService from '@/services/employeeService';
@@ -107,9 +108,21 @@ const Navbar = () => {
         },
         {
           icon: Users,
-          label: 'Employees',
+          label: 'Manage Staff',
           path: '/admin/employees',
           isActive: location.pathname === '/admin/employees'
+        },
+        {
+          icon: UserPlus,
+          label: 'Patient Accounts',
+          path: '/admin/patient-accounts',
+          isActive: location.pathname === '/admin/patient-accounts'
+        },
+        {
+          icon: Stethoscope,
+          label: 'Doctor Availability',
+          path: '/admin/schedules',
+          isActive: location.pathname === '/admin/schedules'
         }
       ];
     }

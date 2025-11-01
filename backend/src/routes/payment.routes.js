@@ -2,6 +2,7 @@ import express from 'express';
 import { authenticate, authorize } from '../middleware/auth.js';
 import { asyncHandler } from '../middleware/errorHandler.js';
 import PaymentService from '../services/Payment.service.js';
+import { logAuditEvent } from '../utils/auditLogger.js';
 
 const router = express.Router();
 
@@ -31,6 +32,20 @@ router.post('/',
     };
 
     const payment = await PaymentService.recordPayment(invoice_id, paymentData, req.user.id);
+    
+    // Audit log - Track payment transaction
+    await logAuditEvent({
+      actor_id: req.user.id,
+      actor_role: req.user.role,
+      action: 'PAYMENT.RECORD',
+      entity_type: 'payment_transactions',
+      entity_id: payment.id,
+      status: 'success',
+      reason: `Payment recorded: ${amount} via ${payment_method}`,
+      new_values: { amount, payment_method, payment_reference, invoice_id },
+      ip: req.ip,
+      userAgent: req.headers['user-agent']
+    });
     
     res.status(201).json({
       success: true,
@@ -102,6 +117,61 @@ router.get('/report',
       success: true,
       data: report
     });
+  })
+);
+
+/**
+ * @route   GET /api/payments/admin/all-transactions
+ * @desc    Get all payment transactions for admin with filters
+ * @access  Private (Admin only)
+ */
+router.get('/admin/all-transactions',
+  authenticate,
+  authorize('admin'),
+  asyncHandler(async (req, res) => {
+    const { 
+      start_date, 
+      end_date, 
+      payment_method, 
+      received_by,
+      limit = 50,
+      offset = 0
+    } = req.query;
+    
+    const payments = await PaymentService.getAllTransactionsAdmin({
+      start_date,
+      end_date,
+      payment_method,
+      received_by,
+      limit: parseInt(limit),
+      offset: parseInt(offset)
+    });
+    
+    res.status(200).json({
+      success: true,
+      data: payments.data,
+      total: payments.total
+    });
+  })
+);
+
+/**
+ * @route   GET /api/payments/:id/receipt/pdf
+ * @desc    Generate and download payment receipt as PDF
+ * @access  Private (Admin, Cashier)
+ */
+router.get('/:id/receipt/pdf',
+  authenticate,
+  authorize('admin', 'cashier'),
+  asyncHandler(async (req, res) => {
+    const { id } = req.params;
+    
+    const pdf = await PaymentService.generateReceiptPDF(id);
+    
+    res.setHeader('Content-Type', 'application/pdf');
+    res.setHeader('Content-Disposition', `attachment; filename=receipt_${id}.pdf`);
+    pdf.pipe(res);
+    pdf.end();
   })
 );
 

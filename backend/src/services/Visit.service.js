@@ -80,6 +80,21 @@ class VisitService {
         throw new Error(`Missing required fields: ${missingFields.join(', ')}`);
       }
 
+      // CHECK: Prevent creating a new visit if patient has an active visit
+      const existingActiveVisit = await this.visitModel.findOne({
+        filters: {
+          patient_id: visitData.patient_id,
+          status: 'in_progress'
+        }
+      });
+
+      if (existingActiveVisit) {
+        throw new Error(
+          `Patient already has an active visit (ID: ${existingActiveVisit.id}). ` +
+          `Please complete or cancel the existing visit before creating a new one.`
+        );
+      }
+
       // Set default values and remove fields not in schema
       const { created_by, updated_by, ...cleanVisitData } = visitData;
       
@@ -220,38 +235,74 @@ class VisitService {
     try {
       const { doctor_id = null, start_date = null, end_date = null } = options;
 
-      let baseQuery = this.visitModel.supabase.from('visits').select('*', { count: 'exact' });
+      const applyFilters = (query) => {
+        if (doctor_id) {
+          query = query.eq('doctor_id', doctor_id);
+        }
+        if (start_date) {
+          query = query.gte('visit_date', start_date);
+        }
+        if (end_date) {
+          query = query.lte('visit_date', end_date);
+        }
+        return query;
+      };
 
-      if (doctor_id) {
-        baseQuery = baseQuery.eq('doctor_id', doctor_id);
-      }
+      const totalQuery = applyFilters(
+        this.visitModel.supabase
+          .from('visits')
+          .select('id', { count: 'exact', head: true })
+      );
 
-      if (start_date) {
-        baseQuery = baseQuery.gte('visit_date', start_date);
-      }
+      const completedQuery = applyFilters(
+        this.visitModel.supabase
+          .from('visits')
+          .select('id', { count: 'exact', head: true })
+          .eq('status', 'completed')
+      );
 
-      if (end_date) {
-        baseQuery = baseQuery.lte('visit_date', end_date);
-      }
+      const inProgressQuery = applyFilters(
+        this.visitModel.supabase
+          .from('visits')
+          .select('id', { count: 'exact', head: true })
+          .eq('status', 'in_progress')
+      );
+
+      const cancelledQuery = applyFilters(
+        this.visitModel.supabase
+          .from('visits')
+          .select('id', { count: 'exact', head: true })
+          .eq('status', 'cancelled')
+      );
 
       const [
-        { count: totalVisits },
-        { count: completedVisits },
-        { count: inProgressVisits },
-        { count: cancelledVisits }
+        { count: totalVisits, error: totalError },
+        { count: completedVisits, error: completedError },
+        { count: inProgressVisits, error: inProgressError },
+        { count: cancelledVisits, error: cancelledError }
       ] = await Promise.all([
-        baseQuery,
-        { ...baseQuery }.eq('status', 'completed'),
-        { ...baseQuery }.eq('status', 'in_progress'),
-        { ...baseQuery }.eq('status', 'cancelled')
+        totalQuery,
+        completedQuery,
+        inProgressQuery,
+        cancelledQuery
       ]);
 
+      if (totalError) throw totalError;
+      if (completedError) throw completedError;
+      if (inProgressError) throw inProgressError;
+      if (cancelledError) throw cancelledError;
+
       // Calculate revenue from completed visits
-      const { data: revenueData } = await this.visitModel.supabase
+      let revenueQuery = this.visitModel.supabase
         .from('visits')
         .select('total_cost')
         .eq('status', 'completed')
         .not('total_cost', 'is', null);
+
+      revenueQuery = applyFilters(revenueQuery);
+
+      const { data: revenueData, error: revenueError } = await revenueQuery;
+      if (revenueError) throw revenueError;
 
       const totalRevenue = revenueData?.reduce((sum, visit) => sum + (visit.total_cost || 0), 0) || 0;
 

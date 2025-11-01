@@ -7,6 +7,7 @@ import UpcomingAppointments from '@/components/patient/UpcomingAppointments';
 import LatestVisitSummary from '@/components/patient/LatestVisitSummary';
 import VitalsSnapshot from '@/components/patient/VitalsSnapshot';
 import PortalSearchResults from '@/components/patient/PortalSearchResults';
+import AIHealthBlog from '@/components/patient/AIHealthBlog';
 import patientPortalService from '@/services/patientPortalService';
 import { Separator } from '@/components/ui/separator';
 
@@ -105,6 +106,8 @@ const PatientPortalDashboard = () => {
   }, [i18n]);
 
   const profileData = profileState.data?.data ?? profileState.data;
+  console.log('[PatientPortalDashboard] profileState:', profileState);
+  console.log('[PatientPortalDashboard] profileData:', profileData);
 
   return (
     <PageLayout
@@ -144,6 +147,15 @@ const PatientPortalDashboard = () => {
             error={visitsState.error}
             onRetry={loadVisits}
           />
+          
+          {/* AI Health Blog - based on last diagnosis */}
+          {console.log('[PatientPortalDashboard] Rendering AIHealthBlog check:', { hasProfileData: !!profileData, patientId: profileData?.patient?.id })}
+          {profileData?.patient?.id && (
+            <>
+              {console.log('[PatientPortalDashboard] Rendering AIHealthBlog with patientId:', profileData.patient.id)}
+              <AIHealthBlog patientId={profileData.patient.id} />
+            </>
+          )}
         </div>
       </div>
     </PageLayout>

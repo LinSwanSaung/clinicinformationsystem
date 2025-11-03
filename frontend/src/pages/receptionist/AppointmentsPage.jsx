@@ -183,7 +183,7 @@ const AppointmentsPage = () => {
   useEffect(() => {
     if (selectedDoctor && doctorAvailability.length > 0) {
       // Reset time to ensure it's valid for the new doctor/availability
-      setNewAppointment((prev) => ({ ...prev, time: '' }));
+      setNewAppointment((prev) => (prev.time ? { ...prev, time: '' } : prev));
     }
   }, [selectedDoctor, doctorAvailability]);
 
@@ -231,7 +231,7 @@ const AppointmentsPage = () => {
               '[AppointmentsPage] Selected time not available, clearing:',
               newAppointment.time
             );
-            setNewAppointment((prev) => ({ ...prev, time: '' }));
+            setNewAppointment((prev) => (prev.time ? { ...prev, time: '' } : prev));
           }
 
           // Show message if no slots available
@@ -1169,7 +1169,7 @@ const AppointmentsPage = () => {
                               Time *
                             </label>
                             <Select
-                              value={newAppointment.time}
+                              value={newAppointment.time || undefined}
                               onValueChange={(value) =>
                                 setNewAppointment((prev) => ({ ...prev, time: value }))
                               }
@@ -1190,7 +1190,7 @@ const AppointmentsPage = () => {
                                         : isLoadingTimeSlots
                                           ? 'Loading available times...'
                                           : timeSlotError
-                                            ? timeSlotError
+                                            ? 'Failed to load time slots'
                                             : availableTimeSlots.length === 0
                                               ? 'No available slots'
                                               : 'Select time'

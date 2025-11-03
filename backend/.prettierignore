@@ -1,0 +1,17 @@
+# Dependencies
+node_modules
+package-lock.json
+
+# Build output
+dist
+build
+
+# Database
+database/migrations/*.sql
+
+# Misc
+.DS_Store
+*.log
+.env
+.env.*
+coverage

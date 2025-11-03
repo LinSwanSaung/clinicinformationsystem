@@ -48,6 +48,19 @@ module.exports = {
     'curly': ['error', 'all'],
     'no-eval': 'error',
     'no-implied-eval': 'error',
+    // Forbid accidental direct Supabase imports in UI
+    'no-restricted-imports': [
+      'error',
+      {
+        paths: [
+          {
+            name: '@supabase/supabase-js',
+            message:
+              'Do not import Supabase in UI. Use API services and React Query hooks instead.',
+          },
+        ],
+      },
+    ],
   },
   ignorePatterns: ['dist', 'node_modules', '.eslintrc.cjs', 'vite.config.js'],
 };

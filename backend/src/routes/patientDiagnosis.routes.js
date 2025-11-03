@@ -14,7 +14,7 @@ const router = express.Router();
 router.get(
   '/patient/:patientId',
   authenticate,
-  authorize('doctor', 'nurse', 'receptionist', 'patient'),
+  authorize('doctor', 'nurse', 'receptionist', 'reception', 'patient'),
   async (req, res) => {
     try {
       const { patientId } = req.params;
@@ -68,7 +68,7 @@ router.get('/visit/:visitId', authenticate, authorize('doctor', 'nurse'), async 
 router.get(
   '/:id',
   authenticate,
-  authorize('doctor', 'nurse', 'receptionist', 'patient'),
+  authorize('doctor', 'nurse', 'receptionist', 'reception', 'patient'),
   async (req, res) => {
     try {
       const { id } = req.params;
@@ -256,7 +256,7 @@ router.delete('/:id', authenticate, authorize('doctor'), async (req, res) => {
 router.get(
   '/active/all',
   authenticate,
-  authorize('doctor', 'nurse', 'receptionist'),
+  authorize('doctor', 'nurse', 'receptionist', 'reception'),
   async (req, res) => {
     try {
       const diagnoses = await patientDiagnosisService.getAllActiveDiagnoses();

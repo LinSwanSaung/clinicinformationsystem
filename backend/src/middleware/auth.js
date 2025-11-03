@@ -8,23 +8,9 @@ import { AppError, asyncHandler } from './errorHandler.js';
  * Verifies JWT token and attaches user info to request
  */
 export const authenticate = asyncHandler(async (req, res, next) => {
-  // Development bypass disabled - use real authentication
-  if (false && (process.env.NODE_ENV === 'development' || process.env.BYPASS_AUTH === 'true')) {
-    console.log('DEV MODE: Bypassing authentication');
-    req.user = {
-      id: 'ff9ca1bf-4964-4703-9212-a2feadc2cbd2', // Use real admin user ID
-      email: 'minswanpyae@gmail.com',
-      role: 'admin',
-      first_name: 'Admin',
-      last_name: 'User',
-      is_active: true
-    };
-    return next();
-  }
-
   // Extract token from header
   const authHeader = req.headers.authorization;
-  
+
   if (!authHeader || !authHeader.startsWith('Bearer ')) {
     throw new AppError('Access token required', 401);
   }
@@ -34,7 +20,7 @@ export const authenticate = asyncHandler(async (req, res, next) => {
   try {
     // Verify JWT token
     const decoded = jwt.verify(token, config.jwt.secret);
-    
+
     // Get user from database
     const { data: user, error } = await supabase
       .from('users')
@@ -72,13 +58,16 @@ export const authorize = (...roles) => {
   return (req, res, next) => {
     // SECURITY: Do NOT bypass authorization - always check roles
     // Development bypass DISABLED for security
-    
+
     if (!req.user) {
       throw new AppError('Authentication required', 401);
     }
 
     if (!roles.includes(req.user.role)) {
-      throw new AppError(`Access denied. Required role: ${roles.join(',').replace(/,/g, ',')}`, 403);
+      throw new AppError(
+        `Access denied. Required role: ${roles.join(',')}. Your role: ${req.user.role}`,
+        403
+      );
     }
 
     next();
@@ -91,7 +80,7 @@ export const authorize = (...roles) => {
  */
 export const optionalAuth = asyncHandler(async (req, res, next) => {
   const authHeader = req.headers.authorization;
-  
+
   if (authHeader && authHeader.startsWith('Bearer ')) {
     try {
       await authenticate(req, res, next);

@@ -99,10 +99,6 @@ const ReceptionistDashboard = () => {
     return now - appointmentTime > overdueThreshold;
   };
 
-  useEffect(() => {
-    loadDashboardData();
-  }, []);
-
   // Load doctors and patients; appointments are provided by React Query hook
   const {
     data: allAppointments,
@@ -174,6 +170,13 @@ const ReceptionistDashboard = () => {
       setIsLoading(false);
     }
   };
+
+  // Call loadDashboardData when allAppointments changes (from React Query)
+  useEffect(() => {
+    if (allAppointments) {
+      loadDashboardData();
+    }
+  }, [allAppointments]);
 
   // Filter appointments based on search and status
   useEffect(() => {

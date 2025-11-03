@@ -1,5 +1,5 @@
 /* eslint-disable no-unused-vars, no-useless-catch, react-hooks/exhaustive-deps, no-constant-condition */
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import {
   ArrowLeft,
@@ -49,7 +49,6 @@ const AppointmentsPage = () => {
   const [showAlert, setShowAlert] = useState(false);
   const [availableDoctors, setAvailableDoctors] = useState([]);
   const [patients, setPatients] = useState([]);
-  const [appointments, setAppointments] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState('');
   const [selectedAppointment, setSelectedAppointment] = useState(null);
@@ -71,6 +70,9 @@ const AppointmentsPage = () => {
     error: appointmentsError,
     refetch: refetchAppointments,
   } = useAppointments();
+
+  // Ref to prevent redundant time clears
+  const lastTimeClearKeyRef = useRef('');
 
   // Add a dedicated state for calendar display
   const [calendarMonthDisplay, setCalendarMonthDisplay] = useState('November 2025');
@@ -139,13 +141,6 @@ const AppointmentsPage = () => {
     setCalendarMonth(new Date(today));
     setSelectedDate(new Date(today));
   }, []);
-
-  // Keep local appointments state in sync with hook data
-  useEffect(() => {
-    if (appointmentsHookData) {
-      setAppointments(appointmentsHookData);
-    }
-  }, [appointmentsHookData]);
 
   // Surface hook errors to the page-level error banner when present
   useEffect(() => {
@@ -225,13 +220,19 @@ const AppointmentsPage = () => {
         if (result && result.slots) {
           setAvailableTimeSlots(result.slots);
 
-          // If current selected time is not available, clear it
-          if (newAppointment.time && !result.slots.includes(newAppointment.time)) {
+          // If current selected time is not available, clear it (guard with ref to prevent loops)
+          const clearKey = `${newAppointment.doctorId}-${dateStr}`;
+          if (
+            newAppointment.time &&
+            !result.slots.includes(newAppointment.time) &&
+            lastTimeClearKeyRef.current !== clearKey
+          ) {
             console.log(
               '[AppointmentsPage] Selected time not available, clearing:',
               newAppointment.time
             );
-            setNewAppointment((prev) => (prev.time ? { ...prev, time: '' } : prev));
+            lastTimeClearKeyRef.current = clearKey;
+            setNewAppointment((prev) => ({ ...prev, time: '' }));
           }
 
           // Show message if no slots available
@@ -260,7 +261,7 @@ const AppointmentsPage = () => {
   }, [newAppointment.doctorId, selectedDate]);
 
   // Filter appointments based on date and search term
-  const filteredAppointments = appointments.filter((appointment) => {
+  const filteredAppointments = (appointmentsHookData || []).filter((appointment) => {
     // Check if date matches - handle both 'date' and 'appointment_date' fields
     const appointmentDate = new Date(appointment.appointment_date || appointment.date);
     const isSameDate = appointmentDate.toDateString() === selectedDate.toDateString();
@@ -360,7 +361,7 @@ const AppointmentsPage = () => {
 
     // Get appointments for selected doctor and date
     const selectedDateStr = selectedDate.toISOString().split('T')[0];
-    const doctorAppointments = appointments.filter((appointment) => {
+    const doctorAppointments = (appointmentsHookData || []).filter((appointment) => {
       const appointmentDate = new Date(appointment.appointment_date || appointment.date);
       const appointmentDateStr = appointmentDate.toISOString().split('T')[0];
       return (
@@ -633,10 +634,8 @@ const AppointmentsPage = () => {
       console.log('Frontend: API response:', result);
 
       if (result.success) {
-        // Update the appointment in the local state
-        setAppointments((prev) =>
-          prev.map((apt) => (apt.id === appointmentId ? { ...apt, status: newStatus } : apt))
-        );
+        // Refresh appointments from React Query
+        await refetchAppointments();
         console.log('Frontend: Status updated successfully');
       } else {
         console.error('Frontend: API returned failure:', result);
@@ -1168,58 +1167,43 @@ const AppointmentsPage = () => {
                             <label className="mb-1 block text-xs font-medium sm:mb-2 sm:text-sm">
                               Time *
                             </label>
-                            <Select
-                              value={newAppointment.time || undefined}
-                              onValueChange={(value) =>
-                                setNewAppointment((prev) => ({ ...prev, time: value }))
-                              }
-                              disabled={
-                                !selectedDoctor ||
-                                !selectedDate ||
-                                isLoadingTimeSlots ||
-                                availableTimeSlots.length === 0
-                              }
-                            >
-                              <SelectTrigger className="h-9 text-xs sm:h-10 sm:text-sm">
-                                <SelectValue
-                                  placeholder={
-                                    !selectedDoctor
-                                      ? 'Select a doctor first'
-                                      : !selectedDate
-                                        ? 'Select a date first'
-                                        : isLoadingTimeSlots
-                                          ? 'Loading available times...'
-                                          : timeSlotError
-                                            ? 'Failed to load time slots'
-                                            : availableTimeSlots.length === 0
-                                              ? 'No available slots'
-                                              : 'Select time'
-                                  }
-                                />
-                              </SelectTrigger>
-                              <SelectContent className="max-h-[300px] overflow-y-auto">
-                                {isLoadingTimeSlots ? (
-                                  <div className="p-2 text-center text-xs text-muted-foreground sm:text-sm">
-                                    <div className="mx-auto mb-2 h-4 w-4 animate-spin rounded-full border-b-2 border-primary"></div>
-                                    Loading available time slots...
-                                  </div>
-                                ) : availableTimeSlots.length === 0 ? (
-                                  <div className="p-2 text-center text-xs text-muted-foreground sm:text-sm">
-                                    {timeSlotError || 'No available time slots'}
-                                  </div>
-                                ) : (
-                                  availableTimeSlots.map((time) => (
-                                    <SelectItem
-                                      key={time}
-                                      value={time}
-                                      className="text-xs sm:text-sm"
-                                    >
-                                      {time}
-                                    </SelectItem>
-                                  ))
-                                )}
-                              </SelectContent>
-                            </Select>
+                            {selectedDoctor &&
+                            selectedDate &&
+                            !isLoadingTimeSlots &&
+                            availableTimeSlots.length > 0 ? (
+                              <select
+                                value={newAppointment.time || ''}
+                                onChange={(e) =>
+                                  setNewAppointment((prev) => ({ ...prev, time: e.target.value }))
+                                }
+                                className="flex h-9 w-full items-center justify-between rounded-md border border-border bg-background px-3 py-2 text-xs ring-offset-background focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50 sm:h-10 sm:text-sm"
+                              >
+                                <option value="">Select time</option>
+                                {availableTimeSlots.map((time) => (
+                                  <option key={time} value={time}>
+                                    {time}
+                                  </option>
+                                ))}
+                              </select>
+                            ) : (
+                              <Input
+                                disabled
+                                readOnly
+                                value=""
+                                placeholder={
+                                  !selectedDoctor
+                                    ? 'Select a doctor first'
+                                    : !selectedDate
+                                      ? 'Select a date first'
+                                      : isLoadingTimeSlots
+                                        ? 'Loading available times...'
+                                        : timeSlotError
+                                          ? 'Failed to load time slots'
+                                          : 'No available slots'
+                                }
+                                className="h-9 text-xs sm:h-10 sm:text-sm"
+                              />
+                            )}
 
                             {/* Show doctor's availability info */}
                             {selectedDoctor &&

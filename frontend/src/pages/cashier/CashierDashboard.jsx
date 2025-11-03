@@ -140,9 +140,6 @@ const searchVariants = {
 const CashierDashboard = () => {
   const navigate = useNavigate();
 
-  // State for invoices from backend
-  const [invoices, setInvoices] = useState([]);
-  const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [successMessage, setSuccessMessage] = useState(null);
 
@@ -157,17 +154,6 @@ const CashierDashboard = () => {
     isLoading: isCompletedLoading,
     refetch: refetchCompleted,
   } = useInvoices({ type: 'completed', limit: 50, offset: 0 });
-
-  // Initial fetch: align local states
-  useEffect(() => {
-    setLoading(isPendingLoading);
-  }, [isPendingLoading]);
-
-  useEffect(() => {
-    if (Array.isArray(pendingInvoicesData)) {
-      setInvoices(pendingInvoicesData);
-    }
-  }, [pendingInvoicesData]);
 
   // Invoice history state
   const [invoiceHistory, setInvoiceHistory] = useState([]);
@@ -227,14 +213,7 @@ const CashierDashboard = () => {
     return () => clearInterval(interval);
   }, []);
 
-  // Load invoice history when switching to history tab
-  useEffect(() => {
-    if (activeTab === 'history' && invoiceHistory.length === 0 && !historyLoading) {
-      loadInvoiceHistory();
-    }
-  }, [activeTab]);
-
-  // Load invoice history when history tab is activated
+  // Load invoice history when switching to history tab (single useEffect)
   useEffect(() => {
     if (activeTab === 'history') {
       loadInvoiceHistory();
@@ -411,9 +390,9 @@ const CashierDashboard = () => {
     }
   };
 
-  // Calculate statistics
+  // Calculate statistics - use hook data directly
   const stats = useMemo(() => {
-    const pending = invoices?.filter((inv) => inv.status === 'pending').length || 0;
+    const pending = (pendingInvoicesData || []).filter((inv) => inv.status === 'pending').length;
 
     // Count today's completed invoices and revenue
     const today = new Date().toLocaleDateString('en-US', {
@@ -422,21 +401,23 @@ const CashierDashboard = () => {
       day: 'numeric',
     });
     const todayInvoices = (invoiceHistory || []).filter((inv) => inv.date === today);
-    const todayCompleted = todayInvoices.length || 0;
-    const todayRevenue =
-      todayInvoices.reduce((sum, inv) => sum + (parseFloat(inv.totalAmount) || 0), 0) || 0;
+    const todayCompleted = todayInvoices.length;
+    const todayRevenue = todayInvoices.reduce(
+      (sum, inv) => sum + (parseFloat(inv.totalAmount) || 0),
+      0
+    );
 
     return {
-      totalInvoices: invoices?.length || 0,
+      totalInvoices: (pendingInvoicesData || []).length,
       pendingInvoices: pending,
       todayCompleted,
       todayRevenue,
     };
-  }, [invoices, invoiceHistory]);
+  }, [pendingInvoicesData, invoiceHistory]);
 
-  // Advanced filtering
+  // Advanced filtering - use hook data directly
   const filteredInvoices = useMemo(() => {
-    let filtered = invoices;
+    let filtered = pendingInvoicesData || [];
 
     if (debouncedSearchTerm) {
       const searchLower = debouncedSearchTerm.toLowerCase();
@@ -466,7 +447,7 @@ const CashierDashboard = () => {
       }
       return a.waitingTime - b.waitingTime;
     });
-  }, [invoices, debouncedSearchTerm, statusFilter, priorityFilter]);
+  }, [pendingInvoicesData, debouncedSearchTerm, statusFilter, priorityFilter]);
 
   const clearSearch = () => {
     setSearchTerm('');
@@ -1123,7 +1104,7 @@ const CashierDashboard = () => {
               {/* Invoice Table */}
               <Card>
                 <CardContent className="p-0">
-                  {loading ? (
+                  {isPendingLoading ? (
                     <div className="p-8 text-center">
                       <div className="inline-block h-8 w-8 animate-spin rounded-full border-b-2 border-primary"></div>
                       <p className="mt-2 text-muted-foreground">Loading invoices...</p>

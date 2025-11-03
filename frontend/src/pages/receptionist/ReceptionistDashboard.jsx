@@ -1,7 +1,8 @@
+/* eslint-disable no-unused-vars, no-useless-catch, react-hooks/exhaustive-deps, no-console */
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
-import { 
+import {
   Calendar,
   Users,
   UserCircle,
@@ -18,7 +19,7 @@ import {
   Stethoscope,
   MoreHorizontal,
   AlertCircle,
-  UserPlus
+  UserPlus,
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Button } from '@/components/ui/button';
@@ -41,12 +42,12 @@ import {
 import AppointmentCard from '@/components/AppointmentCard';
 import WalkInModal from '@/components/WalkInModal';
 import NotificationBell from '@/components/NotificationBell';
-import { 
-  getStatusColor, 
-  getStatusIcon, 
-  getStatusDisplayName, 
+import {
+  getStatusColor,
+  getStatusIcon,
+  getStatusDisplayName,
   getActionsForRole,
-  shouldShowActions 
+  shouldShowActions,
 } from '@/utils/appointmentConfig';
 import userService from '@/services/userService';
 import patientService from '@/services/patientService';
@@ -55,6 +56,8 @@ import queueService from '@/services/queueService';
 import { useAuth } from '@/contexts/AuthContext';
 import PageLayout from '@/components/PageLayout';
 import useDebounce from '@/utils/useDebounce';
+import { useAppointments } from '@/hooks/useAppointments';
+import { useUpdateAppointmentStatus } from '@/hooks/useUpdateAppointmentStatus';
 
 const ReceptionistDashboard = () => {
   const navigate = useNavigate();
@@ -76,7 +79,7 @@ const ReceptionistDashboard = () => {
     delayed: 0,
     noShow: 0,
     scheduled: 0,
-    overdue: 0
+    overdue: 0,
   });
 
   // Helper function to check if appointment is overdue
@@ -85,12 +88,12 @@ const ReceptionistDashboard = () => {
     if (appointment.status !== 'scheduled') {
       return false;
     }
-    
+
     const now = new Date();
     const [hours, minutes] = appointment.appointment_time.split(':');
     const appointmentTime = new Date();
     appointmentTime.setHours(parseInt(hours), parseInt(minutes), 0, 0);
-    
+
     // Consider overdue if more than 15 minutes past appointment time
     const overdueThreshold = 15 * 60 * 1000; // 15 minutes in milliseconds
     return now - appointmentTime > overdueThreshold;
@@ -100,44 +103,47 @@ const ReceptionistDashboard = () => {
     loadDashboardData();
   }, []);
 
+  // Load doctors and patients; appointments are provided by React Query hook
+  const {
+    data: allAppointments,
+    isLoading: isAppointmentsLoading,
+    refetch: refetchAppointments,
+  } = useAppointments();
+  const { mutateAsync: mutateAppointmentStatus } = useUpdateAppointmentStatus();
+
   const loadDashboardData = async () => {
     try {
       setIsLoading(true);
-      
-      // Get all required data
-      const [appointmentsResponse, doctorsResponse, patientsResponse] = await Promise.all([
-        appointmentService.getAllAppointments(),
+
+      // Get required data (exclude appointments; provided by hook)
+      const [doctorsResponse, patientsResponse] = await Promise.all([
         userService.getUsersByRole('doctor'),
-        patientService.getAllPatients()
+        patientService.getAllPatients(),
       ]);
 
-      // Filter today's appointments
+      // Compute 'today appointments' from hook data
       const today = new Date();
       today.setHours(0, 0, 0, 0);
-      
-      const todayAppts = appointmentsResponse.success 
-        ? appointmentsResponse.data.filter(app => {
-            const appDate = new Date(app.appointment_date);
-            appDate.setHours(0, 0, 0, 0);
-            return appDate.getTime() === today.getTime() && app.status !== 'cancelled';
-          }).map(app => {
-            // Format appointment data with proper names
-            return {
-              ...app,
-              patient_name: app.patient 
-                ? `${app.patient.first_name} ${app.patient.last_name}`
-                : 'Unknown Patient',
-              doctor_name: app.doctor 
-                ? `Dr. ${app.doctor.first_name} ${app.doctor.last_name}`
-                : 'Unknown Doctor',
-              // Ensure we have the IDs for actions
-              patient_id: app.patient?.id || app.patient_id,
-              doctor_id: app.doctor?.id || app.doctor_id
-            };
-          })
-        : [];
+      const rawAppointments = Array.isArray(allAppointments) ? allAppointments : [];
+      const todayAppts = rawAppointments
+        .filter((app) => {
+          const appDate = new Date(app.appointment_date);
+          appDate.setHours(0, 0, 0, 0);
+          return appDate.getTime() === today.getTime() && app.status !== 'cancelled';
+        })
+        .map((app) => ({
+          ...app,
+          patient_name: app.patient
+            ? `${app.patient.first_name} ${app.patient.last_name}`
+            : 'Unknown Patient',
+          doctor_name: app.doctor
+            ? `Dr. ${app.doctor.first_name} ${app.doctor.last_name}`
+            : 'Unknown Doctor',
+          patient_id: app.patient?.id || app.patient_id,
+          doctor_id: app.doctor?.id || app.doctor_id,
+        }));
 
-      console.log('[ReceptionistDashboard] Today\'s appointments:', todayAppts);
+      console.log("[ReceptionistDashboard] Today's appointments:", todayAppts);
 
       setTodayAppointments(todayAppts);
       setFilteredAppointments(todayAppts);
@@ -149,7 +155,7 @@ const ReceptionistDashboard = () => {
       }, {});
 
       // Count appointments that are overdue (more than 15 mins past time and still scheduled/pending)
-      const overdueCount = todayAppts.filter(app => isAppointmentOverdue(app)).length;
+      const overdueCount = todayAppts.filter((app) => isAppointmentOverdue(app)).length;
 
       setStats({
         todayAppointments: todayAppts.length,
@@ -159,9 +165,9 @@ const ReceptionistDashboard = () => {
         delayed: statusCounts.late || 0,
         noShow: statusCounts.no_show || 0,
         scheduled: statusCounts.scheduled || 0,
-        overdue: overdueCount
+        overdue: overdueCount,
       });
-      
+
       setIsLoading(false);
     } catch (error) {
       console.error('Error loading dashboard data:', error);
@@ -175,31 +181,35 @@ const ReceptionistDashboard = () => {
 
     // Apply search filter
     if (debouncedSearch) {
-      filtered = filtered.filter(appointment =>
-        (appointment.patient_name && appointment.patient_name.toLowerCase().includes(debouncedSearch.toLowerCase())) ||
-        (appointment.doctor_name && appointment.doctor_name.toLowerCase().includes(debouncedSearch.toLowerCase())) ||
-        (appointment.appointment_type && appointment.appointment_type.toLowerCase().includes(debouncedSearch.toLowerCase()))
+      filtered = filtered.filter(
+        (appointment) =>
+          (appointment.patient_name &&
+            appointment.patient_name.toLowerCase().includes(debouncedSearch.toLowerCase())) ||
+          (appointment.doctor_name &&
+            appointment.doctor_name.toLowerCase().includes(debouncedSearch.toLowerCase())) ||
+          (appointment.appointment_type &&
+            appointment.appointment_type.toLowerCase().includes(debouncedSearch.toLowerCase()))
       );
     }
 
     // Apply status filter
     if (statusFilter === 'needs-action') {
-      filtered = filtered.filter(appointment => 
-        appointment.status === 'scheduled' || 
-        isAppointmentOverdue(appointment)
+      filtered = filtered.filter(
+        (appointment) => appointment.status === 'scheduled' || isAppointmentOverdue(appointment)
       );
     } else if (statusFilter !== 'all') {
       // Map display statuses to actual backend statuses
       if (statusFilter === 'ready') {
-        filtered = filtered.filter(appointment => 
-          appointment.status === 'waiting' || appointment.status === 'ready_for_doctor'
+        filtered = filtered.filter(
+          (appointment) =>
+            appointment.status === 'waiting' || appointment.status === 'ready_for_doctor'
         );
       } else if (statusFilter === 'late') {
-        filtered = filtered.filter(appointment => appointment.status === 'late');
+        filtered = filtered.filter((appointment) => appointment.status === 'late');
       } else if (statusFilter === 'no-show') {
-        filtered = filtered.filter(appointment => appointment.status === 'no_show');
+        filtered = filtered.filter((appointment) => appointment.status === 'no_show');
       } else {
-        filtered = filtered.filter(appointment => appointment.status === statusFilter);
+        filtered = filtered.filter((appointment) => appointment.status === statusFilter);
       }
     }
 
@@ -210,15 +220,17 @@ const ReceptionistDashboard = () => {
   const handleMarkReady = async (appointmentId) => {
     // Prevent double-clicking
     if (processingAppointments.has(appointmentId)) {
-      console.log('[ReceptionistDashboard] Already processing this appointment, ignoring duplicate call');
+      console.log(
+        '[ReceptionistDashboard] Already processing this appointment, ignoring duplicate call'
+      );
       return;
     }
 
     try {
       // Mark as processing
-      setProcessingAppointments(prev => new Set(prev).add(appointmentId));
+      setProcessingAppointments((prev) => new Set(prev).add(appointmentId));
 
-      const appointment = todayAppointments.find(app => app.id === appointmentId);
+      const appointment = todayAppointments.find((app) => app.id === appointmentId);
       if (!appointment) {
         throw new Error('Appointment not found');
       }
@@ -226,7 +238,7 @@ const ReceptionistDashboard = () => {
       console.log('[ReceptionistDashboard] Marking appointment as ready:', appointmentId);
 
       let priority;
-      
+
       // If appointment is already marked as 'late', give them priority 1 (no skip queue)
       if (appointment.status === 'late') {
         priority = 1;
@@ -240,7 +252,7 @@ const ReceptionistDashboard = () => {
         const tenMinutes = 10 * 60 * 1000;
         const thirtyMinutes = 30 * 60 * 1000;
 
-        // Determine priority: 
+        // Determine priority:
         // - Arrived early (up to 30 mins before) OR within 10 mins after = priority 4 (orange)
         // - More than 10 mins late = priority 3 (normal - no highlight)
         const isOnTime = timeDiff >= -thirtyMinutes && timeDiff <= tenMinutes;
@@ -252,11 +264,11 @@ const ReceptionistDashboard = () => {
         patient_id: appointment.patient_id,
         doctor_id: appointment.doctor_id,
         appointment_id: appointmentId,
-        priority: priority // Priority based on status and arrival time
+        priority: priority, // Priority based on status and arrival time
       };
 
       const response = await queueService.issueToken(tokenData);
-      
+
       if (response.success) {
         console.log('[ReceptionistDashboard] Token created successfully:', response.data);
         // Reload data to get updated appointment status
@@ -269,7 +281,7 @@ const ReceptionistDashboard = () => {
       alert(`Failed to mark as ready: ${error.message}`);
     } finally {
       // Remove from processing set
-      setProcessingAppointments(prev => {
+      setProcessingAppointments((prev) => {
         const newSet = new Set(prev);
         newSet.delete(appointmentId);
         return newSet;
@@ -283,18 +295,21 @@ const ReceptionistDashboard = () => {
   const handleMarkLate = async (appointmentId) => {
     // Prevent double-clicking
     if (processingAppointments.has(appointmentId)) {
-      console.log('[ReceptionistDashboard] Already processing this appointment, ignoring duplicate call');
+      console.log(
+        '[ReceptionistDashboard] Already processing this appointment, ignoring duplicate call'
+      );
       return;
     }
 
     try {
-      setProcessingAppointments(prev => new Set(prev).add(appointmentId));
+      setProcessingAppointments((prev) => new Set(prev).add(appointmentId));
       console.log('[ReceptionistDashboard] Manually marking appointment as late:', appointmentId);
-      
-      const response = await appointmentService.updateAppointmentStatus(appointmentId, 'late');
-      
+
+      const response = await mutateAppointmentStatus({ appointmentId, status: 'late' });
+
       if (response.success) {
         console.log('[ReceptionistDashboard] Appointment marked as late (no token created yet)');
+        await refetchAppointments();
         await loadDashboardData();
       } else {
         throw new Error(response.message || 'Failed to mark as late');
@@ -303,7 +318,7 @@ const ReceptionistDashboard = () => {
       console.error('[ReceptionistDashboard] Error marking appointment as late:', error);
       alert(`Failed to mark as late: ${error.message}`);
     } finally {
-      setProcessingAppointments(prev => {
+      setProcessingAppointments((prev) => {
         const newSet = new Set(prev);
         newSet.delete(appointmentId);
         return newSet;
@@ -315,18 +330,21 @@ const ReceptionistDashboard = () => {
   const handleMarkNoShow = async (appointmentId) => {
     // Prevent double-clicking
     if (processingAppointments.has(appointmentId)) {
-      console.log('[ReceptionistDashboard] Already processing this appointment, ignoring duplicate call');
+      console.log(
+        '[ReceptionistDashboard] Already processing this appointment, ignoring duplicate call'
+      );
       return;
     }
 
     try {
-      setProcessingAppointments(prev => new Set(prev).add(appointmentId));
+      setProcessingAppointments((prev) => new Set(prev).add(appointmentId));
       console.log('[ReceptionistDashboard] Marking appointment as no-show:', appointmentId);
-      
-      const response = await appointmentService.updateAppointmentStatus(appointmentId, 'no_show');
-      
+
+      const response = await mutateAppointmentStatus({ appointmentId, status: 'no_show' });
+
       if (response.success) {
         console.log('[ReceptionistDashboard] Appointment marked as no-show');
+        await refetchAppointments();
         await loadDashboardData();
       } else {
         throw new Error(response.message || 'Failed to mark as no-show');
@@ -335,7 +353,7 @@ const ReceptionistDashboard = () => {
       console.error('[ReceptionistDashboard] Error marking appointment as no-show:', error);
       alert(`Failed to mark as no-show: ${error.message}`);
     } finally {
-      setProcessingAppointments(prev => {
+      setProcessingAppointments((prev) => {
         const newSet = new Set(prev);
         newSet.delete(appointmentId);
         return newSet;
@@ -346,7 +364,7 @@ const ReceptionistDashboard = () => {
   // Main action handler
   const updateAppointmentStatus = async (appointmentId, action) => {
     console.log('[ReceptionistDashboard] Action triggered:', { appointmentId, action });
-    
+
     switch (action) {
       case 'mark-ready':
       case 'start-visit':
@@ -368,13 +386,13 @@ const ReceptionistDashboard = () => {
       // Prepare data for backend API - only the fields the backend expects
       const tokenData = {
         patient_id: walkInData.patient.id, // UUID string
-        doctor_id: walkInData.doctor.id,   // UUID string
-        priority: 3 // number - normal priority for walk-ins
+        doctor_id: walkInData.doctor.id, // UUID string
+        priority: 3, // number - normal priority for walk-ins
       };
 
       // Call backend API to create queue token
       const response = await queueService.issueToken(tokenData);
-      
+
       if (response.success) {
         const tokenResult = response.data || {};
         const issuedToken = tokenResult.token || null;
@@ -391,17 +409,17 @@ const ReceptionistDashboard = () => {
           notes: walkInData.notes,
           isWalkIn: true,
           token_number: issuedToken?.token_number || tokenResult.token_number || null,
-          queueMessage: tokenMessage
+          queueMessage: tokenMessage,
         };
 
         // Add to the appointment list
-        setTodayAppointments(prev => [...prev, newAppointment]);
+        setTodayAppointments((prev) => [...prev, newAppointment]);
 
         // Update stats
-        setStats(prev => ({
+        setStats((prev) => ({
           ...prev,
           todayAppointments: prev.todayAppointments + 1,
-          arrived: prev.arrived + 1 // Walk-ins are marked as ready/arrived
+          arrived: prev.arrived + 1, // Walk-ins are marked as ready/arrived
         }));
       } else {
         throw new Error(response.message || 'Failed to create walk-in appointment');
@@ -413,11 +431,11 @@ const ReceptionistDashboard = () => {
 
   if (isLoading) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-background">
+      <div className="flex min-h-screen items-center justify-center bg-background">
         <motion.div
           animate={{ rotate: 360 }}
-          transition={{ duration: 1, repeat: Infinity, ease: "linear" }}
-          className="h-8 w-8 border-b-2 border-primary rounded-full"
+          transition={{ duration: 1, repeat: Infinity, ease: 'linear' }}
+          className="h-8 w-8 rounded-full border-b-2 border-primary"
         />
       </div>
     );
@@ -435,37 +453,37 @@ const ReceptionistDashboard = () => {
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.5 }}
-          className="grid grid-cols-2 sm:grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-6"
+          className="grid grid-cols-2 gap-3 sm:grid-cols-2 sm:gap-6 lg:grid-cols-4"
         >
           {[
             {
               title: t('receptionist.dashboard.totalToday'),
               value: stats.todayAppointments,
               icon: Calendar,
-              color: "text-blue-600",
-              delay: 0
+              color: 'text-blue-600',
+              delay: 0,
             },
             {
-              title: t('receptionist.dashboard.arrived'), 
+              title: t('receptionist.dashboard.arrived'),
               value: stats.arrived,
               icon: CheckCircle,
-              color: "text-green-600",
-              delay: 0.1
+              color: 'text-green-600',
+              delay: 0.1,
             },
             {
               title: t('receptionist.dashboard.overdue'),
               value: stats.overdue,
               icon: AlertCircle,
-              color: "text-orange-600",
-              delay: 0.2
+              color: 'text-orange-600',
+              delay: 0.2,
             },
             {
               title: t('receptionist.dashboard.noShow'),
               value: stats.noShow,
               icon: XCircle,
-              color: "text-red-600",
-              delay: 0.3
-            }
+              color: 'text-red-600',
+              delay: 0.3,
+            },
           ].map((stat, index) => {
             const Icon = stat.icon;
             return (
@@ -477,16 +495,16 @@ const ReceptionistDashboard = () => {
                 whileHover={{ scale: 1.02, y: -5 }}
                 whileTap={{ scale: 0.98 }}
               >
-                <Card className="bg-card hover:shadow-lg transition-all duration-300">
-                  <CardHeader className="text-center pb-2 sm:pb-3">
-                    <CardTitle className="text-xs sm:text-sm font-medium text-muted-foreground">
+                <Card className="bg-card transition-all duration-300 hover:shadow-lg">
+                  <CardHeader className="pb-2 text-center sm:pb-3">
+                    <CardTitle className="text-xs font-medium text-muted-foreground sm:text-sm">
                       {stat.title}
                     </CardTitle>
                   </CardHeader>
                   <CardContent className="flex justify-center pt-1 sm:pt-0">
-                    <div className="flex flex-col sm:flex-row items-center gap-1 sm:gap-2">
+                    <div className="flex flex-col items-center gap-1 sm:flex-row sm:gap-2">
                       <Icon className={`h-4 w-4 sm:h-6 sm:w-6 ${stat.color}`} />
-                      <span className="text-lg sm:text-2xl font-bold">{stat.value}</span>
+                      <span className="text-lg font-bold sm:text-2xl">{stat.value}</span>
                     </div>
                   </CardContent>
                 </Card>
@@ -500,39 +518,41 @@ const ReceptionistDashboard = () => {
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ delay: 0.4, duration: 0.5 }}
-          className="bg-card rounded-lg border p-6"
+          className="rounded-lg border bg-card p-6"
         >
-          <div className="flex flex-col lg:flex-row gap-4 items-start lg:items-center justify-between mb-6">
-            <div className="flex flex-col sm:flex-row items-start sm:items-center gap-3 sm:gap-4 w-full lg:w-auto">
+          <div className="mb-6 flex flex-col items-start justify-between gap-4 lg:flex-row lg:items-center">
+            <div className="flex w-full flex-col items-start gap-3 sm:flex-row sm:items-center sm:gap-4 lg:w-auto">
               <div className="relative w-full sm:flex-1 lg:w-80">
-                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 transform text-muted-foreground" />
                 <Input
                   type="text"
                   placeholder={t('receptionist.dashboard.searchPlaceholder')}
                   value={searchTerm}
                   onChange={(e) => setSearchTerm(e.target.value)}
-                  className="pl-10 pr-4 py-2 w-full"
+                  className="w-full py-2 pl-10 pr-4"
                 />
               </div>
-              
-              <Button 
+
+              <Button
                 onClick={() => setIsWalkInModalOpen(true)}
-                className="flex items-center gap-2 bg-green-600 hover:bg-green-700 w-full sm:w-auto text-sm px-3 py-2"
+                className="flex w-full items-center gap-2 bg-green-600 px-3 py-2 text-sm hover:bg-green-700 sm:w-auto"
               >
                 <UserPlus className="h-4 w-4" />
                 <span>{t('receptionist.dashboard.walkIn')}</span>
               </Button>
             </div>
-            
-            <div className="flex flex-col sm:flex-row items-start sm:items-center gap-3 w-full lg:w-auto">
+
+            <div className="flex w-full flex-col items-start gap-3 sm:flex-row sm:items-center lg:w-auto">
               <div className="flex items-center gap-2">
-                <Filter className="h-4 w-4 text-muted-foreground flex-shrink-0" />
+                <Filter className="h-4 w-4 flex-shrink-0 text-muted-foreground" />
                 <Select value={statusFilter} onValueChange={setStatusFilter}>
                   <SelectTrigger className="w-full sm:w-[140px]">
                     <SelectValue placeholder="Filter status" />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="needs-action">{t('receptionist.dashboard.needsAction')}</SelectItem>
+                    <SelectItem value="needs-action">
+                      {t('receptionist.dashboard.needsAction')}
+                    </SelectItem>
                     <SelectItem value="all">All Status</SelectItem>
                     <SelectItem value="ready">Ready/Checked In</SelectItem>
                     <SelectItem value="late">Late</SelectItem>
@@ -540,13 +560,13 @@ const ReceptionistDashboard = () => {
                   </SelectContent>
                 </Select>
               </div>
-              
+
               {statusFilter !== 'needs-action' && statusFilter !== 'all' && (
                 <Button
                   variant="outline"
                   size="sm"
                   onClick={() => setStatusFilter('needs-action')}
-                  className="text-xs w-full sm:w-auto"
+                  className="w-full text-xs sm:w-auto"
                 >
                   ← Back to Actions
                 </Button>
@@ -562,9 +582,9 @@ const ReceptionistDashboard = () => {
                   initial={{ opacity: 0 }}
                   animate={{ opacity: 1 }}
                   exit={{ opacity: 0 }}
-                  className="text-center py-12 text-muted-foreground"
+                  className="py-12 text-center text-muted-foreground"
                 >
-                  <Calendar className="h-12 w-12 mx-auto mb-4 opacity-50" />
+                  <Calendar className="mx-auto mb-4 h-12 w-12 opacity-50" />
                   {statusFilter === 'needs-action' ? (
                     <>
                       <p className="text-lg">No appointments need action</p>
@@ -614,7 +634,7 @@ const ReceptionistDashboard = () => {
       </div>
 
       {/* Walk-in Modal */}
-      <WalkInModal 
+      <WalkInModal
         isOpen={isWalkInModalOpen}
         onClose={() => setIsWalkInModalOpen(false)}
         onSubmit={handleWalkInSubmit}

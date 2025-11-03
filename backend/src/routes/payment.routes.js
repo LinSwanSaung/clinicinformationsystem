@@ -1,6 +1,7 @@
 import express from 'express';
 import { authenticate, authorize } from '../middleware/auth.js';
 import { asyncHandler } from '../middleware/errorHandler.js';
+import { ROLES } from '../constants/roles.js';
 import PaymentService from '../services/Payment.service.js';
 import { logAuditEvent } from '../utils/auditLogger.js';
 
@@ -14,7 +15,7 @@ const router = express.Router();
 router.post(
   '/',
   authenticate,
-  authorize('admin', 'cashier'),
+  authorize(ROLES.ADMIN, ROLES.CASHIER),
   asyncHandler(async (req, res) => {
     const { invoice_id, amount, payment_method, payment_reference, payment_notes } = req.body;
 
@@ -64,7 +65,7 @@ router.post(
 router.get(
   '/:id',
   authenticate,
-  authorize('admin', 'cashier', 'pharmacist', 'doctor', 'reception'),
+  authorize(ROLES.ADMIN, ROLES.CASHIER, 'pharmacist', 'doctor', ROLES.RECEPTION),
   asyncHandler(async (req, res) => {
     const { id } = req.params;
     const payment = await PaymentService.getPaymentById(id);
@@ -84,7 +85,7 @@ router.get(
 router.get(
   '/invoice/:invoiceId',
   authenticate,
-  authorize('admin', 'cashier', 'pharmacist', 'doctor', 'reception'),
+  authorize(ROLES.ADMIN, ROLES.CASHIER, 'pharmacist', 'doctor', ROLES.RECEPTION),
   asyncHandler(async (req, res) => {
     const { invoiceId } = req.params;
     const payments = await PaymentService.getPaymentsByInvoice(invoiceId);
@@ -104,7 +105,7 @@ router.get(
 router.get(
   '/report',
   authenticate,
-  authorize('admin', 'cashier'),
+  authorize(ROLES.ADMIN, ROLES.CASHIER),
   asyncHandler(async (req, res) => {
     const { start_date, end_date } = req.query;
 
@@ -132,7 +133,7 @@ router.get(
 router.get(
   '/admin/all-transactions',
   authenticate,
-  authorize('admin'),
+  authorize(ROLES.ADMIN),
   asyncHandler(async (req, res) => {
     const { start_date, end_date, payment_method, received_by, limit = 50, offset = 0 } = req.query;
 
@@ -161,7 +162,7 @@ router.get(
 router.get(
   '/:id/receipt/pdf',
   authenticate,
-  authorize('admin', 'cashier'),
+  authorize(ROLES.ADMIN, ROLES.CASHIER),
   asyncHandler(async (req, res) => {
     const { id } = req.params;
 

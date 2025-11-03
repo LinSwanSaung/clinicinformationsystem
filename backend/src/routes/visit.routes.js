@@ -3,6 +3,7 @@ import VisitService from '../services/Visit.service.js';
 import { logAuditEvent } from '../utils/auditLogger.js';
 import { authenticate, authorize } from '../middleware/auth.js';
 import { asyncHandler } from '../middleware/errorHandler.js';
+import { ROLES } from '../constants/roles.js';
 
 const router = express.Router();
 const visitService = new VisitService();
@@ -12,23 +13,24 @@ const visitService = new VisitService();
  * @desc    Get comprehensive visit history for a patient
  * @access  Private (All healthcare staff)
  */
-router.get('/patient/:patientId/history',
+router.get(
+  '/patient/:patientId/history',
   authenticate,
-  authorize('admin', 'doctor', 'nurse', 'receptionist'),
+  authorize(ROLES.ADMIN, ROLES.DOCTOR, 'nurse', 'receptionist'),
   asyncHandler(async (req, res) => {
     const { patientId } = req.params;
-    const { 
-      limit = 50, 
-      offset = 0, 
+    const {
+      limit = 50,
+      offset = 0,
       includeCompleted = 'true',
-      includeInProgress = 'false'
+      includeInProgress = 'false',
     } = req.query;
 
     const options = {
       limit: parseInt(limit),
       offset: parseInt(offset),
       includeCompleted: includeCompleted === 'true',
-      includeInProgress: includeInProgress === 'true'
+      includeInProgress: includeInProgress === 'true',
     };
 
     const result = await visitService.getPatientVisitHistory(patientId, options);
@@ -40,8 +42,8 @@ router.get('/patient/:patientId/history',
       pagination: {
         limit: options.limit,
         offset: options.offset,
-        total: result.total
-      }
+        total: result.total,
+      },
     });
   })
 );
@@ -51,12 +53,13 @@ router.get('/patient/:patientId/history',
  * @desc    Get single visit with all details
  * @access  Private (All healthcare staff)
  */
-router.get('/:id/details',
+router.get(
+  '/:id/details',
   authenticate,
-  authorize('admin', 'doctor', 'nurse', 'receptionist'),
+  authorize(ROLES.ADMIN, ROLES.DOCTOR, 'nurse', 'receptionist'),
   asyncHandler(async (req, res) => {
     const { id } = req.params;
-    
+
     const result = await visitService.getVisitDetails(id);
 
     // Note: Viewing is not logged to avoid excessive audit log entries
@@ -64,7 +67,7 @@ router.get('/:id/details',
     res.status(200).json({
       success: true,
       message: 'Visit details retrieved successfully',
-      data: result.data
+      data: result.data,
     });
   })
 );
@@ -74,18 +77,12 @@ router.get('/:id/details',
  * @desc    Get all visits with filtering
  * @access  Private (Admin, Doctor)
  */
-router.get('/',
+router.get(
+  '/',
   authenticate,
-  authorize('admin', 'doctor'),
+  authorize(ROLES.ADMIN, ROLES.DOCTOR),
   asyncHandler(async (req, res) => {
-    const { 
-      limit = 50, 
-      offset = 0, 
-      status,
-      doctor_id,
-      start_date,
-      end_date
-    } = req.query;
+    const { limit = 50, offset = 0, status, doctor_id, start_date, end_date } = req.query;
 
     const options = {
       limit: parseInt(limit),
@@ -93,7 +90,7 @@ router.get('/',
       status,
       doctor_id,
       start_date,
-      end_date
+      end_date,
     };
 
     const result = await visitService.getAllVisits(options);
@@ -105,8 +102,8 @@ router.get('/',
       pagination: {
         limit: options.limit,
         offset: options.offset,
-        total: result.total
-      }
+        total: result.total,
+      },
     });
   })
 );
@@ -116,13 +113,14 @@ router.get('/',
  * @desc    Create new visit
  * @access  Private (Doctor, Nurse, Admin)
  */
-router.post('/',
+router.post(
+  '/',
   authenticate,
-  authorize('admin', 'doctor', 'nurse'),
+  authorize(ROLES.ADMIN, ROLES.DOCTOR, 'nurse'),
   asyncHandler(async (req, res) => {
     const visitData = {
       ...req.body,
-      created_by: req.user.id
+      created_by: req.user.id,
     };
 
     const result = await visitService.createVisit(visitData);
@@ -137,14 +135,14 @@ router.post('/',
         recordId: result?.data?.id || null,
         patientId: result?.data?.patient_id || visitData.patient_id || null,
         result: 'success',
-        ip: req.ip
+        ip: req.ip,
       });
     } catch (e) {}
 
     res.status(201).json({
       success: true,
       message: result.message,
-      data: result.data
+      data: result.data,
     });
   })
 );
@@ -154,14 +152,15 @@ router.post('/',
  * @desc    Update visit
  * @access  Private (Doctor, Admin)
  */
-router.put('/:id',
+router.put(
+  '/:id',
   authenticate,
-  authorize('admin', 'doctor'),
+  authorize(ROLES.ADMIN, ROLES.DOCTOR),
   asyncHandler(async (req, res) => {
     const { id } = req.params;
     const updateData = {
       ...req.body,
-      updated_by: req.user.id
+      updated_by: req.user.id,
     };
 
     const result = await visitService.updateVisit(id, updateData);
@@ -177,14 +176,14 @@ router.put('/:id',
         patientId: result?.data?.patient_id || null,
         result: 'success',
         meta: { changed_fields: Object.keys(updateData) },
-        ip: req.ip
+        ip: req.ip,
       });
     } catch (e) {}
 
     res.status(200).json({
       success: true,
       message: result.message,
-      data: result.data
+      data: result.data,
     });
   })
 );
@@ -194,14 +193,15 @@ router.put('/:id',
  * @desc    Complete visit with final calculations
  * @access  Private (Doctor, Admin)
  */
-router.post('/:id/complete',
+router.post(
+  '/:id/complete',
   authenticate,
-  authorize('admin', 'doctor'),
+  authorize(ROLES.ADMIN, ROLES.DOCTOR),
   asyncHandler(async (req, res) => {
     const { id } = req.params;
     const completionData = {
       ...req.body,
-      completed_by: req.user.id
+      completed_by: req.user.id,
     };
 
     const result = await visitService.completeVisit(id, completionData);
@@ -209,7 +209,7 @@ router.post('/:id/complete',
     res.status(200).json({
       success: true,
       message: result.message,
-      data: result.data
+      data: result.data,
     });
   })
 );
@@ -219,16 +219,17 @@ router.post('/:id/complete',
  * @desc    Get visit statistics
  * @access  Private (Admin, Doctor)
  */
-router.get('/statistics',
+router.get(
+  '/statistics',
   authenticate,
-  authorize('admin', 'doctor'),
+  authorize(ROLES.ADMIN, ROLES.DOCTOR),
   asyncHandler(async (req, res) => {
     const { doctor_id, start_date, end_date } = req.query;
 
     const options = {
       doctor_id,
       start_date,
-      end_date
+      end_date,
     };
 
     const result = await visitService.getVisitStatistics(options);
@@ -236,7 +237,7 @@ router.get('/statistics',
     res.status(200).json({
       success: true,
       message: 'Visit statistics retrieved successfully',
-      data: result.data
+      data: result.data,
     });
   })
 );
@@ -246,12 +247,13 @@ router.get('/statistics',
  * @desc    Delete visit
  * @access  Private (Admin only)
  */
-router.delete('/:id',
+router.delete(
+  '/:id',
   authenticate,
-  authorize('admin'),
+  authorize(ROLES.ADMIN),
   asyncHandler(async (req, res) => {
     const { id } = req.params;
-    
+
     const result = await visitService.deleteVisit(id);
 
     // Log delete visit
@@ -263,13 +265,13 @@ router.delete('/:id',
         entity: 'visits',
         recordId: id,
         result: 'success',
-        ip: req.ip
+        ip: req.ip,
       });
     } catch (e) {}
 
     res.status(200).json({
       success: true,
-      message: result.message
+      message: result.message,
     });
   })
 );
@@ -279,22 +281,27 @@ router.delete('/:id',
  * @desc    Export single visit summary as PDF
  * @access  Private (Patient themselves or healthcare staff)
  */
-router.get('/:visitId/export/pdf', authenticate, asyncHandler(async (req, res) => {
-  const { visitId } = req.params;
-  
-  const result = await visitService.exportSingleVisitPDF(visitId, req.user);
-  
-  res.setHeader('Content-Type', 'application/pdf');
-  res.setHeader('Content-Disposition', `attachment; filename="${result.filename}"`);
-  res.send(result.pdf);
-}));
+router.get(
+  '/:visitId/export/pdf',
+  authenticate,
+  asyncHandler(async (req, res) => {
+    const { visitId } = req.params;
+
+    const result = await visitService.exportSingleVisitPDF(visitId, req.user);
+
+    res.setHeader('Content-Type', 'application/pdf');
+    res.setHeader('Content-Disposition', `attachment; filename="${result.filename}"`);
+    res.send(result.pdf);
+  })
+);
 
 /**
  * @route   GET /api/visits/patient/:patientId/export/csv
  * @desc    Export patient visit history as CSV
  * @access  Private (Patient themselves or healthcare staff)
  */
-router.get('/patient/:patientId/export/csv',
+router.get(
+  '/patient/:patientId/export/csv',
   authenticate,
   asyncHandler(async (req, res) => {
     const { patientId } = req.params;
@@ -303,14 +310,17 @@ router.get('/patient/:patientId/export/csv',
     if (req.user.role === 'patient' && req.user.patient_id !== patientId) {
       return res.status(403).json({
         success: false,
-        message: 'Access denied: You can only export your own visit history'
+        message: 'Access denied: You can only export your own visit history',
       });
     }
 
     const result = await visitService.exportVisitHistoryCSV(patientId);
 
     res.setHeader('Content-Type', 'text/csv');
-    res.setHeader('Content-Disposition', `attachment; filename="visit-history-${patientId}-${new Date().toISOString().split('T')[0]}.csv"`);
+    res.setHeader(
+      'Content-Disposition',
+      `attachment; filename="visit-history-${patientId}-${new Date().toISOString().split('T')[0]}.csv"`
+    );
     res.status(200).send(result.csv);
   })
 );
@@ -320,7 +330,8 @@ router.get('/patient/:patientId/export/csv',
  * @desc    Export patient visit history as PDF
  * @access  Private (Patient themselves or healthcare staff)
  */
-router.get('/patient/:patientId/export/pdf',
+router.get(
+  '/patient/:patientId/export/pdf',
   authenticate,
   asyncHandler(async (req, res) => {
     const { patientId } = req.params;
@@ -329,14 +340,17 @@ router.get('/patient/:patientId/export/pdf',
     if (req.user.role === 'patient' && req.user.patient_id !== patientId) {
       return res.status(403).json({
         success: false,
-        message: 'Access denied: You can only export your own visit history'
+        message: 'Access denied: You can only export your own visit history',
       });
     }
 
     const result = await visitService.exportVisitHistoryPDF(patientId);
 
     res.setHeader('Content-Type', 'application/pdf');
-    res.setHeader('Content-Disposition', `attachment; filename="visit-history-${patientId}-${new Date().toISOString().split('T')[0]}.pdf"`);
+    res.setHeader(
+      'Content-Disposition',
+      `attachment; filename="visit-history-${patientId}-${new Date().toISOString().split('T')[0]}.pdf"`
+    );
     res.status(200).send(result.pdf);
   })
 );

@@ -2,6 +2,7 @@ import jwt from 'jsonwebtoken';
 import config from '../config/app.config.js';
 import { supabase } from '../config/database.js';
 import { AppError, asyncHandler } from './errorHandler.js';
+import { ROLES, isValidRole } from '../constants/roles.js';
 
 /**
  * Authentication middleware

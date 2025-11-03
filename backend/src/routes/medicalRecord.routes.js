@@ -1,6 +1,7 @@
 import express from 'express';
 import { authenticate, authorize } from '../middleware/auth.js';
 import { asyncHandler } from '../middleware/errorHandler.js';
+import { ROLES } from '../constants/roles.js';
 
 const router = express.Router();
 
@@ -9,7 +10,8 @@ const router = express.Router();
  * @desc    Get patient medical records
  * @access  Private (Doctor, Nurse)
  */
-router.get('/patient/:patientId',
+router.get(
+  '/patient/:patientId',
   authenticate,
   authorize('doctor', 'nurse'),
   asyncHandler(async (req, res) => {
@@ -17,7 +19,7 @@ router.get('/patient/:patientId',
     res.status(200).json({
       success: true,
       message: 'Medical records retrieved successfully',
-      data: []
+      data: [],
     });
   })
 );
@@ -27,14 +29,15 @@ router.get('/patient/:patientId',
  * @desc    Create medical record/doctor note
  * @access  Private (Doctor only)
  */
-router.post('/',
+router.post(
+  '/',
   authenticate,
-  authorize('doctor'),
+  authorize(ROLES.DOCTOR),
   asyncHandler(async (req, res) => {
     // TODO: Implement medical record creation
     res.status(201).json({
       success: true,
-      message: 'Medical record created successfully'
+      message: 'Medical record created successfully',
     });
   })
 );
@@ -44,14 +47,15 @@ router.post('/',
  * @desc    Update medical record
  * @access  Private (Doctor only)
  */
-router.put('/:id',
+router.put(
+  '/:id',
   authenticate,
-  authorize('doctor'),
+  authorize(ROLES.DOCTOR),
   asyncHandler(async (req, res) => {
     // TODO: Implement medical record update
     res.status(200).json({
       success: true,
-      message: 'Medical record updated successfully'
+      message: 'Medical record updated successfully',
     });
   })
 );

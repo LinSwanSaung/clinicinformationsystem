@@ -30,6 +30,18 @@ export default [
       'react-hooks/rules-of-hooks': 'error',
       'react-hooks/exhaustive-deps': 'warn',
       'react-refresh/only-export-components': ['warn', { allowConstantExport: true }],
+      // Prevent direct Supabase imports in UI layer - use services/hooks instead
+      'no-restricted-imports': [
+        'error',
+        {
+          patterns: [
+            {
+              group: ['**/supabase*', '@supabase/*'],
+              message: 'Do not import Supabase directly in UI components. Use services or hooks instead.',
+            },
+          ],
+        },
+      ],
     },
   },
   // Node-specific config files (allow Node globals like __dirname, module)

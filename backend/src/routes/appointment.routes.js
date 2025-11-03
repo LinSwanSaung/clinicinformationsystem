@@ -1,6 +1,7 @@
 import express from 'express';
 import { authenticate, authorize } from '../middleware/auth.js';
 import { AppError, asyncHandler } from '../middleware/errorHandler.js';
+import { ROLES } from '../constants/roles.js';
 import AppointmentService from '../services/Appointment.service.js';
 import { logAuditEvent } from '../utils/auditLogger.js';
 
@@ -76,7 +77,7 @@ router.get(
 router.post(
   '/',
   authenticate,
-  authorize('admin', 'receptionist', 'reception'),
+  authorize(ROLES.ADMIN, ROLES.RECEPTIONIST, ROLES.RECEPTION),
   asyncHandler(async (req, res) => {
     const appointmentData = {
       ...req.body,
@@ -117,7 +118,7 @@ router.post(
 router.put(
   '/:id',
   authenticate,
-  authorize('admin', 'receptionist', 'reception'),
+  authorize(ROLES.ADMIN, ROLES.RECEPTIONIST, ROLES.RECEPTION),
   asyncHandler(async (req, res) => {
     const { id } = req.params;
     const updateData = req.body;
@@ -157,7 +158,7 @@ router.put(
 router.delete(
   '/:id',
   authenticate,
-  authorize('admin', 'receptionist', 'reception'),
+  authorize(ROLES.ADMIN, ROLES.RECEPTIONIST, ROLES.RECEPTION),
   asyncHandler(async (req, res) => {
     const { id } = req.params;
 
@@ -193,7 +194,7 @@ router.delete(
 router.put(
   '/:id/status',
   authenticate,
-  authorize('doctor', 'nurse', 'receptionist', 'reception'),
+  authorize('doctor', 'nurse', 'receptionist', ROLES.RECEPTION),
   asyncHandler(async (req, res) => {
     const { id } = req.params;
     const { status } = req.body;
@@ -240,7 +241,7 @@ router.put(
 router.get(
   '/doctor/:doctorId/slots',
   authenticate,
-  authorize('admin', 'receptionist', 'reception'),
+  authorize(ROLES.ADMIN, ROLES.RECEPTIONIST, ROLES.RECEPTION),
   asyncHandler(async (req, res) => {
     const { doctorId } = req.params;
     const { date } = req.query;

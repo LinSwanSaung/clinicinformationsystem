@@ -1,6 +1,7 @@
 import express from 'express';
 import { authenticate, authorize } from '../middleware/auth.js';
 import { asyncHandler } from '../middleware/errorHandler.js';
+import { ROLES } from '../constants/roles.js';
 import PatientService from '../services/Patient.service.js';
 import { validatePatient, validatePatientUpdate } from '../validators/patient.validator.js';
 
@@ -14,7 +15,7 @@ const router = express.Router();
 router.get(
   '/',
   authenticate,
-  authorize('admin', 'receptionist', 'reception', 'doctor', 'nurse'),
+  authorize(ROLES.ADMIN, ROLES.RECEPTIONIST, 'reception', 'doctor', 'nurse'),
   asyncHandler(async (req, res) => {
     const { page = 1, limit = 100, search } = req.query;
 
@@ -65,7 +66,7 @@ router.get(
 router.get(
   '/doctor',
   authenticate,
-  authorize('doctor'),
+  authorize(ROLES.DOCTOR),
   asyncHandler(async (req, res) => {
     const doctorId = req.user.id;
     const { page = 1, limit = 100 } = req.query;
@@ -125,7 +126,7 @@ router.get(
 router.post(
   '/',
   authenticate,
-  authorize('admin', 'receptionist', 'reception'),
+  authorize(ROLES.ADMIN, ROLES.RECEPTIONIST, ROLES.RECEPTION),
   validatePatient,
   asyncHandler(async (req, res) => {
     const patient = await PatientService.createPatient(req.body, req.user.id);
@@ -146,7 +147,7 @@ router.post(
 router.put(
   '/:id',
   authenticate,
-  authorize('admin', 'receptionist', 'reception'),
+  authorize(ROLES.ADMIN, ROLES.RECEPTIONIST, ROLES.RECEPTION),
   validatePatientUpdate,
   asyncHandler(async (req, res) => {
     const patient = await PatientService.updatePatient(req.params.id, req.body, req.user.id);
@@ -167,7 +168,7 @@ router.put(
 router.delete(
   '/:id',
   authenticate,
-  authorize('admin'),
+  authorize(ROLES.ADMIN),
   asyncHandler(async (req, res) => {
     await PatientService.deletePatient(req.params.id);
 

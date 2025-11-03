@@ -1,9 +1,11 @@
+/* eslint-disable no-unused-vars, no-console */
 import React, { useState, useEffect } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
+import { ROLES } from '@/constants/roles';
 import { Button } from '@/components/ui/button';
-import { 
-  LogOut, 
+import {
+  LogOut,
   UserCircle,
   BellRing,
   Settings,
@@ -16,7 +18,7 @@ import {
   Home,
   Menu,
   Activity,
-  Stethoscope
+  Stethoscope,
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import employeeService from '@/services/employeeService';
@@ -29,7 +31,7 @@ import {
   DropdownMenuLabel,
   DropdownMenuSeparator,
   DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
+} from '@/components/ui/dropdown-menu';
 
 const Navbar = () => {
   const { user, logout } = useAuth();
@@ -43,9 +45,7 @@ const Navbar = () => {
       if (user?.role) {
         try {
           const employees = await employeeService.getEmployeesByRole(user.role);
-          const userDetail = employees.find(
-            emp => emp.email.includes(user?.role.toLowerCase())
-          );
+          const userDetail = employees.find((emp) => emp.email.includes(user?.role.toLowerCase()));
           setUserDetails(userDetail);
         } catch (error) {
           console.error('Error loading user details:', error);
@@ -69,78 +69,80 @@ const Navbar = () => {
           icon: Home,
           label: 'Dashboard',
           path: '/receptionist/dashboard',
-          isActive: location.pathname === '/receptionist/dashboard'
+          isActive: location.pathname === '/receptionist/dashboard',
         },
         {
           icon: Activity,
           label: 'Live Queue',
           path: '/receptionist/live-queue',
-          isActive: location.pathname === '/receptionist/live-queue' || location.pathname.includes('/receptionist/queue/')
+          isActive:
+            location.pathname === '/receptionist/live-queue' ||
+            location.pathname.includes('/receptionist/queue/'),
         },
         {
           icon: UserPlus,
           label: 'Register Patient',
           path: '/receptionist/register-patient',
-          isActive: location.pathname === '/receptionist/register-patient'
+          isActive: location.pathname === '/receptionist/register-patient',
         },
         {
           icon: Calendar,
           label: 'Appointments',
           path: '/receptionist/appointments',
-          isActive: location.pathname === '/receptionist/appointments'
+          isActive: location.pathname === '/receptionist/appointments',
         },
         {
           icon: FileText,
           label: 'Patient Records',
           path: '/receptionist/patients',
-          isActive: location.pathname === '/receptionist/patients'
-        }
+          isActive: location.pathname === '/receptionist/patients',
+        },
       ];
     }
-    
-    if (user?.role === 'admin') {
+
+    if (user?.role === ROLES.ADMIN) {
       return [
         {
           icon: Home,
           label: 'Dashboard',
           path: '/admin/dashboard',
-          isActive: location.pathname === '/admin/dashboard'
+          isActive: location.pathname === '/admin/dashboard',
         },
         {
           icon: Users,
           label: 'Manage Staff',
           path: '/admin/employees',
-          isActive: location.pathname === '/admin/employees'
+          isActive: location.pathname === '/admin/employees',
         },
         {
           icon: UserPlus,
           label: 'Patient Accounts',
           path: '/admin/patient-accounts',
-          isActive: location.pathname === '/admin/patient-accounts'
+          isActive: location.pathname === '/admin/patient-accounts',
         },
         {
           icon: Stethoscope,
           label: 'Doctor Availability',
           path: '/admin/schedules',
-          isActive: location.pathname === '/admin/schedules'
-        }
+          isActive: location.pathname === '/admin/schedules',
+        },
       ];
     }
 
-    if (user?.role === 'doctor') {
+    if (user?.role === ROLES.DOCTOR) {
       return [
         {
           icon: Home,
           label: 'Dashboard',
           path: '/doctor/dashboard',
-          isActive: location.pathname === '/doctor/dashboard'
+          isActive: location.pathname === '/doctor/dashboard',
         },
         {
           icon: FileText,
           label: 'Medical Records',
           path: '/doctor/medical-records',
-          isActive: location.pathname === '/doctor/medical-records'
-        }
+          isActive: location.pathname === '/doctor/medical-records',
+        },
       ];
     }
 
@@ -150,14 +152,14 @@ const Navbar = () => {
           icon: Home,
           label: 'Dashboard',
           path: '/nurse/dashboard',
-          isActive: location.pathname === '/nurse/dashboard'
+          isActive: location.pathname === '/nurse/dashboard',
         },
         {
           icon: FileText,
           label: 'Patient Records',
           path: '/nurse/emr',
-          isActive: location.pathname === '/nurse/emr'
-        }
+          isActive: location.pathname === '/nurse/emr',
+        },
       ];
     }
 
@@ -167,14 +169,15 @@ const Navbar = () => {
           icon: Home,
           label: 'Dashboard',
           path: '/cashier/dashboard',
-          isActive: location.pathname === '/cashier/dashboard' || location.pathname === '/cashier'
+          isActive: location.pathname === '/cashier/dashboard' || location.pathname === '/cashier',
         },
         {
           icon: FileText,
           label: 'Invoices',
           path: '/cashier',
-          isActive: location.pathname === '/cashier' || location.pathname.includes('/cashier/invoice/')
-        }
+          isActive:
+            location.pathname === '/cashier' || location.pathname.includes('/cashier/invoice/'),
+        },
       ];
     }
 
@@ -184,23 +187,23 @@ const Navbar = () => {
           icon: Home,
           label: 'Dashboard',
           path: '/patient/dashboard',
-          isActive: location.pathname === '/patient/dashboard'
+          isActive: location.pathname === '/patient/dashboard',
         },
         {
           icon: Activity,
           label: 'Live Queue',
           path: '/patient/queue',
-          isActive: location.pathname === '/patient/queue'
+          isActive: location.pathname === '/patient/queue',
         },
         {
           icon: FileText,
           label: 'Medical Records',
           path: '/patient/medical-records',
-          isActive: location.pathname === '/patient/medical-records'
-        }
+          isActive: location.pathname === '/patient/medical-records',
+        },
       ];
     }
-    
+
     return [];
   };
 
@@ -210,32 +213,39 @@ const Navbar = () => {
     <motion.nav
       initial={{ y: -100 }}
       animate={{ y: 0 }}
-      transition={{ type: "spring", stiffness: 300, damping: 30 }}
-      className="sticky top-0 z-50 w-full border-b-2 border-border bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60"
+      transition={{ type: 'spring', stiffness: 300, damping: 30 }}
+      className="bg-background/95 supports-[backdrop-filter]:bg-background/60 sticky top-0 z-50 w-full border-b-2 border-border backdrop-blur"
     >
-      <div className="w-full px-3 sm:px-6 md:px-8 mx-auto flex h-20 items-center justify-between">
+      <div className="mx-auto flex h-20 w-full items-center justify-between px-3 sm:px-6 md:px-8">
         {/* Logo and Brand */}
-        <motion.div 
-          className="flex items-center gap-2 sm:gap-3 cursor-pointer min-w-0" 
-          onClick={() => navigate(
-            user?.role === 'admin' ? '/admin/dashboard' : 
-            user?.role === 'cashier' || user?.role === 'pharmacist' ? '/cashier/dashboard' :
-            user?.role === 'patient' ? '/patient/dashboard' :
-            '/receptionist/dashboard'
-          )}
+        <motion.div
+          className="flex min-w-0 cursor-pointer items-center gap-2 sm:gap-3"
+          onClick={() =>
+            navigate(
+              user?.role === 'admin'
+                ? '/admin/dashboard'
+                : user?.role === 'cashier' || user?.role === 'pharmacist'
+                  ? '/cashier/dashboard'
+                  : user?.role === 'patient'
+                    ? '/patient/dashboard'
+                    : '/receptionist/dashboard'
+            )
+          }
           whileHover={{ scale: 1.05 }}
           whileTap={{ scale: 0.95 }}
         >
-          <motion.div 
-            className="bg-primary p-2 sm:p-3 rounded-lg sm:rounded-xl transition-all hover:shadow-lg shrink-0"
+          <motion.div
+            className="shrink-0 rounded-lg bg-primary p-2 transition-all hover:shadow-lg sm:rounded-xl sm:p-3"
             whileHover={{ rotate: 5, scale: 1.1 }}
-            transition={{ type: "spring", stiffness: 400, damping: 10 }}
+            transition={{ type: 'spring', stiffness: 400, damping: 10 }}
           >
-            <Heart className="h-5 w-5 sm:h-6 sm:w-6 md:h-7 md:w-7 text-primary-foreground" />
+            <Heart className="h-5 w-5 text-primary-foreground sm:h-6 sm:w-6 md:h-7 md:w-7" />
           </motion.div>
           <div className="hidden sm:block">
-            <h1 className="text-lg sm:text-xl md:text-2xl font-bold text-foreground tracking-tight">RealCIS</h1>
-            <p className="text-xs sm:text-sm text-muted-foreground">Healthcare System</p>
+            <h1 className="text-lg font-bold tracking-tight text-foreground sm:text-xl md:text-2xl">
+              RealCIS
+            </h1>
+            <p className="text-xs text-muted-foreground sm:text-sm">Healthcare System</p>
           </div>
         </motion.div>
 
@@ -247,7 +257,7 @@ const Navbar = () => {
               animate={{ opacity: 1, x: 0 }}
               exit={{ opacity: 0, x: -20 }}
               transition={{ duration: 0.3 }}
-              className="hidden lg:flex items-center gap-2"
+              className="hidden items-center gap-2 lg:flex"
             >
               {navigationItems.map((item, index) => {
                 const Icon = item.icon;
@@ -259,13 +269,13 @@ const Navbar = () => {
                     transition={{ delay: index * 0.1, duration: 0.2 }}
                   >
                     <Button
-                      variant={item.isActive ? "default" : "ghost"}
+                      variant={item.isActive ? 'default' : 'ghost'}
                       size="lg"
                       onClick={() => navigate(item.path)}
                       className={`flex items-center gap-2 px-4 py-2 text-base font-medium transition-all ${
-                        item.isActive 
-                          ? "bg-primary text-primary-foreground hover:bg-primary/90" 
-                          : "text-muted-foreground hover:text-foreground hover:bg-accent"
+                        item.isActive
+                          ? 'hover:bg-primary/90 bg-primary text-primary-foreground'
+                          : 'text-muted-foreground hover:bg-accent hover:text-foreground'
                       }`}
                     >
                       <Icon className="h-5 w-5" />
@@ -285,12 +295,18 @@ const Navbar = () => {
             <div className="lg:hidden">
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
-                  <Button variant="outline" size="icon" className="h-10 w-10 sm:h-12 sm:w-12 border-2">
-                    <Menu className="h-5 w-5 sm:h-6 sm:w-6 text-muted-foreground" />
+                  <Button
+                    variant="outline"
+                    size="icon"
+                    className="h-10 w-10 border-2 sm:h-12 sm:w-12"
+                  >
+                    <Menu className="h-5 w-5 text-muted-foreground sm:h-6 sm:w-6" />
                   </Button>
                 </DropdownMenuTrigger>
                 <DropdownMenuContent align="end" className="w-[200px]">
-                  <DropdownMenuLabel className="text-base font-semibold">Navigation</DropdownMenuLabel>
+                  <DropdownMenuLabel className="text-base font-semibold">
+                    Navigation
+                  </DropdownMenuLabel>
                   <DropdownMenuSeparator />
                   {navigationItems.map((item) => {
                     const Icon = item.icon;
@@ -298,8 +314,8 @@ const Navbar = () => {
                       <DropdownMenuItem
                         key={item.path}
                         onClick={() => navigate(item.path)}
-                        className={`py-3 text-base cursor-pointer ${
-                          item.isActive ? "bg-accent text-accent-foreground" : ""
+                        className={`cursor-pointer py-3 text-base ${
+                          item.isActive ? 'bg-accent text-accent-foreground' : ''
                         }`}
                       >
                         <Icon className="mr-3 h-5 w-5" />
@@ -321,22 +337,25 @@ const Navbar = () => {
           {/* Profile Menu */}
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
-              <Button variant="ghost" className="flex items-center gap-2 sm:gap-3 border-2 border-border hover:bg-accent px-3 sm:px-6 h-10 sm:h-12">
+              <Button
+                variant="ghost"
+                className="flex h-10 items-center gap-2 border-2 border-border px-3 hover:bg-accent sm:h-12 sm:gap-3 sm:px-6"
+              >
                 <div className="flex items-center gap-2 sm:gap-3">
                   <div className="relative">
-                    <UserCircle className="h-6 w-6 sm:h-8 sm:w-8 text-primary" />
-                    <div className={`absolute bottom-0 right-0 h-2 w-2 sm:h-3 sm:w-3 rounded-full bg-green-500 border-2 border-background`}></div>
+                    <UserCircle className="h-6 w-6 text-primary sm:h-8 sm:w-8" />
+                    <div
+                      className={`absolute bottom-0 right-0 h-2 w-2 rounded-full border-2 border-background bg-green-500 sm:h-3 sm:w-3`}
+                    ></div>
                   </div>
-                  <div className="hidden md:block text-left">
-                    <p className="text-sm sm:text-base font-medium text-foreground">
+                  <div className="hidden text-left md:block">
+                    <p className="text-sm font-medium text-foreground sm:text-base">
                       {userDetails?.name || user?.role}
                     </p>
-                    <p className="text-xs sm:text-sm text-muted-foreground">
-                      {user?.role}
-                    </p>
+                    <p className="text-xs text-muted-foreground sm:text-sm">{user?.role}</p>
                   </div>
                 </div>
-                <ChevronDown className="h-4 w-4 sm:h-5 sm:w-5 text-muted-foreground" />
+                <ChevronDown className="h-4 w-4 text-muted-foreground sm:h-5 sm:w-5" />
               </Button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end" className="w-[200px]">
@@ -345,8 +364,8 @@ const Navbar = () => {
                 Settings
               </DropdownMenuItem>
               <DropdownMenuSeparator />
-              <DropdownMenuItem 
-                className="py-3 text-base text-red-500 focus:text-red-500" 
+              <DropdownMenuItem
+                className="py-3 text-base text-red-500 focus:text-red-500"
                 onClick={handleLogout}
               >
                 <LogOut className="mr-2 h-5 w-5" />

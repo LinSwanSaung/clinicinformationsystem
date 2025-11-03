@@ -30,6 +30,8 @@ import userService from '@/services/userService';
 import doctorAvailabilityService from '@/services/doctorAvailabilityService';
 import clinicSettingsService from '@/services/clinicSettingsService';
 import { useAppointments } from '@/hooks/useAppointments';
+import { useCreateAppointment } from '@/hooks/useCreateAppointment';
+import { useUpdateAppointmentStatus } from '@/hooks/useUpdateAppointmentStatus';
 import Alert from '@/components/Alert';
 import PageLayout from '@/components/PageLayout';
 import AppointmentCard from '@/components/AppointmentCard';
@@ -70,6 +72,19 @@ const AppointmentsPage = () => {
     error: appointmentsError,
     refetch: refetchAppointments,
   } = useAppointments();
+
+  // Mutation hooks for create and update operations
+  const createAppointmentMutation = useCreateAppointment({
+    onSuccess: () => {
+      refetchAppointments();
+    },
+  });
+
+  const updateAppointmentStatusMutation = useUpdateAppointmentStatus({
+    onSuccess: () => {
+      refetchAppointments();
+    },
+  });
 
   // Ref to prevent redundant time clears
   const lastTimeClearKeyRef = useRef('');
@@ -581,7 +596,7 @@ const AppointmentsPage = () => {
 
       console.log('[AppointmentsPage] Creating appointment:', appointmentData);
 
-      const result = await appointmentService.createAppointment(appointmentData);
+      const result = await createAppointmentMutation.mutateAsync(appointmentData);
 
       if (result.success) {
         setShowAlert(true);
@@ -611,8 +626,7 @@ const AppointmentsPage = () => {
         setSelectedDate(new Date(today));
         setCalendarMonth(new Date(today));
 
-        // Refresh appointments
-        await refetchAppointments();
+        // Note: Appointments will be refetched automatically via mutation's onSuccess
 
         setTimeout(() => {
           setShowAlert(false);
@@ -630,12 +644,13 @@ const AppointmentsPage = () => {
   const handleStatusChange = async (appointmentId, newStatus) => {
     try {
       console.log('Frontend: Updating status for appointment', appointmentId, 'to', newStatus);
-      const result = await appointmentService.updateAppointmentStatus(appointmentId, newStatus);
+      const result = await updateAppointmentStatusMutation.mutateAsync({
+        appointmentId,
+        status: newStatus,
+      });
       console.log('Frontend: API response:', result);
 
       if (result.success) {
-        // Refresh appointments from React Query
-        await refetchAppointments();
         console.log('Frontend: Status updated successfully');
       } else {
         console.error('Frontend: API returned failure:', result);
@@ -655,13 +670,14 @@ const AppointmentsPage = () => {
   const handleCancelAppointment = async (appointmentId) => {
     try {
       console.log('[AppointmentsPage] Cancelling appointment:', appointmentId);
-      const result = await appointmentService.updateAppointmentStatus(appointmentId, 'cancelled');
+      const result = await updateAppointmentStatusMutation.mutateAsync({
+        appointmentId,
+        status: 'cancelled',
+      });
       console.log('[AppointmentsPage] Cancel result:', result);
 
       if (result.success) {
         console.log('Appointment cancelled successfully');
-        // Reload appointments to get fresh data
-        await refetchAppointments();
         // Show success message
         setShowAlert(true);
         setTimeout(() => setShowAlert(false), 3000);

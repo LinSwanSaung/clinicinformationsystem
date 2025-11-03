@@ -10,12 +10,12 @@ const router = express.Router();
 /**
  * @route   GET /api/users
  * @desc    Get all users (employees)
- * @access  Private (Admin only)
+ * @access  Private (Admin, Receptionist, Nurse - nurses can view doctors)
  */
 router.get(
   '/',
   authenticate,
-  authorize(ROLES.ADMIN, ROLES.RECEPTIONIST),
+  authorize(ROLES.ADMIN, ROLES.RECEPTIONIST, ROLES.NURSE),
   asyncHandler(async (req, res) => {
     const { role, is_active, includeDeleted } = req.query;
 

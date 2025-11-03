@@ -4,7 +4,7 @@
  * Use these constants instead of hardcoded strings.
  */
 
-const ROLES = Object.freeze({
+export const ROLES = Object.freeze({
   ADMIN: 'admin',
   RECEPTIONIST: 'receptionist',
   RECEPTION: 'reception', // Legacy alias for receptionist - kept for backward compatibility
@@ -19,7 +19,7 @@ const ROLES = Object.freeze({
  * @param {string} role - The role to check
  * @returns {boolean} - True if role is valid
  */
-const isValidRole = (role) => {
+export const isValidRole = (role) => {
   return Object.values(ROLES).includes(role);
 };
 
@@ -27,12 +27,8 @@ const isValidRole = (role) => {
  * Get all roles as an array
  * @returns {string[]} - Array of all role values
  */
-const getAllRoles = () => {
+export const getAllRoles = () => {
   return Object.values(ROLES);
 };
 
-module.exports = {
-  ROLES,
-  isValidRole,
-  getAllRoles,
-};
+export default ROLES;

@@ -10,12 +10,12 @@ const doctorAvailabilityService = new DoctorAvailabilityService();
 /**
  * @route   GET /api/doctor-availability
  * @desc    Get all doctor availability records
- * @access  Public (for development) - TODO: Re-enable auth when ready
+ * @access  Private (Admin, Receptionist, Nurse, Doctor)
  */
 router.get(
   '/',
   authenticate,
-  authorize(ROLES.ADMIN, ROLES.RECEPTIONIST, 'reception', 'doctor'),
+  authorize(ROLES.ADMIN, ROLES.RECEPTIONIST, ROLES.RECEPTION, ROLES.DOCTOR, ROLES.NURSE),
   asyncHandler(async (req, res) => {
     const { doctor_id } = req.query;
 
@@ -39,7 +39,7 @@ router.get(
 router.get(
   '/doctor/:doctorId',
   authenticate,
-  authorize(ROLES.ADMIN, ROLES.RECEPTIONIST, 'reception', 'doctor'),
+  authorize(ROLES.ADMIN, ROLES.RECEPTIONIST, ROLES.RECEPTION, ROLES.DOCTOR, ROLES.NURSE),
   asyncHandler(async (req, res) => {
     const { doctorId } = req.params;
 
@@ -328,7 +328,7 @@ router.post(
 router.get(
   '/status/:doctorId',
   authenticate,
-  authorize('admin', 'reception', 'doctor'),
+  authorize('admin', ROLES.RECEPTION, ROLES.DOCTOR, ROLES.NURSE),
   asyncHandler(async (req, res) => {
     const { doctorId } = req.params;
 

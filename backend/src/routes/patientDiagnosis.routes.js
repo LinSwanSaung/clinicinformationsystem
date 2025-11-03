@@ -1,6 +1,7 @@
 import express from 'express';
 import { authenticate, authorize } from '../middleware/auth.js';
 import { requireActiveVisit } from '../middleware/activeVisitCheck.js';
+import { ROLES } from '../constants/roles.js';
 import patientDiagnosisService from '../services/PatientDiagnosis.service.js';
 import { logAuditEvent } from '../utils/auditLogger.js';
 

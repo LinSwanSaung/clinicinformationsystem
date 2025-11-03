@@ -1,54 +1,96 @@
-﻿import React, { useState, useEffect } from "react";
+import React, { useCallback, useEffect, useMemo, useState } from "react";
+import { useTranslation } from "react-i18next";
 import { Card } from "../ui/card";
 import { Button } from "../ui/button";
 import { Sparkles, RefreshCw, AlertCircle, Heart, PartyPopper } from "lucide-react";
 import ReactMarkdown from "react-markdown";
 import api from "../../services/api";
 
-const TYPE_META = {
-  "diagnosis-based": { label: "Tailored Care Plan", emoji: "\u{1FA7A}" },
-  wellness: { label: "Wellness Boost", emoji: "\u{1F33C}" },
-  nutrition: { label: "Nutrition Nuggets", emoji: "\u{1F957}" },
-  movement: { label: "Move & Groove", emoji: "\u{1F3C3}\u200D\u2640\uFE0F" }
+const TYPE_EMOJI = {
+  "diagnosis-based": "🩺",
+  wellness: "🌿",
+  nutrition: "🥗",
+  movement: "🏃",
+  default: "✨"
 };
 
-const FALLBACK_META = { label: "Health Highlights", emoji: "\u2728" };
+const typeKey = (type) => {
+  switch (type) {
+    case "diagnosis-based":
+      return "diagnosis";
+    case "nutrition":
+      return "nutrition";
+    case "movement":
+      return "movement";
+    case "wellness":
+      return "wellness";
+    default:
+      return "default";
+  }
+};
 
-const AIHealthBlog = ({ patientId }) => {
+const AIHealthBlog = ({ patientId, language }) => {
+  const { t, i18n } = useTranslation();
+  const activeLanguage = (language || i18n.language || "en").toLowerCase();
+  const locale = activeLanguage === "my" ? "my-MM" : undefined;
+
   const [healthAdvice, setHealthAdvice] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [refreshing, setRefreshing] = useState(false);
 
-  const fetchHealthAdvice = async (showRefreshingState = false) => {
-    try {
-      if (showRefreshingState) {
-        setRefreshing(true);
-      } else {
-        setLoading(true);
+  const fetchHealthAdvice = useCallback(
+    async (showRefreshing = false) => {
+      if (!patientId) return;
+      try {
+        if (showRefreshing) {
+          setRefreshing(true);
+        } else {
+          setLoading(true);
+        }
+        setError(null);
+
+        console.log('[AIHealthBlog] Fetching health advice with language:', activeLanguage);
+        const result = await api.get(`/ai/health-advice/${patientId}`, {
+          params: { lang: activeLanguage }
+        });
+        console.log('[AIHealthBlog] Received health advice:', { type: result?.data?.type, hasContent: !!result?.data?.content });
+
+        if (!result?.success) {
+          throw new Error(result?.message || "Failed to fetch health advice");
+        }
+
+        setHealthAdvice(result.data);
+      } catch (err) {
+        setError(err.message || "Unable to load health tips right now.");
+      } finally {
+        setLoading(false);
+        setRefreshing(false);
       }
-      setError(null);
-
-      const result = await api.get(`/ai/health-advice/${patientId}`);
-
-      if (!result?.success) {
-        throw new Error(result?.message || "Failed to fetch health advice");
-      }
-
-      setHealthAdvice(result.data);
-    } catch (err) {
-      setError(err.message || "Unable to load health tips right now.");
-    } finally {
-      setLoading(false);
-      setRefreshing(false);
-    }
-  };
+    },
+    [patientId, activeLanguage]
+  );
 
   useEffect(() => {
     if (patientId) {
-      fetchHealthAdvice();
+      setHealthAdvice(null);
+      fetchHealthAdvice(false);
     }
-  }, [patientId]);
+  }, [patientId, activeLanguage, fetchHealthAdvice]);
+
+  const meta = useMemo(() => {
+    if (!healthAdvice) {
+      return {
+        emoji: TYPE_EMOJI.default,
+        label: t("patient.aiHealth.meta.default")
+      };
+    }
+    const key = typeKey(healthAdvice.type);
+    return {
+      emoji: TYPE_EMOJI[healthAdvice.type] || TYPE_EMOJI.default,
+      label: t(`patient.aiHealth.meta.${key}`)
+    };
+  }, [healthAdvice, t]);
 
   const handleRefresh = () => fetchHealthAdvice(true);
 
@@ -57,7 +99,7 @@ const AIHealthBlog = ({ patientId }) => {
       <Card className="p-6">
         <div className="flex items-center space-x-3 mb-4">
           <Sparkles className="h-6 w-6 text-purple-500 animate-pulse" />
-          <h2 className="text-xl font-bold">AI Health Assistant</h2>
+          <h2 className="text-xl font-bold">{t("patient.aiHealth.title")}</h2>
         </div>
         <div className="space-y-3">
           <div className="h-4 bg-gray-200 rounded animate-pulse w-3/4" />
@@ -66,9 +108,7 @@ const AIHealthBlog = ({ patientId }) => {
           <div className="h-4 bg-gray-200 rounded animate-pulse w-full" />
           <div className="h-4 bg-gray-200 rounded animate-pulse w-2/3" />
         </div>
-        <p className="text-sm text-gray-500 mt-4 text-center">
-          Brewing personalized insights just for you {"\u2615"}
-        </p>
+        <p className="text-sm text-gray-500 mt-4 text-center">{t("patient.aiHealth.loading")}</p>
       </Card>
     );
   }
@@ -79,11 +119,11 @@ const AIHealthBlog = ({ patientId }) => {
         <div className="flex items-start space-x-3">
           <AlertCircle className="h-6 w-6 text-red-500 flex-shrink-0 mt-1" />
           <div className="flex-1">
-            <h2 className="text-xl font-bold text-red-900 mb-2">We hit a snag</h2>
+            <h2 className="text-xl font-bold text-red-900 mb-2">{t("patient.aiHealth.errorTitle")}</h2>
             <p className="text-red-700 mb-4">{error}</p>
             <Button onClick={handleRefresh} variant="outline" size="sm">
               <RefreshCw className="h-4 w-4 mr-2" />
-              Try Again
+              {t("patient.aiHealth.errorCta")}
             </Button>
           </div>
         </div>
@@ -95,8 +135,6 @@ const AIHealthBlog = ({ patientId }) => {
     return null;
   }
 
-  const meta = TYPE_META[healthAdvice.type] || FALLBACK_META;
-
   return (
     <Card className="p-6 bg-gradient-to-br from-purple-50 to-blue-50 border-purple-200">
       <div className="flex items-start justify-between mb-4">
@@ -106,20 +144,19 @@ const AIHealthBlog = ({ patientId }) => {
           </div>
           <div>
             <h2 className="text-xl font-bold text-gray-900 flex items-center gap-2">
-              AI Health Assistant
+              {t("patient.aiHealth.title")}
               <span className="inline-flex items-center gap-1 rounded-full bg-purple-100 px-2.5 py-1 text-xs font-semibold text-purple-700">
                 {meta.emoji} {meta.label}
               </span>
             </h2>
             {healthAdvice.type === "diagnosis-based" && healthAdvice.diagnosis && (
               <p className="text-sm text-gray-600 flex flex-wrap items-center gap-1">
-                Based on your diagnosis:
-                <span className="font-semibold">{healthAdvice.diagnosis}</span>
+                {t("patient.aiHealth.diagnosisPrefix")} <span className="font-semibold">{healthAdvice.diagnosis}</span>
                 {healthAdvice.diagnosedDate && (
                   <>
-                    <span className="text-gray-400">{"\u2022"}</span>
+                    <span className="text-gray-400">•</span>
                     <span className="text-gray-500">
-                      noted {new Date(healthAdvice.diagnosedDate).toLocaleDateString()}
+                      {new Date(healthAdvice.diagnosedDate).toLocaleDateString(locale)}
                     </span>
                   </>
                 )}
@@ -128,7 +165,7 @@ const AIHealthBlog = ({ patientId }) => {
             {healthAdvice.type === "wellness" && (
               <p className="text-sm text-gray-600 flex items-center">
                 <Heart className="h-4 w-4 mr-1 text-pink-500" />
-                General Wellness Tips
+                {meta.label}
               </p>
             )}
           </div>
@@ -150,10 +187,10 @@ const AIHealthBlog = ({ patientId }) => {
             <PartyPopper className="h-5 w-5 text-amber-500 mt-0.5" />
             <div>
               <p className="text-sm font-semibold text-gray-800">
-                Here is your feel-good nudge for today:
+                {t("patient.aiHealth.introTitle")}
               </p>
               <p className="text-sm text-gray-600">
-                Sip some water, roll your shoulders back, and explore a few simple wins to brighten the day. {"\u{1F389}"}
+                {t("patient.aiHealth.introBody")}
               </p>
             </div>
           </div>
@@ -168,7 +205,7 @@ const AIHealthBlog = ({ patientId }) => {
               ol: (props) => <ol className="list-decimal list-inside text-sm text-gray-700 space-y-1 mb-2" {...props} />,
               li: (props) => <li className="ml-2" {...props} />,
               strong: (props) => <strong className="font-semibold text-gray-900" {...props} />,
-              em: (props) => <em className="italic text-gray-600" {...props} />,
+              em: (props) => <em className="italic text-gray-600" {...props} />
             }}
           >
             {healthAdvice.content}
@@ -178,13 +215,13 @@ const AIHealthBlog = ({ patientId }) => {
 
       <div className="mt-4 p-3 bg-yellow-50 border border-yellow-200 rounded-lg">
         <p className="text-xs text-yellow-800 leading-relaxed">
-          <strong>{"\u26A0\uFE0F"} Friendly reminder:</strong> These nuggets are AI-generated for inspiration. Your care team knows you best, so always lean on their guidance for personalized medical advice. {"\u{1F49B}"}
+          {t("patient.aiHealth.disclaimer")}
         </p>
       </div>
 
       {healthAdvice.generatedAt && (
         <p className="text-xs text-gray-500 mt-3 text-right">
-          Generated: {new Date(healthAdvice.generatedAt).toLocaleString()}
+          {t("patient.aiHealth.generatedAt")}: {new Date(healthAdvice.generatedAt).toLocaleString(locale)}
         </p>
       )}
     </Card>

@@ -13,6 +13,7 @@ import {
   CheckCircle,
   RefreshCw,
   PlayCircle,
+  XCircle,
   X
 } from 'lucide-react';
 import PatientCard from '../../components/medical/PatientCard';
@@ -91,17 +92,33 @@ const transformTokenToPatientData = (token) => {
       weight: token.patient?.vitals?.weight || null,
       oxygenSaturation: token.patient?.vitals?.oxygen_saturation || null
     },
-    appointmentTime: token.appointment?.appointment_time 
-      ? new Date(token.appointment.appointment_time).toLocaleTimeString('en-US', { 
-          hour: '2-digit', 
+    appointmentTime: (() => {
+      // For appointments: combine appointment_date + appointment_time
+      if (token.appointment?.appointment_date && token.appointment?.appointment_time) {
+        const dateStr = token.appointment.appointment_date;
+        const timeStr = token.appointment.appointment_time;
+        const datetime = new Date(`${dateStr}T${timeStr}`);
+        return datetime.toLocaleString('en-US', {
+          month: 'short',
+          day: 'numeric',
+          hour: '2-digit',
           minute: '2-digit',
-          hour12: true 
-        })
-      : new Date(token.created_at).toLocaleTimeString('en-US', { 
-          hour: '2-digit', 
+          hour12: true
+        });
+      }
+      // For walk-ins: use token created_at
+      if (token.created_at) {
+        const datetime = new Date(token.created_at);
+        return datetime.toLocaleString('en-US', {
+          month: 'short',
+          day: 'numeric',
+          hour: '2-digit',
           minute: '2-digit',
-          hour12: true 
-        })
+          hour12: true
+        });
+      }
+      return 'N/A';
+    })()
   };
 };
 
@@ -149,9 +166,13 @@ const DoctorDashboard = () => {
       if (queueResponse.success) {
         const tokens = queueResponse.data.tokens || [];
         
+        // Filter out cancelled appointments
+        const activeTokens = tokens.filter(token => token.status !== 'cancelled');
+        console.log(`📋 [DOCTOR] Filtered to ${activeTokens.length} active tokens (excluded ${tokens.length - activeTokens.length} cancelled)`);
+        
         // Fetch vitals for each patient in the queue
         const tokensWithVitals = await Promise.all(
-          tokens.map(async (token) => {
+          activeTokens.map(async (token) => {
             const vitals = await fetchTokenVitals(token);
             if (vitals) {
               token.patient.vitals = vitals;
@@ -196,9 +217,13 @@ const DoctorDashboard = () => {
       if (queueResponse.success && queueResponse.data) {
         const newTokens = queueResponse.data.tokens || [];
         
+        // Filter out cancelled appointments
+        const activeTokens = newTokens.filter(token => token.status !== 'cancelled');
+        console.log(`📋 [DOCTOR REFRESH] Filtered to ${activeTokens.length} active tokens (excluded ${newTokens.length - activeTokens.length} cancelled)`);
+        
         // Fetch vitals for each patient in the queue
         const tokensWithVitals = await Promise.all(
-          newTokens.map(async (token) => {
+          activeTokens.map(async (token) => {
             const vitals = await fetchTokenVitals(token);
             if (vitals) {
               token.patient.vitals = vitals;
@@ -346,6 +371,93 @@ const DoctorDashboard = () => {
     }
   };
 
+  const handleCallNextAndStart = async () => {
+    try {
+      setRefreshing(true);
+      console.log('[UI] Calling next patient and starting consultation...');
+      const response = await queueService.callNextAndStart(currentDoctorId);
+      
+      console.log('[UI] Response:', response);
+
+      // Check if response exists
+      if (!response) {
+        showNotification('error', 'No response from server. Please check your connection.');
+        return;
+      }
+
+      if (response.hasActiveConsultation) {
+        // Doctor has active consultation, ask if they want to end it
+        const activePatient = response.activeToken?.patient 
+          ? `${response.activeToken.patient.first_name} ${response.activeToken.patient.last_name}` 
+          : 'a patient';
+        
+        console.log('[UI] Active consultation detected:', activePatient);
+        
+        const confirmed = window.confirm(
+          `You have an active consultation with ${activePatient} (Token #${response.activeToken?.token_number}).\n\n` +
+          `Would you like to end this consultation and start with the next patient?`
+        );
+        
+        if (confirmed) {
+          console.log('[UI] User confirmed, ending active consultation...');
+          await handleForceEndConsultation();
+          // Try again after ending
+          console.log('[UI] Retrying call next and start...');
+          const retryResponse = await queueService.callNextAndStart(currentDoctorId);
+          if (retryResponse && retryResponse.success) {
+            await refreshQueue();
+            showNotification('success', retryResponse.message);
+          } else if (retryResponse) {
+            showNotification('info', retryResponse.message);
+          }
+        }
+      } else if (response.success) {
+        console.log('[UI] ✅ Consultation started successfully');
+        await refreshQueue();
+        showNotification('success', response.message);
+      } else {
+        console.log('[UI] ℹ️ Response not successful:', response.message);
+        showNotification('info', response.message);
+      }
+    } catch (error) {
+      console.error('[UI] ❌ Failed to call next and start:', error);
+      const errorMsg = error.response?.data?.message || error.message || 'Unknown error occurred';
+      console.error('[UI] Error message:', errorMsg);
+      showNotification('error', errorMsg);
+    } finally {
+      setRefreshing(false);
+    }
+  };
+
+  const handleForceEndConsultation = async () => {
+    try {
+      console.log('[UI] Ending active consultation...');
+      const response = await queueService.forceEndConsultation(currentDoctorId);
+      
+      console.log('[UI] End consultation response:', response);
+
+      // Check if response exists
+      if (!response) {
+        showNotification('error', 'No response from server. Please check your connection.');
+        return;
+      }
+
+      if (response.success) {
+        console.log('[UI] ✅ Consultation ended successfully');
+        await refreshQueue();
+        showNotification('success', response.message);
+      } else {
+        console.log('[UI] ℹ️ No active consultation to end:', response.message);
+        showNotification('info', response.message);
+      }
+    } catch (error) {
+      console.error('[UI] ❌ Failed to end consultation:', error);
+      const errorMsg = error.response?.data?.message || error.message || 'Unknown error occurred';
+      console.error('[UI] Error message:', errorMsg);
+      showNotification('error', errorMsg);
+    }
+  };
+
   const handleStartTokenConsultation = async (tokenId) => {
     try {
       setRefreshing(true);
@@ -474,13 +586,23 @@ const DoctorDashboard = () => {
                 </select>
               </div>
               <Button 
-                onClick={handleCallNextPatient}
-                className="h-12 px-6 bg-green-600 hover:bg-green-700 text-white"
+                onClick={handleCallNextAndStart}
+                className="h-12 px-6 bg-blue-600 hover:bg-blue-700 text-white font-semibold shadow-lg"
                 disabled={refreshing}
-                title="Call the next waiting patient"
+                title="Call next patient by priority (urgent > appointment > token) and start consultation immediately"
               >
-                <PlayCircle className="mr-2" size={18} />
-                Call Next Patient
+                <PlayCircle className="mr-2" size={20} />
+                Call Next & Start
+              </Button>
+              <Button 
+                onClick={handleForceEndConsultation}
+                variant="outline"
+                className="h-12 px-4 border-red-300 text-red-600 hover:bg-red-50"
+                disabled={refreshing}
+                title="End any active consultation (fixes stuck consultations)"
+              >
+                <XCircle className="mr-2" size={18} />
+                End Consultation
               </Button>
               <Button 
                 onClick={refreshQueue}

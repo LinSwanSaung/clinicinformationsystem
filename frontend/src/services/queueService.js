@@ -72,6 +72,38 @@ class QueueService {
     }
   }
 
+  /**
+   * Call next patient and start consultation immediately (smart action)
+   */
+  async callNextAndStart(doctorId) {
+    try {
+      // api.post returns the data directly (not response.data)
+      const data = await api.post(`${this.baseURL}/call-next-and-start/${doctorId}`);
+      console.log('[queueService] callNextAndStart data:', data);
+      return data;
+    } catch (error) {
+      console.error('[queueService] callNextAndStart error:', error);
+      // For fetch-based api, error message is already extracted
+      throw error;
+    }
+  }
+
+  /**
+   * Force end active consultation (fix stuck consultations)
+   */
+  async forceEndConsultation(doctorId) {
+    try {
+      // api.post returns the data directly (not response.data)
+      const data = await api.post(`${this.baseURL}/force-end-consultation/${doctorId}`);
+      console.log('[queueService] forceEndConsultation data:', data);
+      return data;
+    } catch (error) {
+      console.error('[queueService] forceEndConsultation error:', error);
+      // For fetch-based api, error message is already extracted
+      throw error;
+    }
+  }
+
   // ===============================================
   // QUEUE TOKEN STATUS UPDATES
   // ===============================================

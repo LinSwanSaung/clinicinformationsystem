@@ -204,9 +204,13 @@ const AuditLogs = () => {
                       <td className="p-3 text-gray-700">{log.table_name || '—'}</td>
                       <td className="p-3">
                         <span className={`inline-block px-2 py-1 rounded text-xs font-medium ${
-                          log.new_values?.result === 'success' ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'
+                          log.status === 'success' ? 'bg-green-100 text-green-700' : 
+                          log.status === 'failed' ? 'bg-red-100 text-red-700' :
+                          log.status === 'denied' ? 'bg-orange-100 text-orange-700' :
+                          log.status === 'warning' ? 'bg-yellow-100 text-yellow-700' :
+                          'bg-gray-100 text-gray-700'
                         }`}>
-                          {log.new_values?.result || 'N/A'}
+                          {log.status || 'N/A'}
                         </span>
                       </td>
                       <td className="p-3 text-gray-600 text-xs">{log.ip_address || '—'}</td>

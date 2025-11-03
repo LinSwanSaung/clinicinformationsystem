@@ -45,7 +45,7 @@ import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/component
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Separator } from '@/components/ui/separator';
 import { Textarea } from '@/components/ui/textarea';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/dialog';
 import PageLayout from '@/components/PageLayout';
 import useDebounce from '@/utils/useDebounce';
 import invoiceService from '../../services/invoiceService';
@@ -195,6 +195,10 @@ const CashierDashboard = () => {
   const [showAddServiceDialog, setShowAddServiceDialog] = useState(false);
   const [newService, setNewService] = useState({ name: '', price: '', description: '' });
 
+  // Payment history invoice modal state
+  const [invoiceModalOpen, setInvoiceModalOpen] = useState(false);
+  const [selectedPayment, setSelectedPayment] = useState(null);
+
   // Debounced search term for performance
   const debouncedSearchTerm = useDebounce(searchTerm, 300);
 
@@ -294,6 +298,74 @@ const CashierDashboard = () => {
       setHistoryError('Failed to load invoice history');
     } finally {
       setHistoryLoading(false);
+    }
+  };
+
+  // View invoice details from payment history
+  const handleViewHistoryInvoice = async (historyItem) => {
+    try {
+      const response = await invoiceService.getInvoiceById(historyItem.rawData.id);
+      setSelectedPayment({ 
+        ...historyItem.rawData,
+        invoice: historyItem.rawData,
+        invoiceDetails: response 
+      });
+      setInvoiceModalOpen(true);
+    } catch (error) {
+      console.error('Failed to fetch invoice:', error);
+      alert('Failed to load invoice details');
+    }
+  };
+
+  // Download receipt for invoice
+  const handleDownloadReceipt = async (historyItem) => {
+    try {
+      const token = localStorage.getItem('authToken');
+      
+      if (!token) {
+        alert('Please login first');
+        return;
+      }
+
+      // Get the first payment transaction for this invoice
+      const paymentId = historyItem.rawData.payment_transactions?.[0]?.id;
+      
+      if (!paymentId) {
+        alert('No payment found for this invoice');
+        return;
+      }
+      
+      // Use direct fetch with proper auth header format
+      const response = await fetch(
+        `http://localhost:3001/api/payments/${paymentId}/receipt/pdf`,
+        {
+          method: 'GET',
+          headers: {
+            'Authorization': `Bearer ${token}`,
+            'Content-Type': 'application/json'
+          }
+        }
+      );
+
+      if (!response.ok) {
+        const errorText = await response.text();
+        console.error('Server error:', errorText);
+        throw new Error('Failed to download receipt');
+      }
+
+      // Create blob from response
+      const blob = await response.blob();
+      const url = window.URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = `receipt_${historyItem.rawData.invoice_number || historyItem.id}.pdf`;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      window.URL.revokeObjectURL(url);
+    } catch (error) {
+      console.error('Failed to download receipt:', error);
+      alert('Failed to download receipt. Please try again.');
     }
   };
 
@@ -1173,6 +1245,26 @@ const CashierDashboard = () => {
                             <Badge className="bg-green-100 text-green-800">
                               Completed
                             </Badge>
+                            <div className="flex items-center gap-2">
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                onClick={() => handleViewHistoryInvoice(invoice)}
+                                className="gap-2"
+                              >
+                                <Eye className="h-4 w-4" />
+                                View
+                              </Button>
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                onClick={() => handleDownloadReceipt(invoice)}
+                                className="gap-2"
+                              >
+                                <Download className="h-4 w-4" />
+                                Receipt
+                              </Button>
+                            </div>
                           </div>
                         </div>
                       ))}
@@ -2046,6 +2138,111 @@ const CashierDashboard = () => {
                 )}
               </Button>
             </DialogFooter>
+          </DialogContent>
+        </Dialog>
+
+        {/* Invoice Details Modal for Payment History */}
+        <Dialog open={invoiceModalOpen} onOpenChange={setInvoiceModalOpen}>
+          <DialogContent className="max-w-3xl max-h-[80vh] overflow-y-auto">
+            <DialogHeader>
+              <DialogTitle>Invoice Details</DialogTitle>
+              <DialogDescription>
+                Invoice #{selectedPayment?.invoice?.invoice_number || selectedPayment?.invoiceDetails?.invoice_number}
+              </DialogDescription>
+            </DialogHeader>
+            
+            {selectedPayment && (
+              <div className="space-y-4">
+                {/* Patient Info */}
+                <div className="border-b pb-4">
+                  <h4 className="font-semibold mb-2">Patient Information</h4>
+                  <div className="grid grid-cols-2 gap-2 text-sm">
+                    <div>
+                      <span className="text-gray-600">Name:</span>
+                      <span className="ml-2 font-medium">
+                        {selectedPayment.invoice?.patient?.first_name} {selectedPayment.invoice?.patient?.last_name}
+                      </span>
+                    </div>
+                    <div>
+                      <span className="text-gray-600">Patient #:</span>
+                      <span className="ml-2 font-medium">
+                        {selectedPayment.invoice?.patient?.patient_number}
+                      </span>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Invoice Summary */}
+                <div className="border-b pb-4">
+                  <h4 className="font-semibold mb-2">Invoice Summary</h4>
+                  <div className="space-y-2 text-sm">
+                    <div className="flex justify-between">
+                      <span className="text-gray-600">Total Amount:</span>
+                      <span className="font-medium">
+                        ${parseFloat(selectedPayment.invoiceDetails?.total_amount || 0).toFixed(2)}
+                      </span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-gray-600">Paid Amount:</span>
+                      <span className="font-medium text-green-600">
+                        ${parseFloat(selectedPayment.invoiceDetails?.paid_amount || 0).toFixed(2)}
+                      </span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-gray-600">Balance:</span>
+                      <span className="font-medium text-red-600">
+                        ${parseFloat(selectedPayment.invoiceDetails?.balance || 0).toFixed(2)}
+                      </span>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Payment Transactions */}
+                {selectedPayment.invoiceDetails?.payment_transactions?.length > 0 && (
+                  <div className="border-b pb-4">
+                    <h4 className="font-semibold mb-2">Payment History</h4>
+                    <div className="space-y-2">
+                      {selectedPayment.invoiceDetails.payment_transactions.map((payment, idx) => (
+                        <div key={idx} className="flex justify-between items-center text-sm bg-green-50 p-3 rounded">
+                          <div>
+                            <p className="font-medium">${parseFloat(payment.amount).toFixed(2)}</p>
+                            <p className="text-gray-600 text-xs capitalize">{payment.payment_method}</p>
+                          </div>
+                          <div className="text-right">
+                            <p className="text-xs text-gray-600">
+                              {new Date(payment.payment_date).toLocaleDateString()}
+                            </p>
+                            <p className="text-xs text-gray-500">
+                              {payment.received_by_user ? 
+                                `${payment.received_by_user.first_name} ${payment.received_by_user.last_name}` : 
+                                'Unknown'}
+                            </p>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {/* Actions */}
+                <div className="flex justify-end gap-2">
+                  <Button
+                    variant="outline"
+                    onClick={() => handleDownloadReceipt({ rawData: selectedPayment.invoice })}
+                    className="gap-2"
+                  >
+                    <Download className="h-4 w-4" />
+                    Download Receipt
+                  </Button>
+                  <Button
+                    variant="outline"
+                    onClick={() => setInvoiceModalOpen(false)}
+                  >
+                    Close
+                  </Button>
+                </div>
+              </div>
+            )}
           </DialogContent>
         </Dialog>
       </PageLayout>

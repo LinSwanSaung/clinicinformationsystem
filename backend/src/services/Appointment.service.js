@@ -67,7 +67,7 @@ class AppointmentService {
 
       // Prevent same-day appointments
       const appointmentDate = new Date(appointmentData.appointment_date);
-      const today = new Date(2025, 9, 28); // October 28, 2025
+      const today = new Date(); // Use actual current date
       today.setHours(0, 0, 0, 0);
       appointmentDate.setHours(0, 0, 0, 0);
       
@@ -168,8 +168,8 @@ class AppointmentService {
    */
   async updateAppointmentStatus(id, status) {
     try {
-      // Validate status
-      const validStatuses = ['scheduled', 'waiting', 'ready_for_doctor', 'consulting', 'completed', 'cancelled', 'no_show'];
+      // Validate status - added 'late' for receptionist to manually mark late arrivals
+      const validStatuses = ['scheduled', 'waiting', 'ready_for_doctor', 'consulting', 'completed', 'cancelled', 'no_show', 'late'];
       if (!validStatuses.includes(status)) {
         throw new Error(`Invalid status. Must be one of: ${validStatuses.join(', ')}`);
       }

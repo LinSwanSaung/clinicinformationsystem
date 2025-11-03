@@ -197,18 +197,10 @@ class DoctorAvailabilityService {
    */
   async checkTimeSlotAvailability(doctorId, date, time) {
     try {
-      console.log('[DoctorAvailabilityService] Checking time slot:', { doctorId, date, time });
-
       // 1. Get day of week from date (handle timezone correctly)
       const [year, month, day] = date.split('-').map(Number);
       const appointmentDate = new Date(year, month - 1, day); // Create date in local timezone
       const dayOfWeek = appointmentDate.toLocaleDateString('en-US', { weekday: 'long' });
-      
-      console.log('[DoctorAvailabilityService] Date parsing:', { 
-        inputDate: date, 
-        parsedDate: appointmentDate.toISOString(), 
-        dayOfWeek 
-      });
 
       // 2. Get doctor's availability for that day
       const availability = await this.getAvailabilityByDoctorId(doctorId);
@@ -223,7 +215,10 @@ class DoctorAvailabilityService {
 
       // 3. Check if time is within working hours
       const requestedTime = time.substring(0, 5); // Ensure HH:MM format
-      if (requestedTime < daySchedule.start_time || requestedTime >= daySchedule.end_time) {
+      const startTime = daySchedule.start_time.substring(0, 5); // Convert to HH:MM
+      const endTime = daySchedule.end_time.substring(0, 5); // Convert to HH:MM
+      
+      if (requestedTime < startTime || requestedTime >= endTime) {
         return {
           isAvailable: false,
           reason: `Time slot is outside working hours (${daySchedule.start_time} - ${daySchedule.end_time})`
@@ -283,16 +278,14 @@ class DoctorAvailabilityService {
       const [year, month, day] = date.split('-').map(Number);
       const appointmentDate = new Date(year, month - 1, day); // Create date in local timezone
       const dayOfWeek = appointmentDate.toLocaleDateString('en-US', { weekday: 'long' });
-      
-      console.log('[DoctorAvailabilityService] Date parsing for slots:', { 
-        inputDate: date, 
-        parsedDate: appointmentDate.toISOString(), 
-        dayOfWeek 
-      });
 
       // 2. Get doctor's availability
       const availability = await this.getAvailabilityByDoctorId(doctorId);
+      console.log('[DoctorAvailabilityService] Doctor availability:', availability);
+      console.log('[DoctorAvailabilityService] Looking for dayOfWeek:', dayOfWeek);
+      
       const daySchedule = availability.find(a => a.day_of_week === dayOfWeek && a.is_active);
+      console.log('[DoctorAvailabilityService] Found day schedule:', daySchedule);
 
       if (!daySchedule) {
         return {
@@ -317,6 +310,8 @@ class DoctorAvailabilityService {
         daySchedule.end_time,
         30
       );
+      console.log('[DoctorAvailabilityService] Generated slots from', daySchedule.start_time, 'to', daySchedule.end_time, ':', allSlots.length, 'slots');
+      console.log('[DoctorAvailabilityService] First 5 slots:', allSlots.slice(0, 5));
 
       // 5. Filter out booked slots
       const bookedSlots = (existingAppointments || []).map(a => a.appointment_time.substring(0, 5));
@@ -361,6 +356,228 @@ class DoctorAvailabilityService {
     }
 
     return slots;
+  }
+
+  // ===============================================
+  // DOCTOR UNAVAILABILITY MANAGEMENT
+  // ===============================================
+
+  /**
+   * Check and mark tokens as missed for all doctors during unavailable times
+   * This should be called periodically (e.g., every 5-10 minutes)
+   */
+  async checkAndMarkMissedTokens() {
+    try {
+      const { data, error } = await this.doctorAvailabilityModel.supabase.rpc(
+        'mark_tokens_missed_during_unavailability'
+      );
+
+      if (error) throw error;
+
+      return {
+        success: true,
+        missedTokens: data || [],
+        count: data?.length || 0,
+        message: `Processed ${data?.length || 0} tokens during doctor unavailability check`
+      };
+    } catch (error) {
+      console.error('[DoctorAvailability] Error checking missed tokens:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Check and mark tokens as missed for a specific doctor
+   */
+  async checkDoctorMissedTokens(doctorId) {
+    try {
+      const { data, error } = await this.doctorAvailabilityModel.supabase.rpc(
+        'mark_tokens_missed_during_unavailability',
+        { p_doctor_id: doctorId }
+      );
+
+      if (error) throw error;
+
+      return {
+        success: true,
+        missedTokens: data || [],
+        count: data?.length || 0
+      };
+    } catch (error) {
+      console.error('[DoctorAvailability] Error checking doctor missed tokens:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Cancel all remaining tokens for a doctor (when doctor leaves for the day)
+   */
+  async cancelDoctorRemainingTokens(doctorId, reason, performedBy) {
+    try {
+      const { data, error } = await this.doctorAvailabilityModel.supabase.rpc(
+        'cancel_doctor_remaining_tokens',
+        { 
+          p_doctor_id: doctorId,
+          p_reason: reason || 'Doctor unavailable for the rest of the day',
+          p_performed_by: performedBy
+        }
+      );
+
+      if (error) throw error;
+      return {
+        success: true,
+        cancelledTokens: data || [],
+        count: data?.length || 0,
+        message: `Cancelled ${data?.length || 0} waiting tokens for doctor`
+      };
+    } catch (error) {
+      console.error('[DoctorAvailability] Error cancelling doctor tokens:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Check if doctor is currently available
+   */
+  async isDoctorCurrentlyAvailable(doctorId) {
+    try {
+      const { data, error } = await this.doctorAvailabilityModel.supabase.rpc(
+        'is_doctor_currently_available',
+        { p_doctor_id: doctorId }
+      );
+
+      if (error) throw error;
+
+      return {
+        success: true,
+        isAvailable: data || false
+      };
+    } catch (error) {
+      console.error('[DoctorAvailability] Error checking doctor availability:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Check if doctor has remaining availability today
+   */
+  async doctorHasRemainingAvailability(doctorId) {
+    try {
+      const { data, error } = await this.doctorAvailabilityModel.supabase.rpc(
+        'doctor_has_remaining_availability_today',
+        { p_doctor_id: doctorId }
+      );
+
+      if (error) throw error;
+
+      return {
+        success: true,
+        hasAvailability: data || false
+      };
+    } catch (error) {
+      console.error('[DoctorAvailability] Error checking remaining availability:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Get doctor's next available time slot today
+   */
+  async getDoctorNextAvailableTime(doctorId) {
+    try {
+      const { data, error } = await this.doctorAvailabilityModel.supabase.rpc(
+        'get_doctor_next_available_time',
+        { p_doctor_id: doctorId }
+      );
+
+      if (error) throw error;
+
+      return {
+        success: true,
+        nextAvailableTime: data
+      };
+    } catch (error) {
+      console.error('[DoctorAvailability] Error getting next available time:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Get comprehensive doctor availability status
+   */
+  async getDoctorAvailabilityStatus(doctorId) {
+    try {
+      const [currentAvailability, remainingAvailability, nextTime] = await Promise.all([
+        this.isDoctorCurrentlyAvailable(doctorId),
+        this.doctorHasRemainingAvailability(doctorId),
+        this.getDoctorNextAvailableTime(doctorId)
+      ]);
+
+      // Get active tokens count
+      const { data: tokens, error: tokenError } = await this.doctorAvailabilityModel.supabase
+        .from('queue_tokens')
+        .select('id, status')
+        .eq('doctor_id', doctorId)
+        .eq('issued_date', new Date().toISOString().split('T')[0])
+        .in('status', ['waiting', 'called', 'delayed', 'serving']);
+
+      if (tokenError) throw tokenError;
+
+      const status = {
+        isCurrentlyAvailable: currentAvailability.isAvailable,
+        hasRemainingAvailability: remainingAvailability.hasAvailability,
+        nextAvailableTime: nextTime.nextAvailableTime,
+        activeTokensCount: tokens?.length || 0,
+        status: currentAvailability.isAvailable 
+          ? 'available' 
+          : remainingAvailability.hasAvailability 
+            ? 'on_break' 
+            : 'finished'
+      };
+
+      return {
+        success: true,
+        ...status
+      };
+    } catch (error) {
+      console.error('[DoctorAvailability] Error getting availability status:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Get all doctors with their current availability status
+   */
+  async getAllDoctorsAvailabilityStatus() {
+    try {
+      // Get all active doctors
+      const { data: doctors, error: doctorError } = await this.doctorAvailabilityModel.supabase
+        .from('users')
+        .select('id, first_name, last_name, email, specialty')
+        .eq('role', 'doctor')
+        .eq('is_active', true);
+
+      if (doctorError) throw doctorError;
+
+      // Get status for each doctor
+      const doctorStatuses = await Promise.all(
+        doctors.map(async (doctor) => {
+          const status = await this.getDoctorAvailabilityStatus(doctor.id);
+          return {
+            ...doctor,
+            availabilityStatus: status
+          };
+        })
+      );
+
+      return {
+        success: true,
+        doctors: doctorStatuses
+      };
+    } catch (error) {
+      console.error('[DoctorAvailability] Error getting all doctors status:', error);
+      throw error;
+    }
   }
 }
 

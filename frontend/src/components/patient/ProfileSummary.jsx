@@ -6,7 +6,7 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
 import ErrorState from '@/components/ErrorState';
-import { Copy, Languages } from 'lucide-react';
+import { Copy } from 'lucide-react';
 
 const motionProps = {
   initial: { opacity: 0, y: 10 },
@@ -54,9 +54,7 @@ const ProfileSummary = ({
   lastVisit,
   loading,
   error,
-  onRetry,
-  language,
-  onLanguageToggle
+  onRetry
 }) => {
   const { t, i18n } = useTranslation();
   
@@ -90,7 +88,6 @@ const ProfileSummary = ({
 
   console.log('[ProfileSummary] Full name calculated:', fullName);
 
-  const preferredLanguage = patient?.preferred_language?.toUpperCase() ?? 'EN';
   const patientNumber = patient?.patient_number ?? t('patient.profile.noPatientCode');
 
   const lastVisitDate = lastVisit?.visit_date
@@ -125,24 +122,9 @@ const ProfileSummary = ({
             </CardTitle>
             <p className="text-muted-foreground text-sm md:text-base">
               {age !== null
-                ? t('patient.profile.summaryLabel', { age, language: preferredLanguage })
-                : t('patient.profile.summaryFallback', { language: preferredLanguage })}
+                ? t('patient.profile.summaryLabel', { age })
+                : t('patient.profile.summaryFallback')}
             </p>
-          </div>
-          <div className="flex items-center gap-2">
-            <Badge variant="outline" className="px-3 py-1 flex items-center gap-2 text-sm">
-              <Languages className="h-4 w-4" aria-hidden="true" />
-              <span>{t('patient.profile.languageLabel')}:</span>
-              <span className="font-semibold">{language.toUpperCase()}</span>
-            </Badge>
-            <Button
-              type="button"
-              variant="secondary"
-              onClick={onLanguageToggle}
-              aria-label={t('patient.profile.languageToggleAria')}
-            >
-              {language === 'en' ? 'မြန်မာ' : 'English'}
-            </Button>
           </div>
         </CardHeader>
         <CardContent className="grid gap-6 md:grid-cols-[auto,1fr] md:items-center">
@@ -183,15 +165,6 @@ const ProfileSummary = ({
                     <Copy className="h-4 w-4" aria-hidden="true" />
                   </Button>
                 </div>
-              </div>
-
-              <div className="space-y-1">
-                <p className="text-xs uppercase tracking-wide text-muted-foreground">
-                  {t('patient.profile.languagePreferenceLabel')}
-                </p>
-                <Badge className="px-3 py-1 text-sm">
-                  {preferredLanguage === 'MM' ? t('patient.profile.languageMM') : t('patient.profile.languageEN')}
-                </Badge>
               </div>
             </div>
 

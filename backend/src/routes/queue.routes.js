@@ -125,6 +125,56 @@ router.post('/call-next/:doctorId', authenticate, async (req, res) => {
 });
 
 /**
+ * @route   POST /api/queue/call-next-and-start/:doctorId
+ * @desc    Call next patient and start consultation immediately (smart action)
+ * @access  Private (Doctor)
+ */
+router.post('/call-next-and-start/:doctorId', authenticate, async (req, res) => {
+  try {
+    const { doctorId } = req.params;
+    
+    const result = await queueService.callNextAndStart(doctorId);
+    res.json(result);
+  } catch (error) {
+    console.error('[ROUTE] Call next and start error:', error);
+    res.status(400).json({
+      success: false,
+      message: error.message || 'Failed to call next patient and start consultation',
+      error: {
+        type: 'CALL_NEXT_START_ERROR',
+        details: error.message,
+        stack: process.env.NODE_ENV === 'development' ? error.stack : undefined
+      }
+    });
+  }
+});
+
+/**
+ * @route   POST /api/queue/force-end-consultation/:doctorId
+ * @desc    Force end any active consultation for a doctor (fix stuck consultations)
+ * @access  Private (Doctor, Admin)
+ */
+router.post('/force-end-consultation/:doctorId', authenticate, async (req, res) => {
+  try {
+    const { doctorId } = req.params;
+    
+    const result = await queueService.forceEndActiveConsultation(doctorId);
+    res.json(result);
+  } catch (error) {
+    console.error('[ROUTE] Force end consultation error:', error);
+    res.status(400).json({
+      success: false,
+      message: error.message || 'Failed to end consultation',
+      error: {
+        type: 'END_CONSULTATION_ERROR',
+        details: error.message,
+        stack: process.env.NODE_ENV === 'development' ? error.stack : undefined
+      }
+    });
+  }
+});
+
+/**
  * @route   PUT /api/queue/token/:tokenId/mark-ready
  * @desc    Mark patient as ready for doctor (Nurse action)
  * @access  Private (Nurse, Admin)

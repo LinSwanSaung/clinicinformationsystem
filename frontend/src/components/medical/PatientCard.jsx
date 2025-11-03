@@ -134,8 +134,24 @@ const PatientCard = ({
     if (userRole === 'nurse' && !readOnly) {
       // Nurse-specific buttons based on patient status
       if (patient.status === 'waiting') {
+        // Check if vitals exist for this patient/visit
+        console.log(`[PatientCard] Token #${patient.token_number} - Checking vitals:`, {
+          hasLatestVitals: !!patient.latestVitals,
+          latestVitals: patient.latestVitals,
+          vitalsKeys: patient.latestVitals ? Object.keys(patient.latestVitals) : []
+        });
+        
+        const hasVitals = patient.latestVitals && (
+          patient.latestVitals.heart_rate ||
+          patient.latestVitals.blood_pressure_systolic ||
+          patient.latestVitals.temperature ||
+          patient.latestVitals.weight
+        );
+        
+        console.log(`[PatientCard] Token #${patient.token_number} - Has vitals?`, hasVitals);
+        
         // For waiting patients, first they need vitals, then can be marked ready
-        if (!patient.vitalsRecorded) {
+        if (!hasVitals) {
           buttons.unshift(
             <Button 
               key="add-vitals"
@@ -329,23 +345,38 @@ const PatientCard = ({
         <div className="grid grid-cols-2 gap-y-3 gap-x-4 text-base mb-4">
           <div className="flex items-center text-gray-600">
             <User size={18} className="mr-2" />
-            <span>{`${patient.age} years, ${patient.gender}`}</span>
+            <span>{`${patient.age || patient.patient?.age || '-'} years, ${patient.gender || patient.patient?.gender || '-'}`}</span>
           </div>
           <div className="flex items-center text-gray-600">
             <Heart size={18} className="mr-2" />
-            <span>{patient.vitals?.heartRate || '-'} bpm</span>
+            <span>{patient.latestVitals?.heart_rate || patient.vitals?.heartRate || '-'} bpm</span>
           </div>
           <div className="flex items-center text-gray-600">
             <Activity size={18} className="mr-2" />
-            <span>{patient.vitals?.bp || '-'}</span>
+            <span>
+              {patient.latestVitals?.blood_pressure_systolic && patient.latestVitals?.blood_pressure_diastolic
+                ? `${patient.latestVitals.blood_pressure_systolic}/${patient.latestVitals.blood_pressure_diastolic}`
+                : patient.vitals?.bp || '-'
+              }
+            </span>
           </div>
           <div className="flex items-center text-gray-600">
             <ThermometerSnowflake size={18} className="mr-2" />
-            <span>{patient.vitals?.temp ? `${patient.vitals.temp}°F` : '-'}</span>
+            <span>
+              {patient.latestVitals?.temperature
+                ? `${patient.latestVitals.temperature}°${patient.latestVitals.temperature_unit || 'C'}`
+                : patient.vitals?.temp ? `${patient.vitals.temp}°F` : '-'
+              }
+            </span>
           </div>
           <div className="flex items-center text-gray-600">
             <Scale size={18} className="mr-2" />
-            <span>{patient.vitals?.weight ? `${patient.vitals.weight} kg` : '-'}</span>
+            <span>
+              {patient.latestVitals?.weight
+                ? `${patient.latestVitals.weight} ${patient.latestVitals.weight_unit || 'kg'}`
+                : patient.vitals?.weight ? `${patient.vitals.weight} kg` : '-'
+              }
+            </span>
           </div>
         </div>
 

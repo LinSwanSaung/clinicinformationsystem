@@ -87,9 +87,20 @@ CREATE TABLE IF NOT EXISTS appointments (
     resolved_by_admin BOOLEAN DEFAULT false,
     resolved_reason TEXT,
     
-    CONSTRAINT valid_status CHECK (status IN ('scheduled', 'waiting', 'ready_for_doctor', 'consulting', 'completed', 'cancelled', 'no_show')),
+    CONSTRAINT valid_status CHECK (status IN ('scheduled', 'waiting', 'ready_for_doctor', 'consulting', 'completed', 'cancelled', 'no_show', 'late')),
     CONSTRAINT valid_duration CHECK (duration_minutes > 0 AND duration_minutes <= 480)
 );
+
+COMMENT ON COLUMN appointments.status IS 
+'Appointment status: 
+- scheduled: Initial state when appointment is booked
+- late: Patient arrived more than 10 minutes late or manually marked as late by receptionist
+- waiting: Patient checked in and in queue (has token)
+- ready_for_doctor: After vitals taken, ready for consultation
+- consulting: Doctor currently consulting
+- completed: Consultation finished
+- cancelled: Appointment cancelled
+- no_show: Patient did not show up';
 
 -- ===============================================
 -- VISITS TABLE (Medical Encounters)
@@ -299,6 +310,7 @@ CREATE TABLE IF NOT EXISTS queue_tokens (
     patient_id UUID NOT NULL REFERENCES patients(id) ON DELETE CASCADE,
     doctor_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
     appointment_id UUID REFERENCES appointments(id) ON DELETE SET NULL,
+    visit_id UUID REFERENCES visits(id) ON DELETE SET NULL,
     issued_date DATE DEFAULT CURRENT_DATE,
     issued_time TIMESTAMPTZ DEFAULT NOW(),
     -- Queue lifecycle
@@ -355,33 +367,6 @@ BEGIN
         ALTER TABLE queue_tokens ALTER COLUMN estimated_wait_time SET DEFAULT 7;
     END IF;
 END $$;
-
--- ===============================================
--- APPOINTMENT QUEUE TABLE
--- ===============================================
-CREATE TABLE IF NOT EXISTS appointment_queue (
-    id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
-    appointment_id UUID NOT NULL REFERENCES appointments(id) ON DELETE CASCADE,
-    doctor_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-    patient_id UUID NOT NULL REFERENCES patients(id) ON DELETE CASCADE,
-    queue_position INTEGER NOT NULL,
-    estimated_start_time TIMESTAMPTZ,
-    actual_start_time TIMESTAMPTZ,
-    actual_end_time TIMESTAMPTZ,
-    status VARCHAR(20) DEFAULT 'queued', -- queued, in_progress, completed, skipped, cancelled, delayed
-    priority INTEGER DEFAULT 1,
-    notes TEXT,
-    delay_reason TEXT,
-    delayed_at TIMESTAMPTZ,
-    undelayed_at TIMESTAMPTZ,
-    previous_queue_position INTEGER,
-    created_at TIMESTAMPTZ DEFAULT NOW(),
-    updated_at TIMESTAMPTZ DEFAULT NOW(),
-    
-    CONSTRAINT valid_queue_status CHECK (status IN ('queued', 'in_progress', 'completed', 'skipped', 'cancelled', 'delayed')),
-    CONSTRAINT valid_queue_priority CHECK (priority >= 1 AND priority <= 5),
-    CONSTRAINT valid_queue_position CHECK (queue_position > 0)
-);
 
 -- ===============================================
 -- CLINIC SETTINGS (global thresholds)
@@ -445,20 +430,13 @@ CREATE INDEX IF NOT EXISTS idx_queue_tokens_doctor_id ON queue_tokens(doctor_id)
 CREATE INDEX IF NOT EXISTS idx_queue_tokens_date ON queue_tokens(issued_date);
 CREATE INDEX IF NOT EXISTS idx_queue_tokens_status ON queue_tokens(status);
 CREATE INDEX IF NOT EXISTS idx_queue_tokens_number ON queue_tokens(doctor_id, issued_date, token_number);
+CREATE INDEX IF NOT EXISTS idx_queue_tokens_visit_id ON queue_tokens(visit_id);
 -- New helpful indexes for lifecycle
 CREATE INDEX IF NOT EXISTS idx_queue_tokens_doctor_status ON queue_tokens(doctor_id, status);
 -- Only one active consult per doctor at a time (status = 'serving')
 CREATE UNIQUE INDEX IF NOT EXISTS uq_queue_one_serving_per_doctor
     ON queue_tokens(doctor_id)
     WHERE status = 'serving';
-
--- Appointment Queue indexes
-CREATE INDEX IF NOT EXISTS idx_appointment_queue_appointment_id ON appointment_queue(appointment_id);
-CREATE INDEX IF NOT EXISTS idx_appointment_queue_doctor_id ON appointment_queue(doctor_id);
-CREATE INDEX IF NOT EXISTS idx_appointment_queue_patient_id ON appointment_queue(patient_id);
-CREATE INDEX IF NOT EXISTS idx_appointment_queue_status ON appointment_queue(status);
-CREATE INDEX IF NOT EXISTS idx_appointment_queue_position ON appointment_queue(doctor_id, queue_position);
-CREATE INDEX IF NOT EXISTS idx_appointment_queue_created_date ON appointment_queue(doctor_id, created_at);
 
 -- ===============================================
 -- HELPER FUNCTIONS
@@ -540,26 +518,6 @@ $$ LANGUAGE plpgsql;
 
 -- Auto-calculate queue position
 CREATE OR REPLACE FUNCTION calculate_queue_position()
-RETURNS TRIGGER AS $$
-DECLARE
-    next_position INTEGER;
-    queue_date DATE;
-BEGIN
-    queue_date := DATE(NEW.created_at);
-    
-    SELECT COALESCE(MAX(queue_position), 0) + 1
-    INTO next_position
-    FROM appointment_queue 
-    WHERE doctor_id = NEW.doctor_id 
-    AND DATE(created_at) = queue_date
-    AND status IN ('queued', 'in_progress');
-    
-    NEW.queue_position := next_position;
-    
-    RETURN NEW;
-END;
-$$ LANGUAGE plpgsql;
-
 -- Function to check doctor availability
 CREATE OR REPLACE FUNCTION is_doctor_available(
     p_doctor_id UUID,
@@ -720,6 +678,288 @@ END;
 $$ LANGUAGE plpgsql;
 
 -- ===============================================
+-- DOCTOR UNAVAILABILITY MANAGEMENT
+-- ===============================================
+
+-- Function to check if doctor is currently available (not on break, within working hours)
+CREATE OR REPLACE FUNCTION is_doctor_currently_available(
+    p_doctor_id UUID,
+    p_check_time TIMESTAMPTZ DEFAULT NOW()
+) RETURNS BOOLEAN AS $$
+DECLARE
+    v_current_day VARCHAR;
+    v_current_time TIME;
+    v_is_available BOOLEAN;
+BEGIN
+    -- Get current day and time
+    v_current_day := TO_CHAR(p_check_time, 'Day');
+    v_current_day := TRIM(INITCAP(v_current_day)); -- Format: 'Monday', 'Tuesday', etc.
+    v_current_time := p_check_time::TIME;
+    
+    -- Check if doctor has an active availability slot for current time
+    SELECT EXISTS (
+        SELECT 1
+        FROM doctor_availability
+        WHERE doctor_id = p_doctor_id
+        AND day_of_week = v_current_day
+        AND start_time <= v_current_time
+        AND end_time > v_current_time
+        AND is_active = true
+    ) INTO v_is_available;
+    
+    RETURN v_is_available;
+END;
+$$ LANGUAGE plpgsql;
+
+-- Function to get doctor's next available time slot for today
+CREATE OR REPLACE FUNCTION get_doctor_next_available_time(
+    p_doctor_id UUID,
+    p_check_time TIMESTAMPTZ DEFAULT NOW()
+) RETURNS TIME AS $$
+DECLARE
+    v_current_day VARCHAR;
+    v_current_time TIME;
+    v_next_start_time TIME;
+BEGIN
+    v_current_day := TO_CHAR(p_check_time, 'Day');
+    v_current_day := TRIM(INITCAP(v_current_day));
+    v_current_time := p_check_time::TIME;
+    
+    -- Get the next availability slot start time after current time
+    SELECT start_time INTO v_next_start_time
+    FROM doctor_availability
+    WHERE doctor_id = p_doctor_id
+    AND day_of_week = v_current_day
+    AND start_time > v_current_time
+    AND is_active = true
+    ORDER BY start_time ASC
+    LIMIT 1;
+    
+    RETURN v_next_start_time;
+END;
+$$ LANGUAGE plpgsql;
+
+-- Function to check if doctor has any remaining availability today
+CREATE OR REPLACE FUNCTION doctor_has_remaining_availability_today(
+    p_doctor_id UUID,
+    p_check_time TIMESTAMPTZ DEFAULT NOW()
+) RETURNS BOOLEAN AS $$
+DECLARE
+    v_current_day VARCHAR;
+    v_current_time TIME;
+    v_has_availability BOOLEAN;
+BEGIN
+    v_current_day := TO_CHAR(p_check_time, 'Day');
+    v_current_day := TRIM(INITCAP(v_current_day));
+    v_current_time := p_check_time::TIME;
+    
+    -- Check if there are any availability slots remaining today
+    SELECT EXISTS (
+        SELECT 1
+        FROM doctor_availability
+        WHERE doctor_id = p_doctor_id
+        AND day_of_week = v_current_day
+        AND end_time > v_current_time  -- Any slot that hasn't ended yet
+        AND is_active = true
+    ) INTO v_has_availability;
+    
+    RETURN v_has_availability;
+END;
+$$ LANGUAGE plpgsql;
+
+-- Function to mark tokens as missed when doctor is unavailable
+CREATE OR REPLACE FUNCTION mark_tokens_missed_during_unavailability(
+    p_doctor_id UUID DEFAULT NULL,  -- If NULL, check all doctors
+    p_check_time TIMESTAMPTZ DEFAULT NOW()
+) RETURNS TABLE (
+    updated_token_id UUID,
+    token_number INTEGER,
+    patient_name TEXT,
+    reason TEXT
+) AS $$
+DECLARE
+    token_record RECORD;
+    v_is_currently_available BOOLEAN;
+    v_has_more_availability BOOLEAN;
+    v_next_available TIME;
+    v_missed_reason TEXT;
+    v_current_date DATE;
+BEGIN
+    v_current_date := p_check_time::DATE;
+    
+    -- Loop through all active tokens for the day
+    FOR token_record IN
+        SELECT 
+            qt.id,
+            qt.token_number,
+            qt.doctor_id,
+            qt.status,
+            qt.issued_date,
+            qt.visit_id,
+            p.first_name || ' ' || p.last_name AS patient_name,
+            u.first_name || ' ' || u.last_name AS doctor_name
+        FROM queue_tokens qt
+        JOIN patients p ON qt.patient_id = p.id
+        JOIN users u ON qt.doctor_id = u.id
+        WHERE qt.issued_date = v_current_date
+        AND qt.status IN ('waiting', 'called', 'delayed')  -- Only active statuses
+        AND (p_doctor_id IS NULL OR qt.doctor_id = p_doctor_id)
+        AND u.is_active = true  -- Only check active doctors
+    LOOP
+        -- Check doctor's current availability
+        v_is_currently_available := is_doctor_currently_available(
+            token_record.doctor_id, 
+            p_check_time
+        );
+        
+        -- If doctor is not currently available, check if they have remaining availability
+        IF NOT v_is_currently_available THEN
+            v_has_more_availability := doctor_has_remaining_availability_today(
+                token_record.doctor_id,
+                p_check_time
+            );
+            
+            -- Only mark as missed if doctor has NO more availability today
+            -- If doctor is on break, skip this token (keep it active)
+            IF NOT v_has_more_availability THEN
+                -- Doctor has finished for the day - mark token as missed
+                v_missed_reason := 'Doctor ' || token_record.doctor_name || 
+                    ' has finished for the day. No remaining availability.';
+            ELSE
+                -- Doctor is on break - keep token active, skip to next token
+                CONTINUE;
+            END IF;
+            
+            -- Update token status to missed (only reached if doctor finished for day)
+            UPDATE queue_tokens
+            SET 
+                status = 'missed',
+                updated_at = p_check_time,
+                previous_status = token_record.status,
+                delay_reason = v_missed_reason
+            WHERE id = token_record.id;
+            
+            -- Update related visit if exists
+            IF token_record.visit_id IS NOT NULL THEN
+                UPDATE visits
+                SET 
+                    status = 'cancelled',
+                    updated_at = p_check_time
+                WHERE id = token_record.visit_id
+                AND status = 'in_progress';
+            END IF;
+            
+            -- Log audit event
+            INSERT INTO audit_logs (
+                action,
+                table_name,
+                record_id,
+                performed_by,
+                details
+            ) VALUES (
+                'TOKEN.MISSED_AUTO',
+                'queue_tokens',
+                token_record.id,
+                NULL,  -- System action
+                jsonb_build_object(
+                    'token_number', token_record.token_number,
+                    'doctor_id', token_record.doctor_id,
+                    'doctor_name', token_record.doctor_name,
+                    'patient_name', token_record.patient_name,
+                    'reason', v_missed_reason,
+                    'previous_status', token_record.status,
+                    'auto_marked_at', p_check_time
+                )
+            );
+            
+            -- Return updated token info
+            RETURN QUERY SELECT 
+                token_record.id,
+                token_record.token_number,
+                token_record.patient_name,
+                v_missed_reason;
+        END IF;
+    END LOOP;
+END;
+$$ LANGUAGE plpgsql;
+
+-- Function to manually mark all waiting tokens as missed for a specific doctor
+CREATE OR REPLACE FUNCTION cancel_doctor_remaining_tokens(
+    p_doctor_id UUID,
+    p_reason TEXT DEFAULT 'Doctor unavailable for the rest of the day',
+    p_performed_by UUID DEFAULT NULL
+) RETURNS TABLE (
+    cancelled_token_id UUID,
+    token_number INTEGER,
+    patient_name TEXT
+) AS $$
+DECLARE
+    token_record RECORD;
+    v_current_date DATE;
+BEGIN
+    v_current_date := CURRENT_DATE;
+    
+    -- Update all active tokens for the doctor today
+    FOR token_record IN
+        SELECT 
+            qt.id,
+            qt.token_number,
+            qt.visit_id,
+            p.first_name || ' ' || p.last_name AS patient_name
+        FROM queue_tokens qt
+        JOIN patients p ON qt.patient_id = p.id
+        WHERE qt.doctor_id = p_doctor_id
+        AND qt.issued_date = v_current_date
+        AND qt.status IN ('waiting', 'called', 'delayed')
+    LOOP
+        -- Update token to missed
+        UPDATE queue_tokens
+        SET 
+            status = 'missed',
+            updated_at = NOW(),
+            delay_reason = p_reason
+        WHERE id = token_record.id;
+        
+        -- Update related visit if exists
+        IF token_record.visit_id IS NOT NULL THEN
+            UPDATE visits
+            SET 
+                status = 'cancelled',
+                updated_at = NOW()
+            WHERE id = token_record.visit_id
+            AND status = 'in_progress';
+        END IF;
+        
+        -- Log audit event
+        INSERT INTO audit_logs (
+            action,
+            table_name,
+            record_id,
+            performed_by,
+            details
+        ) VALUES (
+            'TOKEN.CANCELLED_DOCTOR_UNAVAILABLE',
+            'queue_tokens',
+            token_record.id,
+            p_performed_by,
+            jsonb_build_object(
+                'token_number', token_record.token_number,
+                'doctor_id', p_doctor_id,
+                'patient_name', token_record.patient_name,
+                'reason', p_reason,
+                'cancelled_at', NOW()
+            )
+        );
+        
+        RETURN QUERY SELECT 
+            token_record.id,
+            token_record.token_number,
+            token_record.patient_name;
+    END LOOP;
+END;
+$$ LANGUAGE plpgsql;
+
+-- ===============================================
 -- TRIGGERS
 -- ===============================================
 
@@ -748,9 +988,6 @@ CREATE TRIGGER update_doctor_availability_updated_at BEFORE UPDATE ON doctor_ava
 DROP TRIGGER IF EXISTS update_queue_tokens_updated_at ON queue_tokens;
 CREATE TRIGGER update_queue_tokens_updated_at BEFORE UPDATE ON queue_tokens FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
 
-DROP TRIGGER IF EXISTS update_appointment_queue_updated_at ON appointment_queue;
-CREATE TRIGGER update_appointment_queue_updated_at BEFORE UPDATE ON appointment_queue FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
-
 -- Auto-generate patient numbers
 DROP TRIGGER IF EXISTS auto_generate_patient_number ON patients;
 CREATE TRIGGER auto_generate_patient_number
@@ -773,14 +1010,6 @@ CREATE TRIGGER auto_generate_token_number
     FOR EACH ROW
     WHEN (NEW.token_number IS NULL OR NEW.token_number = 0)
     EXECUTE FUNCTION generate_token_number();
-
--- Auto-calculate queue position
-DROP TRIGGER IF EXISTS auto_calculate_queue_position ON appointment_queue;
-CREATE TRIGGER auto_calculate_queue_position
-    BEFORE INSERT ON appointment_queue
-    FOR EACH ROW
-    WHEN (NEW.queue_position IS NULL OR NEW.queue_position = 0)
-    EXECUTE FUNCTION calculate_queue_position();
 
 -- Validate doctor role for availability
 DROP TRIGGER IF EXISTS validate_doctor_availability_trigger ON doctor_availability;
@@ -842,8 +1071,6 @@ CREATE POLICY "Healthcare staff can access all data" ON doctor_availability FOR 
 DROP POLICY IF EXISTS "Healthcare staff can access all data" ON queue_tokens;
 CREATE POLICY "Healthcare staff can access all data" ON queue_tokens FOR ALL USING (true);
 
-DROP POLICY IF EXISTS "Healthcare staff can access all data" ON appointment_queue;
-CREATE POLICY "Healthcare staff can access all data" ON appointment_queue FOR ALL USING (true);
 DROP POLICY IF EXISTS "Healthcare staff can access all data" ON clinic_settings;
 CREATE POLICY "Healthcare staff can access all data" ON clinic_settings FOR ALL USING (true);
 
@@ -1152,40 +1379,6 @@ INSERT INTO queue_tokens (
     (SELECT id FROM users WHERE email = 'admin@clinic.com')
 ) ON CONFLICT (doctor_id, issued_date, token_number) DO NOTHING;
 
--- Insert sample appointment queue
-INSERT INTO appointment_queue (
-    appointment_id, 
-    doctor_id, 
-    patient_id, 
-    queue_position, 
-    estimated_start_time, 
-    actual_start_time, 
-    actual_end_time, 
-    status, 
-    priority, 
-    notes
-) 
-SELECT 
-    a.id,
-    a.doctor_id,
-    a.patient_id,
-    ROW_NUMBER() OVER (ORDER BY a.appointment_time),
-    a.appointment_date::timestamp + a.appointment_time + (ROW_NUMBER() OVER (ORDER BY a.appointment_time) - 1) * INTERVAL '5 minutes',
-    NULL,
-    NULL,
-    'queued',
-    1,
-    CASE ROW_NUMBER() OVER (ORDER BY a.appointment_time)
-        WHEN 1 THEN 'First in queue'
-        WHEN 2 THEN 'Second in queue'
-        WHEN 3 THEN 'Third in queue'
-        ELSE 'In queue'
-    END
-FROM appointments a
-WHERE a.appointment_date = CURRENT_DATE
-AND a.doctor_id = (SELECT id FROM users WHERE email = 'dr.smith@clinic.com')
-ON CONFLICT DO NOTHING;
-
 DO $$
 BEGIN
   IF EXISTS (
@@ -1224,7 +1417,6 @@ BEGIN
     RAISE NOTICE '   • audit_logs (security tracking)';
     RAISE NOTICE '   • doctor_availability (doctor schedules)';
     RAISE NOTICE '   • queue_tokens (patient queue management)';
-    RAISE NOTICE '   • appointment_queue (appointment scheduling queue)';
     RAISE NOTICE '';
     RAISE NOTICE '✅ Sample Users Created:';
     RAISE NOTICE '   • admin@clinic.com (password: admin123)';

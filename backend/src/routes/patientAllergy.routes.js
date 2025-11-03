@@ -1,5 +1,6 @@
 import express from 'express';
 import { authenticate, authorize } from '../middleware/auth.js';
+import { requireActiveVisit } from '../middleware/activeVisitCheck.js';
 import patientAllergyService from '../services/PatientAllergy.service.js';
 
 const router = express.Router();
@@ -69,11 +70,13 @@ router.get(
  * @route   POST /api/patient-allergies
  * @desc    Create new allergy
  * @access  Private (Doctor, Nurse)
+ * @security Requires patient to have an active visit
  */
 router.post(
   '/',
   authenticate,
   authorize('doctor', 'nurse'),
+  requireActiveVisit,
   async (req, res) => {
     try {
       const allergyData = {
@@ -101,11 +104,13 @@ router.post(
  * @route   PUT /api/patient-allergies/:id
  * @desc    Update allergy
  * @access  Private (Doctor, Nurse)
+ * @security Requires patient to have an active visit
  */
 router.put(
   '/:id',
   authenticate,
   authorize('doctor', 'nurse'),
+  requireActiveVisit,
   async (req, res) => {
     try {
       const { id } = req.params;

@@ -3,6 +3,9 @@ import { useParams, useNavigate } from 'react-router-dom';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { Textarea } from '@/components/ui/textarea';
 import { 
   ArrowLeft, 
   UserCircle, 
@@ -13,17 +16,103 @@ import {
   Heart,
   AlertTriangle,
   Pill,
-  Shield
+  Shield,
+  ClipboardList,
+  AlertCircle,
+  Edit
 } from 'lucide-react';
 import patientService from '@/services/patientService';
+import { allergyService } from '@/services/allergyService';
+import { diagnosisService } from '@/services/diagnosisService';
 import PageLayout from '@/components/PageLayout';
+import Modal from '@/components/ui/ModalComponent';
 
 const PatientDetailPage = () => {
   const { id } = useParams();
   const navigate = useNavigate();
   const [patient, setPatient] = useState(null);
+  const [allergies, setAllergies] = useState([]);
+  const [diagnoses, setDiagnoses] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState('');
+  const [isEditModalOpen, setIsEditModalOpen] = useState(false);
+  const [isSaving, setIsSaving] = useState(false);
+  const [editFormData, setEditFormData] = useState({
+    first_name: '',
+    last_name: '',
+    date_of_birth: '',
+    gender: '',
+    phone: '',
+    email: '',
+    address: '',
+    emergency_contact_name: '',
+    emergency_contact_phone: '',
+    emergency_contact_relationship: '',
+    blood_group: '',
+    allergies: '',
+    medical_conditions: '',
+    current_medications: '',
+    insurance_provider: '',
+    insurance_number: ''
+  });
+
+  // Handle opening edit modal
+  const handleEditClick = () => {
+    setEditFormData({
+      first_name: patient.first_name || '',
+      last_name: patient.last_name || '',
+      date_of_birth: patient.date_of_birth || '',
+      gender: patient.gender || '',
+      phone: patient.phone || '',
+      email: patient.email || '',
+      address: patient.address || '',
+      emergency_contact_name: patient.emergency_contact_name || '',
+      emergency_contact_phone: patient.emergency_contact_phone || '',
+      emergency_contact_relationship: patient.emergency_contact_relationship || '',
+      blood_group: patient.blood_group || '',
+      allergies: patient.allergies || '',
+      medical_conditions: patient.medical_conditions || '',
+      current_medications: patient.current_medications || '',
+      insurance_provider: patient.insurance_provider || '',
+      insurance_number: patient.insurance_number || ''
+    });
+    setIsEditModalOpen(true);
+  };
+
+  // Handle input change in edit form
+  const handleEditInputChange = (field, value) => {
+    setEditFormData(prev => ({
+      ...prev,
+      [field]: value
+    }));
+  };
+
+  // Handle save patient updates
+  const handleSavePatient = async () => {
+    try {
+      // Validate required fields
+      if (!editFormData.first_name || !editFormData.last_name) {
+        alert('Please fill in all required fields (First Name, Last Name)');
+        return;
+      }
+
+      setIsSaving(true);
+      const response = await patientService.updatePatient(id, editFormData);
+      
+      if (response.success) {
+        setPatient(response.data);
+        setIsEditModalOpen(false);
+        alert('Patient information updated successfully!');
+      } else {
+        alert('Failed to update patient information');
+      }
+    } catch (error) {
+      console.error('Error updating patient:', error);
+      alert('Error updating patient information');
+    } finally {
+      setIsSaving(false);
+    }
+  };
 
   useEffect(() => {
     const loadPatient = async () => {
@@ -32,6 +121,23 @@ const PatientDetailPage = () => {
         const response = await patientService.getPatientById(id);
         if (response.success) {
           setPatient(response.data);
+          
+          // Load allergies and diagnoses
+          try {
+            const allergiesData = await allergyService.getAllergiesByPatient(id);
+            setAllergies(Array.isArray(allergiesData) ? allergiesData : []);
+          } catch (allergyError) {
+            console.error('Error loading allergies:', allergyError);
+            setAllergies([]);
+          }
+          
+          try {
+            const diagnosesData = await diagnosisService.getDiagnosesByPatient(id, true);
+            setDiagnoses(Array.isArray(diagnosesData) ? diagnosesData : []);
+          } catch (diagnosisError) {
+            console.error('Error loading diagnoses:', diagnosisError);
+            setDiagnoses([]);
+          }
         } else {
           setError('Patient not found');
         }
@@ -97,10 +203,21 @@ const PatientDetailPage = () => {
           {/* Patient Overview */}
           <Card>
             <CardHeader>
-              <CardTitle className="flex items-center gap-3">
-                <UserCircle className="h-6 w-6" />
-                Patient Information
-              </CardTitle>
+              <div className="flex items-center justify-between">
+                <CardTitle className="flex items-center gap-3">
+                  <UserCircle className="h-6 w-6" />
+                  Patient Information
+                </CardTitle>
+                <Button 
+                  variant="outline" 
+                  size="sm"
+                  onClick={handleEditClick}
+                  className="flex items-center gap-2"
+                >
+                  <Edit className="h-4 w-4" />
+                  Edit Patient
+                </Button>
+              </div>
             </CardHeader>
             <CardContent>
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
@@ -185,30 +302,122 @@ const PatientDetailPage = () => {
               </CardTitle>
             </CardHeader>
             <CardContent>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                <div className="space-y-4">
-                  <div>
-                    <div className="flex items-center gap-2 mb-2">
-                      <AlertTriangle className="h-5 w-5 text-destructive" />
-                      <h4 className="font-medium">Allergies</h4>
-                    </div>
-                    <p className="text-sm text-muted-foreground">
-                      {patient.allergies || 'No known allergies'}
-                    </p>
+              <div className="space-y-6">
+                {/* Known Allergies */}
+                <div>
+                  <div className="flex items-center gap-2 mb-3">
+                    <AlertCircle className="h-5 w-5 text-amber-500" />
+                    <h4 className="font-semibold">Known Allergies</h4>
                   </div>
-                  
+                  <div className="bg-amber-50 p-4 rounded-lg border border-amber-200">
+                    {allergies && allergies.length > 0 ? (
+                      <div className="space-y-3">
+                        {allergies.map((allergy, index) => (
+                          <div key={allergy.id || index} className="flex items-start justify-between border-b border-amber-200 last:border-0 pb-3 last:pb-0">
+                            <div className="flex-1">
+                              <div className="flex items-center gap-2 mb-1">
+                                <Badge variant="destructive" className="bg-red-100 text-red-800 border-red-300">
+                                  {allergy.allergy_name}
+                                </Badge>
+                                {allergy.severity && (
+                                  <Badge variant="outline" className={
+                                    allergy.severity === 'life-threatening' ? 'border-red-600 text-red-600' :
+                                    allergy.severity === 'severe' ? 'border-orange-600 text-orange-600' :
+                                    allergy.severity === 'moderate' ? 'border-yellow-600 text-yellow-600' :
+                                    'border-gray-600 text-gray-600'
+                                  }>
+                                    {allergy.severity}
+                                  </Badge>
+                                )}
+                                {allergy.allergen_type && (
+                                  <span className="text-xs text-gray-500 capitalize">({allergy.allergen_type})</span>
+                                )}
+                              </div>
+                              {allergy.reaction && (
+                                <p className="text-sm text-gray-600 mt-1">
+                                  <strong>Reaction:</strong> {allergy.reaction}
+                                </p>
+                              )}
+                              {allergy.notes && (
+                                <p className="text-sm text-gray-600 mt-1">
+                                  <strong>Notes:</strong> {allergy.notes}
+                                </p>
+                              )}
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    ) : (
+                      <p className="text-amber-700">No known allergies</p>
+                    )}
+                  </div>
+                </div>
+
+                {/* Diagnosis History */}
+                <div>
+                  <div className="flex items-center gap-2 mb-3">
+                    <ClipboardList className="h-5 w-5 text-blue-500" />
+                    <h4 className="font-semibold">Diagnosis History</h4>
+                  </div>
+                  <div className="bg-blue-50 p-4 rounded-lg border border-blue-200">
+                    {diagnoses && diagnoses.length > 0 ? (
+                      <div className="space-y-3">
+                        {diagnoses.map((diagnosis, index) => (
+                          <div key={diagnosis.id || index} className="border-b border-blue-200 last:border-0 pb-3 last:pb-0">
+                            <div className="flex items-start justify-between mb-1">
+                              <div className="flex-1">
+                                <div className="flex items-center gap-2 mb-1">
+                                  <span className="font-medium text-gray-900">{diagnosis.diagnosis_name}</span>
+                                  {diagnosis.diagnosis_code && (
+                                    <Badge variant="outline" className="text-xs">{diagnosis.diagnosis_code}</Badge>
+                                  )}
+                                  {diagnosis.status && (
+                                    <Badge variant="outline" className={
+                                      diagnosis.status === 'active' ? 'border-green-600 text-green-600' :
+                                      diagnosis.status === 'resolved' ? 'border-blue-600 text-blue-600' :
+                                      diagnosis.status === 'chronic' ? 'border-purple-600 text-purple-600' :
+                                      'border-gray-600 text-gray-600'
+                                    }>
+                                      {diagnosis.status}
+                                    </Badge>
+                                  )}
+                                </div>
+                                <div className="flex flex-wrap gap-3 text-sm text-gray-600">
+                                  {diagnosis.diagnosed_date && (
+                                    <span>Diagnosed: {new Date(diagnosis.diagnosed_date).toLocaleDateString()}</span>
+                                  )}
+                                  {diagnosis.severity && (
+                                    <span className="capitalize">Severity: {diagnosis.severity}</span>
+                                  )}
+                                </div>
+                                {diagnosis.notes && (
+                                  <p className="text-sm text-gray-600 mt-2">
+                                    <strong>Notes:</strong> {diagnosis.notes}
+                                  </p>
+                                )}
+                              </div>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    ) : (
+                      <p className="text-blue-700">No diagnosis history available</p>
+                    )}
+                  </div>
+                </div>
+
+                {/* Old text fields - keep for reference if not in separate tables */}
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                   <div>
                     <div className="flex items-center gap-2 mb-2">
                       <Heart className="h-5 w-5 text-primary" />
-                      <h4 className="font-medium">Medical Conditions</h4>
+                      <h4 className="font-medium">Medical Conditions (from patient record)</h4>
                     </div>
                     <p className="text-sm text-muted-foreground">
                       {patient.medical_conditions || 'No known medical conditions'}
                     </p>
                   </div>
-                </div>
-
-                <div className="space-y-4">
+                  
                   <div>
                     <div className="flex items-center gap-2 mb-2">
                       <Pill className="h-5 w-5 text-blue-500" />
@@ -253,6 +462,239 @@ const PatientDetailPage = () => {
             </Button>
           </div>
         </div>
+
+        {/* Edit Patient Modal */}
+        <Modal
+          isOpen={isEditModalOpen}
+          onClose={() => setIsEditModalOpen(false)}
+          title="Edit Patient Information"
+          size="xl"
+          onSave={handleSavePatient}
+          onCancel={() => setIsEditModalOpen(false)}
+          saveText="Save Changes"
+          loading={isSaving}
+          saveDisabled={!editFormData.first_name || !editFormData.last_name}
+        >
+          <div className="space-y-6 max-h-[60vh] overflow-y-auto px-2">
+            {/* Personal Information */}
+            <div>
+              <h4 className="text-sm font-semibold text-gray-900 mb-4 flex items-center gap-2">
+                <UserCircle className="h-4 w-4" />
+                Personal Information
+              </h4>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                  <Label htmlFor="edit-first-name">First Name *</Label>
+                  <Input
+                    id="edit-first-name"
+                    value={editFormData.first_name}
+                    onChange={(e) => handleEditInputChange('first_name', e.target.value)}
+                    placeholder="Enter first name"
+                  />
+                </div>
+                <div>
+                  <Label htmlFor="edit-last-name">Last Name *</Label>
+                  <Input
+                    id="edit-last-name"
+                    value={editFormData.last_name}
+                    onChange={(e) => handleEditInputChange('last_name', e.target.value)}
+                    placeholder="Enter last name"
+                  />
+                </div>
+                <div>
+                  <Label htmlFor="edit-dob">Date of Birth</Label>
+                  <Input
+                    id="edit-dob"
+                    type="date"
+                    value={editFormData.date_of_birth}
+                    onChange={(e) => handleEditInputChange('date_of_birth', e.target.value)}
+                  />
+                </div>
+                <div>
+                  <Label htmlFor="edit-gender">Gender</Label>
+                  <select
+                    id="edit-gender"
+                    value={editFormData.gender}
+                    onChange={(e) => handleEditInputChange('gender', e.target.value)}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary"
+                  >
+                    <option value="">Select gender</option>
+                    <option value="male">Male</option>
+                    <option value="female">Female</option>
+                    <option value="other">Other</option>
+                  </select>
+                </div>
+                <div>
+                  <Label htmlFor="edit-blood-group">Blood Group</Label>
+                  <select
+                    id="edit-blood-group"
+                    value={editFormData.blood_group}
+                    onChange={(e) => handleEditInputChange('blood_group', e.target.value)}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary"
+                  >
+                    <option value="">Select blood group</option>
+                    <option value="A+">A+</option>
+                    <option value="A-">A-</option>
+                    <option value="B+">B+</option>
+                    <option value="B-">B-</option>
+                    <option value="AB+">AB+</option>
+                    <option value="AB-">AB-</option>
+                    <option value="O+">O+</option>
+                    <option value="O-">O-</option>
+                  </select>
+                </div>
+              </div>
+            </div>
+
+            {/* Contact Information */}
+            <div>
+              <h4 className="text-sm font-semibold text-gray-900 mb-4 flex items-center gap-2">
+                <Phone className="h-4 w-4" />
+                Contact Information
+              </h4>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                  <Label htmlFor="edit-phone">Phone</Label>
+                  <Input
+                    id="edit-phone"
+                    value={editFormData.phone}
+                    onChange={(e) => handleEditInputChange('phone', e.target.value)}
+                    placeholder="Enter phone number"
+                  />
+                </div>
+                <div>
+                  <Label htmlFor="edit-email">Email</Label>
+                  <Input
+                    id="edit-email"
+                    type="email"
+                    value={editFormData.email}
+                    onChange={(e) => handleEditInputChange('email', e.target.value)}
+                    placeholder="Enter email address"
+                  />
+                </div>
+                <div className="md:col-span-2">
+                  <Label htmlFor="edit-address">Address</Label>
+                  <Textarea
+                    id="edit-address"
+                    value={editFormData.address}
+                    onChange={(e) => handleEditInputChange('address', e.target.value)}
+                    placeholder="Enter address"
+                    rows={2}
+                  />
+                </div>
+              </div>
+            </div>
+
+            {/* Emergency Contact */}
+            <div>
+              <h4 className="text-sm font-semibold text-gray-900 mb-4 flex items-center gap-2">
+                <AlertTriangle className="h-4 w-4" />
+                Emergency Contact
+              </h4>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                  <Label htmlFor="edit-emergency-name">Contact Name</Label>
+                  <Input
+                    id="edit-emergency-name"
+                    value={editFormData.emergency_contact_name}
+                    onChange={(e) => handleEditInputChange('emergency_contact_name', e.target.value)}
+                    placeholder="Enter emergency contact name"
+                  />
+                </div>
+                <div>
+                  <Label htmlFor="edit-emergency-phone">Contact Phone</Label>
+                  <Input
+                    id="edit-emergency-phone"
+                    value={editFormData.emergency_contact_phone}
+                    onChange={(e) => handleEditInputChange('emergency_contact_phone', e.target.value)}
+                    placeholder="Enter emergency contact phone"
+                  />
+                </div>
+                <div>
+                  <Label htmlFor="edit-emergency-relationship">Relationship</Label>
+                  <Input
+                    id="edit-emergency-relationship"
+                    value={editFormData.emergency_contact_relationship}
+                    onChange={(e) => handleEditInputChange('emergency_contact_relationship', e.target.value)}
+                    placeholder="e.g., Spouse, Parent, Sibling"
+                  />
+                </div>
+              </div>
+            </div>
+
+            {/* Medical Information */}
+            <div>
+              <h4 className="text-sm font-semibold text-gray-900 mb-4 flex items-center gap-2">
+                <Heart className="h-4 w-4" />
+                Medical Information (Basic)
+              </h4>
+              <div className="space-y-4">
+                <div>
+                  <Label htmlFor="edit-allergies">Allergies (text field)</Label>
+                  <Textarea
+                    id="edit-allergies"
+                    value={editFormData.allergies}
+                    onChange={(e) => handleEditInputChange('allergies', e.target.value)}
+                    placeholder="Enter known allergies"
+                    rows={2}
+                  />
+                </div>
+                <div>
+                  <Label htmlFor="edit-conditions">Medical Conditions</Label>
+                  <Textarea
+                    id="edit-conditions"
+                    value={editFormData.medical_conditions}
+                    onChange={(e) => handleEditInputChange('medical_conditions', e.target.value)}
+                    placeholder="Enter medical conditions"
+                    rows={2}
+                  />
+                </div>
+                <div>
+                  <Label htmlFor="edit-medications">Current Medications</Label>
+                  <Textarea
+                    id="edit-medications"
+                    value={editFormData.current_medications}
+                    onChange={(e) => handleEditInputChange('current_medications', e.target.value)}
+                    placeholder="Enter current medications"
+                    rows={2}
+                  />
+                </div>
+              </div>
+            </div>
+
+            {/* Insurance Information */}
+            <div>
+              <h4 className="text-sm font-semibold text-gray-900 mb-4 flex items-center gap-2">
+                <Shield className="h-4 w-4" />
+                Insurance Information
+              </h4>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                  <Label htmlFor="edit-insurance-provider">Insurance Provider</Label>
+                  <Input
+                    id="edit-insurance-provider"
+                    value={editFormData.insurance_provider}
+                    onChange={(e) => handleEditInputChange('insurance_provider', e.target.value)}
+                    placeholder="Enter insurance provider"
+                  />
+                </div>
+                <div>
+                  <Label htmlFor="edit-insurance-number">Insurance Number</Label>
+                  <Input
+                    id="edit-insurance-number"
+                    value={editFormData.insurance_number}
+                    onChange={(e) => handleEditInputChange('insurance_number', e.target.value)}
+                    placeholder="Enter insurance number"
+                  />
+                </div>
+              </div>
+            </div>
+
+            <p className="text-xs text-gray-500 mt-4">
+              * Required fields. Note: Detailed allergies and diagnoses are managed separately in the medical records section.
+            </p>
+          </div>
+        </Modal>
       </PageLayout>
     </div>
   );

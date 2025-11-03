@@ -55,10 +55,10 @@ const DiagnosisForm = ({
         >
           <option value="primary">Primary</option>
           <option value="secondary">Secondary</option>
-          <option value="comorbidity">Comorbidity</option>
-          <option value="rule-out">Rule-out</option>
-          <option value="working">Working Diagnosis</option>
           <option value="differential">Differential</option>
+          <option value="rule_out">Rule Out</option>
+          <option value="chronic">Chronic</option>
+          <option value="acute">Acute</option>
         </select>
       </div>
       
@@ -74,9 +74,10 @@ const DiagnosisForm = ({
         >
           <option value="active">Active</option>
           <option value="resolved">Resolved</option>
-          <option value="inactive">Inactive</option>
-          <option value="recurrence">Recurrence</option>
-          <option value="remission">Remission</option>
+          <option value="chronic">Chronic</option>
+          <option value="in_remission">In Remission</option>
+          <option value="recurring">Recurring</option>
+          <option value="ruled_out">Ruled Out</option>
         </select>
       </div>
       

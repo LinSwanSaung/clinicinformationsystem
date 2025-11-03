@@ -88,22 +88,33 @@ const PatientPortalDashboard = () => {
 
   const lastVisit = useMemo(() => {
     if (!Array.isArray(visitsState.data) || visitsState.data.length === 0) {
+      console.log('[lastVisit] No visits data available');
       return null;
     }
-    const completedVisits = visitsState.data.filter(v => v.status === 'completed');
-    if (completedVisits.length === 0) return null;
-    return completedVisits.sort((a, b) => new Date(b.visit_date) - new Date(a.visit_date))[0];
+    
+    console.log('[lastVisit] All visits:', visitsState.data);
+    
+    // Include both completed and in-progress visits
+    // This allows patients to see their ongoing visit and measured vitals
+    const relevantVisits = visitsState.data.filter(v => {
+      console.log('[lastVisit] Visit status:', v.status, 'for visit:', v);
+      return v.status === 'completed' || v.status === 'in-progress' || v.status === 'in_progress';
+    });
+    
+    console.log('[lastVisit] Relevant visits:', relevantVisits);
+    
+    if (relevantVisits.length === 0) return null;
+    
+    // Sort by date, most recent first
+    const sorted = relevantVisits.sort((a, b) => new Date(b.visit_date) - new Date(a.visit_date));
+    console.log('[lastVisit] Selected visit:', sorted[0]);
+    return sorted[0];
   }, [visitsState.data]);
 
   const vitalsVisits = useMemo(() => {
     if (!Array.isArray(visitsState.data)) return [];
     return visitsState.data.filter(v => v.vitals && Object.keys(v.vitals).length > 0);
   }, [visitsState.data]);
-
-  const handleLanguageToggle = useCallback(() => {
-    const newLang = i18n.language === 'en' ? 'my' : 'en';
-    i18n.changeLanguage(newLang);
-  }, [i18n]);
 
   const profileData = profileState.data?.data ?? profileState.data;
   console.log('[PatientPortalDashboard] profileState:', profileState);
@@ -124,8 +135,6 @@ const PatientPortalDashboard = () => {
             loading={profileState.loading}
             error={profileState.error}
             onRetry={loadProfile}
-            language={i18n.language}
-            onLanguageToggle={handleLanguageToggle}
           />
           <div className="grid gap-6 xl:grid-cols-[2fr,3fr]">
             <UpcomingAppointments
@@ -153,7 +162,7 @@ const PatientPortalDashboard = () => {
           {profileData?.patient?.id && (
             <>
               {console.log('[PatientPortalDashboard] Rendering AIHealthBlog with patientId:', profileData.patient.id)}
-              <AIHealthBlog patientId={profileData.patient.id} />
+              <AIHealthBlog patientId={profileData.patient.id} language={i18n.language} />
             </>
           )}
         </div>

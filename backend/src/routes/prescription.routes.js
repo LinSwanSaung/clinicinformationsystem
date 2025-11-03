@@ -2,6 +2,7 @@ import express from 'express';
 import PrescriptionService from '../services/Prescription.service.js';
 import { asyncHandler } from '../middleware/errorHandler.js';
 import { authorize } from '../middleware/auth.js';
+import { requireActiveVisit } from '../middleware/activeVisitCheck.js';
 import { logAuditEvent } from '../utils/auditLogger.js';
 
 const router = express.Router();
@@ -10,10 +11,12 @@ const router = express.Router();
  * @route   POST /api/prescriptions
  * @desc    Create a new prescription
  * @access  Doctor only
+ * @security Requires patient to have an active visit
  */
 router.post(
   '/',
   authorize(['doctor']),
+  requireActiveVisit,
   asyncHandler(async (req, res) => {
     const result = await PrescriptionService.createPrescription(req.body);
     try { logAuditEvent({ userId: req.user?.id || null, role: req.user?.role || null, action: 'CREATE', entity: 'prescriptions', recordId: result?.id || null, patientId: req.body?.patient_id || null, result: 'success', ip: req.ip }); } catch (e) {}

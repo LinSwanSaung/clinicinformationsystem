@@ -1,5 +1,4 @@
 import QueueTokenModel from '../models/QueueToken.model.js';
-import AppointmentQueueModel from '../models/AppointmentQueue.model.js';
 import AppointmentModel from '../models/Appointment.model.js';
 import patientModel from '../models/Patient.model.js';
 import VisitService from './Visit.service.js';
@@ -9,7 +8,6 @@ import { logAuditEvent } from '../utils/auditLogger.js';
 class QueueService {
   constructor() {
     this.queueTokenModel = new QueueTokenModel();
-    this.appointmentQueueModel = new AppointmentQueueModel();
     this.appointmentModel = new AppointmentModel();
     this.visitService = new VisitService();
     this.supabase = supabase;
@@ -129,10 +127,10 @@ class QueueService {
         }
       }
 
-      // Check if patient already has an active token today
-      const existingToken = await this.queueTokenModel.getPatientCurrentToken(patient_id, doctor_id);
+      // Check if patient already has an active token today (regardless of doctor)
+      const existingToken = await this.queueTokenModel.getPatientCurrentToken(patient_id);
       if (existingToken) {
-        throw new Error(`Patient already has an active token for this doctor today. Token: ${JSON.stringify(existingToken)}`);
+        throw new Error(`Patient already has an active token today. Please complete or cancel the current visit before queueing again. Current Token: #${existingToken.token_number} with ${existingToken.doctor_id}`);
       }
 
       // Create a visit record for this new consultation
@@ -175,6 +173,7 @@ class QueueService {
 
       } catch (visitError) {
         console.error(`[QUEUE] ⚠️ Failed to create visit record:`, visitError.message);
+        console.error(`[QUEUE] ⚠️ Visit creation error details:`, visitError);
         // Don't fail the token creation if visit creation fails
         // This ensures the queue can still work even if there are visit issues
       }
@@ -194,9 +193,6 @@ class QueueService {
         await this.appointmentModel.update(appointment_id, { 
           status: 'waiting' 
         });
-
-        // Add to appointment queue as well
-        await this.appointmentQueueModel.addToQueue(appointment_id, doctor_id, patient_id, priority);
       }
 
       return {
@@ -207,6 +203,176 @@ class QueueService {
       };
     } catch (error) {
       throw error;
+    }
+  }
+
+  /**
+   * Call next patient and start consultation in one action
+   * Priority: urgent > appointment > token number
+   * Handles stuck consultations automatically
+   */
+  async callNextAndStart(doctorId) {
+    try {
+      console.log('[QUEUE] Call next and start for doctor:', doctorId);
+
+      // Check if doctor has any active consultation
+      const activeConsultation = await this.queueTokenModel.getActiveConsultation(doctorId);
+      if (activeConsultation) {
+        const patientName = activeConsultation.patient 
+          ? `${activeConsultation.patient.first_name} ${activeConsultation.patient.last_name}` 
+          : 'Unknown Patient';
+        
+        console.log('[QUEUE] Active consultation found:', {
+          tokenId: activeConsultation.id,
+          tokenNumber: activeConsultation.token_number,
+          patient: patientName,
+          status: activeConsultation.status
+        });
+
+        return {
+          success: false,
+          hasActiveConsultation: true,
+          activeToken: activeConsultation,
+          message: `You have an active consultation with ${patientName} (Token #${activeConsultation.token_number}). Please complete it first or use "End Consultation" to close it.`
+        };
+      }
+
+      // Get next token in queue (priority order handled by getNextToken)
+      console.log('[QUEUE] Fetching next token in queue...');
+      const nextToken = await this.queueTokenModel.getNextToken(doctorId);
+      
+      if (!nextToken) {
+        console.log('[QUEUE] No patients in queue');
+        return {
+          success: false,
+          message: 'No patients in queue. All patients have been seen or the queue is empty.'
+        };
+      }
+
+      console.log('[QUEUE] Next token found:', {
+        tokenId: nextToken.id,
+        tokenNumber: nextToken.token_number,
+        patient: nextToken.patient,
+        status: nextToken.status,
+        priority: nextToken.priority
+      });
+
+      // Update token status to 'called' first
+      console.log('[QUEUE] Updating token to "called"...');
+      await this.queueTokenModel.updateStatus(nextToken.id, 'called');
+
+      // Then immediately start consultation
+      console.log('[QUEUE] Updating token to "serving"...');
+      await this.queueTokenModel.updateStatus(nextToken.id, 'serving');
+
+      // Update appointment status if linked
+      if (nextToken.appointment_id) {
+        console.log('[QUEUE] Updating linked appointment status...');
+        await this.appointmentModel.update(nextToken.appointment_id, { 
+          status: 'in_progress' 
+        });
+      }
+
+      // Set visit_start_time if visit exists
+      if (nextToken.visit_id) {
+        try {
+          console.log('[QUEUE] Setting visit start time for visit:', nextToken.visit_id);
+          await this.visitService.updateVisit(nextToken.visit_id, {
+            visit_start_time: new Date().toISOString(),
+            status: 'in_progress'
+          });
+        } catch (visitError) {
+          console.warn('[QUEUE] Failed to update visit start time:', visitError.message);
+        }
+      } else {
+        console.warn('[QUEUE] Token has no visit_id, skipping visit update');
+      }
+
+      // Get updated token with patient details
+      const updatedToken = await this.queueTokenModel.findById(nextToken.id);
+      const patientName = updatedToken.patient 
+        ? `${updatedToken.patient.first_name} ${updatedToken.patient.last_name}` 
+        : 'Patient';
+
+      console.log('[QUEUE] ✅ Consultation started successfully');
+
+      return {
+        success: true,
+        token: updatedToken,
+        message: `Consultation started with ${patientName} (Token #${updatedToken.token_number})`
+      };
+    } catch (error) {
+      console.error('[QUEUE] ❌ Error in callNextAndStart:', error);
+      throw new Error(`Failed to call next patient and start consultation: ${error.message}`);
+    }
+  }
+
+  /**
+   * Force end any active consultation for a doctor
+   * Used to fix stuck consultations
+   */
+  async forceEndActiveConsultation(doctorId) {
+    try {
+      console.log('[QUEUE] Force ending active consultation for doctor:', doctorId);
+
+      const activeConsultation = await this.queueTokenModel.getActiveConsultation(doctorId);
+      if (!activeConsultation) {
+        console.log('[QUEUE] No active consultation found');
+        return {
+          success: false,
+          message: 'No active consultation found. The doctor is not currently seeing any patient.'
+        };
+      }
+
+      const patientName = activeConsultation.patient 
+        ? `${activeConsultation.patient.first_name} ${activeConsultation.patient.last_name}` 
+        : 'Unknown Patient';
+
+      console.log('[QUEUE] Ending consultation:', {
+        tokenId: activeConsultation.id,
+        tokenNumber: activeConsultation.token_number,
+        patient: patientName,
+        visitId: activeConsultation.visit_id
+      });
+
+      // Complete the token
+      console.log('[QUEUE] Updating token status to completed...');
+      await this.queueTokenModel.updateStatus(activeConsultation.id, 'completed');
+
+      // Complete the visit if exists
+      if (activeConsultation.visit_id) {
+        try {
+          console.log('[QUEUE] Completing visit:', activeConsultation.visit_id);
+          await this.visitService.completeVisit(activeConsultation.visit_id, {
+            status: 'completed',
+            visit_end_time: new Date().toISOString()
+          });
+          console.log('[QUEUE] ✅ Visit completed');
+        } catch (visitError) {
+          console.error('[QUEUE] ❌ Failed to complete visit:', visitError.message);
+        }
+      } else {
+        console.warn('[QUEUE] ⚠️ Token has no visit_id, skipping visit completion');
+      }
+
+      // Complete appointment if linked
+      if (activeConsultation.appointment_id) {
+        console.log('[QUEUE] Updating linked appointment...');
+        await this.appointmentModel.update(activeConsultation.appointment_id, { 
+          status: 'completed' 
+        });
+      }
+
+      console.log('[QUEUE] ✅ Consultation ended successfully');
+
+      return {
+        success: true,
+        token: activeConsultation,
+        message: `Consultation with ${patientName} (Token #${activeConsultation.token_number}) has been ended successfully.`
+      };
+    } catch (error) {
+      console.error('[QUEUE] ❌ Error ending consultation:', error);
+      throw new Error(`Failed to end consultation: ${error.message}`);
     }
   }
 
@@ -261,66 +427,31 @@ class QueueService {
         throw new Error('Token not found');
       }
 
-      if (token.status !== 'waiting') {
+      // Allow marking ready if status is 'waiting' or already 'called' (idempotent)
+      if (token.status !== 'waiting' && token.status !== 'called') {
         throw new Error(`Cannot mark patient as ready. Current status: ${token.status}`);
+      }
+
+      // If already called, just return success (idempotent operation)
+      if (token.status === 'called') {
+        const existingToken = await this.queueTokenModel.findById(tokenId);
+        return {
+          success: true,
+          token: existingToken,
+          message: 'Patient is already marked as ready'
+        };
       }
 
       const now = new Date();
       const updatePayload = {
         ready_at: now.toISOString()
       };
-      let priorityBoosted = false;
 
-      // Boost priority for scheduled patients who arrived after their appointment time
-      if (token.appointment_id) {
-        try {
-          const appointment = await this.appointmentModel.findById(token.appointment_id);
-
-          if (appointment?.appointment_date && appointment?.appointment_time) {
-            const timePart = appointment.appointment_time.length === 5
-              ? `${appointment.appointment_time}:00`
-              : appointment.appointment_time;
-            const scheduledDateTime = new Date(`${appointment.appointment_date}T${timePart}`);
-
-            if (!Number.isNaN(scheduledDateTime.getTime())) {
-              const diffMinutes = (now.getTime() - scheduledDateTime.getTime()) / 60000;
-
-              if (diffMinutes >= 10) {
-                const targetPriority = 4; // Below emergency (5) but ahead of standard queue
-                const currentPriority = token.priority ?? 1;
-
-                if (currentPriority < targetPriority) {
-                  updatePayload.priority = targetPriority;
-                  priorityBoosted = true;
-                }
-              }
-            } else {
-              console.warn(`[QUEUE] Unable to parse scheduled datetime for appointment ${appointment.id}`);
-            }
-          }
-        } catch (appointmentError) {
-          console.warn(`[QUEUE] Failed to evaluate appointment timing for token ${tokenId}:`, appointmentError.message);
-        }
-      }
+      // Priority is now set at check-in time by receptionist based on arrival time
+      // No need to boost priority here - it was already determined when token was issued
 
       // Update token status to called (indicating ready for doctor)
       const updatedToken = await this.queueTokenModel.updateStatus(tokenId, 'called', updatePayload);
-
-      // Keep appointment queue priority aligned if boosted
-      if (priorityBoosted && token.appointment_id) {
-        try {
-          await this.supabase
-            .from('appointment_queue')
-            .update({
-              priority: updatePayload.priority,
-              updated_at: now.toISOString()
-            })
-            .eq('appointment_id', token.appointment_id)
-            .eq('patient_id', token.patient_id);
-        } catch (queueUpdateError) {
-          console.warn(`[QUEUE] Failed to sync appointment queue priority for token ${tokenId}:`, queueUpdateError.message);
-        }
-      }
       
       // Get the updated token with patient details using the existing method
       const tokensWithDetails = await this.queueTokenModel.getByDoctorAndDate(token.doctor_id, token.issued_date);
@@ -329,9 +460,7 @@ class QueueService {
       return {
         success: true,
         data: fullToken || updatedToken,
-        message: priorityBoosted
-          ? `Patient (Token #${token.token_number}) is now ready and prioritized for their scheduled slot`
-          : `Patient (Token #${token.token_number}) is now ready for doctor`
+        message: `Patient (Token #${token.token_number}) is now ready for doctor`
       };
     } catch (error) {
       console.error('Error in markPatientReady:', error);
@@ -578,6 +707,11 @@ class QueueService {
    */
   async cancelToken(tokenId) {
     try {
+      const token = await this.queueTokenModel.findById(tokenId);
+      if (!token) {
+        throw new Error('Token not found');
+      }
+
       const updatedToken = await this.queueTokenModel.updateStatus(tokenId, 'cancelled');
 
       // Update appointment status if linked
@@ -585,6 +719,19 @@ class QueueService {
         await this.appointmentModel.update(updatedToken.appointment_id, { 
           status: 'cancelled' 
         });
+      }
+
+      // Cancel the associated visit if it exists
+      if (updatedToken.visit_id) {
+        try {
+          await this.visitService.updateVisit(updatedToken.visit_id, {
+            status: 'cancelled'
+          });
+          console.log(`✅ Visit ${updatedToken.visit_id} marked as cancelled`);
+        } catch (visitError) {
+          console.error(`⚠️ Failed to cancel visit ${updatedToken.visit_id}:`, visitError.message);
+          // Don't fail the token cancellation if visit cancellation fails
+        }
       }
 
       return {
@@ -707,140 +854,9 @@ class QueueService {
     }
   }
 
-  /**
-   * Mark an appointment queue entry as delayed
-   * Removes patient from active queue by setting status to 'delayed'
-   */
-  async delayAppointmentQueue(appointmentQueueId, reason = null) {
-    try {
-      // Get current appointment queue entry
-      const { data: currentEntry, error: fetchError } = await this.supabase
-        .from('appointment_queue')
-        .select('*')
-        .eq('id', appointmentQueueId)
-        .single();
-
-      if (fetchError || !currentEntry) {
-        throw new Error('Appointment queue entry not found');
-      }
-
-      if (currentEntry.status === 'delayed') {
-        throw new Error('Patient is already marked as delayed');
-      }
-
-      if (['completed', 'cancelled', 'skipped'].includes(currentEntry.status)) {
-        throw new Error(`Cannot delay patient with status: ${currentEntry.status}`);
-      }
-
-      // Update appointment queue entry
-      const { data: updatedEntry, error: updateError } = await this.supabase
-        .from('appointment_queue')
-        .update({
-          status: 'delayed',
-          delay_reason: reason,
-          delayed_at: new Date().toISOString(),
-          previous_queue_position: currentEntry.queue_position,
-          updated_at: new Date().toISOString()
-        })
-        .eq('id', appointmentQueueId)
-        .select()
-        .single();
-
-      if (updateError) throw updateError;
-
-      return {
-        success: true,
-        appointmentQueue: updatedEntry,
-        message: 'Patient marked as delayed and removed from active queue'
-      };
-    } catch (error) {
-      console.error('Error delaying appointment queue entry:', error);
-      throw error;
-    }
-  }
-
-  /**
-   * Undelay an appointment queue entry
-   * Moves patient to the end of the queue with new position
-   */
-  async undelayAppointmentQueue(appointmentQueueId) {
-    try {
-      // Get current appointment queue entry
-      const { data: currentEntry, error: fetchError } = await this.supabase
-        .from('appointment_queue')
-        .select(`
-          *,
-          appointment:appointments!appointment_id (
-            appointment_date
-          )
-        `)
-        .eq('id', appointmentQueueId)
-        .single();
-
-      if (fetchError || !currentEntry) {
-        throw new Error('Appointment queue entry not found');
-      }
-
-      if (currentEntry.status !== 'delayed') {
-        throw new Error('Patient is not delayed');
-      }
-
-      // Get the highest queue position for this doctor/date
-      const appointmentDate = currentEntry.appointment?.appointment_date || new Date().toISOString().split('T')[0];
-      
-      const { data: maxPositionData, error: maxError } = await this.supabase
-        .from('appointment_queue')
-        .select('queue_position, appointment:appointments!appointment_id(appointment_date)')
-        .eq('doctor_id', currentEntry.doctor_id)
-        .neq('status', 'delayed') // Exclude delayed patients from position calculation
-        .order('queue_position', { ascending: false })
-        .limit(100); // Get enough to filter by date
-
-      if (maxError) throw maxError;
-
-      // Filter by appointment date and find max position
-      const sameDate = maxPositionData.filter(entry => 
-        entry.appointment?.appointment_date === appointmentDate
-      );
-      const newQueuePosition = (sameDate[0]?.queue_position || 0) + 1;
-
-      // Update appointment queue - move to end of queue with new position
-      const { data: updatedEntry, error: updateError } = await this.supabase
-        .from('appointment_queue')
-        .update({
-          status: 'queued', // Reset to queued status
-          queue_position: newQueuePosition, // Assign new position at end of queue
-          undelayed_at: new Date().toISOString(),
-          updated_at: new Date().toISOString()
-        })
-        .eq('id', appointmentQueueId)
-        .select(`
-          *,
-          patient:patients!patient_id (
-            id,
-            first_name,
-            last_name,
-            patient_number
-          )
-        `)
-        .single();
-
-      if (updateError) throw updateError;
-
-      return {
-        success: true,
-        appointmentQueue: updatedEntry,
-        message: `Patient undelayed and moved to position #${newQueuePosition} in queue`,
-        newQueuePosition
-      };
-    } catch (error) {
-      console.error('Error undelaying appointment queue entry:', error);
-      throw error;
-    }
-  }
-
   // ===============================================
-  // QUEUE STATUS AND MONITORING
+  // QUEUE STATUS AND REPORTING
+  // ===============================================
   // ===============================================
 
   /**
@@ -856,17 +872,8 @@ class QueueService {
       const tokens = await this.queueTokenModel.getByDoctorAndDate(doctorId, queueDate);
       console.log(`[QUEUE STATUS] Found ${tokens.length} tokens`);
       
-      // Get appointment-based queue
-      const appointments = await this.appointmentQueueModel.getByDoctorAndDate(doctorId, queueDate);
-      console.log(`[QUEUE STATUS] Found ${appointments.length} appointments`);
-      
-      if (appointments.length > 0) {
-        console.log('[QUEUE STATUS] First appointment sample:', JSON.stringify(appointments[0], null, 2));
-      }
-      
       // Get statistics
       const tokenStats = await this.queueTokenModel.getQueueStats(doctorId, queueDate);
-      const appointmentStats = await this.appointmentQueueModel.getQueueStatistics(doctorId, queueDate);
 
       // Get current status
       const activeConsultation = await this.queueTokenModel.getActiveConsultation(doctorId);
@@ -876,14 +883,14 @@ class QueueService {
         doctor_id: doctorId,
         date: queueDate,
         tokens: tokens,
-        appointments: appointments,
+        appointments: [],
         statistics: {
           tokens: tokenStats,
-          appointments: appointmentStats,
+          appointments: { total: 0, queued: 0, completed: 0 },
           combined: {
-            totalPatients: tokenStats.total + appointmentStats.total,
-            waitingPatients: tokenStats.waiting + appointmentStats.queued,
-            completedToday: tokenStats.completed + appointmentStats.completed
+            totalPatients: tokenStats.total,
+            waitingPatients: tokenStats.waiting,
+            completedToday: tokenStats.completed
           }
         },
         currentStatus: {

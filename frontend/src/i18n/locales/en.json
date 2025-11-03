@@ -19,6 +19,24 @@
       "noPrescriptions": "No active prescriptions",
       "backToDashboard": "Back to Dashboard"
     },
+    "aiHealth": {
+      "title": "AI Health Assistant",
+      "loading": "Brewing personalized insights just for you ✨",
+      "errorTitle": "We hit a snag",
+      "errorCta": "Try Again",
+      "introTitle": "Here's your feel-good nudge for today:",
+      "introBody": "Sip some water, roll your shoulders back, and explore a few simple wins to brighten the day.",
+      "disclaimer": "Friendly reminder: These insights come from AI and are for inspiration. Your care team knows you best—always follow their medical guidance.",
+      "generatedAt": "Generated",
+      "diagnosisPrefix": "Based on your diagnosis:",
+      "meta": {
+        "diagnosis": "Tailored Care Plan",
+        "wellness": "Wellness Boost",
+        "nutrition": "Nutrition Nuggets",
+        "movement": "Move & Groove",
+        "default": "Health Highlights"
+      }
+    },
     "appointmentsList": {
       "errorTitle": "Upcoming appointments unavailable",
       "errorDescription": "We could not retrieve your appointments. Try again soon.",
@@ -30,6 +48,7 @@
       "unknownDoctor": "Doctor to be confirmed",
       "unknownDepartment": "Department pending",
       "book": "Book appointment",
+      "viewDetails": "View Details",
       "reschedule": "Reschedule",
       "cancel": "Cancel",
       "addToCalendar": "Add to Calendar",
@@ -70,12 +89,12 @@
       "heartRate": "Heart Rate",
       "temperature": "Temperature",
       "weight": "Weight",
-      "notRecorded": "—",
+      "notRecorded": "â€”",
       "preparing": "Preparing your vitals trend..."
     },
     "search": {
       "ariaLabel": "Search your medical records",
-      "placeholder": "Search your records…",
+      "placeholder": "Search your recordsâ€¦",
       "inputAria": "Enter search keywords",
       "submit": "Search",
       "resultsTitle": "{count} results",
@@ -248,7 +267,7 @@
       "temperature": "Temperature",
       "weight": "Weight",
       "height": "Height",
-      "oxygenSaturation": "O₂ Saturation",
+      "oxygenSaturation": "Oâ‚‚ Saturation",
       "bmi": "BMI",
       "respiratoryRate": "Respiratory Rate"
     },
@@ -270,10 +289,10 @@
     "profile": {
       "errorTitle": "Unable to load profile information",
       "errorDescription": "Please refresh or try again later.",
-      "greeting": "Welcome back, {name} 👋",
-      "genericGreeting": "Welcome back 👋",
-      "summaryLabel": "Age {age} · Preferred language {language}",
-      "summaryFallback": "Preferred language {language}",
+  "greeting": "Welcome back, {name} 👋",
+  "genericGreeting": "Welcome back 👋",
+  "summaryLabel": "Age {age}",
+      "summaryFallback": "Patient Information",
       "languageLabel": "Language",
       "languageToggleAria": "Toggle language",
       "genderLabel": "Gender",
@@ -283,7 +302,7 @@
       "languagePreferenceLabel": "Preference",
       "languageEN": "English",
       "languageMM": "Myanmar",
-      "lastVisitLabel": "Last visit on {date} • {doctor}",
+  "lastVisitLabel": "Last visit on {date} • {doctor}",
       "lastVisitReason": "Reason: {reason}",
       "unknownDoctor": "Unknown doctor",
       "unknownName": "Patient",

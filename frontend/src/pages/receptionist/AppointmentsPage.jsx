@@ -47,7 +47,7 @@ const AppointmentsPage = () => {
   // Consultation duration in minutes (fetched from clinic_settings table)
   const [consultationDuration, setConsultationDuration] = useState(15); // Default fallback
   
-  const [selectedDate, setSelectedDate] = useState(new Date(2025, 9, 28)); // October 28, 2025
+  const [selectedDate, setSelectedDate] = useState(new Date()); // Today's date
   const [searchTerm, setSearchTerm] = useState('');
   const [showNewAppointment, setShowNewAppointment] = useState(false);
   const [showAlert, setShowAlert] = useState(false);
@@ -68,16 +68,17 @@ const AppointmentsPage = () => {
   const [isLoadingTimeSlots, setIsLoadingTimeSlots] = useState(false);
   const [timeSlotError, setTimeSlotError] = useState('');
   
+  // Add a dedicated state for calendar display
+  const [calendarMonthDisplay, setCalendarMonthDisplay] = useState('November 2025');
+  
   const [calendarMonth, setCalendarMonth] = useState(() => {
-    // Force to current date - October 28, 2025
-    const today = new Date(2025, 9, 28); // Month is 0-indexed, so 9 = October
-    console.log('Calendar initialized to:', today.toLocaleDateString('en-US', { month: 'long', year: 'numeric' }));
+    const today = new Date();
     return today;
   });
   const [newAppointment, setNewAppointment] = useState({
     patientId: location.state?.patient?.id || '',
     doctorId: location.state?.doctor?.id || '',
-    date: new Date(2025, 9, 28), // Initialize to current date
+    date: new Date(), // Initialize to current date
     time: '09:00',
     type: 'Regular Checkup',
     notes: ''
@@ -130,12 +131,19 @@ const AppointmentsPage = () => {
 
   useEffect(() => {
     loadData();
+    
+    // Ensure calendar month is set to current month
+    const today = new Date();
+    setCalendarMonth(new Date(today));
+    setSelectedDate(new Date(today));
   }, []);
 
-  // Debug: Log current calendar month
+  // Update calendar display when month changes
   useEffect(() => {
-    console.log('Current calendar month:', calendarMonth.toLocaleDateString('en-US', { month: 'long', year: 'numeric' }));
-    console.log('Current selected date:', selectedDate.toLocaleDateString());
+    const monthNames = ['January', 'February', 'March', 'April', 'May', 'June',
+                        'July', 'August', 'September', 'October', 'November', 'December'];
+    const display = `${monthNames[calendarMonth.getMonth()]} ${calendarMonth.getFullYear()}`;
+    setCalendarMonthDisplay(display);
   }, [calendarMonth]);
 
   // Reset selected time when doctor or availability changes
@@ -162,7 +170,12 @@ const AppointmentsPage = () => {
         setIsLoadingTimeSlots(true);
         setTimeSlotError('');
         
-        const dateStr = selectedDate.toISOString().split('T')[0];
+        // Format date in local timezone to avoid timezone conversion issues
+        const year = selectedDate.getFullYear();
+        const month = String(selectedDate.getMonth() + 1).padStart(2, '0');
+        const day = String(selectedDate.getDate()).padStart(2, '0');
+        const dateStr = `${year}-${month}-${day}`;
+        
         console.log('[AppointmentsPage] Loading time slots for:', {
           doctorId: newAppointment.doctorId,
           date: dateStr,
@@ -344,31 +357,29 @@ const AppointmentsPage = () => {
       setIsLoadingAvailability(true);
       const response = await doctorAvailabilityService.getDoctorAvailability(doctorId);
       
-      console.log('[AppointmentsPage] Doctor availability response:', response);
-      
-      if (response.success && response.data) {
-        setDoctorAvailability(response.data);
-        
-        console.log('[AppointmentsPage] Raw availability data:', response.data);
+      // Response is directly an array, not wrapped in {success, data}
+      if (response && Array.isArray(response) && response.length > 0) {
+        setDoctorAvailability(response);
         
         // Extract available weekdays (0 = Sunday, 1 = Monday, etc.)
-        const weekdays = response.data
-          .filter(schedule => schedule.is_active) // Only include active schedules
-          .map(schedule => {
-            const dayMap = {
-              'monday': 1, 'tuesday': 2, 'wednesday': 3, 'thursday': 4,
-              'friday': 5, 'saturday': 6, 'sunday': 0
-            };
-            const dayIndex = dayMap[schedule.day_of_week.toLowerCase()];
-            console.log('[AppointmentsPage] Mapping day:', schedule.day_of_week, '→', dayIndex);
-            return dayIndex;
-          })
-          .filter(day => day !== undefined);
+        const dayMap = {
+          'monday': 1, 'tuesday': 2, 'wednesday': 3, 'thursday': 4,
+          'friday': 5, 'saturday': 6, 'sunday': 0
+        };
         
-        console.log('[AppointmentsPage] Available weekday indices:', weekdays);
+        const weekdays = [...new Set(
+          response
+            .filter(schedule => schedule.is_active) // Only include active schedules
+            .map(schedule => {
+              const dayIndex = dayMap[schedule.day_of_week.toLowerCase()];
+              return dayIndex;
+            })
+            .filter(day => day !== undefined)
+        )];
+        
         setAvailableWeekdays(weekdays);
       } else {
-        console.warn('No availability data found for doctor:', doctorId);
+        console.warn('❌ No availability data found for doctor:', doctorId);
         // Fallback - assume Monday to Friday availability
         setAvailableWeekdays([1, 2, 3, 4, 5]);
       }
@@ -385,7 +396,7 @@ const AppointmentsPage = () => {
   const isDateAvailable = (date) => {
     if (!selectedDoctor || availableWeekdays.length === 0) return false;
     
-    const today = new Date(2025, 9, 28); // October 28, 2025
+    const today = new Date();
     today.setHours(0, 0, 0, 0);
     
     // Disable past dates and today
@@ -395,19 +406,10 @@ const AppointmentsPage = () => {
     
     // Check if the day of the week is available
     const dayOfWeek = date.getDay(); // 0 = Sunday, 1 = Monday, etc.
-    const dayNames = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
     const isAvailable = availableWeekdays.includes(dayOfWeek);
-    
-    // Log for debugging (only for dates in current month to reduce noise)
-    if (date.getMonth() === new Date().getMonth()) {
-      console.log(`[isDateAvailable] ${date.toDateString()} (${dayNames[dayOfWeek]}, index ${dayOfWeek}):`, 
-        isAvailable ? '✓ Available' : '✗ Not available',
-        '| Available weekdays:', availableWeekdays);
-    }
     
     return isAvailable;
   };
-
   // Custom day renderer for calendar to highlight available days
   const renderDay = (date) => {
     const isAvailable = isDateAvailable(date);
@@ -454,30 +456,27 @@ const AppointmentsPage = () => {
     const newMonth = new Date(calendarMonth);
     newMonth.setMonth(newMonth.getMonth() + direction);
     
-    // Get current date for comparison - October 28, 2025
-    const today = new Date(2025, 9, 28);
+    // Get current date for comparison
+    const today = new Date();
     const currentMonth = new Date(today.getFullYear(), today.getMonth(), 1);
     
     // Prevent navigation to months before current month
     if (direction < 0 && newMonth < currentMonth) {
-      console.log('Cannot navigate to past months');
       return;
     }
     
     setCalendarMonth(newMonth);
-    console.log('Calendar navigated to:', newMonth.toLocaleDateString('en-US', { month: 'long', year: 'numeric' }));
   };
 
   const goToToday = () => {
-    const today = new Date(2025, 9, 28); // October 28, 2025
+    const today = new Date();
     setCalendarMonth(new Date(today)); // Create new Date object
     setSelectedDate(new Date(today)); // Create new Date object
-    console.log('Calendar reset to today:', today.toLocaleDateString('en-US', { month: 'long', year: 'numeric' }));
   };
 
   // Check if we can navigate to previous month
   const canNavigatePrevious = () => {
-    const today = new Date(2025, 9, 28); // October 28, 2025
+    const today = new Date();
     const currentMonth = new Date(today.getFullYear(), today.getMonth(), 1);
     const calendarMonthStart = new Date(calendarMonth.getFullYear(), calendarMonth.getMonth(), 1);
     return calendarMonthStart > currentMonth;
@@ -485,6 +484,23 @@ const AppointmentsPage = () => {
 
     const handleNewAppointment = async () => {
     try {
+      // Validate that appointment is not for today
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+      const appointmentDate = new Date(selectedDate);
+      appointmentDate.setHours(0, 0, 0, 0);
+      
+      if (appointmentDate.getTime() === today.getTime()) {
+        setError('Cannot book appointments for today. Appointments must be scheduled at least one day in advance. For same-day visits, please use walk-in registration.');
+        return;
+      }
+      
+      // Validate that appointment is not in the past
+      if (appointmentDate < today) {
+        setError('Cannot book appointments for past dates. Please select a future date.');
+        return;
+      }
+
       // Validate that a time slot is selected
       if (!newAppointment.time) {
         setError('Please select a time slot');
@@ -499,10 +515,16 @@ const AppointmentsPage = () => {
 
       setError(''); // Clear any previous errors
 
+      // Format date in local timezone to avoid timezone conversion issues
+      const year = selectedDate.getFullYear();
+      const month = String(selectedDate.getMonth() + 1).padStart(2, '0');
+      const day = String(selectedDate.getDate()).padStart(2, '0');
+      const localDateString = `${year}-${month}-${day}`;
+
       const appointmentData = {
         patient_id: newAppointment.patientId,
         doctor_id: newAppointment.doctorId,
-        appointment_date: selectedDate.toISOString().split('T')[0],
+        appointment_date: localDateString,
         appointment_time: newAppointment.time,
         appointment_type: newAppointment.type,
         notes: newAppointment.notes,
@@ -537,7 +559,7 @@ const AppointmentsPage = () => {
         setAvailableWeekdays([]);
         
         // Reset selected date to today
-        const today = new Date(2025, 9, 28);
+        const today = new Date();
         setSelectedDate(new Date(today));
         setCalendarMonth(new Date(today));
         
@@ -890,11 +912,8 @@ const AppointmentsPage = () => {
                                     <ChevronLeft className="h-2.5 w-2.5 sm:h-3 sm:w-3 md:h-4 md:w-4" />
                                   </Button>
                                   <div className="flex flex-col sm:flex-row sm:items-center gap-0.5 sm:gap-1 md:gap-2 text-center">
-                                    <h3 className="font-medium text-xs sm:text-sm md:text-base lg:text-lg leading-tight">
-                                      {calendarMonth.toLocaleDateString('en-US', { 
-                                        month: 'long', 
-                                        year: 'numeric' 
-                                      })}
+                                    <h3 key={`month-${calendarMonth.getTime()}-${calendarMonthDisplay}`} className="font-medium text-xs sm:text-sm md:text-base lg:text-lg leading-tight">
+                                      {calendarMonthDisplay || 'Loading...'}
                                     </h3>
                                     <Button
                                       type="button"
@@ -938,7 +957,7 @@ const AppointmentsPage = () => {
                                       const isCurrentMonth = date.getMonth() === calendarMonth.getMonth();
                                       const isAvailable = isDateAvailable(date);
                                       const isSelected = selectedDate && date.toDateString() === selectedDate.toDateString();
-                                      const today = new Date(2025, 9, 28); // October 28, 2025
+                                      const today = new Date();
                                       today.setHours(0, 0, 0, 0);
                                       const dateToCheck = new Date(date);
                                       dateToCheck.setHours(0, 0, 0, 0);

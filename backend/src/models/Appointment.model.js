@@ -147,6 +147,27 @@ class AppointmentModel extends BaseModel {
   }
 
   /**
+   * Generic update method for appointments
+   */
+  async update(id, updateData) {
+    const { data, error } = await this.supabase
+      .from(this.tableName)
+      .update({ 
+        ...updateData,
+        updated_at: new Date().toISOString()
+      })
+      .eq('id', id)
+      .select()
+      .single();
+
+    if (error) {
+      throw new Error(`Failed to update appointment: ${error.message}`);
+    }
+
+    return data;
+  }
+
+  /**
    * Check for appointment conflicts
    */
   async checkConflicts(doctorId, appointmentDate, appointmentTime, excludeId = null) {

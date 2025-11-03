@@ -231,4 +231,123 @@ router.delete('/:id',
   })
 );
 
+// ===============================================
+// DOCTOR UNAVAILABILITY MANAGEMENT ROUTES
+// ===============================================
+
+/**
+ * @route   POST /api/doctor-availability/check-missed-tokens
+ * @desc    Manually trigger check for missed tokens during doctor unavailability
+ * @access  Admin, Receptionist
+ */
+router.post('/check-missed-tokens',
+  authenticate,
+  authorize(['admin', 'receptionist']),
+  asyncHandler(async (req, res) => {
+    const result = await doctorAvailabilityService.checkAndMarkMissedTokens();
+
+    res.status(200).json({
+      success: true,
+      message: result.message,
+      data: {
+        missedTokens: result.missedTokens,
+        count: result.count
+      }
+    });
+  })
+);
+
+/**
+ * @route   POST /api/doctor-availability/check-missed-tokens/:doctorId
+ * @desc    Check and mark missed tokens for a specific doctor
+ * @access  Admin, Receptionist
+ */
+router.post('/check-missed-tokens/:doctorId',
+  authenticate,
+  authorize(['admin', 'receptionist']),
+  asyncHandler(async (req, res) => {
+    const { doctorId } = req.params;
+    
+    const result = await doctorAvailabilityService.checkDoctorMissedTokens(doctorId);
+
+    res.status(200).json({
+      success: true,
+      message: `Checked missed tokens for doctor`,
+      data: {
+        missedTokens: result.missedTokens,
+        count: result.count
+      }
+    });
+  })
+);
+
+/**
+ * @route   POST /api/doctor-availability/cancel-remaining-tokens/:doctorId
+ * @desc    Cancel all remaining tokens for a doctor (when doctor leaves for the day)
+ * @access  Admin, Receptionist
+ */
+router.post('/cancel-remaining-tokens/:doctorId',
+  authenticate,
+  authorize(['admin', 'receptionist']),
+  asyncHandler(async (req, res) => {
+    const { doctorId } = req.params;
+    const { reason } = req.body;
+    
+    const result = await doctorAvailabilityService.cancelDoctorRemainingTokens(
+      doctorId,
+      reason,
+      req.user.id
+    );
+
+    res.status(200).json({
+      success: true,
+      message: result.message,
+      data: {
+        cancelledTokens: result.cancelledTokens,
+        count: result.count
+      }
+    });
+  })
+);
+
+/**
+ * @route   GET /api/doctor-availability/status/:doctorId
+ * @desc    Get comprehensive availability status for a doctor
+ * @access  Admin, Receptionist, Doctor
+ */
+router.get('/status/:doctorId',
+  authenticate,
+  authorize(['admin', 'receptionist', 'doctor']),
+  asyncHandler(async (req, res) => {
+    const { doctorId } = req.params;
+    
+    const status = await doctorAvailabilityService.getDoctorAvailabilityStatus(doctorId);
+
+    res.status(200).json({
+      success: true,
+      message: 'Doctor availability status retrieved',
+      data: status
+    });
+  })
+);
+
+/**
+ * @route   GET /api/doctor-availability/status-all
+ * @desc    Get availability status for all active doctors
+ * @access  Admin, Receptionist
+ */
+router.get('/status-all',
+  authenticate,
+  authorize(['admin', 'receptionist']),
+  asyncHandler(async (req, res) => {
+    const result = await doctorAvailabilityService.getAllDoctorsAvailabilityStatus();
+
+    res.status(200).json({
+      success: true,
+      message: 'All doctors availability status retrieved',
+      data: result.doctors
+    });
+  })
+);
+
 export default router;

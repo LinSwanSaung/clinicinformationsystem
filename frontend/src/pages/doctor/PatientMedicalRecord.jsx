@@ -13,7 +13,8 @@ import {
   FileText,
   ChevronDown,
   ChevronRight,
-  DollarSign
+  DollarSign,
+  AlertCircle
 } from 'lucide-react';
 
 // Import our reusable medical components
@@ -43,7 +44,8 @@ const PatientMedicalRecord = () => {
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState('overview');
   const [expandedVisit, setExpandedVisit] = useState(null);
-  const [activeVisitId, setActiveVisitId] = useState(location.state?.visit_id || null);
+  const [activeVisitId, setActiveVisitId] = useState(null); // Don't initialize from location.state, verify it first
+  const [hasActiveVisit, setHasActiveVisit] = useState(false);
   const [patientFiles, setPatientFiles] = useState([]);
   const [uploadingFiles, setUploadingFiles] = useState(false);
 
@@ -132,16 +134,25 @@ const PatientMedicalRecord = () => {
       try {
         setLoading(true);
 
-        // Fetch active visit if not provided in location.state
-        if (!activeVisitId) {
-          try {
-            const activeVisit = await visitService.getPatientActiveVisit(selectedPatient.id);
-            if (activeVisit?.id) {
-              setActiveVisitId(activeVisit.id);
-            }
-          } catch (error) {
-            // No active visit found
+        // Always check for ACTIVE visit, regardless of what was passed in location.state
+        try {
+          // Only check for ACTIVE (in_progress) visits
+          const activeVisit = await visitService.getPatientActiveVisit(selectedPatient.id);
+          
+          if (activeVisit?.id) {
+            setActiveVisitId(activeVisit.id);
+            setHasActiveVisit(true);
+            console.log('🔍 [DOCTOR PMR] Active visit found:', activeVisit.id);
+          } else {
+            setActiveVisitId(null);
+            setHasActiveVisit(false);
+            console.log('🔍 [DOCTOR PMR] No active visit found - patient cannot have medical data added');
           }
+        } catch (error) {
+          // No active visit found
+          console.log('No active visit found:', error);
+          setActiveVisitId(null);
+          setHasActiveVisit(false);
         }
 
         // Fetch allergies
@@ -327,6 +338,12 @@ const PatientMedicalRecord = () => {
   };
 
   const handleAddNote = () => {
+    // Check for active visit first
+    if (!activeVisitId) {
+      alert('⚠️ No Visit Today\n\nCannot add clinical notes: Patient does not have a visit from today.\n\nMedical data can only be added for today\'s visits.');
+      return;
+    }
+    
     resetForm();
     setIsAddNoteModalOpen(true);
   };
@@ -403,6 +420,12 @@ const PatientMedicalRecord = () => {
           savedPrescriptions.push(prescription);
         } catch (error) {
           console.error('Error saving prescription:', error);
+          
+          // Check for specific error from backend
+          if (error.response?.data?.code === 'NO_ACTIVE_VISIT') {
+            alert('⚠️ Security Check Failed\n\nCannot add prescription: Patient does not have an active visit.\n\nPlease ensure the patient has an active consultation session before prescribing medications.');
+            throw error; // Stop processing
+          }
         }
       }
 
@@ -465,6 +488,12 @@ const PatientMedicalRecord = () => {
 
   // Diagnosis handlers
   const handleAddDiagnosis = () => {
+    // Check for active visit first
+    if (!activeVisitId) {
+      alert('⚠️ No Visit Today\n\nCannot add diagnosis: Patient does not have a visit from today.\n\nMedical data can only be added for today\'s visits.');
+      return;
+    }
+    
     // Reset form
     setDiagnosisFormData({
       diagnosis_name: '',
@@ -523,12 +552,24 @@ const PatientMedicalRecord = () => {
       window.location.reload();
     } catch (error) {
       console.error('Error adding diagnosis:', error);
-      alert('Failed to add diagnosis: ' + (error.message || 'Unknown error'));
+      
+      // Check for specific error from backend
+      if (error.response?.data?.code === 'NO_ACTIVE_VISIT') {
+        alert('⚠️ Security Check Failed\n\nCannot add diagnosis: Patient does not have an active visit.\n\nPlease ensure the patient has an active consultation session before adding medical data.');
+      } else {
+        alert('Failed to add diagnosis: ' + (error.response?.data?.message || error.message || 'Unknown error'));
+      }
     }
   };
 
   // Allergy handlers
   const handleAddAllergy = () => {
+    // Check for active visit first
+    if (!activeVisitId) {
+      alert('⚠️ No Visit Today\n\nCannot add allergy: Patient does not have a visit from today.\n\nMedical data can only be added for today\'s visits.');
+      return;
+    }
+    
     // Reset form
     setAllergyFormData({
       allergy_name: '',
@@ -576,7 +617,13 @@ const PatientMedicalRecord = () => {
       window.location.reload();
     } catch (error) {
       console.error('Error adding allergy:', error);
-      alert('Failed to add allergy: ' + (error.message || 'Unknown error'));
+      
+      // Check for specific error from backend
+      if (error.response?.data?.code === 'NO_ACTIVE_VISIT') {
+        alert('⚠️ Security Check Failed\n\nCannot add allergy: Patient does not have an active visit.\n\nPlease ensure the patient has an active consultation session before adding medical data.');
+      } else {
+        alert('Failed to add allergy: ' + (error.response?.data?.message || error.message || 'Unknown error'));
+      }
     }
   };
 
@@ -660,20 +707,34 @@ const PatientMedicalRecord = () => {
         {/* Tab Content */}
         <div className="min-h-[600px]">
           {activeTab === 'overview' && (
-            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-              <PatientVitalsDisplay 
-                vitals={displayPatient.vitals}
-                userRole="doctor"
-                readOnly={false}
-              />
-              
-              <MedicalInformationPanel 
-                patient={displayPatient}
-                userRole="doctor"
-                onAddDiagnosis={handleAddDiagnosis}
-                onAddAllergy={handleAddAllergy}
-              />
-            </div>
+            <>
+              {!activeVisitId && (
+                <Card className="p-4 mb-4 bg-amber-50 border-amber-300">
+                  <div className="flex items-center space-x-3 text-amber-800">
+                    <AlertCircle size={20} />
+                    <div>
+                      <p className="font-semibold">No Active Consultation</p>
+                      <p className="text-sm">Patient does not have an active consultation session. Medical data can only be added during active consultations.</p>
+                    </div>
+                  </div>
+                </Card>
+              )}
+              <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                <PatientVitalsDisplay 
+                  vitals={displayPatient.vitals}
+                  userRole="doctor"
+                  readOnly={false}
+                />
+                
+                <MedicalInformationPanel 
+                  patient={displayPatient}
+                  userRole="doctor"
+                  onAddDiagnosis={activeVisitId ? handleAddDiagnosis : undefined}
+                  onAddAllergy={activeVisitId ? handleAddAllergy : undefined}
+                  showActionButtons={!!activeVisitId}
+                />
+              </div>
+            </>
           )}
 
           {activeTab === 'history' && (
@@ -703,12 +764,25 @@ const PatientMedicalRecord = () => {
           )}
 
           {activeTab === 'notes' && (
-            <ClinicalNotesDisplay 
-              notes={doctorNotesList}
-              userRole="doctor"
-              onAddNote={handleAddNote}
-              onEditNote={handleEditNote}
-            />
+            <>
+              {!activeVisitId && (
+                <Card className="p-4 mb-4 bg-amber-50 border-amber-300">
+                  <div className="flex items-center space-x-3 text-amber-800">
+                    <AlertCircle size={20} />
+                    <div>
+                      <p className="font-semibold">No Active Consultation</p>
+                      <p className="text-sm">Cannot add clinical notes without an active consultation session.</p>
+                    </div>
+                  </div>
+                </Card>
+              )}
+              <ClinicalNotesDisplay 
+                notes={doctorNotesList}
+                userRole="doctor"
+                onAddNote={activeVisitId ? handleAddNote : undefined}
+                onEditNote={activeVisitId ? handleEditNote : undefined}
+              />
+            </>
           )}
 
           {activeTab === 'services' && (

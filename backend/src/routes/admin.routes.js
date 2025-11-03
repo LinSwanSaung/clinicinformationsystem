@@ -303,6 +303,112 @@ router.post('/override',
       throw new AppError(`Failed to update ${entityType} record: ${updateError.message}`, 500);
     }
 
+    // CASCADE CANCELLATION: If cancelling/completing, update related records
+    if (newStatus === 'cancelled' || newStatus === 'completed') {
+      console.log(`[ADMIN] Cascading ${newStatus} status to related records...`);
+
+      try {
+        // Get the full record to find related IDs
+        const { data: fullRecord } = await supabase
+          .from(tableName)
+          .select('*')
+          .eq(idColumn, entityId)
+          .single();
+
+        if (fullRecord) {
+          // If cancelling/completing a VISIT, also cancel/complete its queue token and appointment
+          if (entityType === 'visit') {
+            // Update queue token
+            if (fullRecord.id) {
+              await supabase
+                .from('queue_tokens')
+                .update({ status: newStatus, updated_at: new Date().toISOString() })
+                .eq('visit_id', fullRecord.id);
+              console.log(`[ADMIN] Updated queue_token for visit ${fullRecord.id}`);
+            }
+            
+            // Update appointment if linked
+            if (fullRecord.appointment_id) {
+              await supabase
+                .from('appointments')
+                .update({ 
+                  status: newStatus,
+                  resolved_by_admin: true,
+                  resolved_reason: reason,
+                  updated_at: new Date().toISOString() 
+                })
+                .eq('id', fullRecord.appointment_id);
+              console.log(`[ADMIN] Updated appointment ${fullRecord.appointment_id}`);
+            }
+          }
+
+          // If cancelling/completing an APPOINTMENT, also cancel/complete its visit and queue token
+          if (entityType === 'appointment') {
+            // Find and update the visit
+            const { data: relatedVisit } = await supabase
+              .from('visits')
+              .select('id')
+              .eq('appointment_id', fullRecord.id)
+              .single();
+
+            if (relatedVisit) {
+              await supabase
+                .from('visits')
+                .update({ 
+                  status: newStatus,
+                  resolved_by_admin: true,
+                  resolved_reason: reason,
+                  updated_at: new Date().toISOString() 
+                })
+                .eq('id', relatedVisit.id);
+              console.log(`[ADMIN] Updated visit ${relatedVisit.id}`);
+
+              // Update queue token linked to this visit
+              await supabase
+                .from('queue_tokens')
+                .update({ status: newStatus, updated_at: new Date().toISOString() })
+                .eq('visit_id', relatedVisit.id);
+              console.log(`[ADMIN] Updated queue_token for visit ${relatedVisit.id}`);
+            }
+          }
+
+          // If cancelling/completing a QUEUE TOKEN, also cancel/complete its visit and appointment
+          if (entityType === 'queue') {
+            // Update visit
+            if (fullRecord.visit_id) {
+              await supabase
+                .from('visits')
+                .update({ 
+                  status: newStatus,
+                  resolved_by_admin: true,
+                  resolved_reason: reason,
+                  updated_at: new Date().toISOString() 
+                })
+                .eq('id', fullRecord.visit_id);
+              console.log(`[ADMIN] Updated visit ${fullRecord.visit_id}`);
+            }
+
+            // Update appointment if linked
+            if (fullRecord.appointment_id) {
+              await supabase
+                .from('appointments')
+                .update({ 
+                  status: newStatus,
+                  resolved_by_admin: true,
+                  resolved_reason: reason,
+                  updated_at: new Date().toISOString() 
+                })
+                .eq('id', fullRecord.appointment_id);
+              console.log(`[ADMIN] Updated appointment ${fullRecord.appointment_id}`);
+            }
+          }
+        }
+      } catch (cascadeError) {
+        console.error('[ADMIN] Error cascading status update:', cascadeError);
+        // Don't fail the main operation, just log the error
+      }
+    }
+
     // Log the audit event
     await logAuditEvent({
       actor_id: req.user.id,

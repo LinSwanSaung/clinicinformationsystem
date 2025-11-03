@@ -66,6 +66,7 @@ const InvoiceManagement = () => {
   const [discountPercent, setDiscountPercent] = useState(0);
   const [discountAmount, setDiscountAmount] = useState(0);
   const [paymentMethod, setPaymentMethod] = useState('cash');
+  const [paymentAmount, setPaymentAmount] = useState('');
   const [notes, setNotes] = useState('');
   const [showPaymentDialog, setShowPaymentDialog] = useState(false);
   const [isProcessing, setIsProcessing] = useState(false);
@@ -188,19 +189,36 @@ const InvoiceManagement = () => {
     setIsProcessing(true);
     try {
       const totals = calculateTotals();
+      const amountToRecord = paymentAmount ? parseFloat(paymentAmount) : totals.total;
+      
+      // Validate payment amount
+      if (amountToRecord <= 0) {
+        setError('Payment amount must be greater than 0');
+        setIsProcessing(false);
+        return;
+      }
+      
+      if (amountToRecord > totals.total) {
+        setError('Payment amount cannot exceed total amount');
+        setIsProcessing(false);
+        return;
+      }
       
       // Record payment in backend
       await invoiceService.recordPayment(invoice.id, {
         payment_method: paymentMethod,
-        amount_paid: totals.total,
-        notes: notes
+        amount: amountToRecord,
+        payment_notes: notes
       });
       
-      // Complete the invoice
-      await invoiceService.completeInvoice(invoice.id);
-      
-      // Update invoice status
-      setInvoice(prev => ({ ...prev, status: 'completed' }));
+      // If full payment, complete the invoice
+      if (amountToRecord >= totals.total) {
+        await invoiceService.completeInvoice(invoice.id);
+        setInvoice(prev => ({ ...prev, status: 'completed' }));
+      } else {
+        // Partial payment - update status to 'partial'
+        setInvoice(prev => ({ ...prev, status: 'partial' }));
+      }
       
       console.log('Payment processed successfully');
       setShowPaymentDialog(false);
@@ -209,7 +227,7 @@ const InvoiceManagement = () => {
       setTimeout(() => {
         navigate('/cashier', { 
           state: { 
-            message: `Payment for ${invoice.invoice_number || invoice.id} processed successfully` 
+            message: `Payment of $${amountToRecord.toFixed(2)} for ${invoice.invoice_number || invoice.id} processed successfully` 
           }
         });
       }, 1000);
@@ -644,6 +662,27 @@ const InvoiceManagement = () => {
                       </div>
                     </div>
 
+                    {/* Payment Amount */}
+                    <div className="space-y-2">
+                      <Label className="text-sm font-medium">Payment Amount</Label>
+                      <div className="relative">
+                        <span className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground">$</span>
+                        <Input
+                          type="number"
+                          step="0.01"
+                          min="0"
+                          max={totals.total}
+                          value={paymentAmount}
+                          onChange={(e) => setPaymentAmount(e.target.value)}
+                          placeholder={`Enter amount (Max: $${totals.total.toFixed(2)})`}
+                          className="pl-7"
+                        />
+                      </div>
+                      <p className="text-xs text-muted-foreground">
+                        Leave empty to pay full amount. Enter partial amount for partial payment.
+                      </p>
+                    </div>
+
                     {/* Payment Method */}
                     <div className="space-y-2">
                       <Label className="text-sm font-medium">Payment Method</Label>
@@ -741,10 +780,20 @@ const InvoiceManagement = () => {
                   <span className="font-medium capitalize">{paymentMethod}</span>
                 </div>
                 <Separator />
-                <div className="flex justify-between text-lg font-bold">
+                <div className="flex justify-between">
                   <span>Total Amount:</span>
-                  <span>${totals.total.toFixed(2)}</span>
+                  <span className="font-semibold">${totals.total.toFixed(2)}</span>
                 </div>
+                <div className="flex justify-between text-lg font-bold text-primary">
+                  <span>Payment Amount:</span>
+                  <span>${paymentAmount ? parseFloat(paymentAmount).toFixed(2) : totals.total.toFixed(2)}</span>
+                </div>
+                {paymentAmount && parseFloat(paymentAmount) < totals.total && (
+                  <div className="flex justify-between text-amber-600">
+                    <span>Remaining Balance:</span>
+                    <span>${(totals.total - parseFloat(paymentAmount)).toFixed(2)}</span>
+                  </div>
+                )}
               </div>
 
               {notes && (

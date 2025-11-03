@@ -1,5 +1,5 @@
 import React from "react";
-import PatientCard from "./PatientCard";
+import ReceptionistPatientCard from "./ReceptionistPatientCard";
 import LoadingState from "./LoadingState";
 import EmptyState from "./EmptyState";
 
@@ -21,7 +21,7 @@ export default function PatientList({
   return (
     <div className="grid gap-6">
       {patients.map((patient) => (
-        <PatientCard 
+        <ReceptionistPatientCard 
           key={patient.id} 
           patient={patient} 
           onBookAppointment={onBookAppointment}

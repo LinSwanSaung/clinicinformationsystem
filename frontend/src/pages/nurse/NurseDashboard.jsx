@@ -33,30 +33,37 @@ import queueService from '../../services/queueService';
  */
 const fetchTokenVitals = async (token) => {
   try {
-    if (!token.visit_id) {
+    const patientId = token.patient?.id || token.patient_id;
+    const visitId = token.visit_id || token.current_visit_id;
+    
+    console.log(`🔍 [NURSE] Fetching vitals - Token #${token.token_number}, PatientID: ${patientId}, VisitID: ${visitId}`);
+    console.log(`🔍 [NURSE] Token object keys:`, Object.keys(token));
+    console.log(`🔍 [NURSE] Has visit_id property?`, 'visit_id' in token, 'Value:', token.visit_id);
+    
+    if (!visitId) {
       console.log(`❌ [NURSE] Token #${token.token_number} has no visit_id - treating as fresh visit`);
       return null;
     }
     
-    console.log(`🔍 [NURSE] Fetching vitals for token #${token.token_number} - visit_id: ${token.visit_id}`);
-    
     // Fetch vitals for this specific visit only
     try {
-      const vitalsResponse = await vitalsService.getVisitVitals(token.visit_id);
+      const vitalsResponse = await vitalsService.getVisitVitals(visitId);
+      console.log(`📊 [NURSE] Vitals API response for visit ${visitId}:`, vitalsResponse);
+      
       // Check if we have actual vitals data (not empty array)
       if (vitalsResponse.success && vitalsResponse.data && vitalsResponse.data.length > 0) {
-        console.log(`✅ [NURSE] Found vitals for visit ${token.visit_id}:`, vitalsResponse.data[0]);
+        console.log(`✅ [NURSE] Found vitals for visit ${visitId}:`, vitalsResponse.data[0]);
         return vitalsResponse.data[0]; // Return first vitals record
       }
-      console.log(`❌ [NURSE] No vitals found for visit ${token.visit_id} - showing "Add Vitals & Notes"`);
+      console.log(`❌ [NURSE] No vitals found for visit ${visitId} - showing "Add Vitals & Notes"`);
     } catch (error) {
-      console.warn('[NURSE] Failed to fetch visit vitals:', error);
+      console.error('[NURSE] Failed to fetch visit vitals:', error);
     }
     
     // No vitals for this visit - return null to show "Add Vitals & Notes"
     return null;
   } catch (error) {
-    console.warn('[NURSE] Failed to fetch vitals for token:', token.id, error);
+    console.error('[NURSE] Failed to fetch vitals for token:', token.id, error);
     return null;
   }
 };
@@ -185,17 +192,17 @@ const NurseDashboard = () => {
       const queueAppointments = queueResponse.data?.appointments || [];
       console.log(`📋 [NURSE] Received ${queueTokens.length} tokens and ${queueAppointments.length} appointments from backend`);
       
-      // Combine both tokens and appointments into a single patient list
-      // Mark each entry with its type so we know which API to call for delay/undelay
-      const allPatients = [
-        ...queueTokens.map(t => ({ ...t, queueType: 'token' })),
-        ...queueAppointments.map(a => ({ 
-          ...a, 
-          queueType: 'appointment',
-          token_number: a.queue_position, // Map queue_position to token_number for display
-          issued_time: a.estimated_start_time || a.created_at
-        }))
-      ];
+      // Debug: Log first token structure to see if visit_id is included
+      if (queueTokens.length > 0) {
+        console.log('🔍 [NURSE] First token structure:', JSON.stringify(queueTokens[0], null, 2));
+      }
+      
+      // Filter out cancelled appointments - only show active queue tokens
+      const activeTokens = queueTokens.filter(token => token.status !== 'cancelled');
+      console.log(`📋 [NURSE] Filtered to ${activeTokens.length} active tokens (excluded ${queueTokens.length - activeTokens.length} cancelled)`);
+      
+      // Use only queue tokens (no appointment queue)
+      const allPatients = activeTokens.map(t => ({ ...t, queueType: 'token' }));
       
       // Deduplicate patients - keep only the most recent token per patient
       const patientMap = new Map();
@@ -218,10 +225,19 @@ const NurseDashboard = () => {
           try {
             const vitals = await fetchTokenVitals(patient);
             
-            return {
+            const patientWithVitals = {
               ...patient,
               latestVitals: vitals
             };
+            
+            console.log(`[NURSE] Patient #${patient.token_number} after vitals fetch:`, {
+              token_number: patient.token_number,
+              visit_id: patient.visit_id,
+              hasLatestVitals: !!patientWithVitals.latestVitals,
+              latestVitals: patientWithVitals.latestVitals
+            });
+            
+            return patientWithVitals;
           } catch (error) {
             console.log(`No vitals found for patient ${patient.patient?.id}`);
             return {
@@ -233,6 +249,7 @@ const NurseDashboard = () => {
       );
       
       console.log('✅ [NURSE] Patient list updated with fresh vitals and appointments');
+      console.log('[NURSE] Total patients with vitals data:', patientsWithVitals.length);
       setPatients(patientsWithVitals);
     } catch (error) {
       console.error('Failed to load patients:', error);
@@ -622,17 +639,33 @@ const NurseDashboard = () => {
                           tokenNumber: token.token_number,
                           status: token.status,
                           priority: token.priority || 3, // Include priority for visual highlighting
-                          appointmentTime: token.appointment?.appointment_time 
-                            ? new Date(token.appointment.appointment_time).toLocaleTimeString('en-US', { 
-                                hour: '2-digit', 
+                          appointmentTime: (() => {
+                            // For appointments: combine appointment_date + appointment_time
+                            if (token.appointment?.appointment_date && token.appointment?.appointment_time) {
+                              const dateStr = token.appointment.appointment_date;
+                              const timeStr = token.appointment.appointment_time;
+                              const datetime = new Date(`${dateStr}T${timeStr}`);
+                              return datetime.toLocaleString('en-US', {
+                                month: 'short',
+                                day: 'numeric',
+                                hour: '2-digit',
                                 minute: '2-digit',
-                                hour12: true 
-                              })
-                            : new Date(token.created_at).toLocaleTimeString('en-US', { 
-                                hour: '2-digit', 
+                                hour12: true
+                              });
+                            }
+                            // For walk-ins: use token created_at
+                            if (token.created_at) {
+                              const datetime = new Date(token.created_at);
+                              return datetime.toLocaleString('en-US', {
+                                month: 'short',
+                                day: 'numeric',
+                                hour: '2-digit',
                                 minute: '2-digit',
-                                hour12: true 
-                              }),
+                                hour12: true
+                              });
+                            }
+                            return 'N/A';
+                          })(),
                           vitals: token.latestVitals ? {
                             bp: token.latestVitals.blood_pressure_systolic && token.latestVitals.blood_pressure_diastolic 
                               ? `${token.latestVitals.blood_pressure_systolic}/${token.latestVitals.blood_pressure_diastolic}` 
@@ -641,6 +674,7 @@ const NurseDashboard = () => {
                             weight: token.latestVitals.weight ? token.latestVitals.weight.toString() : '',
                             heartRate: token.latestVitals.heart_rate ? token.latestVitals.heart_rate.toString() : ''
                           } : {},
+                          latestVitals: token.latestVitals, // Pass the raw vitals data for button logic
                           conditions: token.conditions || [],
                           urgency: token.urgency || 'Normal',
                           vitalsRecorded: !!token.latestVitals,
@@ -741,19 +775,26 @@ const NurseDashboard = () => {
                             const result = await vitalsService.saveVitals(patientId, vitalsData);
                             console.log('✅ [NURSE] Vitals saved, result:', result);
                             
-                            // Wait a moment for backend to process
-                            await new Promise(resolve => setTimeout(resolve, 500));
+                            // Wait longer for backend to process and update the queue
+                            await new Promise(resolve => setTimeout(resolve, 1000));
                             
                             // Refresh the patient data to show updated vitals
                             if (selectedDoctor) {
-                              console.log('🔄 [NURSE] Refreshing patient list...');
+                              console.log('🔄 [NURSE] Refreshing patient list after vitals save...');
                               await handleViewPatients(selectedDoctor);
+                              console.log('✅ [NURSE] Patient list refreshed');
                             }
                             
                             alert('Vitals saved successfully!');
                           } catch (error) {
                             console.error('Failed to save vitals:', error);
-                            alert(`Failed to save vitals: ${error.message}`);
+                            
+                            // Check for specific error from backend
+                            if (error.response?.data?.code === 'NO_ACTIVE_VISIT') {
+                              alert('⚠️ Security Check Failed\n\nCannot record vitals: Patient does not have an active visit.\n\nPlease ensure the patient has an active consultation session before recording vitals.');
+                            } else {
+                              alert(`Failed to save vitals: ${error.response?.data?.message || error.message}`);
+                            }
                           }
                         }}
                         onMarkReady={async (patientId) => {
@@ -828,17 +869,10 @@ const NurseDashboard = () => {
                             console.log('   → Treating as:', isAppointment ? 'APPOINTMENT' : 'TOKEN');
                             
                             // Call the appropriate delay API based on queue type
-                            if (isAppointment) {
-                              // For scheduled appointments
-                              await queueService.delayAppointmentQueue(patient.id, reason);
-                              console.log('✅ Appointment queue patient delayed');
-                              alert('✅ Patient has been marked as delayed');
-                            } else {
-                              // For walk-in tokens
-                              await queueService.delayToken(patient.id, reason);
-                              console.log('✅ Token queue patient delayed');
-                              alert('✅ Patient has been marked as delayed');
-                            }
+                            // Delay the token
+                            await queueService.delayToken(patient.id, reason);
+                            console.log('✅ Token queue patient delayed');
+                            alert('✅ Patient has been marked as delayed');
                             
                             // Refresh the patient data
                             if (selectedDoctor) {
@@ -860,22 +894,10 @@ const NurseDashboard = () => {
                               console.log('   Has appointment_id:', !!patient.appointment_id);
                               
                               // Determine if this is an appointment or token
-                              const isAppointment = patient.queueType === 'appointment' || patient.appointment_id;
-                              
-                              console.log('   → Treating as:', isAppointment ? 'APPOINTMENT' : 'TOKEN');
-                              
-                              // Call the appropriate undelay API based on queue type
-                              if (isAppointment) {
-                                // For scheduled appointments
-                                const result = await queueService.undelayAppointmentQueue(patient.id);
-                                console.log('✅ Appointment queue patient undelayed. New position:', result.newQueuePosition);
-                                alert(`Patient has been added back to the queue at position ${result.newQueuePosition}`);
-                              } else {
-                                // For walk-in tokens
-                                const result = await queueService.undelayToken(patient.id);
-                                console.log('✅ Token queue patient undelayed. New token:', result.newTokenNumber);
-                                alert(`Patient has been added back to the queue with token #${result.newTokenNumber}`);
-                              }
+                              // Undelay the token
+                              const result = await queueService.undelayToken(patient.id);
+                              console.log('✅ Token queue patient undelayed. New token:', result.newTokenNumber);
+                              alert(`Patient has been added back to the queue with token #${result.newTokenNumber}`);
                               
                               // Refresh the patient data
                               if (selectedDoctor) {

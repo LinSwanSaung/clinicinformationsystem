@@ -26,7 +26,6 @@
   "author": "RealCIS Team",
   "license": "MIT",
   "dependencies": {
-    "@google/generative-ai": "^0.24.1",
     "@supabase/supabase-js": "^2.39.7",
     "bcryptjs": "^2.4.3",
     "compression": "^1.7.4",
@@ -41,7 +40,9 @@
     "jsonwebtoken": "^9.0.2",
     "morgan": "^1.10.0",
     "multer": "^2.0.0-alpha.7",
+    "node-cron": "^3.0.3",
     "node-fetch": "^3.3.2",
+    "openai": "^6.7.0",
     "pdfkit": "^0.17.2",
     "react-markdown": "^10.1.0"
   },

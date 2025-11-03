@@ -329,9 +329,11 @@ class QueueTokenModel extends BaseModel {
   }
 
   /**
-   * Check if doctor has any active consultation
+   * Check if doctor has any active consultation TODAY
    */
   async getActiveConsultation(doctorId) {
+    const today = new Date().toISOString().split('T')[0];
+    
     const { data, error } = await this.supabase
       .from(this.tableName)
       .select(`
@@ -348,6 +350,7 @@ class QueueTokenModel extends BaseModel {
         )
       `)
       .eq('doctor_id', doctorId)
+      .eq('issued_date', today)  // Only check today's tokens
       .eq('status', 'serving')
       .single();
 

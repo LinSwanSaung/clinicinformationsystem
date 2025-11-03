@@ -1,5 +1,6 @@
 import express from 'express';
 import { authenticate, authorize } from '../middleware/auth.js';
+import { requireActiveVisit } from '../middleware/activeVisitCheck.js';
 import { asyncHandler } from '../middleware/errorHandler.js';
 import VitalsService from '../services/Vitals.service.js';
 
@@ -10,10 +11,12 @@ const vitalsService = new VitalsService();
  * @route   POST /api/vitals
  * @desc    Record patient vitals
  * @access  Private (Nurse, Doctor)
+ * @security Requires patient to have an active visit
  */
 router.post('/',
   authenticate,
   authorize('nurse', 'doctor'),
+  requireActiveVisit,
   asyncHandler(async (req, res) => {
     const vitalsData = req.body;
     const recordedBy = req.user.id;

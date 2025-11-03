@@ -70,12 +70,9 @@ export const authenticate = asyncHandler(async (req, res, next) => {
  */
 export const authorize = (...roles) => {
   return (req, res, next) => {
-    // Development bypass for testing
-    if (process.env.NODE_ENV === 'development' || process.env.BYPASS_AUTH === 'true') {
-      console.log('DEV MODE: Bypassing authorization for roles:', roles);
-      return next();
-    }
-
+    // SECURITY: Do NOT bypass authorization - always check roles
+    // Development bypass DISABLED for security
+    
     if (!req.user) {
       throw new AppError('Authentication required', 401);
     }

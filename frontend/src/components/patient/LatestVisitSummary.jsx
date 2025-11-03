@@ -8,6 +8,19 @@ import { Skeleton } from '@/components/ui/skeleton';
 import ErrorState from '@/components/ErrorState';
 import { AlertTriangle, Pill, ActivitySquare, Stethoscope } from 'lucide-react';
 
+// Myanmar date translation
+const formatDateMyanmar = (date) => {
+  const weekdays = ['တနင်္ဂနွေ', 'တနင်္လာ', 'အင်္ဂါ', 'ဗုဒ္ဓဟူး', 'ကြာသပတေး', 'သောကြာ', 'စနေ'];
+  const months = ['ဇန်နဝါရီ', 'ဖေဖော်ဝါရီ', 'မတ်', 'ဧပြီ', 'မေ', 'ဇွန်', 'ဇူလိုင်', 'သြဂုတ်', 'စက်တင်ဘာ', 'အောက်တိုဘာ', 'နိုဝင်ဘာ', 'ဒီဇင်ဘာ'];
+  
+  const weekday = weekdays[date.getDay()];
+  const month = months[date.getMonth()];
+  const day = date.getDate();
+  const year = date.getFullYear();
+  
+  return `${weekday}၊ ${month} ${day}၊ ${year}`;
+};
+
 const LatestVisitSkeleton = () => (
   <Card className="p-6">
     <Skeleton className="h-6 w-64 mb-4" />
@@ -106,7 +119,7 @@ const evaluateVitals = (vitals) => {
 };
 
 const LatestVisitSummary = ({ visit, loading, error, onRetry }) => {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
 
   const visitDate = visit?.visit_date ? new Date(visit.visit_date) : null;
 
@@ -143,19 +156,36 @@ const LatestVisitSummary = ({ visit, loading, error, onRetry }) => {
             <p className="text-sm text-muted-foreground">
               {visitDate
                 ? t('patient.latestVisit.subtitle', {
-                    date: visitDate.toLocaleDateString(undefined, {
-                      weekday: 'long',
-                      month: 'short',
-                      day: 'numeric',
-                      year: 'numeric'
-                    }),
+                    date: i18n.language === 'my' 
+                      ? formatDateMyanmar(visitDate)
+                      : visitDate.toLocaleDateString('en-US', {
+                          weekday: 'long',
+                          month: 'short',
+                          day: 'numeric',
+                          year: 'numeric'
+                        }),
                     doctor: visit?.doctor_name ?? t('patient.latestVisit.unknownDoctor')
                   })
                 : t('patient.latestVisit.noVisits')}
             </p>
           </div>
-          <Badge variant="outline" className="text-sm">
-            {visit?.status ? t(`latestVisit.status.${visit.status}`, { defaultValue: visit.status }) : t('patient.latestVisit.status.unknown')}
+          <Badge 
+            variant={visit?.status === 'in-progress' ? 'default' : 'outline'} 
+            className={`text-sm ${
+              visit?.status === 'in-progress' 
+                ? 'bg-blue-500 hover:bg-blue-600 text-white' 
+                : visit?.status === 'completed'
+                ? 'bg-green-100 text-green-800 border-green-300'
+                : ''
+            }`}
+          >
+            {visit?.status === 'in-progress' 
+              ? t('patient.latestVisit.status.inProgress', { defaultValue: 'In Progress' })
+              : visit?.status === 'completed'
+              ? t('patient.latestVisit.status.completed', { defaultValue: 'Completed' })
+              : visit?.status 
+              ? t(`latestVisit.status.${visit.status}`, { defaultValue: visit.status }) 
+              : t('patient.latestVisit.status.unknown')}
           </Badge>
         </CardHeader>
         <CardContent className="grid gap-5 md:grid-cols-3">

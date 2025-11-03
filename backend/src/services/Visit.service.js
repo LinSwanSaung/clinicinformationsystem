@@ -80,20 +80,7 @@ class VisitService {
         throw new Error(`Missing required fields: ${missingFields.join(', ')}`);
       }
 
-      // CHECK: Prevent creating a new visit if patient has an active visit
-      const existingActiveVisit = await this.visitModel.findOne({
-        filters: {
-          patient_id: visitData.patient_id,
-          status: 'in_progress'
-        }
-      });
-
-      if (existingActiveVisit) {
-        throw new Error(
-          `Patient already has an active visit (ID: ${existingActiveVisit.id}). ` +
-          `Please complete or cancel the existing visit before creating a new one.`
-        );
-      }
+      console.log('[VISIT] Creating new visit record for patient:', visitData.patient_id);
 
       // Set default values and remove fields not in schema
       const { created_by, updated_by, ...cleanVisitData } = visitData;
@@ -107,12 +94,15 @@ class VisitService {
 
       const visit = await this.visitModel.create(visitToCreate);
       
+      console.log('[VISIT] ✅ Visit record created:', visit.id);
+      
       return {
         success: true,
         data: visit,
         message: 'Visit created successfully'
       };
     } catch (error) {
+      console.error('[VISIT] ❌ Error creating visit:', error);
       throw error;
     }
   }

@@ -31,6 +31,7 @@ import auditLogRoutes from './routes/auditLog.routes.js';
 import adminRoutes from './routes/admin.routes.js';
 import aiRoutes from './routes/ai.routes.js';
 import { testConnection } from './config/database.js';
+import tokenScheduler from './services/TokenScheduler.service.js';
 
 // Load environment variables
 dotenv.config();
@@ -113,6 +114,11 @@ app.listen(PORT, () => {
   console.log(`🚀 RealCIS API Server running on port ${PORT}`);
   console.log(`📋 Environment: ${process.env.NODE_ENV}`);
   console.log(`🏥 Health check: http://localhost:${PORT}/health`);
+  
+  // Start automatic token scheduler
+  console.log('\n⏰ Starting Token Scheduler...');
+  tokenScheduler.start();
+  console.log('✓ Token Scheduler started - will check for missed tokens every 5 minutes\n');
 });
 
 export default app;

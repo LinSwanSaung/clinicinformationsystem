@@ -1,6 +1,6 @@
 import express from 'express';
 import { authenticate } from '../middleware/auth.js';
-import geminiService from '../services/Gemini.service.js';
+import aiService from '../services/OpenAI.service.js';
 import diagnosisService from '../services/PatientDiagnosis.service.js';
 import patientService from '../services/Patient.service.js';
 
@@ -8,11 +8,11 @@ const router = express.Router();
 
 /**
  * GET /ai/models
- * List available Gemini models (for debugging)
+ * List available AI models (for debugging)
  */
 router.get('/models', authenticate, async (req, res) => {
   try {
-    const models = await geminiService.listAvailableModels();
+    const models = await aiService.listAvailableModels();
     res.json({ success: true, models });
   } catch (error) {
     console.error('[AI Route] Error listing models:', error);
@@ -30,13 +30,16 @@ router.get('/models', authenticate, async (req, res) => {
 router.get('/health-advice/:patientId', authenticate, async (req, res) => {
   try {
     const { patientId } = req.params;
+    const { lang = 'en' } = req.query;
+    
+    console.log('[AI Route] Health advice request:', { patientId, language: lang });
 
     // Get patient's latest diagnosis
     const diagnoses = await diagnosisService.getDiagnosesByPatient(patientId);
     
     if (!diagnoses || diagnoses.length === 0) {
       // No diagnosis - return general wellness tips
-      const wellnessTips = await geminiService.generateWellnessTips();
+      const wellnessTips = await aiService.generateWellnessTips(lang);
       return res.json({
         success: true,
         data: {
@@ -62,10 +65,11 @@ router.get('/health-advice/:patientId', authenticate, async (req, res) => {
     }
 
     // Generate health advice
-    const healthAdvice = await geminiService.generateHealthAdvice(
+    const healthAdvice = await aiService.generateHealthAdvice(
       latestDiagnosis.diagnosis_name,
       age,
-      patient.gender
+      patient.gender,
+      lang
     );
 
     res.json({
@@ -93,7 +97,8 @@ router.get('/health-advice/:patientId', authenticate, async (req, res) => {
  */
 router.get('/wellness-tips', authenticate, async (req, res) => {
   try {
-    const wellnessTips = await geminiService.generateWellnessTips();
+    const { lang = 'en' } = req.query;
+    const wellnessTips = await aiService.generateWellnessTips(lang);
     
     res.json({
       success: true,

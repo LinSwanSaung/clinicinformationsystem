@@ -67,6 +67,7 @@ const ReceptionistDashboard = () => {
   const [statusFilter, setStatusFilter] = useState('needs-action');
   const debouncedSearch = useDebounce(searchTerm, 300);
   const [isWalkInModalOpen, setIsWalkInModalOpen] = useState(false);
+  const [processingAppointments, setProcessingAppointments] = useState(new Set()); // Track appointments being processed
   const [stats, setStats] = useState({
     todayAppointments: 0,
     availableDoctorCount: 0,
@@ -80,8 +81,8 @@ const ReceptionistDashboard = () => {
 
   // Helper function to check if appointment is overdue
   const isAppointmentOverdue = (appointment) => {
-    // Only check overdue for appointments that haven't been processed yet (pending status)
-    if (appointment.status === 'ready' || appointment.status === 'late' || appointment.status === 'no-show') {
+    // Only check overdue for appointments that haven't been processed yet
+    if (appointment.status !== 'scheduled') {
       return false;
     }
     
@@ -96,98 +97,77 @@ const ReceptionistDashboard = () => {
   };
 
   useEffect(() => {
-    const loadDashboardData = async () => {
-      try {
-        setIsLoading(true);
-        
-        // Get all required data
-        const [appointmentsResponse, doctorsResponse, patientsResponse] = await Promise.all([
-          appointmentService.getAllAppointments(),
-          userService.getUsersByRole('doctor'),
-          patientService.getAllPatients()
-        ]);
-
-        // Filter today's appointments
-        const today = new Date().toDateString();
-        const todayAppts = appointmentsResponse.success 
-          ? appointmentsResponse.data.filter(
-              app => new Date(app.appointment_date).toDateString() === today
-            )
-          : [];
-
-        // Mock data for demonstration since backend might not have complete data
-        const mockTodayAppointments = [
-          {
-            id: '1',
-            patient_name: 'Sarah Johnson',
-            appointment_time: '09:00',
-            doctor_name: 'Dr. Smith',
-            visit_type: 'Consultation',
-            status: 'pending'
-          },
-          {
-            id: '2', 
-            patient_name: 'Michael Chen',
-            appointment_time: '09:30',
-            doctor_name: 'Dr. Johnson',
-            visit_type: 'Follow-up',
-            status: 'ready'
-          },
-          {
-            id: '3',
-            patient_name: 'Emma Wilson',
-            appointment_time: '10:00',
-            doctor_name: 'Dr. Smith',
-            visit_type: 'Check-up',
-            status: 'late'
-          },
-          {
-            id: '4',
-            patient_name: 'David Brown',
-            appointment_time: '08:30', // Past appointment time for alert demo
-            doctor_name: 'Dr. Johnson',
-            visit_type: 'Consultation',
-            status: 'pending'
-          },
-          {
-            id: '5',
-            patient_name: 'Lisa Garcia',
-            appointment_time: '11:00',
-            doctor_name: 'Dr. Smith',
-            visit_type: 'Follow-up',
-            status: 'no-show'
-          }
-        ];
-
-        setTodayAppointments(mockTodayAppointments);
-        setFilteredAppointments(mockTodayAppointments);
-
-        // Calculate stats
-        const statusCounts = mockTodayAppointments.reduce((acc, app) => {
-          acc[app.status] = (acc[app.status] || 0) + 1;
-          return acc;
-        }, {});
-
-        setStats({
-          todayAppointments: mockTodayAppointments.length,
-          availableDoctorCount: doctorsResponse.success ? doctorsResponse.data.length : 0,
-          totalPatients: patientsResponse.success ? patientsResponse.data.length : 0,
-          arrived: statusCounts.ready || 0,
-          delayed: statusCounts.late || 0,
-          noShow: statusCounts['no-show'] || 0,
-          scheduled: statusCounts.pending || 0,
-          overdue: mockTodayAppointments.filter(app => isAppointmentOverdue(app)).length || 0
-        });
-        
-        setIsLoading(false);
-      } catch (error) {
-        console.error('Error loading dashboard data:', error);
-        setIsLoading(false);
-      }
-    };
-
     loadDashboardData();
   }, []);
+
+  const loadDashboardData = async () => {
+    try {
+      setIsLoading(true);
+      
+      // Get all required data
+      const [appointmentsResponse, doctorsResponse, patientsResponse] = await Promise.all([
+        appointmentService.getAllAppointments(),
+        userService.getUsersByRole('doctor'),
+        patientService.getAllPatients()
+      ]);
+
+      // Filter today's appointments
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+      
+      const todayAppts = appointmentsResponse.success 
+        ? appointmentsResponse.data.filter(app => {
+            const appDate = new Date(app.appointment_date);
+            appDate.setHours(0, 0, 0, 0);
+            return appDate.getTime() === today.getTime() && app.status !== 'cancelled';
+          }).map(app => {
+            // Format appointment data with proper names
+            return {
+              ...app,
+              patient_name: app.patient 
+                ? `${app.patient.first_name} ${app.patient.last_name}`
+                : 'Unknown Patient',
+              doctor_name: app.doctor 
+                ? `Dr. ${app.doctor.first_name} ${app.doctor.last_name}`
+                : 'Unknown Doctor',
+              // Ensure we have the IDs for actions
+              patient_id: app.patient?.id || app.patient_id,
+              doctor_id: app.doctor?.id || app.doctor_id
+            };
+          })
+        : [];
+
+      console.log('[ReceptionistDashboard] Today\'s appointments:', todayAppts);
+
+      setTodayAppointments(todayAppts);
+      setFilteredAppointments(todayAppts);
+
+      // Calculate stats
+      const statusCounts = todayAppts.reduce((acc, app) => {
+        acc[app.status] = (acc[app.status] || 0) + 1;
+        return acc;
+      }, {});
+
+      // Count appointments that are overdue (more than 15 mins past time and still scheduled/pending)
+      const overdueCount = todayAppts.filter(app => isAppointmentOverdue(app)).length;
+
+      setStats({
+        todayAppointments: todayAppts.length,
+        availableDoctorCount: doctorsResponse.success ? doctorsResponse.data.length : 0,
+        totalPatients: patientsResponse.success ? patientsResponse.data.length : 0,
+        arrived: (statusCounts.waiting || 0) + (statusCounts.ready_for_doctor || 0),
+        delayed: statusCounts.late || 0,
+        noShow: statusCounts.no_show || 0,
+        scheduled: statusCounts.scheduled || 0,
+        overdue: overdueCount
+      });
+      
+      setIsLoading(false);
+    } catch (error) {
+      console.error('Error loading dashboard data:', error);
+      setIsLoading(false);
+    }
+  };
 
   // Filter appointments based on search and status
   useEffect(() => {
@@ -196,50 +176,191 @@ const ReceptionistDashboard = () => {
     // Apply search filter
     if (debouncedSearch) {
       filtered = filtered.filter(appointment =>
-        appointment.patient_name.toLowerCase().includes(debouncedSearch.toLowerCase()) ||
-        appointment.doctor_name.toLowerCase().includes(debouncedSearch.toLowerCase()) ||
-        appointment.visit_type.toLowerCase().includes(debouncedSearch.toLowerCase())
+        (appointment.patient_name && appointment.patient_name.toLowerCase().includes(debouncedSearch.toLowerCase())) ||
+        (appointment.doctor_name && appointment.doctor_name.toLowerCase().includes(debouncedSearch.toLowerCase())) ||
+        (appointment.appointment_type && appointment.appointment_type.toLowerCase().includes(debouncedSearch.toLowerCase()))
       );
     }
 
     // Apply status filter
     if (statusFilter === 'needs-action') {
       filtered = filtered.filter(appointment => 
-        appointment.status === 'pending' || 
+        appointment.status === 'scheduled' || 
         isAppointmentOverdue(appointment)
       );
     } else if (statusFilter !== 'all') {
-      filtered = filtered.filter(appointment => appointment.status === statusFilter);
+      // Map display statuses to actual backend statuses
+      if (statusFilter === 'ready') {
+        filtered = filtered.filter(appointment => 
+          appointment.status === 'waiting' || appointment.status === 'ready_for_doctor'
+        );
+      } else if (statusFilter === 'late') {
+        filtered = filtered.filter(appointment => appointment.status === 'late');
+      } else if (statusFilter === 'no-show') {
+        filtered = filtered.filter(appointment => appointment.status === 'no_show');
+      } else {
+        filtered = filtered.filter(appointment => appointment.status === statusFilter);
+      }
     }
 
     setFilteredAppointments(filtered);
   }, [debouncedSearch, statusFilter, todayAppointments]);
 
-  const updateAppointmentStatus = (appointmentId, newStatus) => {
-    setTodayAppointments(prev => 
-      prev.map(app => 
-        app.id === appointmentId ? { ...app, status: newStatus } : app
-      )
-    );
+  // Handle marking appointment as ready and creating queue token
+  const handleMarkReady = async (appointmentId) => {
+    // Prevent double-clicking
+    if (processingAppointments.has(appointmentId)) {
+      console.log('[ReceptionistDashboard] Already processing this appointment, ignoring duplicate call');
+      return;
+    }
 
-    // Update stats
-    const updatedAppointments = todayAppointments.map(app => 
-      app.id === appointmentId ? { ...app, status: newStatus } : app
-    );
+    try {
+      // Mark as processing
+      setProcessingAppointments(prev => new Set(prev).add(appointmentId));
+
+      const appointment = todayAppointments.find(app => app.id === appointmentId);
+      if (!appointment) {
+        throw new Error('Appointment not found');
+      }
+
+      console.log('[ReceptionistDashboard] Marking appointment as ready:', appointmentId);
+
+      let priority;
+      
+      // If appointment is already marked as 'late', give them priority 1 (no skip queue)
+      if (appointment.status === 'late') {
+        priority = 1;
+      } else {
+        // For scheduled appointments, check if patient arrived within acceptable time
+        const now = new Date();
+        const [hours, minutes] = appointment.appointment_time.split(':');
+        const appointmentTime = new Date();
+        appointmentTime.setHours(parseInt(hours), parseInt(minutes), 0, 0);
+        const timeDiff = now - appointmentTime; // Positive = late, Negative = early
+        const tenMinutes = 10 * 60 * 1000;
+        const thirtyMinutes = 30 * 60 * 1000;
+
+        // Determine priority: 
+        // - Arrived early (up to 30 mins before) OR within 10 mins after = priority 4 (orange)
+        // - More than 10 mins late = priority 3 (normal - no highlight)
+        const isOnTime = timeDiff >= -thirtyMinutes && timeDiff <= tenMinutes;
+        priority = isOnTime ? 4 : 3;
+      }
+
+      // Create queue token which will also update appointment status
+      const tokenData = {
+        patient_id: appointment.patient_id,
+        doctor_id: appointment.doctor_id,
+        appointment_id: appointmentId,
+        priority: priority // Priority based on status and arrival time
+      };
+
+      const response = await queueService.issueToken(tokenData);
+      
+      if (response.success) {
+        console.log('[ReceptionistDashboard] Token created successfully:', response.data);
+        // Reload data to get updated appointment status
+        await loadDashboardData();
+      } else {
+        throw new Error(response.message || 'Failed to create queue token');
+      }
+    } catch (error) {
+      console.error('[ReceptionistDashboard] Error marking appointment as ready:', error);
+      alert(`Failed to mark as ready: ${error.message}`);
+    } finally {
+      // Remove from processing set
+      setProcessingAppointments(prev => {
+        const newSet = new Set(prev);
+        newSet.delete(appointmentId);
+        return newSet;
+      });
+    }
+  };
+
+  // Handle marking appointment as late (manual marking only, does NOT start visit)
+  // Use this when patient calls to say they'll be late, or to track late arrivals
+  // Patient can still be checked in later with "Mark Ready" button (will get lower priority)
+  const handleMarkLate = async (appointmentId) => {
+    // Prevent double-clicking
+    if (processingAppointments.has(appointmentId)) {
+      console.log('[ReceptionistDashboard] Already processing this appointment, ignoring duplicate call');
+      return;
+    }
+
+    try {
+      setProcessingAppointments(prev => new Set(prev).add(appointmentId));
+      console.log('[ReceptionistDashboard] Manually marking appointment as late:', appointmentId);
+      
+      const response = await appointmentService.updateAppointmentStatus(appointmentId, 'late');
+      
+      if (response.success) {
+        console.log('[ReceptionistDashboard] Appointment marked as late (no token created yet)');
+        await loadDashboardData();
+      } else {
+        throw new Error(response.message || 'Failed to mark as late');
+      }
+    } catch (error) {
+      console.error('[ReceptionistDashboard] Error marking appointment as late:', error);
+      alert(`Failed to mark as late: ${error.message}`);
+    } finally {
+      setProcessingAppointments(prev => {
+        const newSet = new Set(prev);
+        newSet.delete(appointmentId);
+        return newSet;
+      });
+    }
+  };
+
+  // Handle marking appointment as no-show (cancels it)
+  const handleMarkNoShow = async (appointmentId) => {
+    // Prevent double-clicking
+    if (processingAppointments.has(appointmentId)) {
+      console.log('[ReceptionistDashboard] Already processing this appointment, ignoring duplicate call');
+      return;
+    }
+
+    try {
+      setProcessingAppointments(prev => new Set(prev).add(appointmentId));
+      console.log('[ReceptionistDashboard] Marking appointment as no-show:', appointmentId);
+      
+      const response = await appointmentService.updateAppointmentStatus(appointmentId, 'no_show');
+      
+      if (response.success) {
+        console.log('[ReceptionistDashboard] Appointment marked as no-show');
+        await loadDashboardData();
+      } else {
+        throw new Error(response.message || 'Failed to mark as no-show');
+      }
+    } catch (error) {
+      console.error('[ReceptionistDashboard] Error marking appointment as no-show:', error);
+      alert(`Failed to mark as no-show: ${error.message}`);
+    } finally {
+      setProcessingAppointments(prev => {
+        const newSet = new Set(prev);
+        newSet.delete(appointmentId);
+        return newSet;
+      });
+    }
+  };
+
+  // Main action handler
+  const updateAppointmentStatus = async (appointmentId, action) => {
+    console.log('[ReceptionistDashboard] Action triggered:', { appointmentId, action });
     
-    const statusCounts = updatedAppointments.reduce((acc, app) => {
-      acc[app.status] = (acc[app.status] || 0) + 1;
-      return acc;
-    }, {});
-
-    setStats(prev => ({
-      ...prev,
-      arrived: statusCounts.ready || 0,
-      delayed: statusCounts.late || 0,
-      noShow: statusCounts['no-show'] || 0,
-      scheduled: statusCounts.pending || 0,
-      overdue: updatedAppointments.filter(app => isAppointmentOverdue(app)).length || 0
-    }));
+    switch (action) {
+      case 'mark-ready':
+      case 'start-visit':
+        await handleMarkReady(appointmentId);
+        break;
+      case 'mark-late':
+        await handleMarkLate(appointmentId);
+        break;
+      case 'mark-no-show':
+        await handleMarkNoShow(appointmentId);
+        break;
+      default:
+        console.warn('[ReceptionistDashboard] Unknown action:', action);
+    }
   };
 
   const handleWalkInSubmit = async (walkInData) => {
@@ -248,7 +369,7 @@ const ReceptionistDashboard = () => {
       const tokenData = {
         patient_id: walkInData.patient.id, // UUID string
         doctor_id: walkInData.doctor.id,   // UUID string
-        priority: 1 // number - normal priority for walk-ins
+        priority: 3 // number - normal priority for walk-ins
       };
 
       // Call backend API to create queue token

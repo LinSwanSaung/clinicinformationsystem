@@ -27,7 +27,8 @@ import {
   Activity,
   Calendar,
   FileText,
-  ArrowLeft
+  ArrowLeft,
+  AlertCircle
 } from 'lucide-react';
 
 const PatientMedicalRecordManagement = () => {
@@ -50,6 +51,7 @@ const PatientMedicalRecordManagement = () => {
   const [patientFiles, setPatientFiles] = useState([]);
   const [loading, setLoading] = useState(false);
   const [uploadingFiles, setUploadingFiles] = useState(false);
+  const [hasActiveVisit, setHasActiveVisit] = useState(false);
 
   // Modal states for add functionality (DOCTOR ONLY)
   const [isAllergyModalOpen, setIsAllergyModalOpen] = useState(false);
@@ -120,6 +122,19 @@ const PatientMedicalRecordManagement = () => {
       setAllergies(Array.isArray(patientAllergies) ? patientAllergies : []);
       setDiagnoses(Array.isArray(patientDiagnoses) ? patientDiagnoses : []);
       setVisitHistory(Array.isArray(patientVisitHistory) ? patientVisitHistory : []);
+      
+      // Check if patient has an ACTIVE visit (in_progress status only)
+      const activeVisit = Array.isArray(patientVisitHistory) 
+        ? patientVisitHistory.find(v => v.status === 'in_progress')
+        : null;
+      
+      setHasActiveVisit(!!activeVisit);
+      console.log('🔍 [DOCTOR EMR] Active visit check:', { 
+        hasActiveVisit: !!activeVisit, 
+        activeVisitId: activeVisit?.id,
+        visitStatus: activeVisit?.status,
+        patientId: patientIdToUse 
+      });
       
       // Extract vitals and prescriptions from the most recent visit
       if (Array.isArray(patientVisitHistory) && patientVisitHistory.length > 0) {
@@ -283,6 +298,11 @@ const PatientMedicalRecordManagement = () => {
   };
 
   const handleAddAllergy = () => {
+    if (!hasActiveVisit) {
+      alert('⚠️ No Active Visit\n\nCannot add allergy: Patient does not have an active visit.\n\nPlease start a consultation first.');
+      return;
+    }
+    
     setNewAllergy({
       allergy_name: '',
       severity: 'mild',
@@ -325,13 +345,24 @@ const PatientMedicalRecordManagement = () => {
       alert('Allergy added successfully!');
     } catch (error) {
       console.error('Error saving allergy:', error);
-      alert('Failed to save allergy. Please try again.');
+      
+      // Check for specific error from backend
+      if (error.response?.data?.code === 'NO_ACTIVE_VISIT') {
+        alert('⚠️ Security Check Failed\n\nCannot add allergy: Patient does not have an active visit.\n\nPlease ensure the patient has an active consultation session before adding medical data.');
+      } else {
+        alert('Failed to save allergy: ' + (error.response?.data?.message || error.message || 'Please try again.'));
+      }
     } finally {
       setLoading(false);
     }
   };
 
   const handleAddDiagnosis = () => {
+    if (!hasActiveVisit) {
+      alert('⚠️ No Active Visit\n\nCannot add diagnosis: Patient does not have an active visit.\n\nPlease start a consultation first.');
+      return;
+    }
+    
     setNewDiagnosis({
       diagnosis_name: '',
       diagnosed_date: new Date().toISOString().split('T')[0],
@@ -374,7 +405,13 @@ const PatientMedicalRecordManagement = () => {
       alert('Diagnosis added successfully!');
     } catch (error) {
       console.error('Error saving diagnosis:', error);
-      alert('Failed to save diagnosis. Please try again.');
+      
+      // Check for specific error from backend
+      if (error.response?.data?.code === 'NO_ACTIVE_VISIT') {
+        alert('⚠️ Security Check Failed\n\nCannot add diagnosis: Patient does not have an active visit.\n\nPlease ensure the patient has an active consultation session before adding medical data.');
+      } else {
+        alert('Failed to save diagnosis: ' + (error.response?.data?.message || error.message || 'Please try again.'));
+      }
     } finally {
       setLoading(false);
     }
@@ -566,36 +603,49 @@ const PatientMedicalRecordManagement = () => {
             <div className="min-h-[400px]">
               {/* Overview Tab */}
               {activeTab === 'overview' && (
-                <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
-                  <PatientVitalsDisplay 
-                    vitals={latestVitals}
-                    onAddVitals={handleAddVitals}
-                    onEditVitals={handleEditVitals}
-                    showAddButton={false}
-                    showEditButton={false}
-                  />
-                  
-                  <MedicalInformationPanel 
-                    patient={{
-                      ...selectedPatient,
-                      allergies: (allergies || []).map(a => a?.allergy_name || 'Unknown').filter(Boolean),
-                      diagnosisHistory: (diagnoses || []).map(d => ({
-                        condition: d?.diagnosis_name || 'Unknown',
-                        date: d?.diagnosed_date || 'Unknown'
-                      })).filter(item => item.condition !== 'Unknown'),
-                      currentMedications: (prescriptions || [])
-                        .filter(p => p.is_active)
-                        .map(p => ({
-                          name: p.medication_name,
-                          dosage: p.dosage,
-                          frequency: p.frequency
-                        }))
-                    }}
-                    onAddAllergy={handleAddAllergy}
-                    onAddDiagnosis={handleAddDiagnosis}
-                    onAddMedication={handleAddMedication}
-                  />
-                </div>
+                <>
+                  {!hasActiveVisit && (
+                    <Card className="p-4 mb-4 bg-amber-50 border-amber-300">
+                      <div className="flex items-center space-x-3 text-amber-800">
+                        <AlertCircle size={20} />
+                        <div>
+                          <p className="font-semibold">No Active Consultation</p>
+                          <p className="text-sm">Patient does not have an active consultation session. Medical data can only be added/edited during active consultations.</p>
+                        </div>
+                      </div>
+                    </Card>
+                  )}
+                  <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+                    <PatientVitalsDisplay 
+                      vitals={latestVitals}
+                      onAddVitals={handleAddVitals}
+                      onEditVitals={handleEditVitals}
+                      showAddButton={false}
+                      showEditButton={false}
+                    />
+                    
+                    <MedicalInformationPanel 
+                      patient={{
+                        ...selectedPatient,
+                        allergies: (allergies || []).map(a => a?.allergy_name || 'Unknown').filter(Boolean),
+                        diagnosisHistory: (diagnoses || []).map(d => ({
+                          condition: d?.diagnosis_name || 'Unknown',
+                          date: d?.diagnosed_date || 'Unknown'
+                        })).filter(item => item.condition !== 'Unknown'),
+                        currentMedications: (prescriptions || [])
+                          .filter(p => p.is_active)
+                          .map(p => ({
+                            name: p.medication_name,
+                            dosage: p.dosage,
+                            frequency: p.frequency
+                          }))
+                      }}
+                      onAddAllergy={hasActiveVisit ? handleAddAllergy : undefined}
+                      onAddDiagnosis={hasActiveVisit ? handleAddDiagnosis : undefined}
+                      showActionButtons={hasActiveVisit}
+                    />
+                  </div>
+                </>
               )}
 
               {/* Visit History Tab */}

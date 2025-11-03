@@ -1,5 +1,6 @@
 import express from 'express';
 import { authenticate, authorize } from '../middleware/auth.js';
+import { requireActiveVisit } from '../middleware/activeVisitCheck.js';
 import patientDiagnosisService from '../services/PatientDiagnosis.service.js';
 import { logAuditEvent } from '../utils/auditLogger.js';
 
@@ -104,11 +105,13 @@ router.get(
  * @route   POST /api/patient-diagnoses
  * @desc    Create new diagnosis
  * @access  Private (Doctor only)
+ * @security Requires patient to have an active visit
  */
 router.post(
   '/',
   authenticate,
   authorize('doctor'),
+  requireActiveVisit,
   async (req, res) => {
     try {
       const diagnosisData = {
@@ -134,11 +137,13 @@ router.post(
  * @route   PUT /api/patient-diagnoses/:id
  * @desc    Update diagnosis
  * @access  Private (Doctor only)
+ * @security Requires patient to have an active visit
  */
 router.put(
   '/:id',
   authenticate,
   authorize('doctor'),
+  requireActiveVisit,
   async (req, res) => {
     try {
       const { id } = req.params;

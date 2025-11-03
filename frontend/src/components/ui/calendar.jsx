@@ -10,21 +10,25 @@ export function Calendar({
   onSelect,
   ...props
 }) {
-  const [currentMonth, setCurrentMonth] = React.useState(() => new Date(2025, 9, 1)); // October 2025
+  const [currentMonth, setCurrentMonth] = React.useState(() => {
+    const today = new Date();
+    return new Date(today.getFullYear(), today.getMonth(), 1);
+  });
 
   const navigateMonth = (direction) => {
     const newMonth = new Date(currentMonth);
     newMonth.setMonth(newMonth.getMonth() + direction);
     
-    // Prevent going to months before October 2025
-    const minMonth = new Date(2025, 9, 1); // October 2025
+    // Prevent going to past months
+    const today = new Date();
+    const minMonth = new Date(today.getFullYear(), today.getMonth(), 1);
     if (newMonth < minMonth) return;
     
     setCurrentMonth(newMonth);
   };
 
   const goToToday = () => {
-    const today = new Date(2025, 9, 28); // October 28, 2025
+    const today = new Date();
     setCurrentMonth(new Date(today.getFullYear(), today.getMonth(), 1));
     if (onSelect) onSelect(today);
   };
@@ -47,7 +51,8 @@ export function Calendar({
   };
 
   const days = generateCalendarDays();
-  const canGoBack = currentMonth > new Date(2025, 9, 1);
+  const today = new Date();
+  const canGoBack = currentMonth > new Date(today.getFullYear(), today.getMonth(), 1);
 
   return (
     <div className={cn("p-1 sm:p-2 md:p-3 lg:p-4", className)} {...props}>
@@ -87,10 +92,15 @@ export function Calendar({
         </div>
         <div className="grid grid-cols-7 text-center text-[10px] sm:text-xs md:text-sm lg:text-base gap-0.5 sm:gap-1">
           {days.map((date, i) => {
+            const todayDate = new Date();
+            todayDate.setHours(0, 0, 0, 0);
+            const checkDate = new Date(date);
+            checkDate.setHours(0, 0, 0, 0);
+            
             const isSelected = selected?.toDateString() === date.toDateString();
-            const isToday = date.toDateString() === new Date(2025, 9, 28).toDateString();
+            const isToday = date.toDateString() === todayDate.toDateString();
             const isCurrentMonth = date.getMonth() === currentMonth.getMonth();
-            const isPast = date < new Date(2025, 9, 28);
+            const isPast = checkDate < todayDate;
 
             return (
               <Button

@@ -25,7 +25,8 @@ import {
   FileText,
   ChevronDown,
   ChevronRight,
-  ArrowLeft
+  ArrowLeft,
+  AlertCircle
 } from 'lucide-react';
 
 const ElectronicMedicalRecords = () => {
@@ -46,6 +47,7 @@ const ElectronicMedicalRecords = () => {
   const [prescriptions, setPrescriptions] = useState([]);
   const [doctorNotes, setDoctorNotes] = useState([]);
   const [loading, setLoading] = useState(false);
+  const [hasActiveVisit, setHasActiveVisit] = useState(false);
 
   // Tab configuration
   const tabs = [
@@ -100,6 +102,19 @@ const ElectronicMedicalRecords = () => {
       setAllergies(Array.isArray(patientAllergies) ? patientAllergies : []);
       setDiagnoses(Array.isArray(patientDiagnoses) ? patientDiagnoses : []);
       setVisitHistory(Array.isArray(patientVisitHistory) ? patientVisitHistory : []);
+      
+      // Check if patient has an ACTIVE visit (in_progress status only)
+      const activeVisit = Array.isArray(patientVisitHistory) 
+        ? patientVisitHistory.find(v => v.status === 'in_progress')
+        : null;
+      
+      setHasActiveVisit(!!activeVisit);
+      console.log('🔍 [NURSE EMR] Active visit check:', { 
+        hasActiveVisit: !!activeVisit, 
+        visitStatus: activeVisit?.status,
+        activeVisitId: activeVisit?.id,
+        patientId: patientIdToUse 
+      });
       
       // Extract vitals and prescriptions from the most recent visit
       if (Array.isArray(patientVisitHistory) && patientVisitHistory.length > 0) {
@@ -230,33 +245,33 @@ const ElectronicMedicalRecords = () => {
 
   // Medical action handlers - NURSES CANNOT ADD DIAGNOSIS/ALLERGY
   const handleAddVitals = () => {
+    if (!hasActiveVisit) {
+      console.warn('[NURSE EMR] Cannot add vitals - No active visit');
+      return;
+    }
     console.log('Add vitals for patient:', selectedPatient?.id);
     // TODO: Navigate to vitals entry or open modal
   };
 
   const handleEditVitals = () => {
+    if (!hasActiveVisit) {
+      console.warn('[NURSE EMR] Cannot edit vitals - No active visit');
+      return;
+    }
     console.log('Edit vitals for patient:', selectedPatient?.id);
     // TODO: Navigate to vitals entry or open modal
   };
 
-  const handleAddAllergy = () => {
-    alert('Only doctors can add allergies. Please ask a doctor to add this information.');
-  };
-
-  const handleAddDiagnosis = () => {
-    alert('Only doctors can add diagnoses. Please ask a doctor to add this information.');
-  };
-
-  const handleAddMedication = () => {
-    alert('Only doctors can prescribe medications. Please ask a doctor to add this information.');
-  };
-
+  // Nurses cannot add allergies, diagnoses, medications, or notes - only doctors can
+  // These functions are not needed as buttons are hidden for nurses
   const handleAddNote = () => {
-    alert('Only doctors can add clinical notes. Please ask a doctor to add this information.');
+    // Nurses cannot add notes - this should not be called
+    console.warn('[NURSE EMR] Nurses cannot add clinical notes');
   };
 
-  const handleEditNote = (note, index) => {
-    alert('Only doctors can edit clinical notes.');
+  const handleEditNote = () => {
+    // Nurses cannot edit notes - this should not be called
+    console.warn('[NURSE EMR] Nurses cannot edit clinical notes');
   };
 
   const handleUploadFile = () => {
@@ -395,36 +410,47 @@ const ElectronicMedicalRecords = () => {
               
               {/* Overview Tab */}
               {!loading && activeTab === 'overview' && (
-                <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
-                  <PatientVitalsDisplay 
-                    vitals={latestVitals}
-                    onAddVitals={handleAddVitals}
-                    onEditVitals={handleEditVitals}
-                    showAddButton={!latestVitals}
-                    showEditButton={!!latestVitals}
-                  />
-                  
-                  <MedicalInformationPanel 
-                    patient={{
-                      ...selectedPatient,
-                      allergies: (allergies || []).map(a => a?.allergy_name || 'Unknown').filter(Boolean),
-                      diagnosisHistory: (diagnoses || []).map(d => ({
-                        condition: d?.diagnosis_name || 'Unknown',
-                        date: d?.diagnosed_date || 'Unknown'
-                      })).filter(item => item.condition !== 'Unknown'),
-                      currentMedications: (prescriptions || [])
-                        .filter(p => p.is_active)
-                        .map(p => ({
-                          name: p.medication_name,
-                          dosage: p.dosage,
-                          frequency: p.frequency
-                        }))
-                    }}
-                    onAddAllergy={handleAddAllergy}
-                    onAddDiagnosis={handleAddDiagnosis}
-                    onAddMedication={handleAddMedication}
-                  />
-                </div>
+                <>
+                  {!hasActiveVisit && (
+                    <Card className="p-4 mb-4 bg-amber-50 border-amber-300">
+                      <div className="flex items-center space-x-3 text-amber-800">
+                        <AlertCircle size={20} />
+                        <div>
+                          <p className="font-semibold">No Active Consultation</p>
+                          <p className="text-sm">Patient does not have an active consultation session. Vitals can only be recorded during active consultations.</p>
+                        </div>
+                      </div>
+                    </Card>
+                  )}
+                  <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+                    <PatientVitalsDisplay 
+                      vitals={latestVitals}
+                      onAddVitals={hasActiveVisit ? handleAddVitals : undefined}
+                      onEditVitals={hasActiveVisit ? handleEditVitals : undefined}
+                      showAddButton={hasActiveVisit && !latestVitals}
+                      showEditButton={hasActiveVisit && !!latestVitals}
+                    />
+                    
+                    <MedicalInformationPanel 
+                      patient={{
+                        ...selectedPatient,
+                        allergies: (allergies || []).map(a => a?.allergy_name || 'Unknown').filter(Boolean),
+                        diagnosisHistory: (diagnoses || []).map(d => ({
+                          condition: d?.diagnosis_name || 'Unknown',
+                          date: d?.diagnosed_date || 'Unknown'
+                        })).filter(item => item.condition !== 'Unknown'),
+                        currentMedications: (prescriptions || [])
+                          .filter(p => p.is_active)
+                          .map(p => ({
+                            name: p.medication_name,
+                            dosage: p.dosage,
+                            frequency: p.frequency
+                          }))
+                      }}
+                      showActionButtons={false}
+                    />
+                  </div>
+                </>
               )}
 
               {/* Visit History Tab */}

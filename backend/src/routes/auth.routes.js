@@ -2,9 +2,15 @@ import express from 'express';
 import { authenticate, authorize } from '../middleware/auth.js';
 import { authRateLimiter } from '../middleware/rateLimiter.js';
 import { asyncHandler } from '../middleware/errorHandler.js';
+import { ROLES } from '../constants/roles.js';
 import AuthService from '../services/Auth.service.js';
 import { logAuditEvent } from '../utils/auditLogger.js';
-import { validateLogin, validateRegister, validatePatientRegister, validatePatientBind } from '../validators/auth.validator.js';
+import {
+  validateLogin,
+  validateRegister,
+  validatePatientRegister,
+  validatePatientBind,
+} from '../validators/auth.validator.js';
 
 const router = express.Router();
 
@@ -13,7 +19,8 @@ const router = express.Router();
  * @desc    User login
  * @access  Public
  */
-router.post('/login', 
+router.post(
+  '/login',
   authRateLimiter,
   validateLogin,
   asyncHandler(async (req, res) => {
@@ -30,7 +37,7 @@ router.post('/login',
           action: 'LOGIN_SUCCESS',
           entity: 'auth',
           result: 'success',
-          ip: req.ip
+          ip: req.ip,
         });
       } catch (e) {
         // ignore
@@ -39,7 +46,7 @@ router.post('/login',
       res.status(200).json({
         success: true,
         message: 'Login successful',
-        data: result
+        data: result,
       });
     } catch (err) {
       // Log failed login attempt (avoid storing PHI)
@@ -51,7 +58,7 @@ router.post('/login',
           entity: 'auth',
           result: 'failure',
           meta: { reason: err.message ? String(err.message).slice(0, 200) : 'unknown' },
-          ip: req.ip
+          ip: req.ip,
         });
       } catch (e) {}
 
@@ -65,7 +72,8 @@ router.post('/login',
  * @desc    Patient self-registration
  * @access  Public
  */
-router.post('/register-patient',
+router.post(
+  '/register-patient',
   authRateLimiter,
   validatePatientRegister,
   asyncHandler(async (req, res) => {
@@ -74,7 +82,7 @@ router.post('/register-patient',
     res.status(201).json({
       success: true,
       message: 'Account created successfully',
-      data: result
+      data: result,
     });
   })
 );
@@ -84,15 +92,16 @@ router.post('/register-patient',
  * @desc    List patient portal accounts
  * @access  Private (Admin)
  */
-router.get('/patient-accounts',
+router.get(
+  '/patient-accounts',
   authenticate,
-  authorize('admin'),
+  authorize(ROLES.ADMIN),
   asyncHandler(async (req, res) => {
     const { search = '', limit = 50, page = 1 } = req.query;
     const options = {
       search,
       limit: Math.min(parseInt(limit, 10) || 50, 100),
-      offset: ((parseInt(page, 10) || 1) - 1) * (parseInt(limit, 10) || 50)
+      offset: ((parseInt(page, 10) || 1) - 1) * (parseInt(limit, 10) || 50),
     };
 
     const result = await AuthService.getPatientAccounts(options);
@@ -103,8 +112,8 @@ router.get('/patient-accounts',
       total: result.total,
       pagination: {
         page: parseInt(page, 10) || 1,
-        limit: Math.min(parseInt(limit, 10) || 50, 100)
-      }
+        limit: Math.min(parseInt(limit, 10) || 50, 100),
+      },
     });
   })
 );
@@ -114,19 +123,20 @@ router.get('/patient-accounts',
  * @desc    User registration (Admin only)
  * @access  Private (Admin)
  */
-router.post('/register',
+router.post(
+  '/register',
   authenticate,
-  authorize('admin'),
+  authorize(ROLES.ADMIN),
   validateRegister,
   asyncHandler(async (req, res) => {
     const userData = req.body;
-    
+
     const result = await AuthService.register(userData, req.user.id);
-    
+
     res.status(201).json({
       success: true,
       message: 'User registered successfully',
-      data: result
+      data: result,
     });
   })
 );
@@ -136,12 +146,13 @@ router.post('/register',
  * @desc    User logout
  * @access  Private
  */
-router.post('/logout',
+router.post(
+  '/logout',
   authenticate,
   asyncHandler(async (req, res) => {
     // In a stateless JWT system, logout is handled client-side
     // But we can add token blacklisting logic here if needed
-    
+
     // Log logout
     try {
       logAuditEvent({
@@ -150,13 +161,13 @@ router.post('/logout',
         action: 'LOGOUT',
         entity: 'auth',
         result: 'success',
-        ip: req.ip
+        ip: req.ip,
       });
     } catch (e) {}
 
     res.status(200).json({
       success: true,
-      message: 'Logout successful'
+      message: 'Logout successful',
     });
   })
 );
@@ -166,14 +177,15 @@ router.post('/logout',
  * @desc    Get current user profile
  * @access  Private
  */
-router.get('/me',
+router.get(
+  '/me',
   authenticate,
   asyncHandler(async (req, res) => {
     const user = await AuthService.getCurrentUser(req.user.id);
-    
+
     res.status(200).json({
       success: true,
-      data: user
+      data: user,
     });
   })
 );
@@ -183,16 +195,17 @@ router.get('/me',
  * @desc    Change user password
  * @access  Private
  */
-router.put('/change-password',
+router.put(
+  '/change-password',
   authenticate,
   asyncHandler(async (req, res) => {
     const { currentPassword, newPassword } = req.body;
-    
+
     await AuthService.changePassword(req.user.id, currentPassword, newPassword);
-    
+
     res.status(200).json({
       success: true,
-      message: 'Password changed successfully'
+      message: 'Password changed successfully',
     });
   })
 );
@@ -202,19 +215,20 @@ router.put('/change-password',
  * @desc    Link patient account to clinical record
  * @access  Private (Patient)
  */
-router.post('/bind-patient',
+router.post(
+  '/bind-patient',
   authenticate,
   authorize('patient'),
   validatePatientBind,
   asyncHandler(async (req, res) => {
     const { patient_number, date_of_birth } = req.body;
-    
+
     const result = await AuthService.bindPatientAccount(req.user.id, patient_number, date_of_birth);
 
     res.status(200).json({
       success: true,
       message: 'Patient record linked successfully',
-      data: result
+      data: result,
     });
   })
 );
@@ -224,16 +238,17 @@ router.post('/bind-patient',
  * @desc    Admin bind patient account to patient record
  * @access  Private (Admin)
  */
-router.post('/patient-accounts/:userId/bind',
+router.post(
+  '/patient-accounts/:userId/bind',
   authenticate,
-  authorize('admin'),
+  authorize(ROLES.ADMIN),
   asyncHandler(async (req, res) => {
     const { patient_id } = req.body;
 
     if (!patient_id) {
       return res.status(400).json({
         success: false,
-        message: 'patient_id is required'
+        message: 'patient_id is required',
       });
     }
 
@@ -242,7 +257,7 @@ router.post('/patient-accounts/:userId/bind',
     res.status(200).json({
       success: true,
       message: 'Patient account linked successfully',
-      data: account
+      data: account,
     });
   })
 );
@@ -252,16 +267,17 @@ router.post('/patient-accounts/:userId/bind',
  * @desc    Admin unbind patient account
  * @access  Private (Admin)
  */
-router.delete('/patient-accounts/:userId/bind',
+router.delete(
+  '/patient-accounts/:userId/bind',
   authenticate,
-  authorize('admin'),
+  authorize(ROLES.ADMIN),
   asyncHandler(async (req, res) => {
     const account = await AuthService.adminUnbindPatientAccount(req.params.userId);
 
     res.status(200).json({
       success: true,
       message: 'Patient account unlinked successfully',
-      data: account
+      data: account,
     });
   })
 );

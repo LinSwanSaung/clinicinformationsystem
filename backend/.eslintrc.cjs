@@ -34,7 +34,28 @@ module.exports = {
     // Async/Await
     'require-await': 'warn',
     'no-return-await': 'error',
+    // Forbid importing Supabase client outside repositories/config/scripts
+    'no-restricted-imports': [
+      'error',
+      {
+        paths: [
+          {
+            name: '@supabase/supabase-js',
+            message:
+              'Import Supabase only from src/config/database.js or within src/services/repositories/**. Create/extend a repo instead.',
+          },
+        ],
+      },
+    ],
   },
+  overrides: [
+    {
+      files: ['src/services/repositories/**', 'src/config/**', 'scripts/**'],
+      rules: {
+        'no-restricted-imports': 'off',
+      },
+    },
+  ],
   ignorePatterns: [
     'node_modules',
     'coverage',

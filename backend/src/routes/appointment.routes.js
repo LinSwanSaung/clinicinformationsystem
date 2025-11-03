@@ -1,6 +1,7 @@
 import express from 'express';
 import { authenticate, authorize } from '../middleware/auth.js';
 import { AppError, asyncHandler } from '../middleware/errorHandler.js';
+import { ROLES } from '../constants/roles.js';
 import AppointmentService from '../services/Appointment.service.js';
 import { logAuditEvent } from '../utils/auditLogger.js';
 
@@ -12,14 +13,15 @@ const appointmentService = new AppointmentService();
  * @desc    Get appointments with optional filtering
  * @access  Private (All roles)
  */
-router.get('/',
+router.get(
+  '/',
   authenticate,
   asyncHandler(async (req, res) => {
     const { date, patient_id, doctor_id } = req.query;
     const filters = {
       date,
       patient_id,
-      doctor_id
+      doctor_id,
     };
 
     if (req.user.role === 'patient') {
@@ -39,7 +41,7 @@ router.get('/',
     res.status(200).json({
       success: true,
       message: 'Appointments retrieved successfully',
-      data: appointments
+      data: appointments,
     });
   })
 );
@@ -49,11 +51,12 @@ router.get('/',
  * @desc    Get appointment by ID
  * @access  Private (All roles)
  */
-router.get('/:id',
+router.get(
+  '/:id',
   authenticate,
   asyncHandler(async (req, res) => {
     const { id } = req.params;
-    
+
     const appointment = await appointmentService.getAppointmentById(id);
 
     // Note: Viewing is not logged to avoid excessive audit log entries
@@ -61,7 +64,7 @@ router.get('/:id',
     res.status(200).json({
       success: true,
       message: 'Appointment retrieved successfully',
-      data: appointment
+      data: appointment,
     });
   })
 );
@@ -71,13 +74,14 @@ router.get('/:id',
  * @desc    Create new appointment
  * @access  Private (Receptionist, Admin)
  */
-router.post('/',
+router.post(
+  '/',
   authenticate,
-  authorize('receptionist', 'admin'),
+  authorize(ROLES.ADMIN, ROLES.RECEPTIONIST, ROLES.RECEPTION),
   asyncHandler(async (req, res) => {
     const appointmentData = {
       ...req.body,
-      created_by: req.user.id
+      created_by: req.user.id,
     };
 
     const newAppointment = await appointmentService.createAppointment(appointmentData);
@@ -92,14 +96,16 @@ router.post('/',
         recordId: newAppointment?.id || null,
         patientId: newAppointment?.patient_id || appointmentData.patient_id || null,
         result: 'success',
-        ip: req.ip
+        ip: req.ip,
       });
-    } catch (e) {}
+    } catch (e) {
+      console.error('Audit log error:', e);
+    }
 
     res.status(201).json({
       success: true,
       message: 'Appointment created successfully',
-      data: newAppointment
+      data: newAppointment,
     });
   })
 );
@@ -109,9 +115,10 @@ router.post('/',
  * @desc    Update appointment
  * @access  Private (Receptionist, Admin)
  */
-router.put('/:id',
+router.put(
+  '/:id',
   authenticate,
-  authorize('receptionist', 'admin'),
+  authorize(ROLES.ADMIN, ROLES.RECEPTIONIST, ROLES.RECEPTION),
   asyncHandler(async (req, res) => {
     const { id } = req.params;
     const updateData = req.body;
@@ -129,14 +136,16 @@ router.put('/:id',
         patientId: updatedAppointment?.patient_id || null,
         result: 'success',
         meta: { changed_fields: Object.keys(updateData) },
-        ip: req.ip
+        ip: req.ip,
       });
-    } catch (e) {}
+    } catch (e) {
+      console.error('Audit log error:', e);
+    }
 
     res.status(200).json({
       success: true,
       message: 'Appointment updated successfully',
-      data: updatedAppointment
+      data: updatedAppointment,
     });
   })
 );
@@ -146,12 +155,13 @@ router.put('/:id',
  * @desc    Delete appointment
  * @access  Private (Receptionist, Admin)
  */
-router.delete('/:id',
+router.delete(
+  '/:id',
   authenticate,
-  authorize('receptionist', 'admin'),
+  authorize(ROLES.ADMIN, ROLES.RECEPTIONIST, ROLES.RECEPTION),
   asyncHandler(async (req, res) => {
     const { id } = req.params;
-    
+
     await appointmentService.deleteAppointment(id);
 
     // Log appointment cancel/delete
@@ -163,13 +173,15 @@ router.delete('/:id',
         entity: 'appointments',
         recordId: id,
         result: 'success',
-        ip: req.ip
+        ip: req.ip,
       });
-    } catch (e) {}
+    } catch (e) {
+      console.error('Audit log error:', e);
+    }
 
     res.status(200).json({
       success: true,
-      message: 'Appointment deleted successfully'
+      message: 'Appointment deleted successfully',
     });
   })
 );
@@ -179,9 +191,10 @@ router.delete('/:id',
  * @desc    Update appointment status
  * @access  Private (Doctor, Nurse, Receptionist)
  */
-router.put('/:id/status',
+router.put(
+  '/:id/status',
   authenticate,
-  authorize('doctor', 'nurse', 'receptionist'),
+  authorize('doctor', 'nurse', 'receptionist', ROLES.RECEPTION),
   asyncHandler(async (req, res) => {
     const { id } = req.params;
     const { status } = req.body;
@@ -189,7 +202,7 @@ router.put('/:id/status',
     if (!status) {
       return res.status(400).json({
         success: false,
-        message: 'Status is required'
+        message: 'Status is required',
       });
     }
 
@@ -206,14 +219,16 @@ router.put('/:id/status',
         patientId: updatedAppointment?.patient_id || null,
         result: 'success',
         meta: { status: status },
-        ip: req.ip
+        ip: req.ip,
       });
-    } catch (e) {}
+    } catch (e) {
+      console.error('Audit log error:', e);
+    }
 
     res.status(200).json({
       success: true,
       message: 'Appointment status updated successfully',
-      data: updatedAppointment
+      data: updatedAppointment,
     });
   })
 );
@@ -223,9 +238,10 @@ router.put('/:id/status',
  * @desc    Get available time slots for a doctor on a specific date
  * @access  Private (Receptionist, Admin)
  */
-router.get('/doctor/:doctorId/slots',
+router.get(
+  '/doctor/:doctorId/slots',
   authenticate,
-  authorize('receptionist', 'admin'),
+  authorize(ROLES.ADMIN, ROLES.RECEPTIONIST, ROLES.RECEPTION),
   asyncHandler(async (req, res) => {
     const { doctorId } = req.params;
     const { date } = req.query;
@@ -233,7 +249,7 @@ router.get('/doctor/:doctorId/slots',
     if (!date) {
       return res.status(400).json({
         success: false,
-        message: 'Date is required'
+        message: 'Date is required',
       });
     }
 
@@ -242,7 +258,7 @@ router.get('/doctor/:doctorId/slots',
     res.status(200).json({
       success: true,
       message: 'Available slots retrieved successfully',
-      data: availableSlots
+      data: availableSlots,
     });
   })
 );

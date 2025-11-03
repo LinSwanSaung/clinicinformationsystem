@@ -1,6 +1,7 @@
 import express from 'express';
 import { authenticate, authorize } from '../middleware/auth.js';
 import { asyncHandler } from '../middleware/errorHandler.js';
+import { ROLES } from '../constants/roles.js';
 import InvoiceService from '../services/Invoice.service.js';
 import { logAuditEvent } from '../utils/auditLogger.js';
 
@@ -11,15 +12,16 @@ const router = express.Router();
  * @desc    Get all pending invoices (for cashier dashboard)
  * @access  Private (Cashier, Pharmacist, Admin)
  */
-router.get('/pending',
+router.get(
+  '/pending',
   authenticate,
-  authorize('admin', 'cashier', 'pharmacist'),
+  authorize(ROLES.ADMIN, ROLES.CASHIER, 'pharmacist'),
   asyncHandler(async (req, res) => {
     const invoices = await InvoiceService.getPendingInvoices();
-    
+
     res.status(200).json({
       success: true,
-      data: invoices
+      data: invoices,
     });
   })
 );
@@ -29,20 +31,21 @@ router.get('/pending',
  * @desc    Get completed invoices (invoice history)
  * @access  Private (Cashier, Pharmacist, Admin)
  */
-router.get('/completed',
+router.get(
+  '/completed',
   authenticate,
-  authorize('admin', 'cashier', 'pharmacist'),
+  authorize(ROLES.ADMIN, ROLES.CASHIER, 'pharmacist'),
   asyncHandler(async (req, res) => {
     const { limit = 50, offset = 0 } = req.query;
-    
+
     const invoices = await InvoiceService.getCompletedInvoices({
       limit: parseInt(limit),
-      offset: parseInt(offset)
+      offset: parseInt(offset),
     });
-    
+
     res.status(200).json({
       success: true,
-      data: invoices
+      data: invoices,
     });
   })
 );
@@ -52,16 +55,17 @@ router.get('/completed',
  * @desc    Get invoice by visit ID
  * @access  Private (All roles)
  */
-router.get('/visit/:visitId',
+router.get(
+  '/visit/:visitId',
   authenticate,
-  authorize('admin', 'doctor', 'cashier', 'pharmacist', 'receptionist'),
+  authorize(ROLES.ADMIN, ROLES.DOCTOR, 'cashier', 'pharmacist', 'receptionist'),
   asyncHandler(async (req, res) => {
     const { visitId } = req.params;
     const invoice = await InvoiceService.getInvoiceByVisit(visitId);
-    
+
     res.status(200).json({
       success: true,
-      data: invoice
+      data: invoice,
     });
   })
 );
@@ -71,16 +75,17 @@ router.get('/visit/:visitId',
  * @desc    Get all invoices for a patient
  * @access  Private (All roles)
  */
-router.get('/patient/:patientId',
+router.get(
+  '/patient/:patientId',
   authenticate,
-  authorize('admin', 'doctor', 'cashier', 'pharmacist', 'receptionist'),
+  authorize(ROLES.ADMIN, ROLES.DOCTOR, 'cashier', 'pharmacist', 'receptionist'),
   asyncHandler(async (req, res) => {
     const { patientId } = req.params;
     const invoices = await InvoiceService.getInvoicesByPatient(patientId);
-    
+
     res.status(200).json({
       success: true,
-      data: invoices
+      data: invoices,
     });
   })
 );
@@ -90,21 +95,22 @@ router.get('/patient/:patientId',
  * @desc    Create invoice for a visit
  * @access  Private (Doctor, Cashier, Admin)
  */
-router.post('/',
+router.post(
+  '/',
   authenticate,
-  authorize('admin', 'doctor', 'cashier'),
+  authorize(ROLES.ADMIN, ROLES.DOCTOR, 'cashier'),
   asyncHandler(async (req, res) => {
     const { visit_id } = req.body;
-    
+
     if (!visit_id) {
       return res.status(400).json({
         success: false,
-        message: 'visit_id is required'
+        message: 'visit_id is required',
       });
     }
 
     const invoice = await InvoiceService.createInvoice(visit_id, req.user.id);
-    
+
     // Audit log
     await logAuditEvent({
       actor_id: req.user.id,
@@ -114,13 +120,13 @@ router.post('/',
       entity_id: invoice.id,
       status: 'success',
       ip: req.ip,
-      userAgent: req.headers['user-agent']
+      userAgent: req.headers['user-agent'],
     });
-    
+
     res.status(201).json({
       success: true,
       message: 'Invoice created successfully',
-      data: invoice
+      data: invoice,
     });
   })
 );
@@ -130,17 +136,18 @@ router.post('/',
  * @desc    Add service item to invoice
  * @access  Private (Doctor, Cashier, Admin)
  */
-router.post('/:id/items/service',
+router.post(
+  '/:id/items/service',
   authenticate,
-  authorize('admin', 'doctor', 'cashier'),
+  authorize(ROLES.ADMIN, ROLES.DOCTOR, 'cashier'),
   asyncHandler(async (req, res) => {
     const { id } = req.params;
     const item = await InvoiceService.addServiceItem(id, req.body, req.user.id);
-    
+
     res.status(201).json({
       success: true,
       message: 'Service item added successfully',
-      data: item
+      data: item,
     });
   })
 );
@@ -150,17 +157,18 @@ router.post('/:id/items/service',
  * @desc    Add medicine item to invoice
  * @access  Private (Doctor, Cashier, Pharmacist, Admin)
  */
-router.post('/:id/items/medicine',
+router.post(
+  '/:id/items/medicine',
   authenticate,
-  authorize('admin', 'doctor', 'cashier', 'pharmacist'),
+  authorize(ROLES.ADMIN, ROLES.DOCTOR, 'cashier', 'pharmacist'),
   asyncHandler(async (req, res) => {
     const { id } = req.params;
     const item = await InvoiceService.addMedicineItem(id, req.body, req.user.id);
-    
+
     res.status(201).json({
       success: true,
       message: 'Medicine item added successfully',
-      data: item
+      data: item,
     });
   })
 );
@@ -170,26 +178,27 @@ router.post('/:id/items/medicine',
  * @desc    Add all prescriptions from visit to invoice
  * @access  Private (Doctor, Cashier, Pharmacist, Admin)
  */
-router.post('/:id/prescriptions',
+router.post(
+  '/:id/prescriptions',
   authenticate,
-  authorize('admin', 'doctor', 'cashier', 'pharmacist'),
+  authorize(ROLES.ADMIN, ROLES.DOCTOR, 'cashier', 'pharmacist'),
   asyncHandler(async (req, res) => {
     const { id } = req.params;
     const { visit_id } = req.body;
-    
+
     if (!visit_id) {
       return res.status(400).json({
         success: false,
-        message: 'visit_id is required'
+        message: 'visit_id is required',
       });
     }
 
     const items = await InvoiceService.addPrescriptionsToInvoice(id, visit_id, req.user.id);
-    
+
     res.status(201).json({
       success: true,
       message: 'Prescriptions added to invoice successfully',
-      data: items
+      data: items,
     });
   })
 );
@@ -199,17 +208,18 @@ router.post('/:id/prescriptions',
  * @desc    Update invoice item
  * @access  Private (Cashier, Pharmacist, Admin)
  */
-router.put('/:id/items/:itemId',
+router.put(
+  '/:id/items/:itemId',
   authenticate,
-  authorize('admin', 'cashier', 'pharmacist'),
+  authorize(ROLES.ADMIN, ROLES.CASHIER, 'pharmacist'),
   asyncHandler(async (req, res) => {
     const { itemId } = req.params;
     const item = await InvoiceService.updateInvoiceItem(itemId, req.body);
-    
+
     res.status(200).json({
       success: true,
       message: 'Invoice item updated successfully',
-      data: item
+      data: item,
     });
   })
 );
@@ -219,17 +229,18 @@ router.put('/:id/items/:itemId',
  * @desc    Remove invoice item
  * @access  Private (Cashier, Pharmacist, Admin)
  */
-router.delete('/:id/items/:itemId',
+router.delete(
+  '/:id/items/:itemId',
   authenticate,
-  authorize('admin', 'cashier', 'pharmacist'),
+  authorize(ROLES.ADMIN, ROLES.CASHIER, 'pharmacist'),
   asyncHandler(async (req, res) => {
     const { itemId } = req.params;
     const item = await InvoiceService.removeInvoiceItem(itemId);
-    
+
     res.status(200).json({
       success: true,
       message: 'Invoice item removed successfully',
-      data: item
+      data: item,
     });
   })
 );
@@ -239,19 +250,20 @@ router.delete('/:id/items/:itemId',
  * @desc    Update invoice discount
  * @access  Private (Cashier, Admin)
  */
-router.put('/:id/discount',
+router.put(
+  '/:id/discount',
   authenticate,
-  authorize('admin', 'cashier'),
+  authorize(ROLES.ADMIN, ROLES.CASHIER),
   asyncHandler(async (req, res) => {
     const { id } = req.params;
     const { discount_amount, discount_percentage } = req.body;
-    
+
     const invoice = await InvoiceService.updateDiscount(id, discount_amount, discount_percentage);
-    
+
     res.status(200).json({
       success: true,
       message: 'Discount updated successfully',
-      data: invoice
+      data: invoice,
     });
   })
 );
@@ -261,16 +273,17 @@ router.put('/:id/discount',
  * @desc    Complete invoice (mark as paid) and complete the visit
  * @access  Private (Cashier, Admin)
  */
-router.put('/:id/complete',
+router.put(
+  '/:id/complete',
   authenticate,
-  authorize('admin', 'cashier'),
+  authorize(ROLES.ADMIN, ROLES.CASHIER),
   asyncHandler(async (req, res) => {
     const { id } = req.params;
     const { completed_by } = req.body;
     const userId = completed_by || req.user.id;
-    
+
     const invoice = await InvoiceService.completeInvoice(id, userId);
-    
+
     // Audit log - CRITICAL: Track who completed the invoice
     await logAuditEvent({
       actor_id: userId,
@@ -283,13 +296,13 @@ router.put('/:id/complete',
       old_values: { status: 'pending' },
       new_values: { status: 'paid', completed_by: userId, completed_at: new Date() },
       ip: req.ip,
-      userAgent: req.headers['user-agent']
+      userAgent: req.headers['user-agent'],
     });
-    
+
     res.status(200).json({
       success: true,
       message: 'Invoice completed successfully. Visit has been marked as completed.',
-      data: invoice
+      data: invoice,
     });
   })
 );
@@ -299,15 +312,16 @@ router.put('/:id/complete',
  * @desc    Cancel invoice
  * @access  Private (Cashier, Admin)
  */
-router.put('/:id/cancel',
+router.put(
+  '/:id/cancel',
   authenticate,
-  authorize('admin', 'cashier'),
+  authorize(ROLES.ADMIN, ROLES.CASHIER),
   asyncHandler(async (req, res) => {
     const { id } = req.params;
     const { reason } = req.body;
-    
+
     const invoice = await InvoiceService.cancelInvoice(id, req.user.id, reason);
-    
+
     // Audit log - Track invoice cancellation with reason
     await logAuditEvent({
       actor_id: req.user.id,
@@ -320,13 +334,13 @@ router.put('/:id/cancel',
       old_values: { status: 'pending' },
       new_values: { status: 'cancelled', cancelled_by: req.user.id, cancelled_reason: reason },
       ip: req.ip,
-      userAgent: req.headers['user-agent']
+      userAgent: req.headers['user-agent'],
     });
-    
+
     res.status(200).json({
       success: true,
       message: 'Invoice cancelled successfully',
-      data: invoice
+      data: invoice,
     });
   })
 );
@@ -336,16 +350,17 @@ router.put('/:id/cancel',
  * @desc    Get invoice by ID
  * @access  Private (All roles)
  */
-router.get('/:id',
+router.get(
+  '/:id',
   authenticate,
-  authorize('admin', 'doctor', 'cashier', 'pharmacist', 'receptionist'),
+  authorize(ROLES.ADMIN, ROLES.DOCTOR, 'cashier', 'pharmacist', 'receptionist'),
   asyncHandler(async (req, res) => {
     const { id } = req.params;
     const invoice = await InvoiceService.getInvoiceById(id);
-    
+
     res.status(200).json({
       success: true,
-      data: invoice
+      data: invoice,
     });
   })
 );
@@ -355,16 +370,17 @@ router.get('/:id',
  * @desc    Get patient's outstanding invoices
  * @access  Private (Cashier, Admin)
  */
-router.get('/patient/:patientId/outstanding',
+router.get(
+  '/patient/:patientId/outstanding',
   authenticate,
-  authorize('admin', 'cashier', 'receptionist'),
+  authorize(ROLES.ADMIN, ROLES.CASHIER, 'receptionist'),
   asyncHandler(async (req, res) => {
     const { patientId } = req.params;
     const invoices = await InvoiceService.getPatientOutstandingInvoices(patientId);
-    
+
     res.status(200).json({
       success: true,
-      data: invoices
+      data: invoices,
     });
   })
 );
@@ -374,16 +390,17 @@ router.get('/patient/:patientId/outstanding',
  * @desc    Get patient's total outstanding balance
  * @access  Private (Cashier, Admin)
  */
-router.get('/patient/:patientId/outstanding-balance',
+router.get(
+  '/patient/:patientId/outstanding-balance',
   authenticate,
-  authorize('admin', 'cashier', 'receptionist'),
+  authorize(ROLES.ADMIN, ROLES.CASHIER, 'receptionist'),
   asyncHandler(async (req, res) => {
     const { patientId } = req.params;
     const balance = await InvoiceService.getPatientOutstandingBalance(patientId);
-    
+
     res.status(200).json({
       success: true,
-      data: balance
+      data: balance,
     });
   })
 );
@@ -393,16 +410,17 @@ router.get('/patient/:patientId/outstanding-balance',
  * @desc    Check if patient can create more invoices (max 2 outstanding)
  * @access  Private (Cashier, Doctor, Admin)
  */
-router.get('/patient/:patientId/can-create',
+router.get(
+  '/patient/:patientId/can-create',
   authenticate,
-  authorize('admin', 'cashier', 'doctor', 'receptionist'),
+  authorize(ROLES.ADMIN, ROLES.CASHIER, 'doctor', 'receptionist'),
   asyncHandler(async (req, res) => {
     const { patientId } = req.params;
     const result = await InvoiceService.canPatientCreateInvoice(patientId);
-    
+
     res.status(200).json({
       success: true,
-      data: result
+      data: result,
     });
   })
 );
@@ -412,17 +430,18 @@ router.get('/patient/:patientId/can-create',
  * @desc    Record partial payment for invoice
  * @access  Private (Cashier, Admin)
  */
-router.post('/:id/partial-payment',
+router.post(
+  '/:id/partial-payment',
   authenticate,
-  authorize('admin', 'cashier'),
+  authorize(ROLES.ADMIN, ROLES.CASHIER),
   asyncHandler(async (req, res) => {
     const { id } = req.params;
     const { amount, payment_method, notes, hold_reason, payment_due_date } = req.body;
-    
+
     if (!amount || !payment_method) {
       return res.status(400).json({
         success: false,
-        message: 'amount and payment_method are required'
+        message: 'amount and payment_method are required',
       });
     }
 
@@ -432,11 +451,11 @@ router.post('/:id/partial-payment',
       notes,
       hold_reason,
       payment_due_date,
-      processed_by: req.user.id
+      processed_by: req.user.id,
     };
 
     const result = await InvoiceService.recordPartialPayment(id, paymentData);
-    
+
     // Audit log - Track partial payments
     await logAuditEvent({
       actor_id: req.user.id,
@@ -448,13 +467,13 @@ router.post('/:id/partial-payment',
       reason: `Partial payment recorded: ${amount} via ${payment_method}`,
       new_values: { amount, payment_method, notes, processed_by: req.user.id },
       ip: req.ip,
-      userAgent: req.headers['user-agent']
+      userAgent: req.headers['user-agent'],
     });
-    
+
     res.status(200).json({
       success: true,
       message: 'Payment recorded successfully',
-      data: result
+      data: result,
     });
   })
 );
@@ -464,16 +483,17 @@ router.post('/:id/partial-payment',
  * @desc    Get payment history for invoice
  * @access  Private (Cashier, Admin)
  */
-router.get('/:id/payment-history',
+router.get(
+  '/:id/payment-history',
   authenticate,
-  authorize('admin', 'cashier', 'receptionist'),
+  authorize(ROLES.ADMIN, ROLES.CASHIER, 'receptionist'),
   asyncHandler(async (req, res) => {
     const { id } = req.params;
     const history = await InvoiceService.getPaymentHistory(id);
-    
+
     res.status(200).json({
       success: true,
-      data: history
+      data: history,
     });
   })
 );
@@ -483,27 +503,28 @@ router.get('/:id/payment-history',
  * @desc    Put invoice on hold
  * @access  Private (Cashier, Admin)
  */
-router.put('/:id/hold',
+router.put(
+  '/:id/hold',
   authenticate,
-  authorize('admin', 'cashier'),
+  authorize(ROLES.ADMIN, ROLES.CASHIER),
   asyncHandler(async (req, res) => {
     const { id } = req.params;
     const { reason, payment_due_date } = req.body;
-    
+
     if (!reason) {
       return res.status(400).json({
         success: false,
-        message: 'reason is required'
+        message: 'reason is required',
       });
     }
 
     const holdData = { reason, payment_due_date };
     const invoice = await InvoiceService.putInvoiceOnHold(id, holdData);
-    
+
     res.status(200).json({
       success: true,
       message: 'Invoice put on hold',
-      data: invoice
+      data: invoice,
     });
   })
 );
@@ -513,17 +534,18 @@ router.put('/:id/hold',
  * @desc    Resume invoice from hold
  * @access  Private (Cashier, Admin)
  */
-router.put('/:id/resume',
+router.put(
+  '/:id/resume',
   authenticate,
-  authorize('admin', 'cashier'),
+  authorize(ROLES.ADMIN, ROLES.CASHIER),
   asyncHandler(async (req, res) => {
     const { id } = req.params;
     const invoice = await InvoiceService.resumeInvoiceFromHold(id);
-    
+
     res.status(200).json({
       success: true,
       message: 'Invoice resumed from hold',
-      data: invoice
+      data: invoice,
     });
   })
 );

@@ -1,4 +1,10 @@
+/* eslint-disable no-useless-catch */
 import VisitModel from '../models/Visit.model.js';
+import {
+  listVisitsWithRelations,
+  getVisitStatistics as repoVisitStats,
+  updateVisitStatus as repoUpdateVisitStatus,
+} from './repositories/VisitsRepo.js';
 
 /**
  * Visit Service
@@ -19,12 +25,12 @@ class VisitService {
       }
 
       const visits = await this.visitModel.getPatientVisitHistory(patientId, options);
-      
+
       return {
         success: true,
         data: visits,
         total: visits.length,
-        patient_id: patientId
+        patient_id: patientId,
       };
     } catch (error) {
       throw error;
@@ -41,10 +47,10 @@ class VisitService {
       }
 
       const visit = await this.visitModel.getVisitWithDetails(visitId);
-      
+
       return {
         success: true,
-        data: visit
+        data: visit,
       };
     } catch (error) {
       throw error;
@@ -61,7 +67,7 @@ class VisitService {
       }
 
       const visit = await this.visitModel.getPatientActiveVisit(patientId);
-      
+
       return visit; // Return visit directly (can be null)
     } catch (error) {
       throw error;
@@ -74,8 +80,8 @@ class VisitService {
   async createVisit(visitData) {
     try {
       const requiredFields = ['patient_id', 'doctor_id'];
-      const missingFields = requiredFields.filter(field => !visitData[field]);
-      
+      const missingFields = requiredFields.filter((field) => !visitData[field]);
+
       if (missingFields.length > 0) {
         throw new Error(`Missing required fields: ${missingFields.join(', ')}`);
       }
@@ -83,23 +89,24 @@ class VisitService {
       console.log('[VISIT] Creating new visit record for patient:', visitData.patient_id);
 
       // Set default values and remove fields not in schema
+      // eslint-disable-next-line no-unused-vars
       const { created_by, updated_by, ...cleanVisitData } = visitData;
-      
+
       const visitToCreate = {
         visit_date: new Date().toISOString(),
         status: 'in_progress',
         payment_status: 'pending',
-        ...cleanVisitData
+        ...cleanVisitData,
       };
 
       const visit = await this.visitModel.create(visitToCreate);
-      
+
       console.log('[VISIT] ✅ Visit record created:', visit.id);
-      
+
       return {
         success: true,
         data: visit,
-        message: 'Visit created successfully'
+        message: 'Visit created successfully',
       };
     } catch (error) {
       console.error('[VISIT] ❌ Error creating visit:', error);
@@ -117,14 +124,15 @@ class VisitService {
       }
 
       // Remove fields not in schema
+      // eslint-disable-next-line no-unused-vars
       const { created_by, updated_by, ...cleanUpdateData } = updateData;
 
       const visit = await this.visitModel.update(visitId, cleanUpdateData);
-      
+
       return {
         success: true,
         data: visit,
-        message: 'Visit updated successfully'
+        message: 'Visit updated successfully',
       };
     } catch (error) {
       throw error;
@@ -141,11 +149,11 @@ class VisitService {
       }
 
       const completedVisit = await this.visitModel.completeVisit(visitId, completionData);
-      
+
       return {
         success: true,
         data: completedVisit,
-        message: 'Visit completed successfully'
+        message: 'Visit completed successfully',
       };
     } catch (error) {
       throw error;
@@ -157,61 +165,27 @@ class VisitService {
    */
   async getAllVisits(options = {}) {
     try {
-      const { 
-        limit = 50, 
-        offset = 0, 
-        status = null, 
+      const {
+        limit = 50,
+        offset = 0,
+        status = null,
         doctor_id = null,
         start_date = null,
-        end_date = null 
+        end_date = null,
       } = options;
 
-      let query = this.visitModel.supabase
-        .from('visits')
-        .select(`
-          *,
-          doctor:users!doctor_id (
-            id,
-            first_name,
-            last_name,
-            specialty
-          ),
-          patient:patients!patient_id (
-            id,
-            patient_number,
-            first_name,
-            last_name
-          )
-        `)
-        .order('visit_date', { ascending: false })
-        .range(offset, offset + limit - 1);
-
-      if (status) {
-        query = query.eq('status', status);
-      }
-
-      if (doctor_id) {
-        query = query.eq('doctor_id', doctor_id);
-      }
-
-      if (start_date) {
-        query = query.gte('visit_date', start_date);
-      }
-
-      if (end_date) {
-        query = query.lte('visit_date', end_date);
-      }
-
-      const { data, error } = await query;
-
-      if (error) {
-        throw new Error(`Failed to fetch visits: ${error.message}`);
-      }
-
+      const data = await listVisitsWithRelations({
+        limit,
+        offset,
+        status,
+        doctor_id,
+        start_date,
+        end_date,
+      });
       return {
         success: true,
         data: data || [],
-        total: data?.length || 0
+        total: data?.length || 0,
       };
     } catch (error) {
       throw error;
@@ -225,88 +199,8 @@ class VisitService {
     try {
       const { doctor_id = null, start_date = null, end_date = null } = options;
 
-      const applyFilters = (query) => {
-        if (doctor_id) {
-          query = query.eq('doctor_id', doctor_id);
-        }
-        if (start_date) {
-          query = query.gte('visit_date', start_date);
-        }
-        if (end_date) {
-          query = query.lte('visit_date', end_date);
-        }
-        return query;
-      };
-
-      const totalQuery = applyFilters(
-        this.visitModel.supabase
-          .from('visits')
-          .select('id', { count: 'exact', head: true })
-      );
-
-      const completedQuery = applyFilters(
-        this.visitModel.supabase
-          .from('visits')
-          .select('id', { count: 'exact', head: true })
-          .eq('status', 'completed')
-      );
-
-      const inProgressQuery = applyFilters(
-        this.visitModel.supabase
-          .from('visits')
-          .select('id', { count: 'exact', head: true })
-          .eq('status', 'in_progress')
-      );
-
-      const cancelledQuery = applyFilters(
-        this.visitModel.supabase
-          .from('visits')
-          .select('id', { count: 'exact', head: true })
-          .eq('status', 'cancelled')
-      );
-
-      const [
-        { count: totalVisits, error: totalError },
-        { count: completedVisits, error: completedError },
-        { count: inProgressVisits, error: inProgressError },
-        { count: cancelledVisits, error: cancelledError }
-      ] = await Promise.all([
-        totalQuery,
-        completedQuery,
-        inProgressQuery,
-        cancelledQuery
-      ]);
-
-      if (totalError) throw totalError;
-      if (completedError) throw completedError;
-      if (inProgressError) throw inProgressError;
-      if (cancelledError) throw cancelledError;
-
-      // Calculate revenue from completed visits
-      let revenueQuery = this.visitModel.supabase
-        .from('visits')
-        .select('total_cost')
-        .eq('status', 'completed')
-        .not('total_cost', 'is', null);
-
-      revenueQuery = applyFilters(revenueQuery);
-
-      const { data: revenueData, error: revenueError } = await revenueQuery;
-      if (revenueError) throw revenueError;
-
-      const totalRevenue = revenueData?.reduce((sum, visit) => sum + (visit.total_cost || 0), 0) || 0;
-
-      return {
-        success: true,
-        data: {
-          total_visits: totalVisits || 0,
-          completed_visits: completedVisits || 0,
-          in_progress_visits: inProgressVisits || 0,
-          cancelled_visits: cancelledVisits || 0,
-          total_revenue: totalRevenue,
-          completion_rate: totalVisits > 0 ? ((completedVisits / totalVisits) * 100).toFixed(2) : 0
-        }
-      };
+      const stats = await repoVisitStats({ doctor_id, start_date, end_date });
+      return { success: true, data: stats };
     } catch (error) {
       throw error;
     }
@@ -332,24 +226,11 @@ class VisitService {
       }
 
       // Update the visit status
-      const { data, error } = await this.visitModel.supabase
-        .from('visits')
-        .update({ 
-          status,
-          updated_at: new Date().toISOString()
-        })
-        .eq('id', visitId)
-        .select()
-        .single();
-
-      if (error) {
-        throw new Error(`Failed to update visit status: ${error.message}`);
-      }
-
+      const data = await repoUpdateVisitStatus(visitId, status);
       return {
         success: true,
         data,
-        message: `Visit status updated to ${status}`
+        message: `Visit status updated to ${status}`,
       };
     } catch (error) {
       throw error;
@@ -366,10 +247,10 @@ class VisitService {
       }
 
       await this.visitModel.delete(visitId);
-      
+
       return {
         success: true,
-        message: 'Visit deleted successfully'
+        message: 'Visit deleted successfully',
       };
     } catch (error) {
       throw error;
@@ -382,10 +263,10 @@ class VisitService {
   async exportSingleVisitPDF(visitId, user) {
     try {
       const PDFDocument = (await import('pdfkit')).default;
-      
+
       // Get visit details
       const visit = await this.visitModel.getVisitWithDetails(visitId);
-      
+
       if (!visit) {
         throw new Error('Visit not found');
       }
@@ -396,41 +277,37 @@ class VisitService {
       }
 
       // Create PDF document with A4 size
-      const doc = new PDFDocument({ 
+      const doc = new PDFDocument({
         size: 'A4',
         margin: 50,
-        bufferPages: true
+        bufferPages: true,
       });
       const chunks = [];
 
       doc.on('data', (chunk) => chunks.push(chunk));
-      
+
       const pdfPromise = new Promise((resolve) => {
         doc.on('end', () => resolve(Buffer.concat(chunks)));
       });
 
       // Helper function to draw a box
       const drawBox = (x, y, width, height, fillColor = '#f8fafc') => {
-        doc.rect(x, y, width, height)
-           .fillAndStroke(fillColor, '#e2e8f0')
-           .fillColor('#000000');
+        doc.rect(x, y, width, height).fillAndStroke(fillColor, '#e2e8f0').fillColor('#000000');
       };
 
       // Professional Header with colored background
-      doc.rect(0, 0, doc.page.width, 120)
-         .fillAndStroke('#1e40af', '#1e40af');
-      
-      doc.fillColor('#ffffff')
-         .fontSize(28)
-         .font('Helvetica-Bold')
-         .text('RealCIS', 50, 30)
-         .fontSize(12)
-         .font('Helvetica')
-         .text('Healthcare System', 50, 62);
-      
-      doc.fontSize(20)
-         .font('Helvetica-Bold')
-         .text('VISIT SUMMARY', 50, 85, { align: 'right' });
+      doc.rect(0, 0, doc.page.width, 120).fillAndStroke('#1e40af', '#1e40af');
+
+      doc
+        .fillColor('#ffffff')
+        .fontSize(28)
+        .font('Helvetica-Bold')
+        .text('RealCIS', 50, 30)
+        .fontSize(12)
+        .font('Helvetica')
+        .text('Healthcare System', 50, 62);
+
+      doc.fontSize(20).font('Helvetica-Bold').text('VISIT SUMMARY', 50, 85, { align: 'right' });
 
       // Reset position after header
       doc.fillColor('#000000');
@@ -438,42 +315,60 @@ class VisitService {
 
       // Patient & Visit Info Box
       drawBox(50, yPos, doc.page.width - 100, 140, '#f0f9ff');
-      doc.fillColor('#1e40af')
-         .fontSize(14)
-         .font('Helvetica-Bold')
-         .text('Visit Information', 60, yPos + 10);
-      
-      doc.fillColor('#374151')
-         .fontSize(10)
-         .font('Helvetica')
-         .text(`Date: `, 60, yPos + 35)
-         .font('Helvetica-Bold')
-         .text(new Date(visit.visit_date).toLocaleDateString('en-US', { 
-           year: 'numeric', month: 'long', day: 'numeric', hour: '2-digit', minute: '2-digit' 
-         }), 140, yPos + 35);
-      
-      doc.font('Helvetica')
-         .text(`Visit Type: `, 60, yPos + 55)
-         .font('Helvetica-Bold')
-         .text(visit.visit_type || 'General Visit', 140, yPos + 55);
-      
-      doc.font('Helvetica')
-         .text(`Doctor: `, 60, yPos + 75)
-         .font('Helvetica-Bold')
-         .text(`Dr. ${visit.doctor?.first_name || ''} ${visit.doctor?.last_name || ''}`, 140, yPos + 75);
-      
-      doc.font('Helvetica')
-         .text(`Status: `, 60, yPos + 95)
-         .font('Helvetica-Bold')
-         .fillColor(visit.status === 'completed' ? '#16a34a' : '#ea580c')
-         .text(visit.status?.toUpperCase() || 'N/A', 140, yPos + 95);
-      
+      doc
+        .fillColor('#1e40af')
+        .fontSize(14)
+        .font('Helvetica-Bold')
+        .text('Visit Information', 60, yPos + 10);
+
+      doc
+        .fillColor('#374151')
+        .fontSize(10)
+        .font('Helvetica')
+        .text(`Date: `, 60, yPos + 35)
+        .font('Helvetica-Bold')
+        .text(
+          new Date(visit.visit_date).toLocaleDateString('en-US', {
+            year: 'numeric',
+            month: 'long',
+            day: 'numeric',
+            hour: '2-digit',
+            minute: '2-digit',
+          }),
+          140,
+          yPos + 35
+        );
+
+      doc
+        .font('Helvetica')
+        .text(`Visit Type: `, 60, yPos + 55)
+        .font('Helvetica-Bold')
+        .text(visit.visit_type || 'General Visit', 140, yPos + 55);
+
+      doc
+        .font('Helvetica')
+        .text(`Doctor: `, 60, yPos + 75)
+        .font('Helvetica-Bold')
+        .text(
+          `Dr. ${visit.doctor?.first_name || ''} ${visit.doctor?.last_name || ''}`,
+          140,
+          yPos + 75
+        );
+
+      doc
+        .font('Helvetica')
+        .text(`Status: `, 60, yPos + 95)
+        .font('Helvetica-Bold')
+        .fillColor(visit.status === 'completed' ? '#16a34a' : '#ea580c')
+        .text(visit.status?.toUpperCase() || 'N/A', 140, yPos + 95);
+
       if (visit.chief_complaint) {
-        doc.fillColor('#374151')
-           .font('Helvetica')
-           .text(`Chief Complaint: `, 60, yPos + 115)
-           .font('Helvetica-Bold')
-           .text(visit.chief_complaint, 140, yPos + 115, { width: 350 });
+        doc
+          .fillColor('#374151')
+          .font('Helvetica')
+          .text(`Chief Complaint: `, 60, yPos + 115)
+          .font('Helvetica-Bold')
+          .text(visit.chief_complaint, 140, yPos + 115, { width: 350 });
       }
 
       yPos += 160;
@@ -486,11 +381,12 @@ class VisitService {
           yPos = 50;
         }
 
-        doc.fillColor('#dc2626')
-           .fontSize(14)
-           .font('Helvetica-Bold')
-           .text('♥ Vital Signs', 50, yPos);
-        
+        doc
+          .fillColor('#dc2626')
+          .fontSize(14)
+          .font('Helvetica-Bold')
+          .text('♥ Vital Signs', 50, yPos);
+
         yPos += 25;
         const boxWidth = (doc.page.width - 120) / 2;
         const boxHeight = 50;
@@ -500,17 +396,24 @@ class VisitService {
         // Blood Pressure
         if (visit.vitals.blood_pressure_systolic && visit.vitals.blood_pressure_diastolic) {
           drawBox(xPos, yPos, boxWidth, boxHeight, '#fef2f2');
-          doc.fillColor('#6b7280')
-             .fontSize(9)
-             .font('Helvetica')
-             .text('Blood Pressure', xPos + 10, yPos + 10);
-          doc.fillColor('#dc2626')
-             .fontSize(18)
-             .font('Helvetica-Bold')
-             .text(`${visit.vitals.blood_pressure_systolic}/${visit.vitals.blood_pressure_diastolic}`, xPos + 10, yPos + 24);
-          doc.fillColor('#6b7280')
-             .fontSize(8)
-             .text('mmHg', xPos + 10, yPos + 44);
+          doc
+            .fillColor('#6b7280')
+            .fontSize(9)
+            .font('Helvetica')
+            .text('Blood Pressure', xPos + 10, yPos + 10);
+          doc
+            .fillColor('#dc2626')
+            .fontSize(18)
+            .font('Helvetica-Bold')
+            .text(
+              `${visit.vitals.blood_pressure_systolic}/${visit.vitals.blood_pressure_diastolic}`,
+              xPos + 10,
+              yPos + 24
+            );
+          doc
+            .fillColor('#6b7280')
+            .fontSize(8)
+            .text('mmHg', xPos + 10, yPos + 44);
           xPos += boxWidth + 20;
           vitalsCount++;
         }
@@ -522,17 +425,20 @@ class VisitService {
             yPos += boxHeight + 10;
           }
           drawBox(xPos, yPos, boxWidth, boxHeight, '#fef2f2');
-          doc.fillColor('#6b7280')
-             .fontSize(9)
-             .font('Helvetica')
-             .text('Heart Rate', xPos + 10, yPos + 10);
-          doc.fillColor('#dc2626')
-             .fontSize(18)
-             .font('Helvetica-Bold')
-             .text(visit.vitals.heart_rate, xPos + 10, yPos + 24);
-          doc.fillColor('#6b7280')
-             .fontSize(8)
-             .text('bpm', xPos + 10, yPos + 44);
+          doc
+            .fillColor('#6b7280')
+            .fontSize(9)
+            .font('Helvetica')
+            .text('Heart Rate', xPos + 10, yPos + 10);
+          doc
+            .fillColor('#dc2626')
+            .fontSize(18)
+            .font('Helvetica-Bold')
+            .text(visit.vitals.heart_rate, xPos + 10, yPos + 24);
+          doc
+            .fillColor('#6b7280')
+            .fontSize(8)
+            .text('bpm', xPos + 10, yPos + 44);
           xPos += boxWidth + 20;
           vitalsCount++;
         }
@@ -544,17 +450,20 @@ class VisitService {
             yPos += boxHeight + 10;
           }
           drawBox(xPos, yPos, boxWidth, boxHeight, '#fef2f2');
-          doc.fillColor('#6b7280')
-             .fontSize(9)
-             .font('Helvetica')
-             .text('Temperature', xPos + 10, yPos + 10);
-          doc.fillColor('#dc2626')
-             .fontSize(18)
-             .font('Helvetica-Bold')
-             .text(visit.vitals.temperature, xPos + 10, yPos + 24);
-          doc.fillColor('#6b7280')
-             .fontSize(8)
-             .text(`°${visit.vitals.temperature_unit || 'F'}`, xPos + 10, yPos + 44);
+          doc
+            .fillColor('#6b7280')
+            .fontSize(9)
+            .font('Helvetica')
+            .text('Temperature', xPos + 10, yPos + 10);
+          doc
+            .fillColor('#dc2626')
+            .fontSize(18)
+            .font('Helvetica-Bold')
+            .text(visit.vitals.temperature, xPos + 10, yPos + 24);
+          doc
+            .fillColor('#6b7280')
+            .fontSize(8)
+            .text(`°${visit.vitals.temperature_unit || 'F'}`, xPos + 10, yPos + 44);
           xPos += boxWidth + 20;
           vitalsCount++;
         }
@@ -566,17 +475,20 @@ class VisitService {
             yPos += boxHeight + 10;
           }
           drawBox(xPos, yPos, boxWidth, boxHeight, '#fef2f2');
-          doc.fillColor('#6b7280')
-             .fontSize(9)
-             .font('Helvetica')
-             .text('Weight', xPos + 10, yPos + 10);
-          doc.fillColor('#dc2626')
-             .fontSize(18)
-             .font('Helvetica-Bold')
-             .text(visit.vitals.weight, xPos + 10, yPos + 24);
-          doc.fillColor('#6b7280')
-             .fontSize(8)
-             .text(visit.vitals.weight_unit || 'kg', xPos + 10, yPos + 44);
+          doc
+            .fillColor('#6b7280')
+            .fontSize(9)
+            .font('Helvetica')
+            .text('Weight', xPos + 10, yPos + 10);
+          doc
+            .fillColor('#dc2626')
+            .fontSize(18)
+            .font('Helvetica-Bold')
+            .text(visit.vitals.weight, xPos + 10, yPos + 24);
+          doc
+            .fillColor('#6b7280')
+            .fontSize(8)
+            .text(visit.vitals.weight_unit || 'kg', xPos + 10, yPos + 44);
           xPos += boxWidth + 20;
           vitalsCount++;
         }
@@ -588,17 +500,20 @@ class VisitService {
             yPos += boxHeight + 10;
           }
           drawBox(xPos, yPos, boxWidth, boxHeight, '#fef2f2');
-          doc.fillColor('#6b7280')
-             .fontSize(9)
-             .font('Helvetica')
-             .text('O₂ Saturation', xPos + 10, yPos + 10);
-          doc.fillColor('#dc2626')
-             .fontSize(18)
-             .font('Helvetica-Bold')
-             .text(visit.vitals.oxygen_saturation, xPos + 10, yPos + 24);
-          doc.fillColor('#6b7280')
-             .fontSize(8)
-             .text('%', xPos + 10, yPos + 44);
+          doc
+            .fillColor('#6b7280')
+            .fontSize(9)
+            .font('Helvetica')
+            .text('O₂ Saturation', xPos + 10, yPos + 10);
+          doc
+            .fillColor('#dc2626')
+            .fontSize(18)
+            .font('Helvetica-Bold')
+            .text(visit.vitals.oxygen_saturation, xPos + 10, yPos + 24);
+          doc
+            .fillColor('#6b7280')
+            .fontSize(8)
+            .text('%', xPos + 10, yPos + 44);
           vitalsCount++;
         }
 
@@ -613,16 +528,17 @@ class VisitService {
           yPos = 50;
         }
 
-        doc.fillColor('#7c3aed')
-           .fontSize(14)
-           .font('Helvetica-Bold')
-           .text('⚕ Diagnoses from This Visit', 50, yPos);
-        
+        doc
+          .fillColor('#7c3aed')
+          .fontSize(14)
+          .font('Helvetica-Bold')
+          .text('⚕ Diagnoses from This Visit', 50, yPos);
+
         yPos += 25;
 
         visit.visit_diagnoses.forEach((diagnosis, index) => {
           const boxHeight = diagnosis.clinical_notes ? 90 : 70;
-          
+
           // Check if we need a new page
           if (yPos + boxHeight > 750) {
             doc.addPage();
@@ -630,52 +546,61 @@ class VisitService {
           }
 
           drawBox(50, yPos, doc.page.width - 100, boxHeight, '#faf5ff');
-          
+
           // Diagnosis number badge
-          doc.circle(65, yPos + 15, 12)
-             .fillAndStroke('#7c3aed', '#7c3aed');
-          doc.fillColor('#ffffff')
-             .fontSize(10)
-             .font('Helvetica-Bold')
-             .text(`${index + 1}`, 60, yPos + 10, { width: 10, align: 'center' });
-          
+          doc.circle(65, yPos + 15, 12).fillAndStroke('#7c3aed', '#7c3aed');
+          doc
+            .fillColor('#ffffff')
+            .fontSize(10)
+            .font('Helvetica-Bold')
+            .text(`${index + 1}`, 60, yPos + 10, { width: 10, align: 'center' });
+
           // Diagnosis name
-          doc.fillColor('#1f2937')
-             .fontSize(12)
-             .font('Helvetica-Bold')
-             .text(diagnosis.diagnosis_name, 85, yPos + 12, { width: 400 });
-          
+          doc
+            .fillColor('#1f2937')
+            .fontSize(12)
+            .font('Helvetica-Bold')
+            .text(diagnosis.diagnosis_name, 85, yPos + 12, { width: 400 });
+
           // Code and severity on same line
-          let detailsY = yPos + 35;
+          const detailsY = yPos + 35;
           if (diagnosis.diagnosis_code) {
-            doc.fillColor('#6b7280')
-               .fontSize(9)
-               .font('Helvetica')
-               .text('Code: ', 85, detailsY)
-               .fillColor('#7c3aed')
-               .font('Helvetica-Bold')
-               .text(diagnosis.diagnosis_code, 115, detailsY);
+            doc
+              .fillColor('#6b7280')
+              .fontSize(9)
+              .font('Helvetica')
+              .text('Code: ', 85, detailsY)
+              .fillColor('#7c3aed')
+              .font('Helvetica-Bold')
+              .text(diagnosis.diagnosis_code, 115, detailsY);
           }
-          
+
           if (diagnosis.severity) {
-            const severityColor = diagnosis.severity === 'severe' ? '#dc2626' : diagnosis.severity === 'moderate' ? '#ea580c' : '#16a34a';
-            doc.fillColor('#6b7280')
-               .fontSize(9)
-               .font('Helvetica')
-               .text('Severity: ', 220, detailsY)
-               .fillColor(severityColor)
-               .font('Helvetica-Bold')
-               .text(diagnosis.severity, 265, detailsY);
+            const severityColor =
+              diagnosis.severity === 'severe'
+                ? '#dc2626'
+                : diagnosis.severity === 'moderate'
+                  ? '#ea580c'
+                  : '#16a34a';
+            doc
+              .fillColor('#6b7280')
+              .fontSize(9)
+              .font('Helvetica')
+              .text('Severity: ', 220, detailsY)
+              .fillColor(severityColor)
+              .font('Helvetica-Bold')
+              .text(diagnosis.severity, 265, detailsY);
           }
-          
+
           // Clinical notes
           if (diagnosis.clinical_notes) {
-            doc.fillColor('#4b5563')
-               .fontSize(9)
-               .font('Helvetica')
-               .text(diagnosis.clinical_notes, 85, detailsY + 20, { width: 450 });
+            doc
+              .fillColor('#4b5563')
+              .fontSize(9)
+              .font('Helvetica')
+              .text(diagnosis.clinical_notes, 85, detailsY + 20, { width: 450 });
           }
-          
+
           yPos += boxHeight + 10;
         });
 
@@ -690,16 +615,17 @@ class VisitService {
           yPos = 50;
         }
 
-        doc.fillColor('#0284c7')
-           .fontSize(14)
-           .font('Helvetica-Bold')
-           .text('💊 Medications Prescribed', 50, yPos);
-        
+        doc
+          .fillColor('#0284c7')
+          .fontSize(14)
+          .font('Helvetica-Bold')
+          .text('💊 Medications Prescribed', 50, yPos);
+
         yPos += 25;
 
         visit.prescriptions.forEach((prescription, index) => {
           const boxHeight = prescription.instructions ? 105 : 85;
-          
+
           // Check if we need a new page
           if (yPos + boxHeight > 750) {
             doc.addPage();
@@ -707,70 +633,81 @@ class VisitService {
           }
 
           drawBox(50, yPos, doc.page.width - 100, boxHeight, '#f0f9ff');
-          
+
           // Pill icon badge
-          doc.circle(65, yPos + 15, 12)
-             .fillAndStroke('#0284c7', '#0284c7');
-          doc.fillColor('#ffffff')
-             .fontSize(10)
-             .font('Helvetica-Bold')
-             .text(`${index + 1}`, 60, yPos + 10, { width: 10, align: 'center' });
-          
+          doc.circle(65, yPos + 15, 12).fillAndStroke('#0284c7', '#0284c7');
+          doc
+            .fillColor('#ffffff')
+            .fontSize(10)
+            .font('Helvetica-Bold')
+            .text(`${index + 1}`, 60, yPos + 10, { width: 10, align: 'center' });
+
           // Medication name
-          doc.fillColor('#1f2937')
-             .fontSize(12)
-             .font('Helvetica-Bold')
-             .text(prescription.medication_name, 85, yPos + 12, { width: 400 });
-          
+          doc
+            .fillColor('#1f2937')
+            .fontSize(12)
+            .font('Helvetica-Bold')
+            .text(prescription.medication_name, 85, yPos + 12, { width: 400 });
+
           // Status badge
           const isActive = prescription.status === 'active';
-          doc.rect(480, yPos + 12, 50, 16)
-             .fillAndStroke(isActive ? '#dcfce7' : '#f3f4f6', isActive ? '#16a34a' : '#9ca3af');
-          doc.fillColor(isActive ? '#16a34a' : '#6b7280')
-             .fontSize(8)
-             .font('Helvetica-Bold')
-             .text(prescription.status?.toUpperCase() || 'N/A', 480, yPos + 16, { width: 50, align: 'center' });
-          
+          doc
+            .rect(480, yPos + 12, 50, 16)
+            .fillAndStroke(isActive ? '#dcfce7' : '#f3f4f6', isActive ? '#16a34a' : '#9ca3af');
+          doc
+            .fillColor(isActive ? '#16a34a' : '#6b7280')
+            .fontSize(8)
+            .font('Helvetica-Bold')
+            .text(prescription.status?.toUpperCase() || 'N/A', 480, yPos + 16, {
+              width: 50,
+              align: 'center',
+            });
+
           // Dosage and Frequency
           let detailY = yPos + 38;
-          doc.fillColor('#6b7280')
-             .fontSize(9)
-             .font('Helvetica')
-             .text('Dosage: ', 85, detailY)
-             .fillColor('#0284c7')
-             .font('Helvetica-Bold')
-             .text(prescription.dosage, 130, detailY);
-          
-          doc.fillColor('#6b7280')
-             .font('Helvetica')
-             .text('Frequency: ', 280, detailY)
-             .fillColor('#0284c7')
-             .font('Helvetica-Bold')
-             .text(prescription.frequency, 340, detailY);
-          
+          doc
+            .fillColor('#6b7280')
+            .fontSize(9)
+            .font('Helvetica')
+            .text('Dosage: ', 85, detailY)
+            .fillColor('#0284c7')
+            .font('Helvetica-Bold')
+            .text(prescription.dosage, 130, detailY);
+
+          doc
+            .fillColor('#6b7280')
+            .font('Helvetica')
+            .text('Frequency: ', 280, detailY)
+            .fillColor('#0284c7')
+            .font('Helvetica-Bold')
+            .text(prescription.frequency, 340, detailY);
+
           // Duration
           if (prescription.duration) {
             detailY += 18;
-            doc.fillColor('#6b7280')
-               .font('Helvetica')
-               .text('Duration: ', 85, detailY)
-               .fillColor('#0284c7')
-               .font('Helvetica-Bold')
-               .text(prescription.duration, 130, detailY);
+            doc
+              .fillColor('#6b7280')
+              .font('Helvetica')
+              .text('Duration: ', 85, detailY)
+              .fillColor('#0284c7')
+              .font('Helvetica-Bold')
+              .text(prescription.duration, 130, detailY);
           }
-          
+
           // Instructions
           if (prescription.instructions) {
             detailY += 18;
-            doc.fillColor('#6b7280')
-               .fontSize(9)
-               .font('Helvetica-Oblique')
-               .text('Instructions: ', 85, detailY);
-            doc.fillColor('#4b5563')
-               .font('Helvetica')
-               .text(prescription.instructions, 85, detailY + 12, { width: 450 });
+            doc
+              .fillColor('#6b7280')
+              .fontSize(9)
+              .font('Helvetica-Oblique')
+              .text('Instructions: ', 85, detailY);
+            doc
+              .fillColor('#4b5563')
+              .font('Helvetica')
+              .text(prescription.instructions, 85, detailY + 12, { width: 450 });
           }
-          
+
           yPos += boxHeight + 10;
         });
 
@@ -785,56 +722,78 @@ class VisitService {
           yPos = 50;
         }
 
-        doc.fillColor('#16a34a')
-           .fontSize(14)
-           .font('Helvetica-Bold')
-           .text('💰 Cost Summary', 50, yPos);
-        
+        doc
+          .fillColor('#16a34a')
+          .fontSize(14)
+          .font('Helvetica-Bold')
+          .text('💰 Cost Summary', 50, yPos);
+
         yPos += 25;
 
         drawBox(50, yPos, doc.page.width - 100, 80, '#f0fdf4');
-        
+
         // Consultation Fee
         if (visit.consultation_fee) {
-          doc.fillColor('#6b7280')
-             .fontSize(10)
-             .font('Helvetica')
-             .text('Consultation Fee:', 70, yPos + 15);
-          doc.fillColor('#16a34a')
-             .fontSize(14)
-             .font('Helvetica-Bold')
-             .text(`$${visit.consultation_fee.toFixed(2)}`, 450, yPos + 13, { width: 80, align: 'right' });
+          doc
+            .fillColor('#6b7280')
+            .fontSize(10)
+            .font('Helvetica')
+            .text('Consultation Fee:', 70, yPos + 15);
+          doc
+            .fillColor('#16a34a')
+            .fontSize(14)
+            .font('Helvetica-Bold')
+            .text(`$${visit.consultation_fee.toFixed(2)}`, 450, yPos + 13, {
+              width: 80,
+              align: 'right',
+            });
         }
-        
+
         // Divider line
-        doc.moveTo(70, yPos + 40)
-           .lineTo(530, yPos + 40)
-           .strokeColor('#d1d5db')
-           .lineWidth(1)
-           .stroke();
-        
+        doc
+          .moveTo(70, yPos + 40)
+          .lineTo(530, yPos + 40)
+          .strokeColor('#d1d5db')
+          .lineWidth(1)
+          .stroke();
+
         // Total Cost
-        doc.fillColor('#1f2937')
-           .fontSize(12)
-           .font('Helvetica-Bold')
-           .text('Total Amount:', 70, yPos + 50);
-        doc.fillColor('#16a34a')
-           .fontSize(16)
-           .font('Helvetica-Bold')
-           .text(`$${visit.total_cost.toFixed(2)}`, 450, yPos + 48, { width: 80, align: 'right' });
-        
+        doc
+          .fillColor('#1f2937')
+          .fontSize(12)
+          .font('Helvetica-Bold')
+          .text('Total Amount:', 70, yPos + 50);
+        doc
+          .fillColor('#16a34a')
+          .fontSize(16)
+          .font('Helvetica-Bold')
+          .text(`$${visit.total_cost.toFixed(2)}`, 450, yPos + 48, { width: 80, align: 'right' });
+
         // Payment Status Badge
         const isPaid = visit.payment_status === 'paid';
-        const statusColor = isPaid ? '#16a34a' : visit.payment_status === 'partial' ? '#ea580c' : '#ef4444';
-        const statusBg = isPaid ? '#dcfce7' : visit.payment_status === 'partial' ? '#fed7aa' : '#fee2e2';
-        
-        doc.rect(380, yPos + 15, 150, 20)
-           .fillAndStroke(statusBg, statusColor)
-           .lineWidth(1);
-        doc.fillColor(statusColor)
-           .fontSize(10)
-           .font('Helvetica-Bold')
-           .text((visit.payment_status || 'pending').toUpperCase(), 380, yPos + 20, { width: 150, align: 'center' });
+        const statusColor = isPaid
+          ? '#16a34a'
+          : visit.payment_status === 'partial'
+            ? '#ea580c'
+            : '#ef4444';
+        const statusBg = isPaid
+          ? '#dcfce7'
+          : visit.payment_status === 'partial'
+            ? '#fed7aa'
+            : '#fee2e2';
+
+        doc
+          .rect(380, yPos + 15, 150, 20)
+          .fillAndStroke(statusBg, statusColor)
+          .lineWidth(1);
+        doc
+          .fillColor(statusColor)
+          .fontSize(10)
+          .font('Helvetica-Bold')
+          .text((visit.payment_status || 'pending').toUpperCase(), 380, yPos + 20, {
+            width: 150,
+            align: 'center',
+          });
 
         yPos += 100;
       }
@@ -847,40 +806,60 @@ class VisitService {
           yPos = 50;
         }
 
-        doc.fillColor('#6366f1')
-           .fontSize(14)
-           .font('Helvetica-Bold')
-           .text('📝 Visit Notes', 50, yPos);
-        
+        doc
+          .fillColor('#6366f1')
+          .fontSize(14)
+          .font('Helvetica-Bold')
+          .text('📝 Visit Notes', 50, yPos);
+
         yPos += 25;
 
         const notesHeight = Math.min(100, doc.heightOfString(visit.notes, { width: 480 }) + 20);
         drawBox(50, yPos, doc.page.width - 100, notesHeight, '#eef2ff');
-        
-        doc.fillColor('#4b5563')
-           .fontSize(10)
-           .font('Helvetica')
-           .text(visit.notes, 70, yPos + 15, { width: 460 });
+
+        doc
+          .fillColor('#4b5563')
+          .fontSize(10)
+          .font('Helvetica')
+          .text(visit.notes, 70, yPos + 15, { width: 460 });
 
         yPos += notesHeight + 20;
       }
 
       // Footer
       const footerY = doc.page.height - 80;
-      doc.moveTo(50, footerY)
-         .lineTo(doc.page.width - 50, footerY)
-         .strokeColor('#e5e7eb')
-         .lineWidth(1)
-         .stroke();
-      
-      doc.fillColor('#9ca3af')
-         .fontSize(8)
-         .font('Helvetica')
-         .text('This is a computer-generated document. No signature is required.', 50, footerY + 10, { align: 'center' })
-         .text(`Generated on ${new Date().toLocaleDateString('en-US', { 
-           year: 'numeric', month: 'long', day: 'numeric', hour: '2-digit', minute: '2-digit' 
-         })}`, 50, footerY + 25, { align: 'center' })
-         .text('RealCIS Healthcare System | Confidential Patient Information', 50, footerY + 40, { align: 'center' });
+      doc
+        .moveTo(50, footerY)
+        .lineTo(doc.page.width - 50, footerY)
+        .strokeColor('#e5e7eb')
+        .lineWidth(1)
+        .stroke();
+
+      doc
+        .fillColor('#9ca3af')
+        .fontSize(8)
+        .font('Helvetica')
+        .text(
+          'This is a computer-generated document. No signature is required.',
+          50,
+          footerY + 10,
+          { align: 'center' }
+        )
+        .text(
+          `Generated on ${new Date().toLocaleDateString('en-US', {
+            year: 'numeric',
+            month: 'long',
+            day: 'numeric',
+            hour: '2-digit',
+            minute: '2-digit',
+          })}`,
+          50,
+          footerY + 25,
+          { align: 'center' }
+        )
+        .text('RealCIS Healthcare System | Confidential Patient Information', 50, footerY + 40, {
+          align: 'center',
+        });
 
       doc.end();
       const pdfBuffer = await pdfPromise;
@@ -888,7 +867,7 @@ class VisitService {
       return {
         success: true,
         pdf: pdfBuffer,
-        filename: `visit-summary-${visitId}-${Date.now()}.pdf`
+        filename: `visit-summary-${visitId}-${Date.now()}.pdf`,
       };
     } catch (error) {
       throw error;
@@ -901,12 +880,12 @@ class VisitService {
   async exportVisitHistoryCSV(patientId) {
     try {
       const { Parser } = await import('json2csv');
-      
+
       // Get all completed visits
       const visits = await this.visitModel.getPatientVisitHistory(patientId, {
         includeCompleted: true,
         includeInProgress: false,
-        limit: 1000
+        limit: 1000,
       });
 
       if (!visits || visits.length === 0) {
@@ -914,23 +893,28 @@ class VisitService {
       }
 
       // Flatten the visit data for CSV export
-      const flattenedData = visits.map(visit => ({
+      const flattenedData = visits.map((visit) => ({
         'Visit Date': new Date(visit.visit_date).toLocaleDateString(),
         'Visit Type': visit.visit_type || 'N/A',
-        'Doctor': visit.doctor ? `Dr. ${visit.doctor.first_name} ${visit.doctor.last_name}` : 'N/A',
+        Doctor: visit.doctor ? `Dr. ${visit.doctor.first_name} ${visit.doctor.last_name}` : 'N/A',
         'Chief Complaint': visit.chief_complaint || 'N/A',
-        'Diagnoses': visit.diagnoses?.map(d => d.diagnosis_name || d.icd_code).join('; ') || 'N/A',
-        'Prescriptions': visit.prescriptions?.map(p => `${p.medication_name} (${p.dosage})`).join('; ') || 'None',
-        'Blood Pressure': visit.vitals?.[0]?.blood_pressure_systolic && visit.vitals?.[0]?.blood_pressure_diastolic
-          ? `${visit.vitals[0].blood_pressure_systolic}/${visit.vitals[0].blood_pressure_diastolic}` 
-          : 'N/A',
+        Diagnoses: visit.diagnoses?.map((d) => d.diagnosis_name || d.icd_code).join('; ') || 'N/A',
+        Prescriptions:
+          visit.prescriptions?.map((p) => `${p.medication_name} (${p.dosage})`).join('; ') ||
+          'None',
+        'Blood Pressure':
+          visit.vitals?.[0]?.blood_pressure_systolic && visit.vitals?.[0]?.blood_pressure_diastolic
+            ? `${visit.vitals[0].blood_pressure_systolic}/${visit.vitals[0].blood_pressure_diastolic}`
+            : 'N/A',
         'Heart Rate': visit.vitals?.[0]?.heart_rate ? `${visit.vitals[0].heart_rate} bpm` : 'N/A',
-        'Temperature': visit.vitals?.[0]?.temperature 
-          ? `${visit.vitals[0].temperature}°${visit.vitals[0].temperature_unit}` 
+        Temperature: visit.vitals?.[0]?.temperature
+          ? `${visit.vitals[0].temperature}°${visit.vitals[0].temperature_unit}`
           : 'N/A',
-        'Weight': visit.vitals?.[0]?.weight ? `${visit.vitals[0].weight} ${visit.vitals[0].weight_unit}` : 'N/A',
-        'Status': visit.status || 'N/A',
-        'Notes': visit.notes || 'N/A'
+        Weight: visit.vitals?.[0]?.weight
+          ? `${visit.vitals[0].weight} ${visit.vitals[0].weight_unit}`
+          : 'N/A',
+        Status: visit.status || 'N/A',
+        Notes: visit.notes || 'N/A',
       }));
 
       const parser = new Parser();
@@ -939,7 +923,7 @@ class VisitService {
       return {
         success: true,
         csv,
-        filename: `visit-history-${patientId}-${new Date().toISOString().split('T')[0]}.csv`
+        filename: `visit-history-${patientId}-${new Date().toISOString().split('T')[0]}.csv`,
       };
     } catch (error) {
       throw new Error(`Failed to export visit history as CSV: ${error.message}`);
@@ -952,12 +936,12 @@ class VisitService {
   async exportVisitHistoryPDF(patientId) {
     try {
       const PDFDocument = (await import('pdfkit')).default;
-      
+
       // Get all completed visits
       const visits = await this.visitModel.getPatientVisitHistory(patientId, {
         includeCompleted: true,
         includeInProgress: false,
-        limit: 1000
+        limit: 1000,
       });
 
       if (!visits || visits.length === 0) {
@@ -969,7 +953,7 @@ class VisitService {
       const chunks = [];
 
       // Collect PDF data into buffer
-      doc.on('data', chunk => chunks.push(chunk));
+      doc.on('data', (chunk) => chunks.push(chunk));
 
       // PDF Header
       doc.fontSize(20).text('Patient Visit History', { align: 'center' });
@@ -985,14 +969,19 @@ class VisitService {
         }
 
         // Visit header
-        doc.fontSize(14).fillColor('#2563eb').text(`Visit ${index + 1}`, { underline: true });
+        doc
+          .fontSize(14)
+          .fillColor('#2563eb')
+          .text(`Visit ${index + 1}`, { underline: true });
         doc.moveDown(0.5);
 
         // Visit details
         doc.fontSize(10).fillColor('#000000');
         doc.text(`Date: ${new Date(visit.visit_date).toLocaleDateString()}`);
         doc.text(`Type: ${visit.visit_type || 'N/A'}`);
-        doc.text(`Doctor: ${visit.doctor ? `Dr. ${visit.doctor.first_name} ${visit.doctor.last_name}` : 'N/A'}`);
+        doc.text(
+          `Doctor: ${visit.doctor ? `Dr. ${visit.doctor.first_name} ${visit.doctor.last_name}` : 'N/A'}`
+        );
         doc.text(`Chief Complaint: ${visit.chief_complaint || 'N/A'}`);
         doc.moveDown(0.5);
 
@@ -1002,11 +991,19 @@ class VisitService {
           doc.fontSize(11).fillColor('#4b5563').text('Vitals:', { underline: true });
           doc.fontSize(10).fillColor('#000000');
           if (v.blood_pressure_systolic && v.blood_pressure_diastolic) {
-            doc.text(`  Blood Pressure: ${v.blood_pressure_systolic}/${v.blood_pressure_diastolic} mmHg`);
+            doc.text(
+              `  Blood Pressure: ${v.blood_pressure_systolic}/${v.blood_pressure_diastolic} mmHg`
+            );
           }
-          if (v.heart_rate) doc.text(`  Heart Rate: ${v.heart_rate} bpm`);
-          if (v.temperature) doc.text(`  Temperature: ${v.temperature}°${v.temperature_unit}`);
-          if (v.weight) doc.text(`  Weight: ${v.weight} ${v.weight_unit}`);
+          if (v.heart_rate) {
+            doc.text(`  Heart Rate: ${v.heart_rate} bpm`);
+          }
+          if (v.temperature) {
+            doc.text(`  Temperature: ${v.temperature}°${v.temperature_unit}`);
+          }
+          if (v.weight) {
+            doc.text(`  Weight: ${v.weight} ${v.weight_unit}`);
+          }
           doc.moveDown(0.5);
         }
 
@@ -1014,7 +1011,7 @@ class VisitService {
         if (visit.diagnoses && visit.diagnoses.length > 0) {
           doc.fontSize(11).fillColor('#4b5563').text('Diagnoses:', { underline: true });
           doc.fontSize(10).fillColor('#000000');
-          visit.diagnoses.forEach(d => {
+          visit.diagnoses.forEach((d) => {
             doc.text(`  • ${d.diagnosis_name || d.icd_code}`);
           });
           doc.moveDown(0.5);
@@ -1024,9 +1021,11 @@ class VisitService {
         if (visit.prescriptions && visit.prescriptions.length > 0) {
           doc.fontSize(11).fillColor('#4b5563').text('Prescriptions:', { underline: true });
           doc.fontSize(10).fillColor('#000000');
-          visit.prescriptions.forEach(p => {
+          visit.prescriptions.forEach((p) => {
             doc.text(`  • ${p.medication_name} - ${p.dosage}`);
-            if (p.instructions) doc.text(`    ${p.instructions}`, { indent: 20 });
+            if (p.instructions) {
+              doc.text(`    ${p.instructions}`, { indent: 20 });
+            }
           });
           doc.moveDown(0.5);
         }
@@ -1057,7 +1056,7 @@ class VisitService {
       return {
         success: true,
         pdf,
-        filename: `visit-history-${patientId}-${new Date().toISOString().split('T')[0]}.pdf`
+        filename: `visit-history-${patientId}-${new Date().toISOString().split('T')[0]}.pdf`,
       };
     } catch (error) {
       throw new Error(`Failed to export visit history as PDF: ${error.message}`);

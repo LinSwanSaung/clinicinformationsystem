@@ -1,6 +1,7 @@
 import express from 'express';
 import { authenticate, authorize } from '../middleware/auth.js';
 import { requireActiveVisit } from '../middleware/activeVisitCheck.js';
+import { ROLES } from '../constants/roles.js';
 import patientDiagnosisService from '../services/PatientDiagnosis.service.js';
 import { logAuditEvent } from '../utils/auditLogger.js';
 
@@ -14,7 +15,7 @@ const router = express.Router();
 router.get(
   '/patient/:patientId',
   authenticate,
-  authorize('doctor', 'nurse', 'receptionist', 'patient'),
+  authorize('doctor', 'nurse', 'receptionist', 'reception', 'patient'),
   async (req, res) => {
     try {
       const { patientId } = req.params;
@@ -68,7 +69,7 @@ router.get('/visit/:visitId', authenticate, authorize('doctor', 'nurse'), async 
 router.get(
   '/:id',
   authenticate,
-  authorize('doctor', 'nurse', 'receptionist', 'patient'),
+  authorize('doctor', 'nurse', 'receptionist', 'reception', 'patient'),
   async (req, res) => {
     try {
       const { id } = req.params;
@@ -102,7 +103,7 @@ router.get(
  * @access  Private (Doctor only)
  * @security Requires patient to have an active visit
  */
-router.post('/', authenticate, authorize('doctor'), requireActiveVisit, async (req, res) => {
+router.post('/', authenticate, authorize(ROLES.DOCTOR), requireActiveVisit, async (req, res) => {
   try {
     const diagnosisData = {
       ...req.body,
@@ -143,7 +144,7 @@ router.post('/', authenticate, authorize('doctor'), requireActiveVisit, async (r
  * @access  Private (Doctor only)
  * @security Requires patient to have an active visit
  */
-router.put('/:id', authenticate, authorize('doctor'), requireActiveVisit, async (req, res) => {
+router.put('/:id', authenticate, authorize(ROLES.DOCTOR), requireActiveVisit, async (req, res) => {
   try {
     const { id } = req.params;
     const diagnosis = await patientDiagnosisService.updateDiagnosis(id, req.body);
@@ -176,7 +177,7 @@ router.put('/:id', authenticate, authorize('doctor'), requireActiveVisit, async 
  * @desc    Update diagnosis status
  * @access  Private (Doctor only)
  */
-router.patch('/:id/status', authenticate, authorize('doctor'), async (req, res) => {
+router.patch('/:id/status', authenticate, authorize(ROLES.DOCTOR), async (req, res) => {
   try {
     const { id } = req.params;
     const { status, resolved_date } = req.body;
@@ -222,7 +223,7 @@ router.patch('/:id/status', authenticate, authorize('doctor'), async (req, res) 
  * @desc    Delete diagnosis (soft delete)
  * @access  Private (Doctor only)
  */
-router.delete('/:id', authenticate, authorize('doctor'), async (req, res) => {
+router.delete('/:id', authenticate, authorize(ROLES.DOCTOR), async (req, res) => {
   try {
     const { id } = req.params;
     await patientDiagnosisService.deleteDiagnosis(id);
@@ -256,7 +257,7 @@ router.delete('/:id', authenticate, authorize('doctor'), async (req, res) => {
 router.get(
   '/active/all',
   authenticate,
-  authorize('doctor', 'nurse', 'receptionist'),
+  authorize('doctor', 'nurse', 'receptionist', ROLES.RECEPTION),
   async (req, res) => {
     try {
       const diagnoses = await patientDiagnosisService.getAllActiveDiagnoses();

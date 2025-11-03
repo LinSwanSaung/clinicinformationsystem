@@ -1,6 +1,7 @@
 import express from 'express';
 import DoctorNoteService from '../services/DoctorNote.service.js';
 import { asyncHandler } from '../middleware/errorHandler.js';
+import { ROLES } from '../constants/roles.js';
 import { authorize } from '../middleware/auth.js';
 
 const router = express.Router();
@@ -15,7 +16,9 @@ router.post(
   authorize(['doctor']),
   asyncHandler(async (req, res) => {
     const note = await DoctorNoteService.createNote(req.body);
-    res.status(201).json({ success: true, data: note, message: 'Doctor note created successfully' });
+    res
+      .status(201)
+      .json({ success: true, data: note, message: 'Doctor note created successfully' });
   })
 );
 

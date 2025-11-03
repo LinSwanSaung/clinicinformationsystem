@@ -16,7 +16,10 @@ class DoctorAvailabilityService {
         return await this.doctorAvailabilityModel.getByDoctorId(doctorId);
       }
 
-      return await this.doctorAvailabilityModel.getAllWithDoctorDetails();
+      const allAvailability = await this.doctorAvailabilityModel.getAllWithDoctorDetails();
+
+      // Filter out any records with null doctor_id to prevent validation errors
+      return allAvailability.filter((record) => record && record.doctor_id);
     } catch (error) {
       throw error;
     }
@@ -44,7 +47,7 @@ class DoctorAvailabilityService {
       // Process day name to ensure consistency
       const processedData = {
         ...availabilityData,
-        day_of_week: this.standardizeDayName(availabilityData.day_of_week)
+        day_of_week: this.standardizeDayName(availabilityData.day_of_week),
       };
 
       // Check for conflicts
@@ -71,7 +74,7 @@ class DoctorAvailabilityService {
       this.validateAvailabilityData(availabilityData, true);
       const processedData = {
         ...availabilityData,
-        day_of_week: this.standardizeDayName(availabilityData.day_of_week)
+        day_of_week: this.standardizeDayName(availabilityData.day_of_week),
       };
 
       // Check for conflicts (excluding current record)
@@ -128,7 +131,7 @@ class DoctorAvailabilityService {
    */
   validateAvailabilityData(data, isUpdate = false) {
     const required = ['doctor_id', 'day_of_week', 'start_time', 'end_time'];
-    
+
     for (const field of required) {
       if (!isUpdate && (data[field] === undefined || data[field] === null)) {
         throw new Error(`${field} is required`);
@@ -151,12 +154,12 @@ class DoctorAvailabilityService {
       const days = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
       return days[day] || day;
     }
-    
+
     if (typeof day === 'string') {
       // Capitalize first letter, lowercase rest
       return day.charAt(0).toUpperCase() + day.slice(1).toLowerCase();
     }
-    
+
     return day;
   }
 
@@ -166,7 +169,7 @@ class DoctorAvailabilityService {
   async checkForTimeConflicts(data, excludeId = null) {
     try {
       const existingSlots = await this.doctorAvailabilityModel.getByDoctorAndDay(
-        data.doctor_id, 
+        data.doctor_id,
         data.day_of_week
       );
 
@@ -177,9 +180,7 @@ class DoctorAvailabilityService {
         }
 
         // Check for time overlap
-        const hasOverlap = (
-          (data.start_time < slot.end_time && data.end_time > slot.start_time)
-        );
+        const hasOverlap = data.start_time < slot.end_time && data.end_time > slot.start_time;
 
         if (hasOverlap) {
           throw new Error(
@@ -204,12 +205,12 @@ class DoctorAvailabilityService {
 
       // 2. Get doctor's availability for that day
       const availability = await this.getAvailabilityByDoctorId(doctorId);
-      const daySchedule = availability.find(a => a.day_of_week === dayOfWeek && a.is_active);
+      const daySchedule = availability.find((a) => a.day_of_week === dayOfWeek && a.is_active);
 
       if (!daySchedule) {
         return {
           isAvailable: false,
-          reason: `Doctor is not available on ${dayOfWeek}s`
+          reason: `Doctor is not available on ${dayOfWeek}s`,
         };
       }
 
@@ -217,11 +218,11 @@ class DoctorAvailabilityService {
       const requestedTime = time.substring(0, 5); // Ensure HH:MM format
       const startTime = daySchedule.start_time.substring(0, 5); // Convert to HH:MM
       const endTime = daySchedule.end_time.substring(0, 5); // Convert to HH:MM
-      
+
       if (requestedTime < startTime || requestedTime >= endTime) {
         return {
           isAvailable: false,
-          reason: `Time slot is outside working hours (${daySchedule.start_time} - ${daySchedule.end_time})`
+          reason: `Time slot is outside working hours (${daySchedule.start_time} - ${daySchedule.end_time})`,
         };
       }
 
@@ -251,7 +252,7 @@ class DoctorAvailabilityService {
           return {
             isAvailable: false,
             reason: 'Time slot is already booked',
-            conflictingAppointment: apt.id
+            conflictingAppointment: apt.id,
           };
         }
       }
@@ -259,7 +260,7 @@ class DoctorAvailabilityService {
       return {
         isAvailable: true,
         daySchedule,
-        bookedSlots: (existingAppointments || []).map(a => a.appointment_time)
+        bookedSlots: (existingAppointments || []).map((a) => a.appointment_time),
       };
     } catch (error) {
       console.error('[DoctorAvailabilityService] Error checking time slot:', error);
@@ -283,14 +284,14 @@ class DoctorAvailabilityService {
       const availability = await this.getAvailabilityByDoctorId(doctorId);
       console.log('[DoctorAvailabilityService] Doctor availability:', availability);
       console.log('[DoctorAvailabilityService] Looking for dayOfWeek:', dayOfWeek);
-      
-      const daySchedule = availability.find(a => a.day_of_week === dayOfWeek && a.is_active);
+
+      const daySchedule = availability.find((a) => a.day_of_week === dayOfWeek && a.is_active);
       console.log('[DoctorAvailabilityService] Found day schedule:', daySchedule);
 
       if (!daySchedule) {
         return {
           slots: [],
-          message: `Doctor is not available on ${dayOfWeek}s`
+          message: `Doctor is not available on ${dayOfWeek}s`,
         };
       }
 
@@ -305,27 +306,33 @@ class DoctorAvailabilityService {
       if (error) throw error;
 
       // 4. Generate all possible time slots (30-minute intervals)
-      const allSlots = this.generateTimeSlots(
+      const allSlots = this.generateTimeSlots(daySchedule.start_time, daySchedule.end_time, 30);
+      console.log(
+        '[DoctorAvailabilityService] Generated slots from',
         daySchedule.start_time,
+        'to',
         daySchedule.end_time,
-        30
+        ':',
+        allSlots.length,
+        'slots'
       );
-      console.log('[DoctorAvailabilityService] Generated slots from', daySchedule.start_time, 'to', daySchedule.end_time, ':', allSlots.length, 'slots');
       console.log('[DoctorAvailabilityService] First 5 slots:', allSlots.slice(0, 5));
 
       // 5. Filter out booked slots
-      const bookedSlots = (existingAppointments || []).map(a => a.appointment_time.substring(0, 5));
-      const availableSlots = allSlots.filter(slot => !bookedSlots.includes(slot));
+      const bookedSlots = (existingAppointments || []).map((a) =>
+        a.appointment_time.substring(0, 5)
+      );
+      const availableSlots = allSlots.filter((slot) => !bookedSlots.includes(slot));
 
       return {
         slots: availableSlots,
         workingHours: {
           start: daySchedule.start_time,
-          end: daySchedule.end_time
+          end: daySchedule.end_time,
         },
         bookedSlots,
         totalSlots: allSlots.length,
-        availableCount: availableSlots.length
+        availableCount: availableSlots.length,
       };
     } catch (error) {
       console.error('[DoctorAvailabilityService] Error getting available slots:', error);
@@ -378,7 +385,7 @@ class DoctorAvailabilityService {
         success: true,
         missedTokens: data || [],
         count: data?.length || 0,
-        message: `Processed ${data?.length || 0} tokens during doctor unavailability check`
+        message: `Processed ${data?.length || 0} tokens during doctor unavailability check`,
       };
     } catch (error) {
       console.error('[DoctorAvailability] Error checking missed tokens:', error);
@@ -401,7 +408,7 @@ class DoctorAvailabilityService {
       return {
         success: true,
         missedTokens: data || [],
-        count: data?.length || 0
+        count: data?.length || 0,
       };
     } catch (error) {
       console.error('[DoctorAvailability] Error checking doctor missed tokens:', error);
@@ -416,10 +423,10 @@ class DoctorAvailabilityService {
     try {
       const { data, error } = await this.doctorAvailabilityModel.supabase.rpc(
         'cancel_doctor_remaining_tokens',
-        { 
+        {
           p_doctor_id: doctorId,
           p_reason: reason || 'Doctor unavailable for the rest of the day',
-          p_performed_by: performedBy
+          p_performed_by: performedBy,
         }
       );
 
@@ -428,7 +435,7 @@ class DoctorAvailabilityService {
         success: true,
         cancelledTokens: data || [],
         count: data?.length || 0,
-        message: `Cancelled ${data?.length || 0} waiting tokens for doctor`
+        message: `Cancelled ${data?.length || 0} waiting tokens for doctor`,
       };
     } catch (error) {
       console.error('[DoctorAvailability] Error cancelling doctor tokens:', error);
@@ -450,7 +457,7 @@ class DoctorAvailabilityService {
 
       return {
         success: true,
-        isAvailable: data || false
+        isAvailable: data || false,
       };
     } catch (error) {
       console.error('[DoctorAvailability] Error checking doctor availability:', error);
@@ -472,7 +479,7 @@ class DoctorAvailabilityService {
 
       return {
         success: true,
-        hasAvailability: data || false
+        hasAvailability: data || false,
       };
     } catch (error) {
       console.error('[DoctorAvailability] Error checking remaining availability:', error);
@@ -494,7 +501,7 @@ class DoctorAvailabilityService {
 
       return {
         success: true,
-        nextAvailableTime: data
+        nextAvailableTime: data,
       };
     } catch (error) {
       console.error('[DoctorAvailability] Error getting next available time:', error);
@@ -510,7 +517,7 @@ class DoctorAvailabilityService {
       const [currentAvailability, remainingAvailability, nextTime] = await Promise.all([
         this.isDoctorCurrentlyAvailable(doctorId),
         this.doctorHasRemainingAvailability(doctorId),
-        this.getDoctorNextAvailableTime(doctorId)
+        this.getDoctorNextAvailableTime(doctorId),
       ]);
 
       // Get active tokens count
@@ -528,16 +535,16 @@ class DoctorAvailabilityService {
         hasRemainingAvailability: remainingAvailability.hasAvailability,
         nextAvailableTime: nextTime.nextAvailableTime,
         activeTokensCount: tokens?.length || 0,
-        status: currentAvailability.isAvailable 
-          ? 'available' 
-          : remainingAvailability.hasAvailability 
-            ? 'on_break' 
-            : 'finished'
+        status: currentAvailability.isAvailable
+          ? 'available'
+          : remainingAvailability.hasAvailability
+            ? 'on_break'
+            : 'finished',
       };
 
       return {
         success: true,
-        ...status
+        ...status,
       };
     } catch (error) {
       console.error('[DoctorAvailability] Error getting availability status:', error);
@@ -565,14 +572,14 @@ class DoctorAvailabilityService {
           const status = await this.getDoctorAvailabilityStatus(doctor.id);
           return {
             ...doctor,
-            availabilityStatus: status
+            availabilityStatus: status,
           };
         })
       );
 
       return {
         success: true,
-        doctors: doctorStatuses
+        doctors: doctorStatuses,
       };
     } catch (error) {
       console.error('[DoctorAvailability] Error getting all doctors status:', error);

@@ -3,6 +3,7 @@ import multer from 'multer';
 import { authenticate, authorize } from '../middleware/auth.js';
 import { uploadRateLimiter } from '../middleware/rateLimiter.js';
 import { asyncHandler } from '../middleware/errorHandler.js';
+import { ROLES } from '../constants/roles.js';
 import config from '../config/app.config.js';
 import { supabase } from '../config/database.js';
 import crypto from 'crypto';
@@ -15,7 +16,7 @@ const storage = multer.memoryStorage();
 const upload = multer({
   storage: storage,
   limits: {
-    fileSize: config.upload.maxSize // 10MB limit
+    fileSize: config.upload.maxSize, // 10MB limit
   },
   fileFilter: (req, file, cb) => {
     if (config.upload.allowedTypes.includes(file.mimetype)) {
@@ -23,7 +24,7 @@ const upload = multer({
     } else {
       cb(new Error('Invalid file type'), false);
     }
-  }
+  },
 });
 
 /**
@@ -31,7 +32,8 @@ const upload = multer({
  * @desc    Upload patient document
  * @access  Private (All roles)
  */
-router.post('/upload',
+router.post(
+  '/upload',
   authenticate,
   uploadRateLimiter,
   upload.single('document'),
@@ -47,15 +49,15 @@ router.post('/upload',
           hasBody: !!req.body,
           bodyKeys: Object.keys(req.body || {}),
           hasFiles: !!req.files,
-          hasFile: !!req.file
-        }
+          hasFile: !!req.file,
+        },
       });
     }
 
     if (!patient_id) {
       return res.status(400).json({
         success: false,
-        message: 'Patient ID is required'
+        message: 'Patient ID is required',
       });
     }
 
@@ -69,7 +71,7 @@ router.post('/upload',
         .from('medical-documents')
         .upload(uniqueFileName, file.buffer, {
           contentType: file.mimetype,
-          upsert: false
+          upsert: false,
         });
 
       if (uploadError) {
@@ -78,9 +80,9 @@ router.post('/upload',
       }
 
       // Get public URL
-      const { data: { publicUrl } } = supabase.storage
-        .from('medical-documents')
-        .getPublicUrl(uniqueFileName);
+      const {
+        data: { publicUrl },
+      } = supabase.storage.from('medical-documents').getPublicUrl(uniqueFileName);
 
       // Store document metadata in database
       const { data: docData, error: dbError } = await supabase
@@ -92,7 +94,7 @@ router.post('/upload',
           file_path: uniqueFileName,
           file_size: file.size,
           mime_type: file.mimetype,
-          uploaded_by: req.user.id
+          uploaded_by: req.user.id,
         })
         .select()
         .single();
@@ -115,20 +117,20 @@ router.post('/upload',
           patientId: patient_id,
           result: 'success',
           meta: { file_name: docData?.document_name },
-          ip: req.ip
+          ip: req.ip,
         });
       } catch (e) {}
 
       res.status(201).json({
         success: true,
         message: 'Document uploaded successfully',
-        data: docData
+        data: docData,
       });
     } catch (error) {
       console.error('Document upload error:', error);
       res.status(500).json({
         success: false,
-        message: error.message || 'Failed to upload document'
+        message: error.message || 'Failed to upload document',
       });
     }
   })
@@ -139,7 +141,8 @@ router.post('/upload',
  * @desc  Download document (redirect to public URL)
  * @access Private
  */
-router.get('/:id/download',
+router.get(
+  '/:id/download',
   authenticate,
   asyncHandler(async (req, res) => {
     const { id } = req.params;
@@ -155,7 +158,9 @@ router.get('/:id/download',
     }
 
     // Obtain public URL
-    const { data: { publicUrl } } = supabase.storage.from('medical-documents').getPublicUrl(doc.file_path);
+    const {
+      data: { publicUrl },
+    } = supabase.storage.from('medical-documents').getPublicUrl(doc.file_path);
 
     // Log download
     try {
@@ -167,7 +172,7 @@ router.get('/:id/download',
         recordId: id,
         patientId: doc.patient_id || null,
         result: 'success',
-        ip: req.ip
+        ip: req.ip,
       });
     } catch (e) {}
 
@@ -181,21 +186,24 @@ router.get('/:id/download',
  * @desc    Get patient documents
  * @access  Private (All roles)
  */
-router.get('/patient/:patientId',
+router.get(
+  '/patient/:patientId',
   authenticate,
   asyncHandler(async (req, res) => {
     const { patientId } = req.params;
 
     const { data, error } = await supabase
       .from('medical_documents')
-      .select(`
+      .select(
+        `
         *,
         uploader:uploaded_by (
           first_name,
           last_name,
           role
         )
-      `)
+      `
+      )
       .eq('patient_id', patientId)
       .order('created_at', { ascending: false });
 
@@ -212,9 +220,10 @@ router.get('/patient/:patientId',
  * @desc    Delete document
  * @access  Private (Admin, Doctor)
  */
-router.delete('/:id',
+router.delete(
+  '/:id',
   authenticate,
-  authorize('admin', 'doctor'),
+  authorize(ROLES.ADMIN, ROLES.DOCTOR),
   asyncHandler(async (req, res) => {
     const { id } = req.params;
 
@@ -228,7 +237,7 @@ router.delete('/:id',
     if (fetchError || !doc) {
       return res.status(404).json({
         success: false,
-        message: 'Document not found'
+        message: 'Document not found',
       });
     }
 
@@ -242,10 +251,7 @@ router.delete('/:id',
     }
 
     // Delete from database
-    const { error: dbError } = await supabase
-      .from('medical_documents')
-      .delete()
-      .eq('id', id);
+    const { error: dbError } = await supabase.from('medical_documents').delete().eq('id', id);
 
     if (dbError) {
       throw new Error(`Failed to delete document: ${dbError.message}`);
@@ -253,7 +259,7 @@ router.delete('/:id',
 
     res.status(200).json({
       success: true,
-      message: 'Document deleted successfully'
+      message: 'Document deleted successfully',
     });
   })
 );

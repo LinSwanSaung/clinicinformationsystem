@@ -1,6 +1,7 @@
 import express from 'express';
 import { authenticate, authorize } from '../middleware/auth.js';
 import { asyncHandler, AppError } from '../middleware/errorHandler.js';
+import { ROLES } from '../constants/roles.js';
 import { logAuditEvent } from '../utils/auditLogger.js';
 import { supabase } from '../config/database.js';
 
@@ -11,20 +12,23 @@ const router = express.Router();
  * @desc    Debug endpoint to see all active visits
  * @access  Private (Admin only)
  */
-router.get('/debug/visits',
+router.get(
+  '/debug/visits',
   authenticate,
-  authorize('admin'),
+  authorize(ROLES.ADMIN),
   asyncHandler(async (req, res) => {
     const { data, error } = await supabase
       .from('visits')
-      .select(`
+      .select(
+        `
         id,
         status,
         created_at,
         updated_at,
         patients (first_name, last_name, patient_number),
         users (first_name, last_name)
-      `)
+      `
+      )
       .order('created_at', { ascending: false })
       .limit(20);
 
@@ -37,9 +41,10 @@ router.get('/debug/visits',
  * @desc    Get all pending items across modules that need admin attention
  * @access  Private (Admin only)
  */
-router.get('/pending-items',
+router.get(
+  '/pending-items',
   authenticate,
-  authorize('admin'),
+  authorize(ROLES.ADMIN),
   asyncHandler(async (req, res) => {
     const pendingItems = [];
 
@@ -51,7 +56,7 @@ router.get('/pending-items',
       .select('id, status, updated_at, created_at')
       .order('created_at', { ascending: false })
       .limit(5);
-    
+
     console.log('[ADMIN] All visits (last 5):', allVisits);
 
     // Get pending visits (in_progress or active visits older than 5 minutes - for testing)
@@ -60,7 +65,8 @@ router.get('/pending-items',
 
     const { data: visitsData, error: visitsError } = await supabase
       .from('visits')
-      .select(`
+      .select(
+        `
         id,
         status,
         updated_at,
@@ -75,7 +81,8 @@ router.get('/pending-items',
           first_name,
           last_name
         )
-      `)
+      `
+      )
       .in('status', ['in_progress', 'active', 'consulting'])
       .lt('updated_at', fiveMinutesAgo)
       .order('updated_at', { ascending: true });
@@ -87,27 +94,33 @@ router.get('/pending-items',
     }
 
     if (visitsData && visitsData.length > 0) {
-      console.log('[ADMIN] Found visits:', visitsData.map(v => ({ id: v.id, status: v.status, updated: v.updated_at })));
+      console.log(
+        '[ADMIN] Found visits:',
+        visitsData.map((v) => ({ id: v.id, status: v.status, updated: v.updated_at }))
+      );
     }
 
     if (!visitsError && visitsData) {
-      pendingItems.push(...visitsData.map(visit => ({
-        entityType: 'visit',
-        entityId: visit.id,
-        currentStatus: visit.status,
-        lastUpdated: visit.updated_at,
-        patientName: `${visit.patients.first_name} ${visit.patients.last_name}`,
-        patientNumber: visit.patients.patient_number,
-        doctorName: visit.users ? `${visit.users.first_name} ${visit.users.last_name}` : null,
-        resolvedByAdmin: visit.resolved_by_admin,
-        resolvedReason: visit.resolved_reason
-      })));
+      pendingItems.push(
+        ...visitsData.map((visit) => ({
+          entityType: 'visit',
+          entityId: visit.id,
+          currentStatus: visit.status,
+          lastUpdated: visit.updated_at,
+          patientName: `${visit.patients.first_name} ${visit.patients.last_name}`,
+          patientNumber: visit.patients.patient_number,
+          doctorName: visit.users ? `${visit.users.first_name} ${visit.users.last_name}` : null,
+          resolvedByAdmin: visit.resolved_by_admin,
+          resolvedReason: visit.resolved_reason,
+        }))
+      );
     }
 
     // Get pending appointments (scheduled but not completed/cancelled, older than 1 hour past scheduled time)
     const { data: appointmentsData, error: appointmentsError } = await supabase
       .from('appointments')
-      .select(`
+      .select(
+        `
         id,
         status,
         updated_at,
@@ -124,35 +137,43 @@ router.get('/pending-items',
           first_name,
           last_name
         )
-      `)
+      `
+      )
       .eq('status', 'scheduled')
       .order('appointment_date', { ascending: true });
 
     if (!appointmentsError && appointmentsData) {
       // Filter appointments that are past their scheduled time by more than 1 hour
       const now = new Date();
-      const pastAppointments = appointmentsData.filter(appointment => {
-        const appointmentDateTime = new Date(`${appointment.appointment_date}T${appointment.appointment_time}`);
+      const pastAppointments = appointmentsData.filter((appointment) => {
+        const appointmentDateTime = new Date(
+          `${appointment.appointment_date}T${appointment.appointment_time}`
+        );
         return appointmentDateTime < new Date(now.getTime() - 60 * 60 * 1000); // 1 hour ago
       });
 
-      pendingItems.push(...pastAppointments.map(appointment => ({
-        entityType: 'appointment',
-        entityId: appointment.id,
-        currentStatus: appointment.status,
-        lastUpdated: appointment.updated_at,
-        patientName: `${appointment.patients.first_name} ${appointment.patients.last_name}`,
-        patientNumber: appointment.patients.patient_number,
-        doctorName: appointment.users ? `${appointment.users.first_name} ${appointment.users.last_name}` : null,
-        resolvedByAdmin: appointment.resolved_by_admin,
-        resolvedReason: appointment.resolved_reason
-      })));
+      pendingItems.push(
+        ...pastAppointments.map((appointment) => ({
+          entityType: 'appointment',
+          entityId: appointment.id,
+          currentStatus: appointment.status,
+          lastUpdated: appointment.updated_at,
+          patientName: `${appointment.patients.first_name} ${appointment.patients.last_name}`,
+          patientNumber: appointment.patients.patient_number,
+          doctorName: appointment.users
+            ? `${appointment.users.first_name} ${appointment.users.last_name}`
+            : null,
+          resolvedByAdmin: appointment.resolved_by_admin,
+          resolvedReason: appointment.resolved_reason,
+        }))
+      );
     }
 
     // Get pending queue tokens (active tokens older than 4 hours)
     const { data: queueData, error: queueError } = await supabase
       .from('queue_tokens')
-      .select(`
+      .select(
+        `
         id,
         status,
         updated_at,
@@ -167,29 +188,33 @@ router.get('/pending-items',
           first_name,
           last_name
         )
-      `)
+      `
+      )
       .in('status', ['waiting', 'called', 'serving', 'delayed'])
       .lt('created_at', new Date(Date.now() - 4 * 60 * 60 * 1000).toISOString())
       .order('created_at', { ascending: true });
 
     if (!queueError && queueData) {
-      pendingItems.push(...queueData.map(token => ({
-        entityType: 'queue',
-        entityId: token.id,
-        currentStatus: token.status,
-        lastUpdated: token.updated_at,
-        patientName: `${token.patients.first_name} ${token.patients.last_name}`,
-        patientNumber: token.patients.patient_number,
-        doctorName: token.users ? `${token.users.first_name} ${token.users.last_name}` : null,
-        resolvedByAdmin: token.resolved_by_admin,
-        resolvedReason: token.resolved_reason
-      })));
+      pendingItems.push(
+        ...queueData.map((token) => ({
+          entityType: 'queue',
+          entityId: token.id,
+          currentStatus: token.status,
+          lastUpdated: token.updated_at,
+          patientName: `${token.patients.first_name} ${token.patients.last_name}`,
+          patientNumber: token.patients.patient_number,
+          doctorName: token.users ? `${token.users.first_name} ${token.users.last_name}` : null,
+          resolvedByAdmin: token.resolved_by_admin,
+          resolvedReason: token.resolved_reason,
+        }))
+      );
     }
 
     // Get pending invoices (unpaid invoices older than 7 days)
     const { data: invoicesData, error: invoicesError } = await supabase
       .from('invoices')
-      .select(`
+      .select(
+        `
         id,
         status,
         updated_at,
@@ -200,23 +225,26 @@ router.get('/pending-items',
           last_name,
           patient_number
         )
-      `)
+      `
+      )
       .eq('status', 'pending')
       .lt('created_at', new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString())
       .order('created_at', { ascending: true });
 
     if (!invoicesError && invoicesData) {
-      pendingItems.push(...invoicesData.map(invoice => ({
-        entityType: 'billing',
-        entityId: invoice.id,
-        currentStatus: invoice.status,
-        lastUpdated: invoice.updated_at,
-        patientName: `${invoice.patients.first_name} ${invoice.patients.last_name}`,
-        patientNumber: invoice.patients.patient_number,
-        doctorName: null,
-        resolvedByAdmin: invoice.resolved_by_admin,
-        resolvedReason: invoice.resolved_reason
-      })));
+      pendingItems.push(
+        ...invoicesData.map((invoice) => ({
+          entityType: 'billing',
+          entityId: invoice.id,
+          currentStatus: invoice.status,
+          lastUpdated: invoice.updated_at,
+          patientName: `${invoice.patients.first_name} ${invoice.patients.last_name}`,
+          patientNumber: invoice.patients.patient_number,
+          doctorName: null,
+          resolvedByAdmin: invoice.resolved_by_admin,
+          resolvedReason: invoice.resolved_reason,
+        }))
+      );
     }
 
     console.log('[ADMIN] Total pending items found:', pendingItems.length);
@@ -230,9 +258,10 @@ router.get('/pending-items',
  * @desc    Admin override for resolving stuck records
  * @access  Private (Admin only)
  */
-router.post('/override',
+router.post(
+  '/override',
   authenticate,
-  authorize('admin'),
+  authorize(ROLES.ADMIN),
   asyncHandler(async (req, res) => {
     const { entityType, entityId, newStatus, reason } = req.body;
 
@@ -294,7 +323,7 @@ router.post('/override',
         [statusColumn]: newStatus,
         resolved_by_admin: true,
         resolved_reason: reason,
-        updated_at: new Date().toISOString()
+        updated_at: new Date().toISOString(),
       })
       .eq(idColumn, entityId);
 
@@ -326,16 +355,16 @@ router.post('/override',
                 .eq('visit_id', fullRecord.id);
               console.log(`[ADMIN] Updated queue_token for visit ${fullRecord.id}`);
             }
-            
+
             // Update appointment if linked
             if (fullRecord.appointment_id) {
               await supabase
                 .from('appointments')
-                .update({ 
+                .update({
                   status: newStatus,
                   resolved_by_admin: true,
                   resolved_reason: reason,
-                  updated_at: new Date().toISOString() 
+                  updated_at: new Date().toISOString(),
                 })
                 .eq('id', fullRecord.appointment_id);
               console.log(`[ADMIN] Updated appointment ${fullRecord.appointment_id}`);
@@ -354,11 +383,11 @@ router.post('/override',
             if (relatedVisit) {
               await supabase
                 .from('visits')
-                .update({ 
+                .update({
                   status: newStatus,
                   resolved_by_admin: true,
                   resolved_reason: reason,
-                  updated_at: new Date().toISOString() 
+                  updated_at: new Date().toISOString(),
                 })
                 .eq('id', relatedVisit.id);
               console.log(`[ADMIN] Updated visit ${relatedVisit.id}`);
@@ -378,11 +407,11 @@ router.post('/override',
             if (fullRecord.visit_id) {
               await supabase
                 .from('visits')
-                .update({ 
+                .update({
                   status: newStatus,
                   resolved_by_admin: true,
                   resolved_reason: reason,
-                  updated_at: new Date().toISOString() 
+                  updated_at: new Date().toISOString(),
                 })
                 .eq('id', fullRecord.visit_id);
               console.log(`[ADMIN] Updated visit ${fullRecord.visit_id}`);
@@ -392,11 +421,11 @@ router.post('/override',
             if (fullRecord.appointment_id) {
               await supabase
                 .from('appointments')
-                .update({ 
+                .update({
                   status: newStatus,
                   resolved_by_admin: true,
                   resolved_reason: reason,
-                  updated_at: new Date().toISOString() 
+                  updated_at: new Date().toISOString(),
                 })
                 .eq('id', fullRecord.appointment_id);
               console.log(`[ADMIN] Updated appointment ${fullRecord.appointment_id}`);
@@ -421,8 +450,8 @@ router.post('/override',
       reason: reason,
       metadata: {
         admin_override: true,
-        resolved_reason: reason
-      }
+        resolved_reason: reason,
+      },
     });
 
     res.json({
@@ -434,8 +463,8 @@ router.post('/override',
         oldStatus,
         newStatus,
         resolvedBy: req.user.id,
-        reason
-      }
+        reason,
+      },
     });
   })
 );

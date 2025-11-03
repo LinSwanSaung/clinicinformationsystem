@@ -2,6 +2,7 @@ import express from 'express';
 import { authenticate, authorize } from '../middleware/auth.js';
 import { requireActiveVisit } from '../middleware/activeVisitCheck.js';
 import { asyncHandler } from '../middleware/errorHandler.js';
+import { ROLES } from '../constants/roles.js';
 import VitalsService from '../services/Vitals.service.js';
 
 const router = express.Router();
@@ -13,7 +14,8 @@ const vitalsService = new VitalsService();
  * @access  Private (Nurse, Doctor)
  * @security Requires patient to have an active visit
  */
-router.post('/',
+router.post(
+  '/',
   authenticate,
   authorize('nurse', 'doctor'),
   requireActiveVisit,
@@ -26,7 +28,7 @@ router.post('/',
     res.status(201).json({
       success: true,
       message: 'Vitals recorded successfully',
-      data: vitals
+      data: vitals,
     });
   })
 );
@@ -36,19 +38,23 @@ router.post('/',
  * @desc    Get patient vitals history
  * @access  Private (Doctor, Nurse)
  */
-router.get('/patient/:patientId',
+router.get(
+  '/patient/:patientId',
   authenticate,
   authorize('doctor', 'nurse'),
   asyncHandler(async (req, res) => {
     const { patientId } = req.params;
     const { limit } = req.query;
 
-    const vitals = await vitalsService.getPatientVitalsHistory(patientId, limit ? parseInt(limit) : null);
+    const vitals = await vitalsService.getPatientVitalsHistory(
+      patientId,
+      limit ? parseInt(limit) : null
+    );
 
     res.status(200).json({
       success: true,
       message: 'Vitals history retrieved successfully',
-      data: vitals
+      data: vitals,
     });
   })
 );
@@ -58,7 +64,8 @@ router.get('/patient/:patientId',
  * @desc    Get latest vitals for a patient
  * @access  Private (Doctor, Nurse)
  */
-router.get('/patient/:patientId/latest',
+router.get(
+  '/patient/:patientId/latest',
   authenticate,
   authorize('doctor', 'nurse'),
   asyncHandler(async (req, res) => {
@@ -69,7 +76,7 @@ router.get('/patient/:patientId/latest',
     res.status(200).json({
       success: true,
       message: 'Latest vitals retrieved successfully',
-      data: vitals
+      data: vitals,
     });
   })
 );
@@ -79,7 +86,8 @@ router.get('/patient/:patientId/latest',
  * @desc    Get vitals for a specific visit
  * @access  Private (Doctor, Nurse)
  */
-router.get('/visit/:visitId',
+router.get(
+  '/visit/:visitId',
   authenticate,
   authorize('doctor', 'nurse'),
   asyncHandler(async (req, res) => {
@@ -90,7 +98,7 @@ router.get('/visit/:visitId',
     res.status(200).json({
       success: true,
       message: 'Visit vitals retrieved successfully',
-      data: vitals
+      data: vitals,
     });
   })
 );
@@ -100,7 +108,8 @@ router.get('/visit/:visitId',
  * @desc    Get vitals for patient's current active visit
  * @access  Private (Doctor, Nurse)
  */
-router.get('/patient/:patientId/current-visit',
+router.get(
+  '/patient/:patientId/current-visit',
   authenticate,
   authorize('doctor', 'nurse'),
   asyncHandler(async (req, res) => {
@@ -110,8 +119,10 @@ router.get('/patient/:patientId/current-visit',
 
     res.status(200).json({
       success: true,
-      message: vitals ? 'Current visit vitals retrieved successfully' : 'No vitals found for current visit',
-      data: vitals
+      message: vitals
+        ? 'Current visit vitals retrieved successfully'
+        : 'No vitals found for current visit',
+      data: vitals,
     });
   })
 );
@@ -121,7 +132,8 @@ router.get('/patient/:patientId/current-visit',
  * @desc    Update vitals record
  * @access  Private (Nurse, Doctor)
  */
-router.put('/:id',
+router.put(
+  '/:id',
   authenticate,
   authorize('nurse', 'doctor'),
   asyncHandler(async (req, res) => {
@@ -134,7 +146,7 @@ router.put('/:id',
     res.status(200).json({
       success: true,
       message: 'Vitals updated successfully',
-      data: vitals
+      data: vitals,
     });
   })
 );

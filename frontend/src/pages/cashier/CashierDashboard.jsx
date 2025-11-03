@@ -1,7 +1,8 @@
+/* eslint-disable no-unused-vars, no-useless-catch, react-hooks/exhaustive-deps, no-console */
 import React, { useState, useEffect, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
-import { 
+import {
   Search,
   Filter,
   X,
@@ -32,7 +33,7 @@ import {
   Download,
   Tag,
   Edit2,
-  Trash2
+  Trash2,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -40,21 +41,35 @@ import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Skeleton } from '@/components/ui/skeleton';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Separator } from '@/components/ui/separator';
 import { Textarea } from '@/components/ui/textarea';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/dialog';
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+  DialogFooter,
+} from '@/components/ui/dialog';
 import PageLayout from '@/components/PageLayout';
 import useDebounce from '@/utils/useDebounce';
 import invoiceService from '../../services/invoiceService';
+import { useInvoices } from '@/hooks/useInvoices';
 
 // Animation variants
 const pageVariants = {
   initial: { opacity: 0, y: 20 },
-  animate: { opacity: 1, y: 0, transition: { duration: 0.4, ease: "easeOut" } },
-  exit: { opacity: 0, y: -20, transition: { duration: 0.3 } }
+  animate: { opacity: 1, y: 0, transition: { duration: 0.4, ease: 'easeOut' } },
+  exit: { opacity: 0, y: -20, transition: { duration: 0.3 } },
 };
 
 const containerVariants = {
@@ -63,95 +78,83 @@ const containerVariants = {
     opacity: 1,
     transition: {
       staggerChildren: 0.1,
-      delayChildren: 0.2
-    }
-  }
+      delayChildren: 0.2,
+    },
+  },
 };
 
 const itemVariants = {
   hidden: { opacity: 0, y: 20, scale: 0.95 },
-  visible: { 
-    opacity: 1, 
-    y: 0, 
+  visible: {
+    opacity: 1,
+    y: 0,
     scale: 1,
-    transition: { 
-      duration: 0.3, 
-      ease: "easeOut" 
-    }
-  }
+    transition: {
+      duration: 0.3,
+      ease: 'easeOut',
+    },
+  },
 };
 
 const cardVariants = {
   hidden: { opacity: 0, y: 20, scale: 0.9 },
-  visible: { 
-    opacity: 1, 
-    y: 0, 
+  visible: {
+    opacity: 1,
+    y: 0,
     scale: 1,
-    transition: { 
-      duration: 0.4, 
-      ease: "easeOut",
-      type: "spring",
-      stiffness: 100
-    }
+    transition: {
+      duration: 0.4,
+      ease: 'easeOut',
+      type: 'spring',
+      stiffness: 100,
+    },
   },
-  hover: { 
+  hover: {
     y: -4,
     scale: 1.02,
-    transition: { 
+    transition: {
       duration: 0.2,
-      ease: "easeOut"
-    }
+      ease: 'easeOut',
+    },
   },
-  tap: { scale: 0.98 }
+  tap: { scale: 0.98 },
 };
 
 const searchVariants = {
-  centered: { 
-    width: "100%", 
-    maxWidth: "500px",
-    margin: "0 auto"
+  centered: {
+    width: '100%',
+    maxWidth: '500px',
+    margin: '0 auto',
   },
-  expanded: { 
-    width: "100%", 
-    maxWidth: "400px",
-    margin: "0"
+  expanded: {
+    width: '100%',
+    maxWidth: '400px',
+    margin: '0',
   },
-  focused: { 
+  focused: {
     scale: 1.02,
-    transition: { duration: 0.2 }
-  }
+    transition: { duration: 0.2 },
+  },
 };
 
 const CashierDashboard = () => {
   const navigate = useNavigate();
-  
-  // State for invoices from backend
-  const [invoices, setInvoices] = useState([]);
-  const [loading, setLoading] = useState(true);
+
   const [error, setError] = useState(null);
   const [successMessage, setSuccessMessage] = useState(null);
-  
-  // Load pending invoices from backend
-  useEffect(() => {
-    loadPendingInvoices();
-  }, []);
 
-  const loadPendingInvoices = async () => {
-    try {
-      setLoading(true);
-      setError(null);
-      const data = await invoiceService.getPendingInvoices();
-      
-      // Use backend data directly without transformation
-      setInvoices(Array.isArray(data) ? data : []);
-    } catch (error) {
-      console.error('Error loading pending invoices:', error);
-      setError('Failed to load pending invoices');
-    } finally {
-      setLoading(false);
-    }
-  };
-  
+  // Invoices via React Query hooks
+  const {
+    data: pendingInvoicesData,
+    isLoading: isPendingLoading,
+    refetch: refetchPending,
+  } = useInvoices({ type: 'pending' });
+  const {
+    data: completedInvoicesData,
+    isLoading: isCompletedLoading,
+    refetch: refetchCompleted,
+  } = useInvoices({ type: 'completed', limit: 50, offset: 0 });
+
   // Invoice history state
   const [invoiceHistory, setInvoiceHistory] = useState([]);
   const [historyLoading, setHistoryLoading] = useState(false);
@@ -165,7 +168,7 @@ const CashierDashboard = () => {
   const [showFilters, setShowFilters] = useState(false);
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [lastRefreshTime, setLastRefreshTime] = useState(new Date());
-  
+
   // Invoice detail modal state
   const [selectedInvoice, setSelectedInvoice] = useState(null);
   const [showInvoiceDetail, setShowInvoiceDetail] = useState(false);
@@ -176,19 +179,19 @@ const CashierDashboard = () => {
   const [notes, setNotes] = useState('');
   const [showPaymentDialog, setShowPaymentDialog] = useState(false);
   const [isProcessing, setIsProcessing] = useState(false);
-  
+
   // Partial payment state
   const [isPartialPayment, setIsPartialPayment] = useState(false);
   const [partialAmount, setPartialAmount] = useState('');
   const [holdReason, setHoldReason] = useState('');
   const [paymentDueDate, setPaymentDueDate] = useState('');
-  
+
   // Outstanding balance state
   const [outstandingBalance, setOutstandingBalance] = useState(null);
   const [showOutstandingAlert, setShowOutstandingAlert] = useState(false);
   const [addOutstandingToInvoice, setAddOutstandingToInvoice] = useState(false);
   const [invoiceLimitReached, setInvoiceLimitReached] = useState(false);
-  
+
   // Services management state
   const [services, setServices] = useState([]);
   const [isEditingService, setIsEditingService] = useState(null);
@@ -210,14 +213,7 @@ const CashierDashboard = () => {
     return () => clearInterval(interval);
   }, []);
 
-  // Load invoice history when switching to history tab
-  useEffect(() => {
-    if (activeTab === 'history' && invoiceHistory.length === 0 && !historyLoading) {
-      loadInvoiceHistory();
-    }
-  }, [activeTab]);
-
-  // Load invoice history when history tab is activated
+  // Load invoice history when switching to history tab (single useEffect)
   useEffect(() => {
     if (activeTab === 'history') {
       loadInvoiceHistory();
@@ -229,8 +225,8 @@ const CashierDashboard = () => {
     if (selectedInvoice) {
       // Get medications from invoice_items
       const meds = (selectedInvoice.invoice_items || [])
-        .filter(item => item.item_type === 'medicine')
-        .map(item => ({
+        .filter((item) => item.item_type === 'medicine')
+        .map((item) => ({
           id: item.id,
           name: item.item_name,
           quantity: item.quantity,
@@ -239,59 +235,65 @@ const CashierDashboard = () => {
           instructions: item.notes || '',
           inStock: 100, // Mock value
           dispensedQuantity: 0,
-          action: 'pending' // pending, dispense, write-out
+          action: 'pending', // pending, dispense, write-out
         }));
       setMedications(meds);
-      
+
       // Get services from invoice_items
       const servs = (selectedInvoice.invoice_items || [])
-        .filter(item => item.item_type === 'service')
-        .map(item => ({
+        .filter((item) => item.item_type === 'service')
+        .map((item) => ({
           id: item.id,
           name: item.item_name,
           price: parseFloat(item.unit_price || 0),
           description: item.notes || '',
-          quantity: item.quantity || 1
+          quantity: item.quantity || 1,
         }));
       setServices(servs);
     }
   }, [selectedInvoice]);
 
-  // Load invoice history
+  // Load invoice history using hook data
   const loadInvoiceHistory = async () => {
     try {
       setHistoryLoading(true);
       setHistoryError(null);
-      const response = await invoiceService.getCompletedInvoices(50, 0);
-      
+      const response = Array.isArray(completedInvoicesData) ? completedInvoicesData : [];
       // Transform the data to match the UI format
-      const formattedHistory = response.map(invoice => ({
+      const formattedHistory = response.map((invoice) => ({
         id: invoice.invoice_number,
-        patientName: invoice.patients?.full_name || 
-                     `${invoice.patients?.first_name || ''} ${invoice.patients?.last_name || ''}`.trim() || 
-                     'Unknown Patient',
-        doctorName: invoice.visits?.doctor?.full_name || 
-                   `${invoice.visits?.doctor?.first_name || ''} ${invoice.visits?.doctor?.last_name || ''}`.trim() || 
-                   'Unknown Doctor',
-        date: invoice.completed_at ? new Date(invoice.completed_at).toLocaleDateString('en-US', {
-          year: 'numeric',
-          month: 'short',
-          day: 'numeric'
-        }) : 'N/A',
-        time: invoice.completed_at ? new Date(invoice.completed_at).toLocaleTimeString('en-US', {
-          hour: 'numeric',
-          minute: '2-digit',
-          hour12: true
-        }) : 'N/A',
+        patientName:
+          invoice.patients?.full_name ||
+          `${invoice.patients?.first_name || ''} ${invoice.patients?.last_name || ''}`.trim() ||
+          'Unknown Patient',
+        doctorName:
+          invoice.visits?.doctor?.full_name ||
+          `${invoice.visits?.doctor?.first_name || ''} ${invoice.visits?.doctor?.last_name || ''}`.trim() ||
+          'Unknown Doctor',
+        date: invoice.completed_at
+          ? new Date(invoice.completed_at).toLocaleDateString('en-US', {
+              year: 'numeric',
+              month: 'short',
+              day: 'numeric',
+            })
+          : 'N/A',
+        time: invoice.completed_at
+          ? new Date(invoice.completed_at).toLocaleTimeString('en-US', {
+              hour: 'numeric',
+              minute: '2-digit',
+              hour12: true,
+            })
+          : 'N/A',
         totalAmount: parseFloat(invoice.total_amount || 0),
         status: invoice.status,
         paymentMethod: invoice.payment_transactions?.[0]?.payment_method || 'N/A',
-        processedBy: invoice.completed_by_user?.full_name || 
-                    `${invoice.completed_by_user?.first_name || ''} ${invoice.completed_by_user?.last_name || ''}`.trim() || 
-                    'Unknown',
-        rawData: invoice // Keep original data for details
+        processedBy:
+          invoice.completed_by_user?.full_name ||
+          `${invoice.completed_by_user?.first_name || ''} ${invoice.completed_by_user?.last_name || ''}`.trim() ||
+          'Unknown',
+        rawData: invoice, // Keep original data for details
       }));
-      
+
       setInvoiceHistory(formattedHistory);
     } catch (error) {
       console.error('Failed to load invoice history:', error);
@@ -305,10 +307,10 @@ const CashierDashboard = () => {
   const handleViewHistoryInvoice = async (historyItem) => {
     try {
       const response = await invoiceService.getInvoiceById(historyItem.rawData.id);
-      setSelectedPayment({ 
+      setSelectedPayment({
         ...historyItem.rawData,
         invoice: historyItem.rawData,
-        invoiceDetails: response 
+        invoiceDetails: response,
       });
       setInvoiceModalOpen(true);
     } catch (error) {
@@ -321,7 +323,7 @@ const CashierDashboard = () => {
   const handleDownloadReceipt = async (historyItem) => {
     try {
       const token = localStorage.getItem('authToken');
-      
+
       if (!token) {
         alert('Please login first');
         return;
@@ -329,23 +331,20 @@ const CashierDashboard = () => {
 
       // Get the first payment transaction for this invoice
       const paymentId = historyItem.rawData.payment_transactions?.[0]?.id;
-      
+
       if (!paymentId) {
         alert('No payment found for this invoice');
         return;
       }
-      
+
       // Use direct fetch with proper auth header format
-      const response = await fetch(
-        `http://localhost:3001/api/payments/${paymentId}/receipt/pdf`,
-        {
-          method: 'GET',
-          headers: {
-            'Authorization': `Bearer ${token}`,
-            'Content-Type': 'application/json'
-          }
-        }
-      );
+      const response = await fetch(`http://localhost:3001/api/payments/${paymentId}/receipt/pdf`, {
+        method: 'GET',
+        headers: {
+          Authorization: `Bearer ${token}`,
+          'Content-Type': 'application/json',
+        },
+      });
 
       if (!response.ok) {
         const errorText = await response.text();
@@ -380,7 +379,8 @@ const CashierDashboard = () => {
   const handleRefresh = async () => {
     try {
       setIsRefreshing(true);
-      await new Promise(resolve => setTimeout(resolve, 1000));
+      await new Promise((resolve) => setTimeout(resolve, 1000));
+      await refetchPending();
       setLastRefreshTime(new Date());
     } catch (error) {
       console.error('Manual refresh error:', error);
@@ -390,55 +390,64 @@ const CashierDashboard = () => {
     }
   };
 
-  // Calculate statistics
+  // Calculate statistics - use hook data directly
   const stats = useMemo(() => {
-    const pending = invoices?.filter(inv => inv.status === 'pending').length || 0;
-    
+    const pending = (pendingInvoicesData || []).filter((inv) => inv.status === 'pending').length;
+
     // Count today's completed invoices and revenue
     const today = new Date().toLocaleDateString('en-US', {
       year: 'numeric',
       month: 'short',
-      day: 'numeric'
+      day: 'numeric',
     });
-    const todayInvoices = (invoiceHistory || []).filter(inv => inv.date === today);
-    const todayCompleted = todayInvoices.length || 0;
-    const todayRevenue = todayInvoices.reduce((sum, inv) => sum + (parseFloat(inv.totalAmount) || 0), 0) || 0;
+    const todayInvoices = (invoiceHistory || []).filter((inv) => inv.date === today);
+    const todayCompleted = todayInvoices.length;
+    const todayRevenue = todayInvoices.reduce(
+      (sum, inv) => sum + (parseFloat(inv.totalAmount) || 0),
+      0
+    );
 
     return {
-      totalInvoices: invoices?.length || 0,
+      totalInvoices: (pendingInvoicesData || []).length,
       pendingInvoices: pending,
       todayCompleted,
-      todayRevenue
+      todayRevenue,
     };
-  }, [invoices, invoiceHistory]);
+  }, [pendingInvoicesData, invoiceHistory]);
 
-  // Advanced filtering
+  // Advanced filtering - use hook data directly
   const filteredInvoices = useMemo(() => {
-    let filtered = invoices;
+    let filtered = pendingInvoicesData || [];
 
     if (debouncedSearchTerm) {
       const searchLower = debouncedSearchTerm.toLowerCase();
-      filtered = filtered.filter(invoice => {
-        return invoice.id.toLowerCase().includes(searchLower) ||
-               invoice.patientName.toLowerCase().includes(searchLower) ||
-               invoice.doctorName.toLowerCase().includes(searchLower);
+      filtered = filtered.filter((invoice) => {
+        return (
+          invoice.id.toLowerCase().includes(searchLower) ||
+          invoice.patientName.toLowerCase().includes(searchLower) ||
+          invoice.doctorName.toLowerCase().includes(searchLower)
+        );
       });
     }
 
     if (statusFilter !== 'all') {
-      filtered = filtered.filter(invoice => invoice.status === statusFilter);
+      filtered = filtered.filter((invoice) => invoice.status === statusFilter);
     }
 
     if (priorityFilter !== 'all') {
-      filtered = filtered.filter(invoice => invoice.priority === priorityFilter);
+      filtered = filtered.filter((invoice) => invoice.priority === priorityFilter);
     }
 
     return filtered.sort((a, b) => {
-      if (a.priority === 'high' && b.priority !== 'high') return -1;
-      if (b.priority === 'high' && a.priority !== 'high') return 1;
+      if (a.priority === 'high' && b.priority !== 'high') {
+        return -1;
+      }
+      if (b.priority === 'high' && a.priority !== 'high') {
+        return 1;
+      }
       return a.waitingTime - b.waitingTime;
     });
-  }, [invoices, debouncedSearchTerm, statusFilter, priorityFilter]);
+  }, [pendingInvoicesData, debouncedSearchTerm, statusFilter, priorityFilter]);
 
   const clearSearch = () => {
     setSearchTerm('');
@@ -460,26 +469,31 @@ const CashierDashboard = () => {
     setDiscountAmount(0);
     setPaymentMethod('cash');
     setNotes('');
-    
+
     // Check for outstanding balance and invoice limit
     if (invoice.patient_id) {
       try {
         const balanceData = await invoiceService.getPatientOutstandingBalance(invoice.patient_id);
-        
+
         // Filter out the current invoice from outstanding invoices
-        const otherOutstandingInvoices = balanceData.invoices.filter(inv => inv.id !== invoice.id);
-        
+        const otherOutstandingInvoices = balanceData.invoices.filter(
+          (inv) => inv.id !== invoice.id
+        );
+
         if (otherOutstandingInvoices.length > 0) {
-          const otherBalance = otherOutstandingInvoices.reduce((sum, inv) => sum + parseFloat(inv.balance_due || 0), 0);
-          
+          const otherBalance = otherOutstandingInvoices.reduce(
+            (sum, inv) => sum + parseFloat(inv.balance_due || 0),
+            0
+          );
+
           setOutstandingBalance({
             ...balanceData,
             totalBalance: otherBalance,
             invoiceCount: otherOutstandingInvoices.length,
-            invoices: otherOutstandingInvoices
+            invoices: otherOutstandingInvoices,
           });
           setShowOutstandingAlert(true);
-          
+
           // Check if limit is reached (2 or more outstanding invoices)
           setInvoiceLimitReached(otherOutstandingInvoices.length >= 2);
         } else {
@@ -510,68 +524,63 @@ const CashierDashboard = () => {
   };
 
   const handleMedicationAction = (medicationId, action) => {
-    setMedications(prev => prev.map(med => 
-      med.id === medicationId 
-        ? { ...med, action }
-        : med
-    ));
+    setMedications((prev) =>
+      prev.map((med) => (med.id === medicationId ? { ...med, action } : med))
+    );
   };
 
   const handleQuantityChange = (medicationId, quantity) => {
-    setMedications(prev => prev.map(med => 
-      med.id === medicationId 
-        ? { ...med, dispensedQuantity: Math.max(0, Math.min(quantity, med.quantity)) }
-        : med
-    ));
+    setMedications((prev) =>
+      prev.map((med) =>
+        med.id === medicationId
+          ? { ...med, dispensedQuantity: Math.max(0, Math.min(quantity, med.quantity)) }
+          : med
+      )
+    );
   };
 
   const handlePriceChange = (medicationId, price) => {
-    setMedications(prev => prev.map(med => 
-      med.id === medicationId 
-        ? { ...med, price: Math.max(0, parseFloat(price) || 0) }
-        : med
-    ));
+    setMedications((prev) =>
+      prev.map((med) =>
+        med.id === medicationId ? { ...med, price: Math.max(0, parseFloat(price) || 0) } : med
+      )
+    );
   };
 
   // Service management handlers
   const handleServicePriceChange = (serviceId, price) => {
-    setServices(prev => prev.map(serv => 
-      serv.id === serviceId 
-        ? { ...serv, price: Math.max(0, parseFloat(price) || 0) }
-        : serv
-    ));
+    setServices((prev) =>
+      prev.map((serv) =>
+        serv.id === serviceId ? { ...serv, price: Math.max(0, parseFloat(price) || 0) } : serv
+      )
+    );
   };
 
   const handleServiceNameChange = (serviceId, name) => {
-    setServices(prev => prev.map(serv => 
-      serv.id === serviceId 
-        ? { ...serv, name }
-        : serv
-    ));
+    setServices((prev) => prev.map((serv) => (serv.id === serviceId ? { ...serv, name } : serv)));
   };
 
   const handleServiceDescriptionChange = (serviceId, description) => {
-    setServices(prev => prev.map(serv => 
-      serv.id === serviceId 
-        ? { ...serv, description }
-        : serv
-    ));
+    setServices((prev) =>
+      prev.map((serv) => (serv.id === serviceId ? { ...serv, description } : serv))
+    );
   };
 
   const handleRemoveService = async (serviceId) => {
-    if (!selectedInvoice) return;
-    
+    if (!selectedInvoice) {
+      return;
+    }
+
     try {
       setIsProcessing(true);
       await invoiceService.removeInvoiceItem(selectedInvoice.id, serviceId);
-      
+
       // Remove from local state
-      setServices(prev => prev.filter(serv => serv.id !== serviceId));
-      
+      setServices((prev) => prev.filter((serv) => serv.id !== serviceId));
+
       // Update selected invoice
       const updatedInvoice = await invoiceService.getInvoiceById(selectedInvoice.id);
       setSelectedInvoice(updatedInvoice);
-      
     } catch (error) {
       console.error('Error removing service:', error);
       setError('Failed to remove service');
@@ -585,24 +594,23 @@ const CashierDashboard = () => {
       setError('Service name and price are required');
       return;
     }
-    
+
     try {
       setIsProcessing(true);
       await invoiceService.addServiceItem(selectedInvoice.id, {
         service_name: newService.name,
         unit_price: parseFloat(newService.price),
         quantity: 1,
-        notes: newService.description
+        notes: newService.description,
       });
-      
+
       // Reload invoice to get updated items
       const updatedInvoice = await invoiceService.getInvoiceById(selectedInvoice.id);
       setSelectedInvoice(updatedInvoice);
-      
+
       // Reset form
       setNewService({ name: '', price: '', description: '' });
       setShowAddServiceDialog(false);
-      
     } catch (error) {
       console.error('Error adding service:', error);
       setError('Failed to add service');
@@ -612,11 +620,15 @@ const CashierDashboard = () => {
   };
 
   const handleUpdateService = async (serviceId) => {
-    if (!selectedInvoice) return;
-    
-    const service = services.find(s => s.id === serviceId);
-    if (!service) return;
-    
+    if (!selectedInvoice) {
+      return;
+    }
+
+    const service = services.find((s) => s.id === serviceId);
+    if (!service) {
+      return;
+    }
+
     try {
       setIsProcessing(true);
       await invoiceService.updateInvoiceItem(selectedInvoice.id, serviceId, {
@@ -624,15 +636,14 @@ const CashierDashboard = () => {
         unit_price: service.price,
         quantity: 1,
         total_price: service.price,
-        notes: service.description
+        notes: service.description,
       });
-      
+
       setIsEditingService(null);
-      
+
       // Reload invoice
       const updatedInvoice = await invoiceService.getInvoiceById(selectedInvoice.id);
       setSelectedInvoice(updatedInvoice);
-      
     } catch (error) {
       console.error('Error updating service:', error);
       setError('Failed to update service');
@@ -642,37 +653,40 @@ const CashierDashboard = () => {
   };
 
   const calculateTotals = () => {
-    if (!selectedInvoice) return { 
-      servicesTotal: 0, 
-      medicationsTotal: 0, 
-      outstandingBalance: 0,
-      subtotal: 0, 
-      discountAmount: 0, 
-      total: 0 
-    };
-    
+    if (!selectedInvoice) {
+      return {
+        servicesTotal: 0,
+        medicationsTotal: 0,
+        outstandingBalance: 0,
+        subtotal: 0,
+        discountAmount: 0,
+        total: 0,
+      };
+    }
+
     // Calculate services total from state array (for real-time updates during editing)
-    const servicesTotal = services.reduce((sum, service) => sum + parseFloat(service.price || 0), 0);
-    
+    const servicesTotal = services.reduce(
+      (sum, service) => sum + parseFloat(service.price || 0),
+      0
+    );
+
     // Only include dispensed medications in total
     const medicationsTotal = medications
-      .filter(med => med.action === 'dispense' && med.dispensedQuantity > 0)
+      .filter((med) => med.action === 'dispense' && med.dispensedQuantity > 0)
       .reduce((sum, med) => {
         // Calculate based on dispensed quantity
         const unitPrice = med.price / med.quantity; // Price per unit
         const itemTotal = unitPrice * med.dispensedQuantity;
         return sum + itemTotal;
       }, 0);
-    
+
     // Add outstanding balance if checkbox is checked
-    const outstandingBalanceAmount = (addOutstandingToInvoice && outstandingBalance) 
-      ? outstandingBalance.totalBalance 
-      : 0;
-    
+    const outstandingBalanceAmount =
+      addOutstandingToInvoice && outstandingBalance ? outstandingBalance.totalBalance : 0;
+
     const subtotal = servicesTotal + medicationsTotal + outstandingBalanceAmount;
-    const discountAmountCalc = discountPercent > 0 
-      ? (subtotal * discountPercent / 100) 
-      : discountAmount;
+    const discountAmountCalc =
+      discountPercent > 0 ? (subtotal * discountPercent) / 100 : discountAmount;
     const total = subtotal - discountAmountCalc;
 
     return {
@@ -681,7 +695,7 @@ const CashierDashboard = () => {
       outstandingBalance: outstandingBalanceAmount,
       subtotal,
       discountAmount: discountAmountCalc,
-      total: Math.max(0, total)
+      total: Math.max(0, total),
     };
   };
 
@@ -701,9 +715,11 @@ const CashierDashboard = () => {
       try {
         // Check if patient can have more outstanding invoices
         const limitCheck = await invoiceService.canPatientCreateInvoice(selectedInvoice.patient_id);
-        
+
         if (!limitCheck.canCreate) {
-          setError(`Cannot process partial payment: ${limitCheck.message}. Patient must pay outstanding invoices first.`);
+          setError(
+            `Cannot process partial payment: ${limitCheck.message}. Patient must pay outstanding invoices first.`
+          );
           return;
         }
       } catch (error) {
@@ -712,7 +728,7 @@ const CashierDashboard = () => {
         return;
       }
     }
-    
+
     setShowPaymentDialog(true);
   };
 
@@ -721,20 +737,22 @@ const CashierDashboard = () => {
   };
 
   const handleLoadPrescriptions = async () => {
-    if (!selectedInvoice) return;
-    
+    if (!selectedInvoice) {
+      return;
+    }
+
     try {
       setIsProcessing(true);
-      
+
       // Add prescriptions to invoice
       await invoiceService.addPrescriptionsToInvoice(selectedInvoice.id, selectedInvoice.visit_id);
-      
+
       // Reload the invoice to get updated items
       const updatedInvoice = await invoiceService.getInvoiceById(selectedInvoice.id);
       setSelectedInvoice(updatedInvoice);
-      
+
       // Reload the invoice list
-      await loadPendingInvoices();
+      await refetchPending();
     } catch (error) {
       console.error('Error loading prescriptions:', error);
       setError('Failed to load prescriptions');
@@ -747,29 +765,29 @@ const CashierDashboard = () => {
     setIsProcessing(true);
     try {
       const totals = calculateTotals();
-      
+
       // Get current user from localStorage
       const currentUser = JSON.parse(localStorage.getItem('user') || '{}');
-      
+
       // Step 1: Update medication items in the invoice
       for (const med of medications) {
         if (med.action === 'dispense' && med.dispensedQuantity > 0) {
           const unitPrice = med.price / med.quantity;
-          
+
           // Update the invoice item with quantity and price
           await invoiceService.updateInvoiceItem(selectedInvoice.id, med.id, {
             quantity: med.dispensedQuantity,
             unit_price: unitPrice,
-            total_price: unitPrice * med.dispensedQuantity
+            total_price: unitPrice * med.dispensedQuantity,
           });
-          
+
           // If partially dispensed, add a write-out item for remaining quantity
           if (med.dispensedQuantity < med.quantity) {
             await invoiceService.addMedicineItem(selectedInvoice.id, {
               medicine_name: `${med.name} (Write-out)`,
               quantity: med.quantity - med.dispensedQuantity,
               unit_price: 0,
-              notes: `Written prescription - ${med.quantity - med.dispensedQuantity} units not dispensed`
+              notes: `Written prescription - ${med.quantity - med.dispensedQuantity} units not dispensed`,
             });
           }
         } else if (med.action === 'write-out') {
@@ -778,27 +796,27 @@ const CashierDashboard = () => {
             quantity: med.quantity,
             unit_price: 0,
             total_price: 0,
-            notes: 'Written out - not dispensed'
+            notes: 'Written out - not dispensed',
           });
         }
       }
-      
+
       // Step 2: If outstanding balance is added, pay off those invoices first
       if (addOutstandingToInvoice && outstandingBalance && outstandingBalance.totalBalance > 0) {
         // Pay off outstanding invoices in order (oldest first)
         for (const oldInvoice of outstandingBalance.invoices) {
           const balanceDue = parseFloat(oldInvoice.balance_due);
-          
+
           // Record payment for old invoice
           await invoiceService.recordPartialPayment(oldInvoice.id, {
             amount: balanceDue,
             payment_method: paymentMethod,
             notes: `Paid with current visit invoice #${selectedInvoice.invoice_number || selectedInvoice.id}`,
-            processed_by: currentUser?.id
+            processed_by: currentUser?.id,
           });
         }
       }
-      
+
       // Step 3: Record payment for current invoice (full or partial)
       if (isPartialPayment && partialAmount && parseFloat(partialAmount) < totals.total) {
         // Process partial payment
@@ -808,11 +826,11 @@ const CashierDashboard = () => {
           payment_method: paymentMethod,
           notes: notes || 'Partial payment processed',
           hold_reason: holdReason,
-          payment_due_date: paymentDueDate || null
+          payment_due_date: paymentDueDate || null,
         });
-        
+
         const balanceDue = totals.total - paymentAmount;
-        
+
         let successMsg = `Partial payment of $${paymentAmount.toFixed(2)} recorded. Balance due: $${balanceDue.toFixed(2)}`;
         if (addOutstandingToInvoice && outstandingBalance) {
           successMsg += ` (including $${outstandingBalance.totalBalance.toFixed(2)} from previous invoices)`;
@@ -823,37 +841,36 @@ const CashierDashboard = () => {
         await invoiceService.recordPayment(selectedInvoice.id, {
           payment_method: paymentMethod,
           amount_paid: totals.total,
-          notes: notes || 'Payment processed'
+          notes: notes || 'Payment processed',
         });
-        
+
         // Complete the invoice (this will also complete the visit)
         await invoiceService.completeInvoice(selectedInvoice.id, currentUser?.id);
-        
+
         let successMsg = `Invoice ${selectedInvoice.invoice_number || selectedInvoice.id} completed successfully! Visit has been marked as completed.`;
         if (addOutstandingToInvoice && outstandingBalance) {
           successMsg += ` Also paid off ${outstandingBalance.invoiceCount} previous invoice(s) totaling $${outstandingBalance.totalBalance.toFixed(2)}.`;
         }
         setSuccessMessage(successMsg);
       }
-      
+
       setShowPaymentDialog(false);
       handleCloseInvoiceDetail();
-      
+
       // Reload pending invoices
-      await loadPendingInvoices();
-      
+      await refetchPending();
+
       // Clear success message after 5 seconds
       setTimeout(() => setSuccessMessage(null), 5000);
-      
+
       // Clear error
       setError(null);
-      
+
       // Reset partial payment state
       setIsPartialPayment(false);
       setPartialAmount('');
       setHoldReason('');
       setPaymentDueDate('');
-      
     } catch (error) {
       console.error('Payment processing error:', error);
       setError('Failed to process payment: ' + error.message);
@@ -864,19 +881,27 @@ const CashierDashboard = () => {
 
   const getStatusColor = (status) => {
     switch (status) {
-      case 'pending': return 'bg-yellow-100 text-yellow-800 border-yellow-200';
-      case 'processing': return 'bg-blue-100 text-blue-800 border-blue-200';
-      case 'completed': return 'bg-green-100 text-green-800 border-green-200';
-      default: return 'bg-gray-100 text-gray-800 border-gray-200';
+      case 'pending':
+        return 'bg-yellow-100 text-yellow-800 border-yellow-200';
+      case 'processing':
+        return 'bg-blue-100 text-blue-800 border-blue-200';
+      case 'completed':
+        return 'bg-green-100 text-green-800 border-green-200';
+      default:
+        return 'bg-gray-100 text-gray-800 border-gray-200';
     }
   };
 
   const getPriorityColor = (priority) => {
     switch (priority) {
-      case 'high': return 'bg-red-100 text-red-800 border-red-200';
-      case 'normal': return 'bg-blue-100 text-blue-800 border-blue-200';
-      case 'low': return 'bg-gray-100 text-gray-800 border-gray-200';
-      default: return 'bg-gray-100 text-gray-800 border-gray-200';
+      case 'high':
+        return 'bg-red-100 text-red-800 border-red-200';
+      case 'normal':
+        return 'bg-blue-100 text-blue-800 border-blue-200';
+      case 'low':
+        return 'bg-gray-100 text-gray-800 border-gray-200';
+      default:
+        return 'bg-gray-100 text-gray-800 border-gray-200';
     }
   };
 
@@ -885,7 +910,7 @@ const CashierDashboard = () => {
   // Skeleton loader component
   const SkeletonCard = () => (
     <Card className="border-l-4 border-l-gray-200">
-      <div className="p-4 space-y-4">
+      <div className="space-y-4 p-4">
         <div className="flex items-start justify-between">
           <div className="space-y-2">
             <Skeleton className="h-5 w-24" />
@@ -897,7 +922,7 @@ const CashierDashboard = () => {
           <Skeleton className="h-4 w-full" />
           <Skeleton className="h-4 w-3/4" />
         </div>
-        <div className="flex justify-between items-center">
+        <div className="flex items-center justify-between">
           <Skeleton className="h-8 w-20" />
           <Skeleton className="h-8 w-24" />
         </div>
@@ -906,14 +931,9 @@ const CashierDashboard = () => {
   );
 
   return (
-    <motion.div
-      initial="initial"
-      animate="animate"
-      exit="exit"
-      variants={pageVariants}
-    >
-      <PageLayout 
-        title="Cashier Dashboard" 
+    <motion.div initial="initial" animate="animate" exit="exit" variants={pageVariants}>
+      <PageLayout
+        title="Cashier Dashboard"
         subtitle="Manage pending invoices and process payments"
         fullWidth
       >
@@ -924,10 +944,10 @@ const CashierDashboard = () => {
               initial={{ opacity: 0, y: -20 }}
               animate={{ opacity: 1, y: 0 }}
               exit={{ opacity: 0, y: -20 }}
-              className="bg-green-50 border border-green-200 rounded-lg p-4 flex items-center gap-3"
+              className="flex items-center gap-3 rounded-lg border border-green-200 bg-green-50 p-4"
             >
               <CheckCircle className="h-5 w-5 text-green-600" />
-              <p className="text-green-800 font-medium">{successMessage}</p>
+              <p className="font-medium text-green-800">{successMessage}</p>
             </motion.div>
           )}
 
@@ -937,16 +957,11 @@ const CashierDashboard = () => {
               initial={{ opacity: 0, y: -20 }}
               animate={{ opacity: 1, y: 0 }}
               exit={{ opacity: 0, y: -20 }}
-              className="bg-red-50 border border-red-200 rounded-lg p-4 flex items-center gap-3"
+              className="flex items-center gap-3 rounded-lg border border-red-200 bg-red-50 p-4"
             >
               <AlertCircle className="h-5 w-5 text-red-600" />
-              <p className="text-red-800 font-medium">{error}</p>
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={() => setError(null)}
-                className="ml-auto"
-              >
+              <p className="font-medium text-red-800">{error}</p>
+              <Button variant="ghost" size="sm" onClick={() => setError(null)} className="ml-auto">
                 <X className="h-4 w-4" />
               </Button>
             </motion.div>
@@ -957,13 +972,33 @@ const CashierDashboard = () => {
             variants={containerVariants}
             initial="hidden"
             animate="visible"
-            className="grid grid-cols-2 md:grid-cols-4 gap-4"
+            className="grid grid-cols-2 gap-4 md:grid-cols-4"
           >
             {[
-              { label: 'Pending', value: stats?.pendingInvoices || 0, color: 'yellow', icon: Clock },
-              { label: 'Today Completed', value: stats?.todayCompleted || 0, color: 'green', icon: CheckCircle },
-              { label: 'Today Revenue', value: `$${(stats?.todayRevenue || 0).toFixed(2)}`, color: 'blue', icon: DollarSign },
-              { label: 'Total Invoices', value: stats?.totalInvoices || 0, color: 'gray', icon: Receipt }
+              {
+                label: 'Pending',
+                value: stats?.pendingInvoices || 0,
+                color: 'yellow',
+                icon: Clock,
+              },
+              {
+                label: 'Today Completed',
+                value: stats?.todayCompleted || 0,
+                color: 'green',
+                icon: CheckCircle,
+              },
+              {
+                label: 'Today Revenue',
+                value: `$${(stats?.todayRevenue || 0).toFixed(2)}`,
+                color: 'blue',
+                icon: DollarSign,
+              },
+              {
+                label: 'Total Invoices',
+                value: stats?.totalInvoices || 0,
+                color: 'gray',
+                icon: Receipt,
+              },
             ].map((stat, index) => (
               <motion.div
                 key={stat.label}
@@ -971,16 +1006,14 @@ const CashierDashboard = () => {
                 whileHover={{ scale: 1.02 }}
                 whileTap={{ scale: 0.98 }}
               >
-                <Card className="cursor-pointer hover:shadow-md transition-shadow">
+                <Card className="cursor-pointer transition-shadow hover:shadow-md">
                   <CardContent className="p-4">
                     <div className="flex items-center gap-3">
                       <div className={`p-2 bg-${stat.color}-100 rounded-lg`}>
                         <stat.icon className={`h-4 w-4 text-${stat.color}-600`} />
                       </div>
                       <div>
-                        <p className={`text-lg font-bold text-${stat.color}-600`}>
-                          {stat.value}
-                        </p>
+                        <p className={`text-lg font-bold text-${stat.color}-600`}>{stat.value}</p>
                         <p className="text-sm text-muted-foreground">{stat.label}</p>
                       </div>
                     </div>
@@ -992,7 +1025,7 @@ const CashierDashboard = () => {
 
           {/* Main Content with Tabs */}
           <Tabs value={activeTab} onValueChange={setActiveTab}>
-            <div className="flex items-center justify-between mb-6">
+            <div className="mb-6 flex items-center justify-between">
               <TabsList className="grid w-auto grid-cols-2">
                 <TabsTrigger value="pending" className="gap-2">
                   <Clock className="h-4 w-4" />
@@ -1003,7 +1036,7 @@ const CashierDashboard = () => {
                   Invoice History
                 </TabsTrigger>
               </TabsList>
-              
+
               <div className="flex items-center gap-2">
                 <Button
                   onClick={handleRefresh}
@@ -1023,10 +1056,10 @@ const CashierDashboard = () => {
               {/* Search and Filters */}
               <Card>
                 <CardContent className="p-4">
-                  <div className="flex flex-col md:flex-row gap-4">
+                  <div className="flex flex-col gap-4 md:flex-row">
                     <div className="flex-1">
                       <div className="relative">
-                        <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                        <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 transform text-muted-foreground" />
                         <Input
                           type="text"
                           placeholder="Search invoices by patient name, invoice ID, or doctor..."
@@ -1071,18 +1104,18 @@ const CashierDashboard = () => {
               {/* Invoice Table */}
               <Card>
                 <CardContent className="p-0">
-                  {loading ? (
+                  {isPendingLoading ? (
                     <div className="p-8 text-center">
-                      <div className="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
-                      <p className="text-muted-foreground mt-2">Loading invoices...</p>
+                      <div className="inline-block h-8 w-8 animate-spin rounded-full border-b-2 border-primary"></div>
+                      <p className="mt-2 text-muted-foreground">Loading invoices...</p>
                     </div>
                   ) : filteredInvoices.length === 0 ? (
                     <div className="p-8 text-center">
-                      <Receipt className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
-                      <p className="text-lg text-muted-foreground mb-2">No invoices found</p>
-                      <p className="text-sm text-muted-foreground mb-4">
-                        {searchTerm || statusFilter !== 'all' || priorityFilter !== 'all' 
-                          ? 'Try adjusting your search or filter criteria' 
+                      <Receipt className="mx-auto mb-4 h-12 w-12 text-muted-foreground" />
+                      <p className="mb-2 text-lg text-muted-foreground">No invoices found</p>
+                      <p className="mb-4 text-sm text-muted-foreground">
+                        {searchTerm || statusFilter !== 'all' || priorityFilter !== 'all'
+                          ? 'Try adjusting your search or filter criteria'
                           : 'No pending invoices at the moment'}
                       </p>
                       {(searchTerm || statusFilter !== 'all' || priorityFilter !== 'all') && (
@@ -1097,14 +1130,30 @@ const CashierDashboard = () => {
                       <table className="w-full">
                         <thead className="bg-muted/50 border-b">
                           <tr>
-                            <th className="px-4 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">Invoice #</th>
-                            <th className="px-4 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">Patient</th>
-                            <th className="px-4 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">Visit Type</th>
-                            <th className="px-4 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">Date</th>
-                            <th className="px-4 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">Items</th>
-                            <th className="px-4 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">Total</th>
-                            <th className="px-4 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">Status</th>
-                            <th className="px-4 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">Action</th>
+                            <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-muted-foreground">
+                              Invoice #
+                            </th>
+                            <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-muted-foreground">
+                              Patient
+                            </th>
+                            <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-muted-foreground">
+                              Visit Type
+                            </th>
+                            <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-muted-foreground">
+                              Date
+                            </th>
+                            <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-muted-foreground">
+                              Items
+                            </th>
+                            <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-muted-foreground">
+                              Total
+                            </th>
+                            <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-muted-foreground">
+                              Status
+                            </th>
+                            <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-muted-foreground">
+                              Action
+                            </th>
                           </tr>
                         </thead>
                         <tbody className="divide-y divide-border">
@@ -1129,7 +1178,9 @@ const CashierDashboard = () => {
                                       <div className="text-sm font-medium">
                                         {invoice.patient?.first_name} {invoice.patient?.last_name}
                                       </div>
-                                      <div className="text-xs text-muted-foreground">{invoice.patient?.phone}</div>
+                                      <div className="text-xs text-muted-foreground">
+                                        {invoice.patient?.phone}
+                                      </div>
                                     </div>
                                   </div>
                                 </td>
@@ -1148,9 +1199,17 @@ const CashierDashboard = () => {
                                 </td>
                                 <td className="px-4 py-3 text-sm">
                                   <div className="space-y-1">
-                                    <div>{invoice.invoice_items?.filter(i => i.item_type === 'service').length || 0} services</div>
+                                    <div>
+                                      {invoice.invoice_items?.filter(
+                                        (i) => i.item_type === 'service'
+                                      ).length || 0}{' '}
+                                      services
+                                    </div>
                                     <div className="text-xs text-muted-foreground">
-                                      {invoice.invoice_items?.filter(i => i.item_type === 'medicine').length || 0} medications
+                                      {invoice.invoice_items?.filter(
+                                        (i) => i.item_type === 'medicine'
+                                      ).length || 0}{' '}
+                                      medications
                                     </div>
                                   </div>
                                 </td>
@@ -1199,7 +1258,7 @@ const CashierDashboard = () => {
                   {historyLoading ? (
                     <div className="flex items-center justify-center py-8">
                       <div className="text-center">
-                        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto mb-4"></div>
+                        <div className="mx-auto mb-4 h-8 w-8 animate-spin rounded-full border-b-2 border-primary"></div>
                         <p className="text-muted-foreground">Loading invoice history...</p>
                       </div>
                     </div>
@@ -1207,7 +1266,7 @@ const CashierDashboard = () => {
                     <div className="flex items-center justify-center py-8">
                       <div className="text-center text-destructive">
                         <p>{historyError}</p>
-                        <Button 
+                        <Button
                           onClick={loadInvoiceHistory}
                           variant="outline"
                           size="sm"
@@ -1224,27 +1283,34 @@ const CashierDashboard = () => {
                   ) : (
                     <div className="space-y-4">
                       {invoiceHistory.map((invoice) => (
-                        <div key={invoice.id} className="flex items-center justify-between p-4 border rounded-lg hover:bg-muted/50 transition-colors">
+                        <div
+                          key={invoice.id}
+                          className="hover:bg-muted/50 flex items-center justify-between rounded-lg border p-4 transition-colors"
+                        >
                           <div className="flex-1">
                             <div className="flex items-center gap-4">
                               <div>
                                 <p className="font-medium">{invoice.id}</p>
-                                <p className="text-sm text-muted-foreground">{invoice.patientName}</p>
+                                <p className="text-sm text-muted-foreground">
+                                  {invoice.patientName}
+                                </p>
                               </div>
                               <div>
                                 <p className="text-sm">{invoice.doctorName}</p>
-                                <p className="text-sm text-muted-foreground">{invoice.date} at {invoice.time}</p>
+                                <p className="text-sm text-muted-foreground">
+                                  {invoice.date} at {invoice.time}
+                                </p>
                               </div>
                             </div>
                           </div>
                           <div className="flex items-center gap-4">
                             <div className="text-right">
                               <p className="font-medium">${invoice.totalAmount.toFixed(2)}</p>
-                              <p className="text-sm text-muted-foreground capitalize">{invoice.paymentMethod}</p>
+                              <p className="text-sm capitalize text-muted-foreground">
+                                {invoice.paymentMethod}
+                              </p>
                             </div>
-                            <Badge className="bg-green-100 text-green-800">
-                              Completed
-                            </Badge>
+                            <Badge className="bg-green-100 text-green-800">Completed</Badge>
                             <div className="flex items-center gap-2">
                               <Button
                                 variant="outline"
@@ -1278,15 +1344,15 @@ const CashierDashboard = () => {
 
         {/* Invoice Detail Modal */}
         <Dialog open={showInvoiceDetail} onOpenChange={setShowInvoiceDetail}>
-          <DialogContent className="max-w-6xl max-h-[90vh] overflow-y-auto">
+          <DialogContent className="max-h-[90vh] max-w-6xl overflow-y-auto">
             <DialogHeader>
               <DialogTitle>Process Invoice - {selectedInvoice?.id}</DialogTitle>
             </DialogHeader>
-            
+
             {selectedInvoice && (
-              <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+              <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
                 {/* Main Content */}
-                <div className="lg:col-span-2 space-y-6">
+                <div className="space-y-6 lg:col-span-2">
                   {/* Patient Information */}
                   <Card>
                     <CardHeader>
@@ -1296,11 +1362,12 @@ const CashierDashboard = () => {
                       </CardTitle>
                     </CardHeader>
                     <CardContent className="space-y-4">
-                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
                         <div>
                           <Label className="text-sm font-medium">Patient Name</Label>
                           <p className="text-lg">
-                            {selectedInvoice.patient?.first_name} {selectedInvoice.patient?.last_name}
+                            {selectedInvoice.patient?.first_name}{' '}
+                            {selectedInvoice.patient?.last_name}
                           </p>
                         </div>
                         <div>
@@ -1311,7 +1378,8 @@ const CashierDashboard = () => {
                           <Label className="text-sm font-medium">Date & Time</Label>
                           <p className="flex items-center gap-2">
                             <Calendar className="h-4 w-4" />
-                            {new Date(selectedInvoice.created_at).toLocaleDateString()} at {new Date(selectedInvoice.created_at).toLocaleTimeString()}
+                            {new Date(selectedInvoice.created_at).toLocaleDateString()} at{' '}
+                            {new Date(selectedInvoice.created_at).toLocaleTimeString()}
                           </p>
                         </div>
                         <div>
@@ -1325,9 +1393,17 @@ const CashierDashboard = () => {
 
                   {/* Outstanding Balance Alert */}
                   {outstandingBalance && outstandingBalance.totalBalance > 0 && (
-                    <Card className={invoiceLimitReached ? "border-red-300 bg-red-50" : "border-amber-200 bg-amber-50"}>
+                    <Card
+                      className={
+                        invoiceLimitReached
+                          ? 'border-red-300 bg-red-50'
+                          : 'border-amber-200 bg-amber-50'
+                      }
+                    >
                       <CardHeader>
-                        <CardTitle className={`flex items-center gap-2 ${invoiceLimitReached ? 'text-red-900' : 'text-amber-900'}`}>
+                        <CardTitle
+                          className={`flex items-center gap-2 ${invoiceLimitReached ? 'text-red-900' : 'text-amber-900'}`}
+                        >
                           <AlertCircle className="h-5 w-5" />
                           {invoiceLimitReached ? '⚠️ Invoice Limit Reached' : 'Outstanding Balance'}
                         </CardTitle>
@@ -1335,38 +1411,56 @@ const CashierDashboard = () => {
                       <CardContent className="space-y-4">
                         <div className="flex items-start justify-between">
                           <div className="space-y-2">
-                            <p className={`text-sm ${invoiceLimitReached ? 'text-red-800' : 'text-amber-800'}`}>
-                              This patient has {outstandingBalance.invoiceCount} unpaid invoice{outstandingBalance.invoiceCount > 1 ? 's' : ''} with a total balance of:
+                            <p
+                              className={`text-sm ${invoiceLimitReached ? 'text-red-800' : 'text-amber-800'}`}
+                            >
+                              This patient has {outstandingBalance.invoiceCount} unpaid invoice
+                              {outstandingBalance.invoiceCount > 1 ? 's' : ''} with a total balance
+                              of:
                             </p>
-                            <p className={`text-3xl font-bold ${invoiceLimitReached ? 'text-red-900' : 'text-amber-900'}`}>
+                            <p
+                              className={`text-3xl font-bold ${invoiceLimitReached ? 'text-red-900' : 'text-amber-900'}`}
+                            >
                               ${outstandingBalance.totalBalance.toFixed(2)}
                             </p>
-                            
+
                             {/* 2-Invoice Limit Warning */}
                             {invoiceLimitReached && (
-                              <div className="p-3 bg-red-100 border-2 border-red-400 rounded-lg mt-3">
-                                <p className="text-sm font-bold text-red-900 flex items-center gap-2">
+                              <div className="mt-3 rounded-lg border-2 border-red-400 bg-red-100 p-3">
+                                <p className="flex items-center gap-2 text-sm font-bold text-red-900">
                                   <XCircle className="h-5 w-5" />
                                   MAXIMUM OUTSTANDING INVOICES REACHED (2/2)
                                 </p>
-                                <p className="text-xs text-red-800 mt-1">
-                                  Patient cannot leave with another unpaid invoice. They must either:
+                                <p className="mt-1 text-xs text-red-800">
+                                  Patient cannot leave with another unpaid invoice. They must
+                                  either:
                                 </p>
-                                <ul className="text-xs text-red-800 mt-1 ml-4 list-disc space-y-1">
+                                <ul className="ml-4 mt-1 list-disc space-y-1 text-xs text-red-800">
                                   <li>Pay the full amount including previous balance</li>
-                                  <li>Pay off at least one previous invoice to reduce outstanding count</li>
+                                  <li>
+                                    Pay off at least one previous invoice to reduce outstanding
+                                    count
+                                  </li>
                                 </ul>
                               </div>
                             )}
-                            
+
                             {/* List of outstanding invoices */}
-                            <div className="space-y-1 mt-3">
-                              {outstandingBalance.invoices.map(inv => (
-                                <div key={inv.id} className={`text-xs flex items-center gap-2 ${invoiceLimitReached ? 'text-red-700' : 'text-amber-700'}`}>
+                            <div className="mt-3 space-y-1">
+                              {outstandingBalance.invoices.map((inv) => (
+                                <div
+                                  key={inv.id}
+                                  className={`flex items-center gap-2 text-xs ${invoiceLimitReached ? 'text-red-700' : 'text-amber-700'}`}
+                                >
                                   <Receipt className="h-3 w-3" />
-                                  Invoice #{inv.invoice_number || inv.id.slice(0, 8)} - ${parseFloat(inv.balance_due).toFixed(2)} due
+                                  Invoice #{inv.invoice_number || inv.id.slice(0, 8)} - $
+                                  {parseFloat(inv.balance_due).toFixed(2)} due
                                   {inv.payment_due_date && (
-                                    <span className={invoiceLimitReached ? 'text-red-600' : 'text-amber-600'}>
+                                    <span
+                                      className={
+                                        invoiceLimitReached ? 'text-red-600' : 'text-amber-600'
+                                      }
+                                    >
                                       (Due: {new Date(inv.payment_due_date).toLocaleDateString()})
                                     </span>
                                   )}
@@ -1377,36 +1471,42 @@ const CashierDashboard = () => {
                         </div>
 
                         {/* Action: Add to current invoice */}
-                        <div className={`flex items-center gap-3 p-3 bg-white border rounded-lg ${invoiceLimitReached ? 'border-red-300' : 'border-amber-200'}`}>
+                        <div
+                          className={`flex items-center gap-3 rounded-lg border bg-white p-3 ${invoiceLimitReached ? 'border-red-300' : 'border-amber-200'}`}
+                        >
                           <input
                             type="checkbox"
                             id="addOutstanding"
                             checked={addOutstandingToInvoice}
                             onChange={(e) => setAddOutstandingToInvoice(e.target.checked)}
-                            className={`h-4 w-4 focus:ring-2 border rounded ${invoiceLimitReached ? 'text-red-600 focus:ring-red-500 border-red-400' : 'text-amber-600 focus:ring-amber-500 border-amber-300'}`}
+                            className={`h-4 w-4 rounded border focus:ring-2 ${invoiceLimitReached ? 'border-red-400 text-red-600 focus:ring-red-500' : 'border-amber-300 text-amber-600 focus:ring-amber-500'}`}
                           />
-                          <label htmlFor="addOutstanding" className={`flex-1 text-sm font-medium cursor-pointer ${invoiceLimitReached ? 'text-red-900' : 'text-amber-900'}`}>
-                            {invoiceLimitReached 
+                          <label
+                            htmlFor="addOutstanding"
+                            className={`flex-1 cursor-pointer text-sm font-medium ${invoiceLimitReached ? 'text-red-900' : 'text-amber-900'}`}
+                          >
+                            {invoiceLimitReached
                               ? `⚠️ Must add outstanding balance (${outstandingBalance.totalBalance.toFixed(2)}) - cannot create another unpaid invoice`
-                              : `Add outstanding balance ($${outstandingBalance.totalBalance.toFixed(2)}) to current invoice`
-                            }
+                              : `Add outstanding balance ($${outstandingBalance.totalBalance.toFixed(2)}) to current invoice`}
                           </label>
                         </div>
 
                         {addOutstandingToInvoice && !invoiceLimitReached && (
-                          <div className="p-3 bg-green-50 border border-green-200 rounded-lg">
-                            <p className="text-sm text-green-800 flex items-center gap-2">
+                          <div className="rounded-lg border border-green-200 bg-green-50 p-3">
+                            <p className="flex items-center gap-2 text-sm text-green-800">
                               <CheckCircle className="h-4 w-4" />
-                              Outstanding balance will be added to the total. Patient can pay full amount or make partial payment.
+                              Outstanding balance will be added to the total. Patient can pay full
+                              amount or make partial payment.
                             </p>
                           </div>
                         )}
-                        
+
                         {addOutstandingToInvoice && invoiceLimitReached && (
-                          <div className="p-3 bg-green-50 border border-green-200 rounded-lg">
-                            <p className="text-sm text-green-800 flex items-center gap-2">
+                          <div className="rounded-lg border border-green-200 bg-green-50 p-3">
+                            <p className="flex items-center gap-2 text-sm text-green-800">
                               <CheckCircle className="h-4 w-4" />
-                              Good! Outstanding balance added. Patient must pay full amount to proceed.
+                              Good! Outstanding balance added. Patient must pay full amount to
+                              proceed.
                             </p>
                           </div>
                         )}
@@ -1415,7 +1515,7 @@ const CashierDashboard = () => {
                   )}
 
                   {/* Services and Medications */}
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                  <div className="grid grid-cols-1 gap-6 md:grid-cols-2">
                     {/* Services */}
                     <Card>
                       <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-3">
@@ -1432,15 +1532,20 @@ const CashierDashboard = () => {
                       </CardHeader>
                       <CardContent>
                         {services.length === 0 ? (
-                          <div className="text-center py-8 text-muted-foreground">
-                            <FileText className="h-12 w-12 mx-auto mb-2 opacity-50" />
+                          <div className="py-8 text-center text-muted-foreground">
+                            <FileText className="mx-auto mb-2 h-12 w-12 opacity-50" />
                             <p>No services added yet</p>
-                            <p className="text-sm mt-1">Click "Add Service" to add a service</p>
+                            <p className="mt-1 text-sm">
+                              Click &quot;Add Service&quot; to add a service
+                            </p>
                           </div>
                         ) : (
                           <div className="space-y-3">
-                            {services.map(service => (
-                              <div key={service.id} className="p-3 bg-green-50 rounded-lg space-y-3">
+                            {services.map((service) => (
+                              <div
+                                key={service.id}
+                                className="space-y-3 rounded-lg bg-green-50 p-3"
+                              >
                                 {isEditingService === service.id ? (
                                   // Edit Mode
                                   <div className="space-y-3">
@@ -1448,7 +1553,9 @@ const CashierDashboard = () => {
                                       <Label className="text-xs">Service Name</Label>
                                       <Input
                                         value={service.name}
-                                        onChange={(e) => handleServiceNameChange(service.id, e.target.value)}
+                                        onChange={(e) =>
+                                          handleServiceNameChange(service.id, e.target.value)
+                                        }
                                         className="h-8"
                                       />
                                     </div>
@@ -1458,7 +1565,9 @@ const CashierDashboard = () => {
                                         type="number"
                                         step="0.01"
                                         value={service.price}
-                                        onChange={(e) => handleServicePriceChange(service.id, e.target.value)}
+                                        onChange={(e) =>
+                                          handleServicePriceChange(service.id, e.target.value)
+                                        }
                                         className="h-8"
                                       />
                                     </div>
@@ -1466,8 +1575,10 @@ const CashierDashboard = () => {
                                       <Label className="text-xs">Description</Label>
                                       <textarea
                                         value={service.description || ''}
-                                        onChange={(e) => handleServiceDescriptionChange(service.id, e.target.value)}
-                                        className="w-full px-3 py-2 text-sm border rounded-md resize-none"
+                                        onChange={(e) =>
+                                          handleServiceDescriptionChange(service.id, e.target.value)
+                                        }
+                                        className="w-full resize-none rounded-md border px-3 py-2 text-sm"
                                         rows={2}
                                       />
                                     </div>
@@ -1478,7 +1589,7 @@ const CashierDashboard = () => {
                                         disabled={isProcessing}
                                         className="flex-1"
                                       >
-                                        <Save className="h-3 w-3 mr-1" />
+                                        <Save className="mr-1 h-3 w-3" />
                                         Save
                                       </Button>
                                       <Button
@@ -1495,20 +1606,27 @@ const CashierDashboard = () => {
                                 ) : (
                                   // View Mode
                                   <>
-                                    <div className="flex justify-between items-start">
+                                    <div className="flex items-start justify-between">
                                       <div className="flex-1">
                                         <p className="font-medium">{service.name}</p>
-                                        <p className="text-sm text-muted-foreground">{service.description || 'No description'}</p>
+                                        <p className="text-sm text-muted-foreground">
+                                          {service.description || 'No description'}
+                                        </p>
                                       </div>
                                       <div className="text-right">
-                                        <p className="font-medium">${parseFloat(service.price || 0).toFixed(2)}</p>
-                                        <Badge variant="outline" className="border-green-200 text-green-800">
-                                          <CheckCircle className="h-3 w-3 mr-1" />
+                                        <p className="font-medium">
+                                          ${parseFloat(service.price || 0).toFixed(2)}
+                                        </p>
+                                        <Badge
+                                          variant="outline"
+                                          className="border-green-200 text-green-800"
+                                        >
+                                          <CheckCircle className="mr-1 h-3 w-3" />
                                           Completed
                                         </Badge>
                                       </div>
                                     </div>
-                                    <div className="flex gap-2 pt-2 border-t">
+                                    <div className="flex gap-2 border-t pt-2">
                                       <Button
                                         size="sm"
                                         variant="ghost"
@@ -1516,21 +1634,23 @@ const CashierDashboard = () => {
                                         disabled={isProcessing}
                                         className="flex-1 text-xs"
                                       >
-                                        <Edit2 className="h-3 w-3 mr-1" />
+                                        <Edit2 className="mr-1 h-3 w-3" />
                                         Edit
                                       </Button>
                                       <Button
                                         size="sm"
                                         variant="ghost"
                                         onClick={() => {
-                                          if (window.confirm(`Remove "${service.name}" from invoice?`)) {
+                                          if (
+                                            window.confirm(`Remove "${service.name}" from invoice?`)
+                                          ) {
                                             handleRemoveService(service.id);
                                           }
                                         }}
                                         disabled={isProcessing}
-                                        className="flex-1 text-xs text-red-600 hover:text-red-700 hover:bg-red-50"
+                                        className="flex-1 text-xs text-red-600 hover:bg-red-50 hover:text-red-700"
                                       >
-                                        <Trash2 className="h-3 w-3 mr-1" />
+                                        <Trash2 className="mr-1 h-3 w-3" />
                                         Remove
                                       </Button>
                                     </div>
@@ -1562,142 +1682,177 @@ const CashierDashboard = () => {
                       </CardHeader>
                       <CardContent>
                         {medications.length === 0 ? (
-                          <div className="text-center py-8 text-muted-foreground">
-                            <Pill className="h-12 w-12 mx-auto mb-2 opacity-50" />
+                          <div className="py-8 text-center text-muted-foreground">
+                            <Pill className="mx-auto mb-2 h-12 w-12 opacity-50" />
                             <p>No medications added yet</p>
-                            <p className="text-sm mt-1">Click "Load Prescriptions" to add prescribed medications</p>
+                            <p className="mt-1 text-sm">
+                              Click &quot;Load Prescriptions&quot; to add prescribed medications
+                            </p>
                           </div>
                         ) : (
-                        <div className="space-y-4">
-                          {medications.map(med => (
-                            <div key={med.id} className="p-3 border rounded-lg space-y-3">
-                              <div className="flex justify-between items-start">
-                                <div className="space-y-1">
-                                  <h5 className="font-medium">{med.name}</h5>
-                                  <p className="text-sm text-muted-foreground">{med.dosage}</p>
-                                  <p className="text-xs text-muted-foreground">
-                                    Quantity: {med.quantity}
-                                  </p>
+                          <div className="space-y-4">
+                            {medications.map((med) => (
+                              <div key={med.id} className="space-y-3 rounded-lg border p-3">
+                                <div className="flex items-start justify-between">
+                                  <div className="space-y-1">
+                                    <h5 className="font-medium">{med.name}</h5>
+                                    <p className="text-sm text-muted-foreground">{med.dosage}</p>
+                                    <p className="text-xs text-muted-foreground">
+                                      Quantity: {med.quantity}
+                                    </p>
+                                  </div>
+                                  <Badge
+                                    className={
+                                      med.action === 'dispense'
+                                        ? 'bg-green-100 text-green-800'
+                                        : med.action === 'write-out'
+                                          ? 'bg-blue-100 text-blue-800'
+                                          : 'bg-gray-100 text-gray-800'
+                                    }
+                                  >
+                                    {med.action}
+                                  </Badge>
                                 </div>
-                                <Badge 
-                                  className={
-                                    med.action === 'dispense' 
-                                      ? 'bg-green-100 text-green-800'
-                                      : med.action === 'write-out'
-                                      ? 'bg-blue-100 text-blue-800'
-                                      : 'bg-gray-100 text-gray-800'
-                                  }
-                                >
-                                  {med.action}
-                                </Badge>
-                              </div>
 
-                              {/* Action Buttons */}
-                              <div className="flex gap-2">
-                                <Button
-                                  size="sm"
-                                  variant={med.action === 'dispense' ? 'default' : 'outline'}
-                                  onClick={() => handleMedicationAction(med.id, 'dispense')}
-                                  className="gap-2"
-                                >
-                                  <Package className="h-4 w-4" />
-                                  Dispense
-                                </Button>
-                                <Button
-                                  size="sm"
-                                  variant={med.action === 'write-out' ? 'default' : 'outline'}
-                                  onClick={() => handleMedicationAction(med.id, 'write-out')}
-                                  className="gap-2"
-                                >
-                                  <FileText className="h-4 w-4" />
-                                  Write Out
-                                </Button>
-                              </div>
+                                {/* Action Buttons */}
+                                <div className="flex gap-2">
+                                  <Button
+                                    size="sm"
+                                    variant={med.action === 'dispense' ? 'default' : 'outline'}
+                                    onClick={() => handleMedicationAction(med.id, 'dispense')}
+                                    className="gap-2"
+                                  >
+                                    <Package className="h-4 w-4" />
+                                    Dispense
+                                  </Button>
+                                  <Button
+                                    size="sm"
+                                    variant={med.action === 'write-out' ? 'default' : 'outline'}
+                                    onClick={() => handleMedicationAction(med.id, 'write-out')}
+                                    className="gap-2"
+                                  >
+                                    <FileText className="h-4 w-4" />
+                                    Write Out
+                                  </Button>
+                                </div>
 
-                              {/* Quantity Controls for Dispensing */}
-                              {med.action === 'dispense' && (
-                                <motion.div
-                                  initial={{ opacity: 0, height: 0 }}
-                                  animate={{ opacity: 1, height: 'auto' }}
-                                  className="space-y-3 p-3 bg-green-50 rounded-lg"
-                                >
-                                  {/* Price Input */}
-                                  <div className="flex items-center gap-2">
-                                    <Label className="text-sm font-medium w-24">Unit Price:</Label>
-                                    <div className="relative flex-1">
-                                      <span className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground">$</span>
-                                      <Input
-                                        type="number"
-                                        value={(med.price / med.quantity).toFixed(2)}
-                                        onChange={(e) => handlePriceChange(med.id, parseFloat(e.target.value || 0) * med.quantity)}
-                                        className="pl-7"
-                                        min="0"
-                                        step="0.01"
-                                        placeholder="0.00"
-                                      />
-                                    </div>
-                                    <span className="text-xs text-muted-foreground">per unit</span>
-                                  </div>
-                                  
-                                  {/* Quantity Selector */}
-                                  <div className="space-y-2">
-                                    <div className="flex items-center justify-between">
-                                      <Label className="text-sm font-medium">Dispense Quantity:</Label>
-                                      <span className="text-xs text-muted-foreground">Max: {med.quantity}</span>
-                                    </div>
+                                {/* Quantity Controls for Dispensing */}
+                                {med.action === 'dispense' && (
+                                  <motion.div
+                                    initial={{ opacity: 0, height: 0 }}
+                                    animate={{ opacity: 1, height: 'auto' }}
+                                    className="space-y-3 rounded-lg bg-green-50 p-3"
+                                  >
+                                    {/* Price Input */}
                                     <div className="flex items-center gap-2">
-                                      <Button
-                                        size="sm"
-                                        variant="outline"
-                                        onClick={() => handleQuantityChange(med.id, med.dispensedQuantity - 1)}
-                                        disabled={med.dispensedQuantity <= 0}
-                                      >
-                                        <Minus className="h-4 w-4" />
-                                      </Button>
-                                      <Input
-                                        type="number"
-                                        value={med.dispensedQuantity}
-                                        onChange={(e) => handleQuantityChange(med.id, parseInt(e.target.value) || 0)}
-                                        className="w-20 text-center"
-                                        min="0"
-                                        max={med.quantity}
-                                      />
-                                      <Button
-                                        size="sm"
-                                        variant="outline"
-                                        onClick={() => handleQuantityChange(med.id, med.dispensedQuantity + 1)}
-                                        disabled={med.dispensedQuantity >= med.quantity}
-                                      >
-                                        <Plus className="h-4 w-4" />
-                                      </Button>
-                                      <div className="ml-auto text-right">
-                                        <div className="text-sm font-medium">
-                                          ${((med.price / med.quantity) * med.dispensedQuantity).toFixed(2)}
+                                      <Label className="w-24 text-sm font-medium">
+                                        Unit Price:
+                                      </Label>
+                                      <div className="relative flex-1">
+                                        <span className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground">
+                                          $
+                                        </span>
+                                        <Input
+                                          type="number"
+                                          value={(med.price / med.quantity).toFixed(2)}
+                                          onChange={(e) =>
+                                            handlePriceChange(
+                                              med.id,
+                                              parseFloat(e.target.value || 0) * med.quantity
+                                            )
+                                          }
+                                          className="pl-7"
+                                          min="0"
+                                          step="0.01"
+                                          placeholder="0.00"
+                                        />
+                                      </div>
+                                      <span className="text-xs text-muted-foreground">
+                                        per unit
+                                      </span>
+                                    </div>
+
+                                    {/* Quantity Selector */}
+                                    <div className="space-y-2">
+                                      <div className="flex items-center justify-between">
+                                        <Label className="text-sm font-medium">
+                                          Dispense Quantity:
+                                        </Label>
+                                        <span className="text-xs text-muted-foreground">
+                                          Max: {med.quantity}
+                                        </span>
+                                      </div>
+                                      <div className="flex items-center gap-2">
+                                        <Button
+                                          size="sm"
+                                          variant="outline"
+                                          onClick={() =>
+                                            handleQuantityChange(med.id, med.dispensedQuantity - 1)
+                                          }
+                                          disabled={med.dispensedQuantity <= 0}
+                                        >
+                                          <Minus className="h-4 w-4" />
+                                        </Button>
+                                        <Input
+                                          type="number"
+                                          value={med.dispensedQuantity}
+                                          onChange={(e) =>
+                                            handleQuantityChange(
+                                              med.id,
+                                              parseInt(e.target.value) || 0
+                                            )
+                                          }
+                                          className="w-20 text-center"
+                                          min="0"
+                                          max={med.quantity}
+                                        />
+                                        <Button
+                                          size="sm"
+                                          variant="outline"
+                                          onClick={() =>
+                                            handleQuantityChange(med.id, med.dispensedQuantity + 1)
+                                          }
+                                          disabled={med.dispensedQuantity >= med.quantity}
+                                        >
+                                          <Plus className="h-4 w-4" />
+                                        </Button>
+                                        <div className="ml-auto text-right">
+                                          <div className="text-sm font-medium">
+                                            $
+                                            {(
+                                              (med.price / med.quantity) *
+                                              med.dispensedQuantity
+                                            ).toFixed(2)}
+                                          </div>
+                                          <div className="text-xs text-muted-foreground">
+                                            Charge
+                                          </div>
                                         </div>
-                                        <div className="text-xs text-muted-foreground">Charge</div>
                                       </div>
                                     </div>
-                                  </div>
-                                  
-                                  {/* Auto Write-out Warning */}
-                                  {med.dispensedQuantity < med.quantity && med.dispensedQuantity > 0 && (
-                                    <div className="flex items-start gap-2 p-2 bg-blue-50 border border-blue-200 rounded text-xs">
-                                      <AlertCircle className="h-4 w-4 text-blue-600 mt-0.5" />
-                                      <div>
-                                        <p className="font-medium text-blue-900">
-                                          {med.quantity - med.dispensedQuantity} units will be written out
-                                        </p>
-                                        <p className="text-blue-700">
-                                          Remaining quantity not dispensed will be marked as write-out (not charged)
-                                        </p>
-                                      </div>
-                                    </div>
-                                  )}
-                                </motion.div>
-                              )}
-                            </div>
-                          ))}
-                        </div>
+
+                                    {/* Auto Write-out Warning */}
+                                    {med.dispensedQuantity < med.quantity &&
+                                      med.dispensedQuantity > 0 && (
+                                        <div className="flex items-start gap-2 rounded border border-blue-200 bg-blue-50 p-2 text-xs">
+                                          <AlertCircle className="mt-0.5 h-4 w-4 text-blue-600" />
+                                          <div>
+                                            <p className="font-medium text-blue-900">
+                                              {med.quantity - med.dispensedQuantity} units will be
+                                              written out
+                                            </p>
+                                            <p className="text-blue-700">
+                                              Remaining quantity not dispensed will be marked as
+                                              write-out (not charged)
+                                            </p>
+                                          </div>
+                                        </div>
+                                      )}
+                                  </motion.div>
+                                )}
+                              </div>
+                            ))}
+                          </div>
                         )}
                       </CardContent>
                     </Card>
@@ -1724,10 +1879,10 @@ const CashierDashboard = () => {
                           <span>Medications</span>
                           <span>${totals.medicationsTotal.toFixed(2)}</span>
                         </div>
-                        
+
                         {/* Outstanding Balance Line Item */}
                         {totals.outstandingBalance > 0 && (
-                          <div className="flex justify-between text-amber-700 font-medium">
+                          <div className="flex justify-between font-medium text-amber-700">
                             <span className="flex items-center gap-1">
                               <AlertCircle className="h-4 w-4" />
                               Previous Balance
@@ -1735,13 +1890,13 @@ const CashierDashboard = () => {
                             <span>${totals.outstandingBalance.toFixed(2)}</span>
                           </div>
                         )}
-                        
+
                         <Separator />
                         <div className="flex justify-between font-medium">
                           <span>Subtotal</span>
                           <span>${totals.subtotal.toFixed(2)}</span>
                         </div>
-                        
+
                         {/* Discount Section */}
                         <div className="space-y-2">
                           <Label className="text-sm font-medium">Apply Discount</Label>
@@ -1752,13 +1907,15 @@ const CashierDashboard = () => {
                                 <Input
                                   type="number"
                                   value={discountPercent}
-                                  onChange={(e) => handleDiscountPercentChange(parseFloat(e.target.value) || 0)}
+                                  onChange={(e) =>
+                                    handleDiscountPercentChange(parseFloat(e.target.value) || 0)
+                                  }
                                   placeholder="0"
                                   className="rounded-r-none"
                                   min="0"
                                   max="100"
                                 />
-                                <div className="px-3 py-2 bg-muted border border-l-0 rounded-r-md flex items-center">
+                                <div className="flex items-center rounded-r-md border border-l-0 bg-muted px-3 py-2">
                                   <Percent className="h-4 w-4" />
                                 </div>
                               </div>
@@ -1766,13 +1923,15 @@ const CashierDashboard = () => {
                             <div>
                               <Label className="text-xs">Amount</Label>
                               <div className="flex">
-                                <div className="px-3 py-2 bg-muted border border-r-0 rounded-l-md flex items-center">
+                                <div className="flex items-center rounded-l-md border border-r-0 bg-muted px-3 py-2">
                                   <DollarSign className="h-4 w-4" />
                                 </div>
                                 <Input
                                   type="number"
                                   value={discountAmount}
-                                  onChange={(e) => handleDiscountAmountChange(parseFloat(e.target.value) || 0)}
+                                  onChange={(e) =>
+                                    handleDiscountAmountChange(parseFloat(e.target.value) || 0)
+                                  }
                                   placeholder="0.00"
                                   className="rounded-l-none"
                                   min="0"
@@ -1789,7 +1948,7 @@ const CashierDashboard = () => {
                             <span>-${totals.discountAmount.toFixed(2)}</span>
                           </div>
                         )}
-                        
+
                         <Separator />
                         <div className="flex justify-between text-lg font-bold">
                           <span>Total</span>
@@ -1828,23 +1987,31 @@ const CashierDashboard = () => {
                       <div className="space-y-2">
                         <Label className="text-sm font-medium">Quick Discounts</Label>
                         <div className="grid grid-cols-2 gap-2">
-                          <Button variant="outline" size="sm" onClick={() => handleDiscountPercentChange(10)}>
-                            <Tag className="h-4 w-4 mr-1" />
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => handleDiscountPercentChange(10)}
+                          >
+                            <Tag className="mr-1 h-4 w-4" />
                             10% Senior
                           </Button>
-                          <Button variant="outline" size="sm" onClick={() => handleDiscountPercentChange(20)}>
-                            <Tag className="h-4 w-4 mr-1" />
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => handleDiscountPercentChange(20)}
+                          >
+                            <Tag className="mr-1 h-4 w-4" />
                             20% Staff
                           </Button>
                         </div>
                       </div>
 
                       {/* Partial Payment Toggle */}
-                      <div className="space-y-3 pt-4 border-t">
+                      <div className="space-y-3 border-t pt-4">
                         <div className="flex items-center justify-between">
                           <Label className="text-sm font-medium">Partial Payment</Label>
                           <Button
-                            variant={isPartialPayment ? "default" : "outline"}
+                            variant={isPartialPayment ? 'default' : 'outline'}
                             size="sm"
                             onClick={() => {
                               setIsPartialPayment(!isPartialPayment);
@@ -1858,27 +2025,30 @@ const CashierDashboard = () => {
                             {isPartialPayment ? 'Enabled' : 'Enable'}
                           </Button>
                         </div>
-                        
+
                         {/* Warning when limit reached */}
                         {invoiceLimitReached && !addOutstandingToInvoice && (
-                          <div className="p-2 bg-red-50 border border-red-200 rounded text-xs text-red-800">
-                            <AlertCircle className="h-4 w-4 inline mr-1" />
-                            Partial payment disabled: Patient has reached maximum outstanding invoices (2). Must pay full amount or add previous balance.
+                          <div className="rounded border border-red-200 bg-red-50 p-2 text-xs text-red-800">
+                            <AlertCircle className="mr-1 inline h-4 w-4" />
+                            Partial payment disabled: Patient has reached maximum outstanding
+                            invoices (2). Must pay full amount or add previous balance.
                           </div>
                         )}
 
                         {isPartialPayment && (
-                          <div className="space-y-3 p-3 bg-amber-50 border border-amber-200 rounded-lg">
+                          <div className="space-y-3 rounded-lg border border-amber-200 bg-amber-50 p-3">
                             {invoiceLimitReached && addOutstandingToInvoice && (
-                              <div className="p-2 bg-red-100 border border-red-300 rounded text-xs text-red-900 mb-2">
-                                <AlertCircle className="h-4 w-4 inline mr-1" />
-                                <strong>Warning:</strong> Patient already has 2 unpaid invoices. Cannot create another partial payment unless previous invoices are paid.
+                              <div className="mb-2 rounded border border-red-300 bg-red-100 p-2 text-xs text-red-900">
+                                <AlertCircle className="mr-1 inline h-4 w-4" />
+                                <strong>Warning:</strong> Patient already has 2 unpaid invoices.
+                                Cannot create another partial payment unless previous invoices are
+                                paid.
                               </div>
                             )}
                             <div className="space-y-2">
                               <Label className="text-sm">Amount to Pay Now</Label>
                               <div className="flex">
-                                <div className="px-3 py-2 bg-white border border-r-0 rounded-l-md flex items-center">
+                                <div className="flex items-center rounded-l-md border border-r-0 bg-white px-3 py-2">
                                   <DollarSign className="h-4 w-4" />
                                 </div>
                                 <Input
@@ -1894,7 +2064,8 @@ const CashierDashboard = () => {
                               </div>
                               {partialAmount && parseFloat(partialAmount) < totals.total && (
                                 <p className="text-xs text-amber-700">
-                                  Balance Due: ${(totals.total - parseFloat(partialAmount || 0)).toFixed(2)}
+                                  Balance Due: $
+                                  {(totals.total - parseFloat(partialAmount || 0)).toFixed(2)}
                                 </p>
                               )}
                             </div>
@@ -1928,32 +2099,35 @@ const CashierDashboard = () => {
                       <div className="space-y-2 pt-4">
                         {/* Warning when trying to create partial payment at limit */}
                         {invoiceLimitReached && isPartialPayment && (
-                          <div className="p-3 bg-red-100 border-2 border-red-400 rounded-lg mb-2">
-                            <p className="text-xs font-bold text-red-900 flex items-center gap-2">
+                          <div className="mb-2 rounded-lg border-2 border-red-400 bg-red-100 p-3">
+                            <p className="flex items-center gap-2 text-xs font-bold text-red-900">
                               <XCircle className="h-4 w-4" />
                               Cannot process partial payment
                             </p>
-                            <p className="text-xs text-red-800 mt-1">
+                            <p className="mt-1 text-xs text-red-800">
                               Patient has 2 outstanding invoices. Must pay full amount.
                             </p>
                           </div>
                         )}
-                        
+
                         <Button
                           onClick={handleApproveInvoice}
                           className="w-full gap-2"
                           disabled={
-                            totals.total <= 0 || 
-                            (isPartialPayment && (!partialAmount || parseFloat(partialAmount) <= 0 || !holdReason)) ||
+                            totals.total <= 0 ||
+                            (isPartialPayment &&
+                              (!partialAmount || parseFloat(partialAmount) <= 0 || !holdReason)) ||
                             (invoiceLimitReached && isPartialPayment) // Disable partial payment when limit reached
                           }
                         >
                           <Check className="h-4 w-4" />
-                          {isPartialPayment ? 'Process Partial Payment' : 'Approve & Process Full Payment'}
+                          {isPartialPayment
+                            ? 'Process Partial Payment'
+                            : 'Approve & Process Full Payment'}
                         </Button>
-                        <Button 
+                        <Button
                           onClick={handleDeclineInvoice}
-                          variant="outline" 
+                          variant="outline"
                           className="w-full gap-2"
                         >
                           <XCircle className="h-4 w-4" />
@@ -1974,9 +2148,9 @@ const CashierDashboard = () => {
             <DialogHeader>
               <DialogTitle>Confirm Payment</DialogTitle>
             </DialogHeader>
-            
+
             <div className="space-y-4">
-              <div className="p-4 bg-muted rounded-lg space-y-2">
+              <div className="space-y-2 rounded-lg bg-muted p-4">
                 <div className="flex justify-between">
                   <span>Patient:</span>
                   <span className="font-medium">{selectedInvoice?.patientName}</span>
@@ -1990,11 +2164,11 @@ const CashierDashboard = () => {
                   <span className="font-medium capitalize">{paymentMethod}</span>
                 </div>
                 <Separator />
-                
+
                 {/* Payment Type */}
                 {isPartialPayment ? (
-                  <div className="space-y-2 p-3 bg-amber-50 border border-amber-200 rounded">
-                    <div className="flex items-center gap-2 text-amber-800 font-medium">
+                  <div className="space-y-2 rounded border border-amber-200 bg-amber-50 p-3">
+                    <div className="flex items-center gap-2 font-medium text-amber-800">
                       <AlertCircle className="h-4 w-4" />
                       Partial Payment
                     </div>
@@ -2008,12 +2182,14 @@ const CashierDashboard = () => {
                     </div>
                     <div className="flex justify-between text-sm text-red-700">
                       <span>Balance Due:</span>
-                      <span className="font-medium">${(totals.total - parseFloat(partialAmount || 0)).toFixed(2)}</span>
+                      <span className="font-medium">
+                        ${(totals.total - parseFloat(partialAmount || 0)).toFixed(2)}
+                      </span>
                     </div>
                     {holdReason && (
-                      <div className="pt-2 border-t border-amber-200">
+                      <div className="border-t border-amber-200 pt-2">
                         <span className="text-xs text-amber-700">Hold Reason:</span>
-                        <p className="text-sm text-amber-900 mt-1">{holdReason}</p>
+                        <p className="mt-1 text-sm text-amber-900">{holdReason}</p>
                       </div>
                     )}
                     {paymentDueDate && (
@@ -2033,7 +2209,7 @@ const CashierDashboard = () => {
               {notes && (
                 <div>
                   <Label className="text-sm font-medium">Notes:</Label>
-                  <p className="text-sm text-muted-foreground mt-1">{notes}</p>
+                  <p className="mt-1 text-sm text-muted-foreground">{notes}</p>
                 </div>
               )}
             </div>
@@ -2046,14 +2222,10 @@ const CashierDashboard = () => {
               >
                 Cancel
               </Button>
-              <Button
-                onClick={handleProcessPayment}
-                disabled={isProcessing}
-                className="gap-2"
-              >
+              <Button onClick={handleProcessPayment} disabled={isProcessing} className="gap-2">
                 {isProcessing ? (
                   <>
-                    <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
+                    <div className="h-4 w-4 animate-spin rounded-full border-b-2 border-white"></div>
                     Processing...
                   </>
                 ) : (
@@ -2073,10 +2245,12 @@ const CashierDashboard = () => {
             <DialogHeader>
               <DialogTitle>Add Service to Invoice</DialogTitle>
             </DialogHeader>
-            
+
             <div className="space-y-4">
               <div>
-                <Label htmlFor="serviceName">Service Name <span className="text-red-500">*</span></Label>
+                <Label htmlFor="serviceName">
+                  Service Name <span className="text-red-500">*</span>
+                </Label>
                 <Input
                   id="serviceName"
                   placeholder="e.g., Consultation, X-Ray, Blood Test"
@@ -2084,9 +2258,11 @@ const CashierDashboard = () => {
                   onChange={(e) => setNewService({ ...newService, name: e.target.value })}
                 />
               </div>
-              
+
               <div>
-                <Label htmlFor="servicePrice">Price ($) <span className="text-red-500">*</span></Label>
+                <Label htmlFor="servicePrice">
+                  Price ($) <span className="text-red-500">*</span>
+                </Label>
                 <Input
                   id="servicePrice"
                   type="number"
@@ -2096,7 +2272,7 @@ const CashierDashboard = () => {
                   onChange={(e) => setNewService({ ...newService, price: e.target.value })}
                 />
               </div>
-              
+
               <div>
                 <Label htmlFor="serviceDescription">Description</Label>
                 <Textarea
@@ -2127,7 +2303,7 @@ const CashierDashboard = () => {
               >
                 {isProcessing ? (
                   <>
-                    <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
+                    <div className="h-4 w-4 animate-spin rounded-full border-b-2 border-white"></div>
                     Adding...
                   </>
                 ) : (
@@ -2143,24 +2319,27 @@ const CashierDashboard = () => {
 
         {/* Invoice Details Modal for Payment History */}
         <Dialog open={invoiceModalOpen} onOpenChange={setInvoiceModalOpen}>
-          <DialogContent className="max-w-3xl max-h-[80vh] overflow-y-auto">
+          <DialogContent className="max-h-[80vh] max-w-3xl overflow-y-auto">
             <DialogHeader>
               <DialogTitle>Invoice Details</DialogTitle>
               <DialogDescription>
-                Invoice #{selectedPayment?.invoice?.invoice_number || selectedPayment?.invoiceDetails?.invoice_number}
+                Invoice #
+                {selectedPayment?.invoice?.invoice_number ||
+                  selectedPayment?.invoiceDetails?.invoice_number}
               </DialogDescription>
             </DialogHeader>
-            
+
             {selectedPayment && (
               <div className="space-y-4">
                 {/* Patient Info */}
                 <div className="border-b pb-4">
-                  <h4 className="font-semibold mb-2">Patient Information</h4>
+                  <h4 className="mb-2 font-semibold">Patient Information</h4>
                   <div className="grid grid-cols-2 gap-2 text-sm">
                     <div>
                       <span className="text-gray-600">Name:</span>
                       <span className="ml-2 font-medium">
-                        {selectedPayment.invoice?.patient?.first_name} {selectedPayment.invoice?.patient?.last_name}
+                        {selectedPayment.invoice?.patient?.first_name}{' '}
+                        {selectedPayment.invoice?.patient?.last_name}
                       </span>
                     </div>
                     <div>
@@ -2174,7 +2353,7 @@ const CashierDashboard = () => {
 
                 {/* Invoice Summary */}
                 <div className="border-b pb-4">
-                  <h4 className="font-semibold mb-2">Invoice Summary</h4>
+                  <h4 className="mb-2 font-semibold">Invoice Summary</h4>
                   <div className="space-y-2 text-sm">
                     <div className="flex justify-between">
                       <span className="text-gray-600">Total Amount:</span>
@@ -2200,22 +2379,27 @@ const CashierDashboard = () => {
                 {/* Payment Transactions */}
                 {selectedPayment.invoiceDetails?.payment_transactions?.length > 0 && (
                   <div className="border-b pb-4">
-                    <h4 className="font-semibold mb-2">Payment History</h4>
+                    <h4 className="mb-2 font-semibold">Payment History</h4>
                     <div className="space-y-2">
                       {selectedPayment.invoiceDetails.payment_transactions.map((payment, idx) => (
-                        <div key={idx} className="flex justify-between items-center text-sm bg-green-50 p-3 rounded">
+                        <div
+                          key={idx}
+                          className="flex items-center justify-between rounded bg-green-50 p-3 text-sm"
+                        >
                           <div>
                             <p className="font-medium">${parseFloat(payment.amount).toFixed(2)}</p>
-                            <p className="text-gray-600 text-xs capitalize">{payment.payment_method}</p>
+                            <p className="text-xs capitalize text-gray-600">
+                              {payment.payment_method}
+                            </p>
                           </div>
                           <div className="text-right">
                             <p className="text-xs text-gray-600">
                               {new Date(payment.payment_date).toLocaleDateString()}
                             </p>
                             <p className="text-xs text-gray-500">
-                              {payment.received_by_user ? 
-                                `${payment.received_by_user.first_name} ${payment.received_by_user.last_name}` : 
-                                'Unknown'}
+                              {payment.received_by_user
+                                ? `${payment.received_by_user.first_name} ${payment.received_by_user.last_name}`
+                                : 'Unknown'}
                             </p>
                           </div>
                         </div>
@@ -2234,10 +2418,7 @@ const CashierDashboard = () => {
                     <Download className="h-4 w-4" />
                     Download Receipt
                   </Button>
-                  <Button
-                    variant="outline"
-                    onClick={() => setInvoiceModalOpen(false)}
-                  >
+                  <Button variant="outline" onClick={() => setInvoiceModalOpen(false)}>
                     Close
                   </Button>
                 </div>

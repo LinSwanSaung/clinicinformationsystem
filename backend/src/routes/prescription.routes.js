@@ -1,6 +1,7 @@
 import express from 'express';
 import PrescriptionService from '../services/Prescription.service.js';
 import { asyncHandler } from '../middleware/errorHandler.js';
+import { ROLES } from '../constants/roles.js';
 import { authorize } from '../middleware/auth.js';
 import { requireActiveVisit } from '../middleware/activeVisitCheck.js';
 import { logAuditEvent } from '../utils/auditLogger.js';
@@ -19,7 +20,18 @@ router.post(
   requireActiveVisit,
   asyncHandler(async (req, res) => {
     const result = await PrescriptionService.createPrescription(req.body);
-    try { logAuditEvent({ userId: req.user?.id || null, role: req.user?.role || null, action: 'CREATE', entity: 'prescriptions', recordId: result?.id || null, patientId: req.body?.patient_id || null, result: 'success', ip: req.ip }); } catch (e) {}
+    try {
+      logAuditEvent({
+        userId: req.user?.id || null,
+        role: req.user?.role || null,
+        action: 'CREATE',
+        entity: 'prescriptions',
+        recordId: result?.id || null,
+        patientId: req.body?.patient_id || null,
+        result: 'success',
+        ip: req.ip,
+      });
+    } catch (e) {}
     res.status(201).json(result);
   })
 );
@@ -70,7 +82,18 @@ router.patch(
     const { prescriptionId } = req.params;
     const { status } = req.body;
     const result = await PrescriptionService.updatePrescriptionStatus(prescriptionId, status);
-    try { logAuditEvent({ userId: req.user?.id || null, role: req.user?.role || null, action: 'UPDATE', entity: 'prescriptions', recordId: prescriptionId, result: 'success', meta: { status }, ip: req.ip }); } catch (e) {}
+    try {
+      logAuditEvent({
+        userId: req.user?.id || null,
+        role: req.user?.role || null,
+        action: 'UPDATE',
+        entity: 'prescriptions',
+        recordId: prescriptionId,
+        result: 'success',
+        meta: { status },
+        ip: req.ip,
+      });
+    } catch (e) {}
     res.json(result);
   })
 );
@@ -86,7 +109,17 @@ router.delete(
   asyncHandler(async (req, res) => {
     const { prescriptionId } = req.params;
     const result = await PrescriptionService.cancelPrescription(prescriptionId);
-    try { logAuditEvent({ userId: req.user?.id || null, role: req.user?.role || null, action: 'DELETE', entity: 'prescriptions', recordId: prescriptionId, result: 'success', ip: req.ip }); } catch (e) {}
+    try {
+      logAuditEvent({
+        userId: req.user?.id || null,
+        role: req.user?.role || null,
+        action: 'DELETE',
+        entity: 'prescriptions',
+        recordId: prescriptionId,
+        result: 'success',
+        ip: req.ip,
+      });
+    } catch (e) {}
     res.json(result);
   })
 );

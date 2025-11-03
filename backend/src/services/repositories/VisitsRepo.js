@@ -11,7 +11,7 @@ export const VisitId = z.string().min(1);
 const Filters = z
   .object({
     status: z.string().optional(),
-    doctor_id: z.string().optional(),
+    doctor_id: z.string().nullable().optional(),
     start_date: z.string().optional(),
     end_date: z.string().optional(),
     limit: z.number().int().positive().max(200).default(50),

@@ -15,7 +15,8 @@ class DoctorAvailabilityModel extends BaseModel {
   async getAllWithDoctorDetails() {
     const { data, error } = await this.supabase
       .from(this.tableName)
-      .select(`
+      .select(
+        `
         *,
         users!doctor_id (
           id,
@@ -23,7 +24,9 @@ class DoctorAvailabilityModel extends BaseModel {
           last_name,
           email
         )
-      `)
+      `
+      )
+      .not('doctor_id', 'is', null)
       .order('day_of_week, start_time');
 
     if (error) {
@@ -39,7 +42,8 @@ class DoctorAvailabilityModel extends BaseModel {
   async getByDoctorId(doctorId) {
     const { data, error } = await this.supabase
       .from(this.tableName)
-      .select(`
+      .select(
+        `
         *,
         users!doctor_id (
           id,
@@ -47,7 +51,8 @@ class DoctorAvailabilityModel extends BaseModel {
           last_name,
           email
         )
-      `)
+      `
+      )
       .eq('doctor_id', doctorId)
       .order('day_of_week, start_time');
 
@@ -83,7 +88,8 @@ class DoctorAvailabilityModel extends BaseModel {
     const { data, error } = await this.supabase
       .from(this.tableName)
       .insert(availabilityData)
-      .select(`
+      .select(
+        `
         *,
         users!doctor_id (
           id,
@@ -91,7 +97,8 @@ class DoctorAvailabilityModel extends BaseModel {
           last_name,
           email
         )
-      `)
+      `
+      )
       .single();
 
     if (error) {
@@ -109,7 +116,8 @@ class DoctorAvailabilityModel extends BaseModel {
       .from(this.tableName)
       .update(availabilityData)
       .eq('id', id)
-      .select(`
+      .select(
+        `
         *,
         users!doctor_id (
           id,
@@ -117,7 +125,8 @@ class DoctorAvailabilityModel extends BaseModel {
           last_name,
           email
         )
-      `)
+      `
+      )
       .single();
 
     if (error) {
@@ -169,7 +178,8 @@ class DoctorAvailabilityModel extends BaseModel {
   async getAvailableDoctors(dayOfWeek, time) {
     const { data, error } = await this.supabase
       .from(this.tableName)
-      .select(`
+      .select(
+        `
         *,
         users!doctor_id (
           id,
@@ -178,7 +188,8 @@ class DoctorAvailabilityModel extends BaseModel {
           email,
           specialization
         )
-      `)
+      `
+      )
       .eq('day_of_week', dayOfWeek)
       .lte('start_time', time)
       .gte('end_time', time)
@@ -216,8 +227,7 @@ class DoctorAvailabilityModel extends BaseModel {
    * Get availability with 12-hour format using database function
    */
   async getAllWith12HourFormat() {
-    const { data, error } = await this.supabase
-      .rpc('get_doctor_availability_12hr');
+    const { data, error } = await this.supabase.rpc('get_doctor_availability_12hr');
 
     if (error) {
       throw error;

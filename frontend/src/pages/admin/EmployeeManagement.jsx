@@ -11,7 +11,7 @@ import {
 import { Button } from '../../components/ui/button';
 import { Input } from '../../components/ui/input';
 import PageLayout from '../../components/PageLayout';
-import { LoadingSpinner, SearchBar, StatusBadge } from '@/components/library';
+import { LoadingSpinner, StatusBadge, TableToolbar } from '@/components/library';
 import {
   Users,
   Plus,
@@ -585,56 +585,48 @@ const EmployeeManagement = () => {
         {editingEmployee && <EditEmployeeForm />}
 
         {/* Controls */}
-        <Card className="mb-6">
-          <CardContent className="p-6">
-            <div className="flex flex-col items-center justify-between gap-4 sm:flex-row">
-              <div className="flex flex-1 flex-col gap-4 sm:flex-row">
-                <div className="max-w-md flex-1">
-                  <SearchBar
-                    variant="flat"
-                    value={searchTerm}
-                    onChange={(e) => setSearchTerm(e.target.value)}
-                    placeholder="Search employees..."
-                    inputProps={{ className: 'h-10 pl-10' }}
-                    ariaLabel="Search employees"
-                  />
-                </div>
-                <select
-                  className="flex h-10 rounded-md border border-input bg-background px-3 py-2 text-sm"
-                  value={selectedRole}
-                  onChange={(e) => setSelectedRole(e.target.value)}
-                >
-                  <option value="all">All Roles</option>
-                  {roles.map((role) => (
-                    <option key={role.value} value={role.value}>
-                      {role.label}
-                    </option>
-                  ))}
-                </select>
-              </div>
-              <div className="flex items-center gap-2">
-                <label className="select-none text-sm text-gray-700">Status</label>
-                <select
-                  className="flex h-10 rounded-md border border-input bg-background px-3 py-2 text-sm"
-                  value={selectedStatus}
-                  onChange={(e) => setSelectedStatus(e.target.value)}
-                >
-                  <option value="active">Active</option>
-                  <option value="inactive">Inactive</option>
-                  <option value="deleted">Deleted</option>
-                  <option value="all">All</option>
-                </select>
-              </div>
-              <Button
-                onClick={() => setShowAddForm(!showAddForm)}
-                className="flex items-center gap-2"
+        <TableToolbar
+          searchValue={searchTerm}
+          onSearchChange={(e) => setSearchTerm(e.target.value)}
+          searchPlaceholder="Search employees..."
+          filters={[
+            <select
+              key="role-filter"
+              className="flex h-10 rounded-md border border-input bg-background px-3 py-2 text-sm"
+              value={selectedRole}
+              onChange={(e) => setSelectedRole(e.target.value)}
+            >
+              <option value="all">All Roles</option>
+              {roles.map((role) => (
+                <option key={role.value} value={role.value}>
+                  {role.label}
+                </option>
+              ))}
+            </select>,
+            <div key="status-filter" className="flex items-center gap-2">
+              <label className="select-none text-sm text-gray-700">Status</label>
+              <select
+                className="flex h-10 rounded-md border border-input bg-background px-3 py-2 text-sm"
+                value={selectedStatus}
+                onChange={(e) => setSelectedStatus(e.target.value)}
               >
-                <Plus className="h-4 w-4" />
-                Add Employee
-              </Button>
-            </div>
-          </CardContent>
-        </Card>
+                <option value="active">Active</option>
+                <option value="inactive">Inactive</option>
+                <option value="deleted">Deleted</option>
+                <option value="all">All</option>
+              </select>
+            </div>,
+          ]}
+          actions={
+            <Button
+              onClick={() => setShowAddForm(!showAddForm)}
+              className="flex items-center gap-2"
+            >
+              <Plus className="h-4 w-4" />
+              Add Employee
+            </Button>
+          }
+        />
 
         {/* Employee List */}
         {error && (

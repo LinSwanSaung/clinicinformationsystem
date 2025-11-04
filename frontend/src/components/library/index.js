@@ -15,6 +15,7 @@ export { SearchBar } from './inputs/SearchBar';
 
 // DataTable kit
 export { DataTable } from './DataTable';
+export { TableToolbar } from './DataTable';
 
 // Form components
 export { FormModal, FormCard } from './forms';

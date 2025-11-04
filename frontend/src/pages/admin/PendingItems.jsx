@@ -23,14 +23,6 @@ import {
   DialogHeader,
   DialogTitle,
 } from '../../components/ui/dialog';
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from '../../components/ui/table';
 import { Textarea } from '../../components/ui/textarea';
 import {
   AlertTriangle,
@@ -46,7 +38,7 @@ import {
 } from 'lucide-react';
 import PageLayout from '@/components/PageLayout';
 import adminService from '@/services/Admin.service';
-import { LoadingSpinner, StatusBadge } from '@/components/library';
+import { StatusBadge, DataTable } from '@/components/library';
 
 const PendingItems = () => {
   const [pendingItems, setPendingItems] = useState([]);
@@ -321,80 +313,75 @@ const PendingItems = () => {
             <CardDescription>Records that may need administrative attention</CardDescription>
           </CardHeader>
           <CardContent>
-            <div className="rounded-lg border">
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>Module</TableHead>
-                    <TableHead>Patient</TableHead>
-                    <TableHead>Doctor</TableHead>
-                    <TableHead>Status</TableHead>
-                    <TableHead>Last Updated</TableHead>
-                    <TableHead className="w-[100px]">Action</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {loading ? (
-                    <TableRow>
-                      <TableCell colSpan={6} className="py-6">
-                        <LoadingSpinner label="Loading pending items" />
-                      </TableCell>
-                    </TableRow>
-                  ) : filteredItems.length === 0 ? (
-                    <TableRow>
-                      <TableCell colSpan={6} className="py-6 text-center text-muted-foreground">
-                        No pending items found.
-                      </TableCell>
-                    </TableRow>
-                  ) : (
-                    filteredItems.map((item) => (
-                      <TableRow key={`${item.entityType}-${item.entityId}`}>
-                        <TableCell>
-                          <div className="flex items-center gap-2">
-                            {getModuleIcon(item.entityType)}
-                            <span className="capitalize">{item.entityType}</span>
-                          </div>
-                        </TableCell>
-                        <TableCell>
-                          <div>
-                            <div className="font-medium">{item.patientName}</div>
-                            <div className="text-sm text-muted-foreground">
-                              {item.patientNumber}
-                            </div>
-                          </div>
-                        </TableCell>
-                        <TableCell>
-                          {item.doctorName ? (
-                            <div className="flex items-center gap-2">
-                              <User className="h-4 w-4" />
-                              {item.doctorName}
-                            </div>
-                          ) : (
-                            <span className="text-muted-foreground">-</span>
-                          )}
-                        </TableCell>
-                        <TableCell>
-                          <StatusBadge
-                            status={item.currentStatus}
-                            variant={getStatusBadgeVariant(item.currentStatus)}
-                          />
-                        </TableCell>
-                        <TableCell>
-                          <span className="text-sm text-muted-foreground">
-                            {new Date(item.lastUpdated).toLocaleString()}
-                          </span>
-                        </TableCell>
-                        <TableCell>
-                          <Button size="sm" onClick={() => openOverrideModal(item)}>
-                            Resolve
-                          </Button>
-                        </TableCell>
-                      </TableRow>
-                    ))
-                  )}
-                </TableBody>
-              </Table>
-            </div>
+            <DataTable
+              columns={[
+                {
+                  key: 'module',
+                  label: 'Module',
+                  render: (_, row) => (
+                    <div className="flex items-center gap-2">
+                      {getModuleIcon(row.entityType)}
+                      <span className="capitalize">{row.entityType}</span>
+                    </div>
+                  ),
+                },
+                {
+                  key: 'patient',
+                  label: 'Patient',
+                  render: (_, row) => (
+                    <div>
+                      <div className="font-medium">{row.patientName}</div>
+                      <div className="text-sm text-muted-foreground">{row.patientNumber}</div>
+                    </div>
+                  ),
+                },
+                {
+                  key: 'doctor',
+                  label: 'Doctor',
+                  render: (_, row) =>
+                    row.doctorName ? (
+                      <div className="flex items-center gap-2">
+                        <User className="h-4 w-4" />
+                        {row.doctorName}
+                      </div>
+                    ) : (
+                      <span className="text-muted-foreground">-</span>
+                    ),
+                },
+                {
+                  key: 'status',
+                  label: 'Status',
+                  render: (_, row) => (
+                    <StatusBadge
+                      status={row.currentStatus}
+                      variant={getStatusBadgeVariant(row.currentStatus)}
+                    />
+                  ),
+                },
+                {
+                  key: 'lastUpdated',
+                  label: 'Last Updated',
+                  render: (_, row) => (
+                    <span className="text-sm text-muted-foreground">
+                      {new Date(row.lastUpdated).toLocaleString()}
+                    </span>
+                  ),
+                },
+                {
+                  key: 'action',
+                  label: 'Action',
+                  className: 'w-[100px]',
+                  render: (_, row) => (
+                    <Button size="sm" onClick={() => openOverrideModal(row)}>
+                      Resolve
+                    </Button>
+                  ),
+                },
+              ]}
+              data={filteredItems}
+              isLoading={loading}
+              emptyText="No pending items found."
+            />
           </CardContent>
         </Card>
 

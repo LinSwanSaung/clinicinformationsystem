@@ -1,6 +1,16 @@
+// Feedback components
 export { LoadingSpinner } from './feedback/LoadingSpinner';
+export { EmptyState } from './feedback/EmptyState';
+export { ErrorState } from './feedback/ErrorState';
+export { ConfirmDialog } from './feedback/ConfirmDialog';
+
+// Status components
 export { StatusBadge } from './status/StatusBadge';
+
+// Dashboard components
 export { StatCard } from './dashboard/StatCard';
+
+// Input components
 export { SearchBar } from './inputs/SearchBar';
 
 // DataTable kit

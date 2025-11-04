@@ -1,5 +1,5 @@
 /* eslint-disable no-unused-vars, no-console */
-import React, { useEffect, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
   Card,
@@ -24,6 +24,7 @@ import userService from '@/services/userService';
 import doctorAvailabilityService from '@/services/doctorAvailabilityService';
 import { visitService } from '@/services/visitService';
 import { formatTimeRange } from '@/utils/timeUtils';
+import { StatCard } from '@/components/library';
 
 const AdminDashboard = () => {
   const navigate = useNavigate();
@@ -262,18 +263,13 @@ const AdminDashboard = () => {
           {/* Stats Cards */}
           <div className="grid grid-cols-1 gap-8 md:grid-cols-2 lg:grid-cols-4">
             {statsCards.map((stat, index) => (
-              <Card key={index} className="bg-card">
-                <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-3">
-                  <CardTitle className="text-lg font-semibold text-foreground">
-                    {stat.title}
-                  </CardTitle>
-                  <stat.icon className={`h-6 w-6 ${stat.color}`} />
-                </CardHeader>
-                <CardContent>
-                  <div className="mb-2 text-3xl font-bold">{stat.value}</div>
-                  <p className="text-base text-muted-foreground">{stat.description}</p>
-                </CardContent>
-              </Card>
+              <StatCard
+                key={index}
+                title={stat.title}
+                value={stat.value}
+                helperText={stat.description}
+                icon={stat.icon}
+              />
             ))}
           </div>
 

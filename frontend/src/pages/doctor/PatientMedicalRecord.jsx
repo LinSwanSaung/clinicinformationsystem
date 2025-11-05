@@ -114,7 +114,7 @@ const PatientMedicalRecord = () => {
     }]
   });
 
-  // Tab configuration
+  // Tab configuration: show Doctor's Notes tab (doctor can add only with active visit)
   const tabs = [
     { id: 'overview', label: 'Overview', icon: User },
     { id: 'history', label: 'Visit History', icon: Activity },
@@ -134,10 +134,19 @@ const PatientMedicalRecord = () => {
       try {
         setLoading(true);
 
-        // Always check for ACTIVE visit, regardless of what was passed in location.state
+        // Check for ACTIVE visit using visit history (same approach as nurse's view)
         try {
-          // Only check for ACTIVE (in_progress) visits
-          const activeVisit = await visitService.getPatientActiveVisit(selectedPatient.id);
+          // Fetch visit history with in-progress visits included
+          const visitHistory = await visitService.getPatientVisitHistory(selectedPatient.id, {
+            includeCompleted: true,
+            includeInProgress: true,
+            limit: 50
+          });
+          
+          // Find active visit (status === 'in_progress')
+          const activeVisit = Array.isArray(visitHistory) 
+            ? visitHistory.find(v => v.status === 'in_progress')
+            : null;
           
           if (activeVisit?.id) {
             setActiveVisitId(activeVisit.id);
@@ -488,12 +497,12 @@ const PatientMedicalRecord = () => {
 
   // Diagnosis handlers
   const handleAddDiagnosis = () => {
-    // Check for active visit first
+    // Require active visit to add diagnosis
     if (!activeVisitId) {
-      alert('⚠️ No Visit Today\n\nCannot add diagnosis: Patient does not have a visit from today.\n\nMedical data can only be added for today\'s visits.');
+      alert('⚠️ No Visit Today\n\nCannot add diagnosis: Patient does not have an active consultation.');
       return;
     }
-    
+
     // Reset form
     setDiagnosisFormData({
       diagnosis_name: '',
@@ -555,7 +564,7 @@ const PatientMedicalRecord = () => {
       
       // Check for specific error from backend
       if (error.response?.data?.code === 'NO_ACTIVE_VISIT') {
-        alert('⚠️ Security Check Failed\n\nCannot add diagnosis: Patient does not have an active visit.\n\nPlease ensure the patient has an active consultation session before adding medical data.');
+        alert('⚠️ Security Check Failed\n\nCannot add diagnosis: Patient does not have an active visit.');
       } else {
         alert('Failed to add diagnosis: ' + (error.response?.data?.message || error.message || 'Unknown error'));
       }
@@ -564,12 +573,12 @@ const PatientMedicalRecord = () => {
 
   // Allergy handlers
   const handleAddAllergy = () => {
-    // Check for active visit first
+    // Require active visit to add allergy
     if (!activeVisitId) {
-      alert('⚠️ No Visit Today\n\nCannot add allergy: Patient does not have a visit from today.\n\nMedical data can only be added for today\'s visits.');
+      alert('⚠️ No Visit Today\n\nCannot add allergy: Patient does not have an active consultation.');
       return;
     }
-    
+
     // Reset form
     setAllergyFormData({
       allergy_name: '',
@@ -620,7 +629,7 @@ const PatientMedicalRecord = () => {
       
       // Check for specific error from backend
       if (error.response?.data?.code === 'NO_ACTIVE_VISIT') {
-        alert('⚠️ Security Check Failed\n\nCannot add allergy: Patient does not have an active visit.\n\nPlease ensure the patient has an active consultation session before adding medical data.');
+        alert('⚠️ Security Check Failed\n\nCannot add allergy: Patient does not have an active visit.');
       } else {
         alert('Failed to add allergy: ' + (error.response?.data?.message || error.message || 'Unknown error'));
       }
@@ -846,6 +855,11 @@ const PatientMedicalRecord = () => {
           size="small"
         >
           <div className="space-y-4">
+            {!activeVisitId && (
+              <div className="rounded-md border border-yellow-200 bg-yellow-50 p-3 text-sm text-yellow-800">
+                Patient does not have an active visit. This diagnosis will be recorded without linking to a visit.
+              </div>
+            )}
             <DiagnosisForm
               diagnosis={diagnosisFormData}
               onChange={setDiagnosisFormData}
@@ -876,6 +890,11 @@ const PatientMedicalRecord = () => {
           size="small"
         >
           <div className="space-y-4">
+            {!activeVisitId && (
+              <div className="rounded-md border border-yellow-200 bg-yellow-50 p-3 text-sm text-yellow-800">
+                Patient does not have an active visit. This allergy will be recorded without linking to a visit.
+              </div>
+            )}
             <AllergyForm
               allergy={allergyFormData}
               onChange={setAllergyFormData}

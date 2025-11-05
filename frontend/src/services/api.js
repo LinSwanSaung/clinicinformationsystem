@@ -1,3 +1,5 @@
+import { getAbortSignal, handleUnauthorized } from './sessionGuard';
+
 // API Base Configuration
 const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:3001/api';
 
@@ -59,6 +61,7 @@ class ApiService {
     const config = {
       cache: 'no-store',
       headers,
+      signal: getAbortSignal(),
       ...fetchOptions,
     };
 
@@ -66,9 +69,12 @@ class ApiService {
     const token = localStorage.getItem('authToken');
     if (token) {
       config.headers.Authorization = `Bearer ${token}`;
-    } else if (import.meta.env.DEV) {
-      // In development mode, use a test token if no auth token is present
+    } else if (import.meta.env.DEV && import.meta.env.VITE_USE_DEV_TOKEN === 'true') {
+      // Optional dev bypass, explicit opt-in
       config.headers.Authorization = `Bearer test-token`;
+      if (import.meta.env.VITE_DEV_ROLE) {
+        config.headers['X-Dev-Role'] = String(import.meta.env.VITE_DEV_ROLE);
+      }
     }
 
     try {
@@ -86,6 +92,23 @@ class ApiService {
         data = { message: response.statusText };
       }
 
+      if (response.status === 401) {
+        // Don't redirect on login failures - let the login component show the error
+        // Only redirect if user is already authenticated (has token) or on non-login endpoints
+        const isLoginEndpoint = endpoint.includes('/auth/login');
+        const hasAuthToken = !!localStorage.getItem('authToken');
+        
+        if (!isLoginEndpoint || hasAuthToken) {
+          // Global 401 handler: sign out and redirect (for authenticated requests)
+          await handleUnauthorized();
+          throw new Error('Unauthorized');
+        } else {
+          // Login failed - extract error message from response
+          const errorMessage = data.message || data.error || 'Invalid credentials. Please check your email and password.';
+          throw new Error(errorMessage);
+        }
+      }
+
       if (!response.ok) {
         throw new Error(data.message || `HTTP error! status: ${response.status}`);
       }
@@ -94,6 +117,73 @@ class ApiService {
     } catch (error) {
       throw error;
     }
+  }
+
+  // GET request returning Blob (e.g., PDFs). Inherits 401 handling and abort.
+  async getBlob(endpoint, options = {}) {
+    // Support optional params object to be serialized into query string
+    const { params, headers: customHeaders, ...rest } = options;
+    let url = `${this.baseURL}${endpoint}`;
+    if (params && typeof params === 'object') {
+      const qs = new URLSearchParams();
+      Object.entries(params).forEach(([key, value]) => {
+        if (value !== undefined && value !== null) {
+          qs.append(key, String(value));
+        }
+      });
+      const qsStr = qs.toString();
+      if (qsStr) {
+        url += (url.includes('?') ? '&' : '?') + qsStr;
+      }
+    }
+
+    // Cache-bust GETs to avoid stale browser cache
+    const cacheBuster = `_=${Date.now()}`;
+    url += (url.includes('?') ? '&' : '?') + cacheBuster;
+
+    const headers = {
+      'Cache-Control': 'no-store',
+      Pragma: 'no-cache',
+      Accept: customHeaders?.Accept || 'application/pdf',
+      ...customHeaders,
+    };
+
+    const config = {
+      method: 'GET',
+      cache: 'no-store',
+      headers,
+      signal: getAbortSignal(),
+      ...rest,
+    };
+
+    // Add auth token if available (or dev token if configured)
+    const token = localStorage.getItem('authToken');
+    if (token) {
+      config.headers.Authorization = `Bearer ${token}`;
+    } else if (import.meta.env.DEV && import.meta.env.VITE_USE_DEV_TOKEN === 'true') {
+      config.headers.Authorization = `Bearer test-token`;
+      if (import.meta.env.VITE_DEV_ROLE) {
+        config.headers['X-Dev-Role'] = String(import.meta.env.VITE_DEV_ROLE);
+      }
+    }
+
+    const response = await fetch(url, config);
+
+    if (response.status === 401) {
+      await handleUnauthorized();
+      throw new Error('Unauthorized');
+    }
+
+    if (!response.ok) {
+      // Try to extract text error for easier debugging
+      let message = response.statusText;
+      try {
+        message = await response.text();
+      } catch {}
+      throw new Error(message || `HTTP error! status: ${response.status}`);
+    }
+
+    return await response.blob();
   }
 
   // GET request

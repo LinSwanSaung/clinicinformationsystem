@@ -1,6 +1,9 @@
-import React, { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { Bell } from 'lucide-react';
 import notificationService from '../services/notificationService';
+import { useQuery } from '@tanstack/react-query';
+import { isAuthenticated as isAuthed } from '@/services/sessionGuard';
+import { POLLING_INTERVALS } from '@/constants/polling';
 
 const NotificationBell = () => {
   const [notifications, setNotifications] = useState([]);
@@ -9,17 +12,20 @@ const NotificationBell = () => {
   const [loading, setLoading] = useState(false);
   const dropdownRef = useRef(null);
 
-  // Fetch unread count
-  const fetchUnreadCount = async () => {
-    try {
-      const response = await notificationService.getUnreadCount();
-      // response is { count: number } from notificationService
-      setUnreadCount(response?.count || 0);
-    } catch (error) {
-      console.error('Error fetching unread count:', error);
-      setUnreadCount(0); // Set to 0 on error
-    }
-  };
+  // React Query: unread count polling with auth guard
+  const unreadQuery = useQuery({
+    queryKey: ['notifications', 'unreadCount'],
+    queryFn: () => notificationService.getUnreadCount(),
+    enabled: isAuthed(),
+    refetchInterval: POLLING_INTERVALS.NOTIFICATIONS,
+    refetchIntervalInBackground: true,
+    refetchOnWindowFocus: false,
+  });
+
+  useEffect(() => {
+    const c = unreadQuery.data?.count;
+    if (typeof c === 'number') setUnreadCount(c);
+  }, [unreadQuery.data]);
 
   // Fetch notifications
   const fetchNotifications = async () => {
@@ -96,16 +102,7 @@ const NotificationBell = () => {
     };
   }, [isOpen]);
 
-  // Poll for new notifications every 30 seconds
-  useEffect(() => {
-    fetchUnreadCount();
-    
-    const interval = setInterval(() => {
-      fetchUnreadCount();
-    }, 30000); // 30 seconds
-
-    return () => clearInterval(interval);
-  }, []);
+  // Remove manual polling; handled by React Query above
 
   // Format timestamp
   const formatTime = (timestamp) => {

@@ -22,6 +22,7 @@ import patientService from '../../services/patientService';
 import prescriptionService from '../../services/prescriptionService';
 import doctorNotesService from '../../services/doctorNotesService';
 import documentService from '../../services/documentService';
+import api from '../../services/api';
 import { 
   User,
   Activity,
@@ -69,7 +70,7 @@ const PatientMedicalRecordManagement = () => {
     severity: 'mild'
   });
 
-  // Tab configuration
+  // Tab configuration: show Doctor's Notes tab (view/add guarded by visit)
   const tabs = [
     { id: 'overview', label: 'Overview', icon: User },
     { id: 'history', label: 'Visit History', icon: Activity },
@@ -483,17 +484,9 @@ const PatientMedicalRecordManagement = () => {
 
   const handleDownloadFile = async (file) => {
     try {
-      // Use the document download endpoint with audit logging
-      const response = await fetch(`http://localhost:3001/api/documents/${file.id}/download`, {
-        method: 'GET',
-        headers: {
-          'Authorization': `Bearer ${localStorage.getItem('token')}`
-        }
+      const blob = await api.getBlob(`/documents/${file.id}/download`, {
+        headers: { Accept: 'application/octet-stream' },
       });
-
-      if (!response.ok) throw new Error('Download failed');
-
-      const blob = await response.blob();
       const url = window.URL.createObjectURL(blob);
       const a = document.createElement('a');
       a.href = url;

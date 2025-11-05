@@ -20,6 +20,10 @@ import useDebounce from '@/utils/useDebounce';
 import queueService from '@/services/queueService';
 import QueueDoctorCard from '@/components/QueueDoctorCard';
 import PatientCard from '@/components/medical/PatientCard';
+import { useQuery } from '@tanstack/react-query';
+import { useAuth } from '@/contexts/AuthContext';
+import { POLLING_INTERVALS } from '@/constants/polling';
+import { ROLES } from '@/constants/roles';
 
 // Animation variants
 const pageVariants = {
@@ -41,6 +45,7 @@ const containerVariants = {
 
 const NursePatientQueuePage = () => {
   const navigate = useNavigate();
+  const { user } = useAuth();
   
   // State management
   const [doctors, setDoctors] = useState([]);
@@ -51,42 +56,45 @@ const NursePatientQueuePage = () => {
   const [error, setError] = useState(null);
   const [lastUpdated, setLastUpdated] = useState(new Date());
 
-  const refreshInterval = 15000; // 15 seconds for nurse interface
   const debouncedSearchTerm = useDebounce(searchTerm, 300);
 
-  // Load doctors and their queues
-  const loadDoctorsData = async (showLoader = true) => {
-    try {
-      if (showLoader) setIsLoading(true);
-      setError(null);
+  // React Query: doctors queue polling with auth/role guard
+  const doctorsQuery = useQuery({
+    queryKey: ['nurse', 'queue', 'doctors'],
+    queryFn: () => queueService.getAllDoctorsQueueStatus(),
+    enabled: !!user && user.role === ROLES.NURSE,
+    refetchInterval: POLLING_INTERVALS.NURSE_QUEUE,
+    refetchIntervalInBackground: true,
+    refetchOnWindowFocus: false,
+  });
 
-      const doctorsData = await queueService.getAllDoctorsQueueStatus();
-      const doctors = doctorsData.data || [];
-      setDoctors(doctors);
-      setLastUpdated(new Date());
-    } catch (err) {
-      setError(err.message);
-    } finally {
-      setIsLoading(false);
-      setIsRefreshing(false);
-    }
-  };
-
-  // Auto-refresh effect
   useEffect(() => {
-    loadDoctorsData();
+    if (doctorsQuery.isLoading) {
+      setIsLoading(true);
+      return;
+    }
+    if (doctorsQuery.error) {
+      setError(doctorsQuery.error.message || 'Failed to load');
+      setIsLoading(false);
+      return;
+    }
+    const list = doctorsQuery.data?.data || [];
+    setDoctors(list);
+    setLastUpdated(new Date());
+    setIsLoading(false);
+    setIsRefreshing(false);
+  }, [doctorsQuery.isLoading, doctorsQuery.error, doctorsQuery.data]);
 
-    const interval = setInterval(() => {
-      loadDoctorsData(false);
-    }, refreshInterval);
-
-    return () => clearInterval(interval);
-  }, []);
+  // Remove manual interval; handled by React Query
 
   // Manual refresh
   const handleRefresh = async () => {
-    setIsRefreshing(true);
-    await loadDoctorsData(false);
+    try {
+      setIsRefreshing(true);
+      await doctorsQuery.refetch();
+    } finally {
+      setIsRefreshing(false);
+    }
   };
 
   // Filter doctors based on search and those who have patients

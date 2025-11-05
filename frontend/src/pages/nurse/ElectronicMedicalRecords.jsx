@@ -46,6 +46,7 @@ const ElectronicMedicalRecords = () => {
   const [latestVitals, setLatestVitals] = useState(null);
   const [prescriptions, setPrescriptions] = useState([]);
   const [doctorNotes, setDoctorNotes] = useState([]);
+  const [notesAuthError, setNotesAuthError] = useState(false);
   const [loading, setLoading] = useState(false);
   const [hasActiveVisit, setHasActiveVisit] = useState(false);
 
@@ -193,6 +194,10 @@ const ElectronicMedicalRecords = () => {
       } catch (error) {
         console.error('Failed to fetch doctor notes:', error);
         setDoctorNotes([]);
+        // Surface auth error as a non-blocking banner so nurses still see the tab
+        if (String(error?.message || '').toLowerCase().includes('auth')) {
+          setNotesAuthError(true);
+        }
       }
     } catch (error) {
       console.error('Error loading patient medical data:', error);
@@ -458,12 +463,19 @@ const ElectronicMedicalRecords = () => {
 
               {/* Doctor's Notes Tab */}
               {activeTab === 'notes' && (
-                <ClinicalNotesDisplay 
-                  notes={doctorNotes}
-                  userRole="nurse"
-                  onAddNote={handleAddNote}
-                  onEditNote={handleEditNote}
-                />
+                <>
+                  {notesAuthError && (
+                    <div className="mb-3 rounded-md border border-yellow-200 bg-yellow-50 p-3 text-sm text-yellow-800">
+                      Unable to load doctor\'s notes due to authorization. If your role should have access, please contact an administrator.
+                    </div>
+                  )}
+                  <ClinicalNotesDisplay 
+                    notes={doctorNotes}
+                    userRole="nurse"
+                    onAddNote={handleAddNote}
+                    onEditNote={handleEditNote}
+                  />
+                </>
               )}
 
               {/* Files & Images Tab */}

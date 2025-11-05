@@ -20,6 +20,7 @@ import { allergyService } from '../../services/allergyService';
 import { diagnosisService } from '../../services/diagnosisService';
 import { visitService } from '../../services/visitService';
 import vitalsService from '../../services/vitalsService';
+import api from '../../services/api';
 
 const PatientMedicalRecords = () => {
   const navigate = useNavigate();
@@ -104,22 +105,9 @@ const PatientMedicalRecords = () => {
   // Download single visit PDF
   const handleDownloadVisitPDF = async (visitId) => {
     try {
-      const token = localStorage.getItem('authToken');
-      const response = await fetch(
-        `http://localhost:3001/api/visits/${visitId}/export/pdf`,
-        {
-          method: 'GET',
-          headers: {
-            'Authorization': `Bearer ${token}`,
-          },
-        }
-      );
-
-      if (!response.ok) {
-        throw new Error('Failed to download visit summary');
-      }
-
-      const blob = await response.blob();
+      const blob = await api.getBlob(`/visits/${visitId}/export/pdf`, {
+        headers: { Accept: 'application/pdf' },
+      });
       const url = window.URL.createObjectURL(blob);
       const a = document.createElement('a');
       a.href = url;

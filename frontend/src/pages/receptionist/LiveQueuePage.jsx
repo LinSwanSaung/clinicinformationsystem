@@ -30,6 +30,10 @@ import PageLayout from '@/components/PageLayout';
 import useDebounce from '@/utils/useDebounce';
 import queueService from '@/services/queueService';
 import QueueDoctorCard from '@/components/QueueDoctorCard';
+import { useQuery } from '@tanstack/react-query';
+import { useAuth } from '@/contexts/AuthContext';
+import { POLLING_INTERVALS } from '@/constants/polling';
+import { ROLES } from '@/constants/roles';
 
 // Animation variants
 const pageVariants = {
@@ -101,72 +105,66 @@ const LiveQueuePage = () => {
   const [lastUpdated, setLastUpdated] = useState(new Date());
   const [autoRefresh, setAutoRefresh] = useState(true);
 
-  const refreshInterval = 10000; // 10 seconds
   const debouncedSearchTerm = useDebounce(searchTerm, 300);
+  const { user } = useAuth();
 
-  // Load queue data
-  const loadQueueData = async (showLoader = true) => {
-    try {
-      if (showLoader) setIsLoading(true);
-      setError(null);
+  // React Query: doctors + queue status polling with role/auth guard
+  const doctorsQuery = useQuery({
+    queryKey: ['receptionist', 'doctorsQueue'],
+    queryFn: () => queueService.getAllDoctorsQueueStatus(),
+    enabled: !!user && user.role === ROLES.RECEPTIONIST,
+    refetchInterval: autoRefresh ? POLLING_INTERVALS.QUEUE : false,
+    refetchIntervalInBackground: true,
+    refetchOnWindowFocus: false,
+  });
 
-      // Load doctors with their queue status
-      const doctorsData = await queueService.getAllDoctorsQueueStatus();
-
-      const doctors = doctorsData.data || [];
-      setDoctors(doctors);
-
-      // Filter out unavailable doctors for summary calculation
-      const availableDoctors = doctors.filter(d => d.status?.status !== 'unavailable');
-
-      // Calculate summary from actual backend data structure
-      const summary = {
-        totalDoctors: availableDoctors.length, // Only count available doctors
-        activeDoctors: availableDoctors.filter(d => d.queueStatus?.tokens?.length > 0).length,
-        totalPatients: availableDoctors.reduce((sum, d) => sum + (d.queueStatus?.tokens?.length || 0), 0),
-        waitingPatients: availableDoctors.reduce((sum, d) => {
-          const activeTokens = d.queueStatus?.tokens?.filter(token => 
-            token.status === 'waiting' || token.status === 'called'
-          ) || [];
-          return sum + activeTokens.length;
-        }, 0),
-        completedToday: availableDoctors.reduce((sum, d) => {
-          const completedTokens = d.queueStatus?.tokens?.filter(token => token.status === 'completed') || [];
-          return sum + completedTokens.length;
-        }, 0),
-        busyDoctors: availableDoctors.filter(d => {
-          const servingTokens = d.queueStatus?.tokens?.filter(token => token.status === 'serving') || [];
-          return servingTokens.length > 0;
-        }).length
-      };
-
-      setQueueSummary(summary);
-      setLastUpdated(new Date());
-    } catch (err) {
-      setError(err.message);
-    } finally {
-      setIsLoading(false);
-      setIsRefreshing(false);
-    }
-  };
-
-  // Auto-refresh effect
+  // Derive state from query results
   useEffect(() => {
-    loadQueueData();
-
-    if (autoRefresh) {
-      const interval = setInterval(() => {
-        loadQueueData(false);
-      }, refreshInterval);
-
-      return () => clearInterval(interval);
+    if (doctorsQuery.isLoading) {
+      setIsLoading(true);
+      return;
     }
-  }, [autoRefresh]);
+    if (doctorsQuery.error) {
+      setError(doctorsQuery.error.message || 'Failed to load');
+      setIsLoading(false);
+      return;
+    }
+    const list = doctorsQuery.data?.data || [];
+    setDoctors(list);
+    const availableDoctors = list.filter(d => d.status?.status !== 'unavailable');
+    const summary = {
+      totalDoctors: availableDoctors.length,
+      activeDoctors: availableDoctors.filter(d => d.queueStatus?.tokens?.length > 0).length,
+      totalPatients: availableDoctors.reduce((sum, d) => sum + (d.queueStatus?.tokens?.length || 0), 0),
+      waitingPatients: availableDoctors.reduce((sum, d) => {
+        const activeTokens = d.queueStatus?.tokens?.filter(token => token.status === 'waiting' || token.status === 'called') || [];
+        return sum + activeTokens.length;
+      }, 0),
+      completedToday: availableDoctors.reduce((sum, d) => {
+        const completedTokens = d.queueStatus?.tokens?.filter(token => token.status === 'completed') || [];
+        return sum + completedTokens.length;
+      }, 0),
+      busyDoctors: availableDoctors.filter(d => {
+        const servingTokens = d.queueStatus?.tokens?.filter(token => token.status === 'serving') || [];
+        return servingTokens.length > 0;
+      }).length,
+    };
+    setQueueSummary(summary);
+    setLastUpdated(new Date());
+    setIsLoading(false);
+    setIsRefreshing(false);
+  }, [doctorsQuery.isLoading, doctorsQuery.error, doctorsQuery.data]);
+
+  // Remove manual interval; handled by React Query via refetchInterval
 
   // Manual refresh
   const handleRefresh = async () => {
-    setIsRefreshing(true);
-    await loadQueueData(false);
+    try {
+      setIsRefreshing(true);
+      await doctorsQuery.refetch();
+    } finally {
+      setIsRefreshing(false);
+    }
   };
 
   // Clear all filters

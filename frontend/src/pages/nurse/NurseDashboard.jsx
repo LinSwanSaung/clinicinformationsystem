@@ -26,6 +26,10 @@ import {
 } from 'lucide-react';
 import doctorService from '../../services/doctorService';
 import queueService from '../../services/queueService';
+import { useQuery } from '@tanstack/react-query';
+import { useAuth } from '@/contexts/AuthContext';
+import { ROLES } from '@/constants/roles';
+import { POLLING_INTERVALS } from '@/constants/polling';
 
 /**
  * Helper function to fetch appropriate vitals for a token
@@ -70,6 +74,7 @@ const fetchTokenVitals = async (token) => {
 
 const NurseDashboard = () => {
   const navigate = useNavigate();
+  const { user } = useAuth();
   const [doctors, setDoctors] = useState([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
@@ -86,54 +91,38 @@ const NurseDashboard = () => {
     waitingPatients: 0
   });
 
-  // Load doctors and queue data on component mount
-  useEffect(() => {
-    const loadDoctorsAndQueues = async () => {
-      try {
-        setLoading(true);
-        // Use the same method as the working NursePatientQueuePage
-        const doctorsData = await queueService.getAllDoctorsQueueStatus();
-        
-        const doctors = doctorsData.data || [];
-        
-        setDoctors(doctors);
-        
-        // Calculate stats (only count available doctors)
-        const availableDoctors = doctors.filter(d => d.status?.status !== 'unavailable');
-        const totalDoctors = availableDoctors.length;
-        const activeDoctors = availableDoctors.filter(d => d.queueStatus?.tokens?.length > 0).length;
-        const totalPatients = availableDoctors.reduce((sum, d) => sum + (d.queueStatus?.tokens?.length || 0), 0);
-        const waitingPatients = availableDoctors.reduce((sum, d) => sum + (d.queueStatus?.tokens?.filter(t => t.status === 'waiting').length || 0), 0);
-        
-        setQueueStats({
-          totalDoctors,
-          activeDoctors,
-          totalPatients,
-          waitingPatients
-        });
-        
-        setLastRefresh(new Date());
-        
-      } catch (error) {
-        console.error('Failed to load doctors and queues:', error);
-        setDoctors([]);
-      } finally {
-        setLoading(false);
-      }
-    };
+  // React Query: Poll doctors queue with auth/role guard and pause on activity
+  const doctorsQuery = useQuery({
+    queryKey: ['nurse', 'doctorsQueue'],
+    queryFn: () => queueService.getAllDoctorsQueueStatus(),
+    enabled: !!user && user.role === ROLES.NURSE && !isUserActive,
+    refetchInterval: isUserActive ? false : POLLING_INTERVALS.DASHBOARD,
+    refetchIntervalInBackground: false,
+    refetchOnWindowFocus: false,
+  });
 
-    loadDoctorsAndQueues();
-    
-    // Smarter refresh strategy - only refresh if user is not actively interacting
-    const interval = setInterval(() => {
-      // Don't auto-refresh if user is actively interacting (typing, modals open, etc.)
-      if (!isUserActive) {
-        loadDoctorsAndQueues();
-      }
-    }, 60000); // Increased to 60 seconds
-    
-    return () => clearInterval(interval);
-  }, [isUserActive]);
+  useEffect(() => {
+    if (doctorsQuery.isLoading) {
+      setLoading(true);
+      return;
+    }
+    if (doctorsQuery.error) {
+      console.error('Failed to load doctors and queues:', doctorsQuery.error);
+      setDoctors([]);
+      setLoading(false);
+      return;
+    }
+    const list = doctorsQuery.data?.data || [];
+    setDoctors(list);
+    const availableDoctors = list.filter(d => d.status?.status !== 'unavailable');
+    const totalDoctors = availableDoctors.length;
+    const activeDoctors = availableDoctors.filter(d => d.queueStatus?.tokens?.length > 0).length;
+    const totalPatients = availableDoctors.reduce((sum, d) => sum + (d.queueStatus?.tokens?.length || 0), 0);
+    const waitingPatients = availableDoctors.reduce((sum, d) => sum + (d.queueStatus?.tokens?.filter(t => t.status === 'waiting').length || 0), 0);
+    setQueueStats({ totalDoctors, activeDoctors, totalPatients, waitingPatients });
+    setLastRefresh(new Date());
+    setLoading(false);
+  }, [doctorsQuery.isLoading, doctorsQuery.error, doctorsQuery.data]);
 
   // Track user activity to pause auto-refresh during interactions
   useEffect(() => {
@@ -167,7 +156,7 @@ const NurseDashboard = () => {
     if (selectedDoctor) {
       await handleViewPatients(selectedDoctor);
     } else {
-      await loadDoctorsAndQueues();
+      await doctorsQuery.refetch();
     }
   };
 

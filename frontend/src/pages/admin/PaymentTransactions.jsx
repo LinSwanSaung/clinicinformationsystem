@@ -83,30 +83,9 @@ const PaymentTransactions = () => {
 
   const handleDownloadReceipt = async (payment) => {
     try {
-      const token = localStorage.getItem('authToken');
-
-      if (!token) {
-        alert('Please login first');
-        return;
-      }
-
-      // Use direct fetch with proper auth header format
-      const response = await fetch(`http://localhost:3001/api/payments/${payment.id}/receipt/pdf`, {
-        method: 'GET',
-        headers: {
-          Authorization: `Bearer ${token}`,
-          'Content-Type': 'application/json',
-        },
+      const blob = await api.getBlob(`/payments/${payment.id}/receipt/pdf`, {
+        headers: { Accept: 'application/pdf' },
       });
-
-      if (!response.ok) {
-        const errorText = await response.text();
-        console.error('Server error:', errorText);
-        throw new Error('Failed to download receipt');
-      }
-
-      // Create blob from response
-      const blob = await response.blob();
       const url = window.URL.createObjectURL(blob);
       const link = document.createElement('a');
       link.href = url;

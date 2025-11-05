@@ -64,6 +64,7 @@ import PageLayout from '@/components/PageLayout';
 import useDebounce from '@/utils/useDebounce';
 import invoiceService from '../../services/invoiceService';
 import { useInvoices } from '@/hooks/useInvoices';
+import api from '../../services/api';
 
 // Animation variants
 const pageVariants = {
@@ -322,13 +323,6 @@ const CashierDashboard = () => {
   // Download receipt for invoice
   const handleDownloadReceipt = async (historyItem) => {
     try {
-      const token = localStorage.getItem('authToken');
-
-      if (!token) {
-        alert('Please login first');
-        return;
-      }
-
       // Get the first payment transaction for this invoice
       const paymentId = historyItem.rawData.payment_transactions?.[0]?.id;
 
@@ -337,23 +331,9 @@ const CashierDashboard = () => {
         return;
       }
 
-      // Use direct fetch with proper auth header format
-      const response = await fetch(`http://localhost:3001/api/payments/${paymentId}/receipt/pdf`, {
-        method: 'GET',
-        headers: {
-          Authorization: `Bearer ${token}`,
-          'Content-Type': 'application/json',
-        },
+      const blob = await api.getBlob(`/payments/${paymentId}/receipt/pdf`, {
+        headers: { Accept: 'application/pdf' },
       });
-
-      if (!response.ok) {
-        const errorText = await response.text();
-        console.error('Server error:', errorText);
-        throw new Error('Failed to download receipt');
-      }
-
-      // Create blob from response
-      const blob = await response.blob();
       const url = window.URL.createObjectURL(blob);
       const link = document.createElement('a');
       link.href = url;

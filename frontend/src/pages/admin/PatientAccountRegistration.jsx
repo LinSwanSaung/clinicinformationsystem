@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import useDebounce from '@/utils/useDebounce';
+import useDebounce from '@/hooks/useDebounce';
 import PageLayout from '@/components/PageLayout';
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';

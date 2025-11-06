@@ -26,7 +26,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog';
-import useDebounce from '@/utils/useDebounce';
+import useDebounce from '@/hooks/useDebounce';
 import patientService from '@/services/patientService';
 import doctorService from '@/services/doctorService';
 import appointmentService from '@/services/appointmentService';

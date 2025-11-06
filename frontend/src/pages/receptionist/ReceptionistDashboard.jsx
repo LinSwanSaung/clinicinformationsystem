@@ -55,7 +55,7 @@ import appointmentService from '@/services/appointmentService';
 import queueService from '@/services/queueService';
 import { useAuth } from '@/contexts/AuthContext';
 import PageLayout from '@/components/PageLayout';
-import useDebounce from '@/utils/useDebounce';
+import useDebounce from '@/hooks/useDebounce';
 import { useAppointments } from '@/hooks/useAppointments';
 import { useUpdateAppointmentStatus } from '@/hooks/useUpdateAppointmentStatus';
 

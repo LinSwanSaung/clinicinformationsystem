@@ -61,7 +61,7 @@ import {
   DialogFooter,
 } from '@/components/ui/dialog';
 import PageLayout from '@/components/PageLayout';
-import useDebounce from '@/utils/useDebounce';
+import useDebounce from '@/hooks/useDebounce';
 import invoiceService from '../../services/invoiceService';
 import { useInvoices } from '@/hooks/useInvoices';
 import api from '../../services/api';

@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
-import useDebounce from '../../utils/useDebounce';
+import useDebounce from '@/hooks/useDebounce';
 import { useNavigate } from 'react-router-dom';
 import {
   Card,

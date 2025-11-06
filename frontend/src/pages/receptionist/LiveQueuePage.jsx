@@ -28,7 +28,7 @@ import {
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import PageLayout from '@/components/PageLayout';
-import useDebounce from '@/utils/useDebounce';
+import useDebounce from '@/hooks/useDebounce';
 import queueService from '@/services/queueService';
 import QueueDoctorCard from '@/components/QueueDoctorCard';
 import { useQuery } from '@tanstack/react-query';

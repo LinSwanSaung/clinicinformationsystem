@@ -5,7 +5,7 @@ import { Search, RefreshCw, UserCheck, ArrowLeft } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import PageLayout from '@/components/PageLayout';
-import useDebounce from '@/utils/useDebounce';
+import useDebounce from '@/hooks/useDebounce';
 import queueService from '@/services/queueService';
 import QueueDoctorCard from '@/components/QueueDoctorCard';
 import PatientCard from '@/components/medical/PatientCard';

@@ -4,6 +4,7 @@ import notificationService from '../services/notificationService';
 import { useQuery } from '@tanstack/react-query';
 import { isAuthenticated as isAuthed } from '@/services/sessionGuard';
 import { POLLING_INTERVALS } from '@/constants/polling';
+import { EmptyState } from '@/components/library';
 
 const NotificationBell = () => {
   const [notifications, setNotifications] = useState([]);
@@ -169,9 +170,12 @@ const NotificationBell = () => {
                 <p className="mt-2">Loading...</p>
               </div>
             ) : notifications.length === 0 ? (
-              <div className="p-8 text-center text-gray-500">
-                <Bell className="w-12 h-12 mx-auto mb-2 opacity-50" />
-                <p>No notifications</p>
+              <div className="p-6">
+                <EmptyState
+                  title="No notifications"
+                  description="You're all caught up. New alerts will appear here."
+                  className="p-6"
+                />
               </div>
             ) : (
               <ul className="divide-y divide-gray-100">

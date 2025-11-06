@@ -49,8 +49,9 @@ const ElectronicMedicalRecords = () => {
   const [notesAuthError, setNotesAuthError] = useState(false);
   const [loading, setLoading] = useState(false);
   const [hasActiveVisit, setHasActiveVisit] = useState(false);
+  const canViewDoctorNotes = true; // Nurse role: allow access to Doctor's Notes tab
 
-  // Tab configuration
+  // Tab configuration: include Doctor's Notes for nurse access
   const tabs = [
     { id: 'overview', label: 'Overview', icon: User },
     { id: 'history', label: 'Visit History', icon: Activity },
@@ -132,71 +133,59 @@ const ElectronicMedicalRecords = () => {
         setPrescriptions([]);
       }
 
-      // Fetch doctor notes for this patient
-      try {
-        const notes = await doctorNotesService.getNotesByPatient(patientIdToUse);
-        if (Array.isArray(notes) && notes.length > 0) {
-          // Format notes for display and fetch prescriptions for each note
-          const formattedNotes = await Promise.all(notes.map(async (note) => {
-            // Parse the content to extract diagnosis and clinical notes
-            const content = note.content || '';
-            const diagnosisMatch = content.match(/Diagnosis:\s*(.+?)(?:\n\n|$)/);
-            const notesMatch = content.match(/Clinical Notes:\s*(.+)/s);
-            
-            // Fetch prescriptions for this note's visit and doctor
-            let prescriptions = [];
-            if (note.visit_id) {
-              try {
-                const visitPrescriptions = await prescriptionService.getPrescriptionsByVisit(note.visit_id);
-                
-                // Filter prescriptions to only those by the same doctor and around the same time
-                const noteTime = new Date(note.created_at).getTime();
-                const timeWindow = 5 * 60 * 1000; // 5 minutes window
-                
-                prescriptions = Array.isArray(visitPrescriptions) 
-                  ? visitPrescriptions
-                      .filter(p => {
-                        // Match by doctor ID
-                        if (p.doctor_id !== note.doctor_id) return false;
-                        
-                        // Match by time window (prescriptions created within 5 minutes of note)
-                        const prescriptionTime = new Date(p.created_at || p.prescribed_date).getTime();
-                        const timeDiff = Math.abs(noteTime - prescriptionTime);
-                        
-                        return timeDiff <= timeWindow;
-                      })
-                      .map(p => ({
-                        name: p.medication_name,
-                        dosage: p.dosage,
-                        frequency: p.frequency,
-                        duration: p.duration,
-                        quantity: p.quantity,
-                        refills: p.refills,
-                        instructions: p.instructions
-                      }))
-                  : [];
-              } catch (error) {
-                console.error('Error fetching prescriptions for visit:', note.visit_id, error);
+      // Doctor's notes disabled for nurse role; skip fetching to avoid 401 noise
+      if (canViewDoctorNotes) {
+        try {
+          const notes = await doctorNotesService.getNotesByPatient(patientIdToUse);
+          if (Array.isArray(notes) && notes.length > 0) {
+            const formattedNotes = await Promise.all(notes.map(async (note) => {
+              const content = note.content || '';
+              const diagnosisMatch = content.match(/Diagnosis:\s*(.+?)(?:\n\n|$)/);
+              const notesMatch = content.match(/Clinical Notes:\s*(.+)/s);
+              let prescriptions = [];
+              if (note.visit_id) {
+                try {
+                  const visitPrescriptions = await prescriptionService.getPrescriptionsByVisit(note.visit_id);
+                  const noteTime = new Date(note.created_at).getTime();
+                  const timeWindow = 5 * 60 * 1000;
+                  prescriptions = Array.isArray(visitPrescriptions)
+                    ? visitPrescriptions
+                        .filter(p => {
+                          if (p.doctor_id !== note.doctor_id) return false;
+                          const prescriptionTime = new Date(p.created_at || p.prescribed_date).getTime();
+                          return Math.abs(noteTime - prescriptionTime) <= timeWindow;
+                        })
+                        .map(p => ({
+                          name: p.medication_name,
+                          dosage: p.dosage,
+                          frequency: p.frequency,
+                          duration: p.duration,
+                          quantity: p.quantity,
+                          refills: p.refills,
+                          instructions: p.instructions
+                        }))
+                    : [];
+                } catch (error) {
+                  console.error('Error fetching prescriptions for visit:', note.visit_id, error);
+                }
               }
-            }
-            
-            return {
-              date: new Date(note.created_at).toLocaleDateString(),
-              note: notesMatch ? notesMatch[1].trim() : content,
-              diagnosis: diagnosisMatch ? diagnosisMatch[1].trim() : 'N/A',
-              prescribedMedications: prescriptions
-            };
-          }));
-          setDoctorNotes(formattedNotes);
-        } else {
+              return {
+                date: new Date(note.created_at).toLocaleDateString(),
+                note: notesMatch ? notesMatch[1].trim() : content,
+                diagnosis: diagnosisMatch ? diagnosisMatch[1].trim() : 'N/A',
+                prescribedMedications: prescriptions
+              };
+            }));
+            setDoctorNotes(formattedNotes);
+          } else {
+            setDoctorNotes([]);
+          }
+        } catch (error) {
+          console.error('Failed to fetch doctor notes:', error);
           setDoctorNotes([]);
-        }
-      } catch (error) {
-        console.error('Failed to fetch doctor notes:', error);
-        setDoctorNotes([]);
-        // Surface auth error as a non-blocking banner so nurses still see the tab
-        if (String(error?.message || '').toLowerCase().includes('auth')) {
-          setNotesAuthError(true);
+          if (String(error?.message || '').toLowerCase().includes('auth')) {
+            setNotesAuthError(true);
+          }
         }
       }
     } catch (error) {

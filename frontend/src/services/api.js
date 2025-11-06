@@ -38,6 +38,7 @@ class ApiService {
     }
 
     const method = (rest.method ? rest.method.toUpperCase() : 'GET');
+    // eslint-disable-next-line no-unused-vars
     const { method: _ignored, ...restWithoutMethod } = rest;
     const fetchOptions = { ...restWithoutMethod, method };
 
@@ -77,46 +78,42 @@ class ApiService {
       }
     }
 
-    try {
-      const response = await fetch(url, config);
-      
-      // Handle 204 No Content gracefully
-      if (response.status === 204) {
-        return { success: true };
-      }
-
-      let data;
-      try {
-        data = await response.json();
-      } catch (e) {
-        data = { message: response.statusText };
-      }
-
-      if (response.status === 401) {
-        // Don't redirect on login failures - let the login component show the error
-        // Only redirect if user is already authenticated (has token) or on non-login endpoints
-        const isLoginEndpoint = endpoint.includes('/auth/login');
-        const hasAuthToken = !!localStorage.getItem('authToken');
-        
-        if (!isLoginEndpoint || hasAuthToken) {
-          // Global 401 handler: sign out and redirect (for authenticated requests)
-          await handleUnauthorized();
-          throw new Error('Unauthorized');
-        } else {
-          // Login failed - extract error message from response
-          const errorMessage = data.message || data.error || 'Invalid credentials. Please check your email and password.';
-          throw new Error(errorMessage);
-        }
-      }
-
-      if (!response.ok) {
-        throw new Error(data.message || `HTTP error! status: ${response.status}`);
-      }
-
-      return data;
-    } catch (error) {
-      throw error;
+    const response = await fetch(url, config);
+    
+    // Handle 204 No Content gracefully
+    if (response.status === 204) {
+      return { success: true };
     }
+
+    let data;
+    try {
+      data = await response.json();
+    } catch (e) {
+      data = { message: response.statusText };
+    }
+
+    if (response.status === 401) {
+      // Don't redirect on login failures - let the login component show the error
+      // Only redirect if user is already authenticated (has token) or on non-login endpoints
+      const isLoginEndpoint = endpoint.includes('/auth/login');
+      const hasAuthToken = !!localStorage.getItem('authToken');
+      
+      if (!isLoginEndpoint || hasAuthToken) {
+        // Global 401 handler: sign out and redirect (for authenticated requests)
+        await handleUnauthorized();
+        throw new Error('Unauthorized');
+      } else {
+        // Login failed - extract error message from response
+        const errorMessage = data.message || data.error || 'Invalid credentials. Please check your email and password.';
+        throw new Error(errorMessage);
+      }
+    }
+
+    if (!response.ok) {
+      throw new Error(data.message || `HTTP error! status: ${response.status}`);
+    }
+
+    return data;
   }
 
   // GET request returning Blob (e.g., PDFs). Inherits 401 handling and abort.
@@ -179,7 +176,9 @@ class ApiService {
       let message = response.statusText;
       try {
         message = await response.text();
-      } catch {}
+      } catch {
+        // Ignore - use statusText as fallback
+      }
       throw new Error(message || `HTTP error! status: ${response.status}`);
     }
 

@@ -4,6 +4,7 @@ import { useAuth } from '../../contexts/AuthContext';
 import PageLayout from '../../components/PageLayout';
 import { Card } from '../../components/ui/card';
 import { Input } from '../../components/ui/input';
+import { SearchBar, LoadingSpinner } from '@/components/library';
 import { Button } from '../../components/ui/button';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '../../components/ui/tabs';
 import { 
@@ -554,8 +555,8 @@ const DoctorDashboard = () => {
       <div className="space-y-8 p-8">
         {/* Loading state */}
         {loading ? (
-          <div className="text-center py-12">
-            <p className="text-gray-500 text-lg">Loading patients...</p>
+          <div className="py-12">
+            <LoadingSpinner label="Loading patients..." />
           </div>
         ) : (
           <>
@@ -565,13 +566,11 @@ const DoctorDashboard = () => {
             {/* Search and actions bar */}
             <div className="flex gap-4 items-center">
               <div className="relative flex-1 max-w-md">
-                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" size={20} />
-                <Input 
-                  type="search" 
-                  placeholder="Search by patient name or token..." 
-                  className="pl-10 h-12 text-base" 
+                <SearchBar
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
+                  placeholder="Search by patient name or token..."
+                  ariaLabel="Search patients"
                 />
               </div>
               <div className="min-w-[200px]">

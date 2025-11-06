@@ -24,7 +24,7 @@ import {
 } from 'lucide-react';
 import patientAccountService from '@/services/patientAccountService';
 import api from '@/services/api';
-import { DataTable, SearchBar, StatusBadge, FormModal } from '@/components/library';
+import { DataTable, SearchBar, StatusBadge, FormModal, LinkedPatientBadge } from '@/components/library';
 
 const defaultAccountForm = {
   first_name: '',
@@ -572,18 +572,14 @@ const PatientAccountRegistration = () => {
                     const isLinked = Boolean(row.patient);
                     return isLinked ? (
                       <div className="flex flex-col">
-                        <StatusBadge status="linked" variant="secondary" className="mb-1 w-fit">
-                          Linked
-                        </StatusBadge>
+                        <LinkedPatientBadge linked className="mb-1 w-fit" />
                         <span className="text-sm text-muted-foreground">
                           {row.patient?.patient_number} - {row.patient?.first_name}{' '}
                           {row.patient?.last_name}
                         </span>
                       </div>
                     ) : (
-                      <StatusBadge status="unlinked" variant="outline">
-                        Unlinked
-                      </StatusBadge>
+                      <LinkedPatientBadge linked={false} />
                     );
                   },
                 },

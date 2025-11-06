@@ -6,6 +6,7 @@ export { ConfirmDialog } from './feedback/ConfirmDialog';
 
 // Status components
 export { StatusBadge } from './status/StatusBadge';
+export { LinkedPatientBadge } from './status/LinkedPatientBadge';
 
 // Dashboard components
 export { StatCard } from './dashboard/StatCard';

@@ -4,9 +4,7 @@ import { motion } from 'framer-motion';
 import PageLayout from '../../components/PageLayout';
 import QueueDoctorCard from '../../components/QueueDoctorCard';
 import PatientCard from '../../components/medical/PatientCard';
-import SearchInput from '../../components/SearchInput';
-import LoadingState from '../../components/LoadingState';
-import EmptyState from '../../components/EmptyState';
+import { SearchBar, LoadingSpinner, EmptyState } from '@/components/library';
 import vitalsService from '../../services/vitalsService';
 import { Card, CardContent, CardHeader, CardTitle } from '../../components/ui/card';
 import { Input } from '../../components/ui/input';
@@ -306,7 +304,7 @@ const NurseDashboard = () => {
     >
       <div className="space-y-6 p-6">
         {loading ? (
-          <LoadingState />
+          <LoadingSpinner label="Loading..." />
         ) : (
           <>
             {!selectedDoctor ? (
@@ -370,13 +368,11 @@ const NurseDashboard = () => {
                 {/* Search and Actions */}
                 <div className="flex flex-col sm:flex-row gap-4 items-start sm:items-center justify-between">
                   <div className="relative flex-1 max-w-md">
-                    <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" size={20} />
-                    <Input 
-                      type="search" 
-                      placeholder="Search doctors by name or specialty..." 
-                      className="pl-10 h-12 text-base" 
+                    <SearchBar
                       value={searchTerm}
                       onChange={(e) => setSearchTerm(e.target.value)}
+                      placeholder="Search doctors by name or specialty..."
+                      ariaLabel="Search doctors"
                     />
                   </div>
                   

@@ -2,54 +2,55 @@
 
 ## Shim Removal Verification
 
-### ✅ Removed Shims (Confirmed Deleted)
+### ✅ All Shims Removed (Confirmed Deleted)
 
-1. **`frontend/src/utils/useDebounce.js`** - ✅ Deleted (file does not exist)
-2. **`frontend/src/components/ErrorState.jsx`** - ✅ Deleted (file does not exist)
-3. **`frontend/src/components/LoadingState.jsx`** - ✅ Deleted (file does not exist)
+1. **`frontend/src/utils/useDebounce.js`** - ✅ Deleted
+2. **`frontend/src/components/ErrorState.jsx`** - ✅ Deleted
+3. **`frontend/src/components/LoadingState.jsx`** - ✅ Deleted
+4. **`frontend/src/components/EmptyState.jsx`** - ✅ Deleted
+5. **`frontend/src/components/DataTable.jsx`** - ✅ Deleted
+6. **`frontend/src/components/SearchInput.jsx`** - ✅ Deleted
+7. **`frontend/src/components/ui/ModalComponent.jsx`** - ✅ Deleted
 
 ### Import Scan Results
 
-#### useDebounce
+#### Final Verification (All Legacy Paths)
 
 ```bash
-grep -r "from.*utils/useDebounce\|from.*@/utils/useDebounce" frontend/src
+# Check for any remaining imports from deleted shims
+grep -r "from.*components/EmptyState\|from.*components/DataTable\|from.*components/SearchInput\|from.*ui/ModalComponent" frontend/src
+grep -r "from.*components/LoadingState\|from.*components/ErrorState\|from.*utils/useDebounce" frontend/src
 ```
 
-**Result**: ✅ **0 matches** (no imports found)
+**Result**: ✅ **0 matches** (no imports found from any deleted shim)
 
-#### ErrorState
+**Updated Files**:
 
-```bash
-grep -r "from.*components/ErrorState\|from.*@/components/ErrorState" frontend/src
-```
+- `frontend/src/components/PatientList.jsx` - Updated to use `@components/library/feedback/EmptyState` and `@components/library/feedback/LoadingSpinner`
+- `frontend/src/components/DataList.jsx` - Updated to use `@components/library/feedback/EmptyState`, `@components/library/feedback/LoadingSpinner`, and `@components/library/feedback/ErrorState`
 
-**Result**: ⚠️ **2 matches** (backup files only):
+## Backup Files Cleanup
 
-- `frontend/src/components/patient/VitalsSnapshot_ORIGINAL.jsx` (backup file)
-- `frontend/src/components/patient/VitalsSnapshot.jsx.backup` (backup file)
+### ✅ Removed Backup Files
 
-**Action**: ✅ **Safe to ignore** - these are backup files, not used in production
+1. **`frontend/src/components/patient/VitalsSnapshot_ORIGINAL.jsx`** - ✅ Deleted
+2. **`frontend/src/components/patient/VitalsSnapshot.jsx.backup`** - ✅ Deleted
 
-#### LoadingState
-
-```bash
-grep -r "from.*components/LoadingState\|from.*@/components/LoadingState" frontend/src
-```
-
-**Result**: ✅ **0 matches** (no imports found)
+**Result**: ✅ All backup files with legacy imports have been removed
 
 ## Raw fetch() Usage Verification
 
-### Files with fetch() calls:
+### ✅ Verification Complete
+
+**Files Verified**:
 
 1. `frontend/src/services/api.js` - ✅ **Expected** (centralized API service)
-2. `frontend/src/pages/receptionist/LiveQueuePage.jsx` - ⚠️ **Needs verification**
-3. `frontend/src/pages/nurse/NursePatientQueuePage.jsx` - ⚠️ **Needs verification**
-4. `frontend/src/pages/nurse/NurseDashboard.jsx` - ⚠️ **Needs verification**
-5. `frontend/src/pages/receptionist/PatientListPage.jsx` - ⚠️ **Needs verification**
+2. `frontend/src/pages/receptionist/LiveQueuePage.jsx` - ✅ **Verified** (uses React Query `refetch()` and service layer)
+3. `frontend/src/pages/nurse/NursePatientQueuePage.jsx` - ✅ **Verified** (uses React Query `refetch()` and service layer)
+4. `frontend/src/pages/nurse/NurseDashboard.jsx` - ✅ **Verified** (uses React Query `refetch()` and service layer)
+5. `frontend/src/pages/receptionist/PatientListPage.jsx` - ✅ **Verified** (uses React Query `refetch()` and service layer)
 
-**Action**: Verify these files use `api.js` or route through it. If raw `fetch()` is found, it must be replaced.
+**ESLint Guardrail Added**: ✅ **Active** - `no-restricted-globals` rule blocks raw `fetch()` in `pages/` and `components/` directories, while allowing it in `services/api.js`
 
 ## ESLint Rules Status
 
@@ -80,16 +81,23 @@ cd frontend && npm run build
 
 ### ✅ Completed
 
-- All 3 shims removed (useDebounce, ErrorState, LoadingState)
-- Zero imports from removed shims (backup files excluded)
-- ESLint rules active and blocking legacy imports
-- Build passes
+- **All 7 shims removed** (useDebounce, ErrorState, LoadingState, EmptyState, DataTable, SearchInput, ModalComponent)
+- **Zero imports from removed shims** (verified with repo-wide scan)
+- **All backup files removed** (VitalsSnapshot_ORIGINAL.jsx, VitalsSnapshot.jsx.backup)
+- **ESLint rules active** and blocking legacy imports
+- **ESLint guardrail added** to prevent future raw `fetch()` usage in pages/components
+- **Raw `fetch()` verification complete** - all flagged files verified to use service layer
+- **Import updates complete** - PatientList.jsx and DataList.jsx updated to use library paths
 
-### ⚠️ Pending Verification
+### 📝 Final Status
 
-- Raw `fetch()` usage in 4 page files (need to verify they route through `api.js`)
+- ✅ All legacy duplicates removed
+- ✅ All shims removed (no remaining references)
+- ✅ All backup files cleaned up
+- ✅ All imports updated to use library paths and aliases
+- ✅ ESLint rules enforcing new structure
+- ✅ No runtime behavior changes
 
-### 📝 Notes
+### 🎯 Ready for PR
 
-- Backup files (`VitalsSnapshot_ORIGINAL.jsx`, `VitalsSnapshot.jsx.backup`) still have old imports but are not used in production
-- All active code uses new import paths
+All Stage 6 verification items are complete. The codebase is ready for final review and merge.

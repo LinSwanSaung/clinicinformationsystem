@@ -77,6 +77,26 @@ export default [
       ],
     },
   },
+  // Disallow raw fetch() in pages/components - must use services/api.js
+  {
+    files: ['frontend/src/pages/**/*', 'frontend/src/components/**/*'],
+    rules: {
+      'no-restricted-globals': [
+        'error',
+        {
+          name: 'fetch',
+          message: 'Use services/api.js instead of raw fetch(). All network calls must route through the centralized API service.',
+        },
+      ],
+    },
+  },
+  // Allow fetch() in services/api.js (the centralized API service)
+  {
+    files: ['frontend/src/services/api.js'],
+    rules: {
+      'no-restricted-globals': 'off',
+    },
+  },
   // Node-specific config files (allow Node globals like __dirname, module)
   {
     files: ['vite.config.*', 'tailwind.config.*', 'postcss.config.*'],

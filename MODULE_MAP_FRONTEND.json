@@ -1,0 +1,115 @@
+{
+  "components": {
+    "purpose": "React UI components",
+    "primary_consumers": ["pages", "App.jsx"],
+    "notable_files": [
+      "components/library/index.js (barrel export)",
+      "components/library/DataTable/DataTable.jsx",
+      "components/library/forms/FormModal.jsx",
+      "components/medical/PatientCard.jsx",
+      "components/Navbar.jsx"
+    ],
+    "submodules": {
+      "library": "Reusable component library (buttons, forms, feedback, status, etc.)",
+      "medical": "Medical domain components (forms, displays, cards)",
+      "patient": "Patient portal components",
+      "ui": "shadcn/ui primitives"
+    },
+    "notes": "92 files total. Legacy components at root (EmptyState, ErrorState, LoadingState, DataTable) being phased out in favor of library/ versions."
+  },
+  "pages": {
+    "purpose": "Route pages organized by role",
+    "primary_consumers": ["App.jsx (routing)"],
+    "notable_files": [
+      "pages/doctor/PatientMedicalRecord.jsx (~1,000 lines)",
+      "pages/cashier/CashierDashboard.jsx",
+      "pages/receptionist/AppointmentsPage.jsx (~1,300 lines)",
+      "pages/nurse/NurseDashboard.jsx (~900 lines)"
+    ],
+    "submodules": {
+      "admin": "Admin role pages (7 files)",
+      "cashier": "Cashier role pages (2 files)",
+      "doctor": "Doctor role pages (3 files)",
+      "nurse": "Nurse role pages (3 files)",
+      "patient": "Patient portal pages (3 files)",
+      "receptionist": "Receptionist role pages (7 files)"
+    },
+    "notes": "28 files total. One legacy duplicate: CashierDashboard.jsx at root (should be removed)."
+  },
+  "services": {
+    "purpose": "API service layer - all network calls",
+    "primary_consumers": ["pages", "components", "hooks"],
+    "notable_files": [
+      "services/api.js (centralized fetch wrapper, 401 handler, AbortController)",
+      "services/sessionGuard.js (AbortController coordination)",
+      "services/patientService.js",
+      "services/visitService.js",
+      "services/invoiceService.js"
+    ],
+    "notes": "26 service files, one per domain. All API calls go through services/api.js. No direct Supabase calls in components."
+  },
+  "hooks": {
+    "purpose": "Custom React hooks for data fetching/state",
+    "primary_consumers": ["pages", "components"],
+    "notable_files": [
+      "hooks/useAppointments.js",
+      "hooks/useVisits.js",
+      "hooks/usePatients.js",
+      "hooks/useVitals.js"
+    ],
+    "notes": "10 hooks total, all domain-specific. useDebounce.js is in utils/ but should be in hooks/."
+  },
+  "contexts": {
+    "purpose": "React context providers",
+    "primary_consumers": ["App.jsx", "pages", "components"],
+    "notable_files": ["contexts/AuthContext.jsx (authentication state)"],
+    "notes": "Single context: AuthContext for user/auth state."
+  },
+  "constants": {
+    "purpose": "Application constants",
+    "primary_consumers": ["pages", "components", "services"],
+    "notable_files": [
+      "constants/roles.js (ROLES enum)",
+      "constants/polling.js (polling intervals)"
+    ],
+    "notes": "2 files. Roles used throughout for authorization."
+  },
+  "utils": {
+    "purpose": "Utility functions",
+    "primary_consumers": ["pages", "components", "services"],
+    "notable_files": [
+      "utils/useDebounce.js (should be in hooks/)",
+      "utils/timeUtils.js",
+      "utils/appointmentConfig.js"
+    ],
+    "notes": "3 files. useDebounce.js is a hook but placed in utils/."
+  },
+  "lib": {
+    "purpose": "Third-party library utilities",
+    "primary_consumers": ["components"],
+    "notable_files": ["lib/utils.js (cn utility for Tailwind class merging)"],
+    "notes": "Single file: cn utility from shadcn/ui."
+  },
+  "schemas": {
+    "purpose": "Validation schemas (Zod)",
+    "primary_consumers": ["pages", "components"],
+    "notable_files": ["schemas/index.js"],
+    "notes": "Single file with Zod schemas."
+  },
+  "i18n": {
+    "purpose": "Internationalization (i18next)",
+    "primary_consumers": ["pages", "components"],
+    "notable_files": [
+      "i18n/index.js",
+      "i18n/locales/en.json",
+      "i18n/locales/my.json"
+    ],
+    "notes": "Supports English and Myanmar locales."
+  },
+  "styles": {
+    "purpose": "Global styles",
+    "primary_consumers": ["App.jsx", "main.jsx"],
+    "notable_files": ["styles/theme.css", "styles/README.md"],
+    "notes": "Global CSS and theme variables."
+  }
+}

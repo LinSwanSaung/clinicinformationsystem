@@ -10,9 +10,9 @@ import {
   DialogHeader,
   DialogTitle,
 } from '../../components/ui/dialog';
-import { DollarSign, Download, Eye, Filter } from 'lucide-react';
+import { DollarSign, Eye, Filter } from 'lucide-react';
 import api from '../../services/api';
-import { DataTable } from '@/components/library';
+import { DataTable, PdfDownloadButton } from '@/components/library';
 
 const PaymentTransactions = () => {
   const [payments, setPayments] = useState([]);
@@ -81,24 +81,7 @@ const PaymentTransactions = () => {
     }
   };
 
-  const handleDownloadReceipt = async (payment) => {
-    try {
-      const blob = await api.getBlob(`/payments/${payment.id}/receipt/pdf`, {
-        headers: { Accept: 'application/pdf' },
-      });
-      const url = window.URL.createObjectURL(blob);
-      const link = document.createElement('a');
-      link.href = url;
-      link.download = `receipt_${payment.payment_reference || payment.id}.pdf`;
-      document.body.appendChild(link);
-      link.click();
-      document.body.removeChild(link);
-      window.URL.revokeObjectURL(url);
-    } catch (error) {
-      console.error('Failed to download receipt:', error);
-      alert('Failed to download receipt. Please try again.');
-    }
-  };
+  // Receipt download handled by PdfDownloadButton
 
   const handleFilterChange = (key, value) => {
     setFilters((prev) => ({ ...prev, [key]: value, offset: 0 }));
@@ -278,10 +261,13 @@ const PaymentTransactions = () => {
                       <Eye className="mr-1 h-4 w-4" />
                       View
                     </Button>
-                    <Button size="sm" variant="outline" onClick={() => handleDownloadReceipt(row)}>
-                      <Download className="mr-1 h-4 w-4" />
-                      Receipt
-                    </Button>
+                    <PdfDownloadButton
+                      size="sm"
+                      variant="outline"
+                      endpoint={`/payments/${row.id}/receipt/pdf`}
+                      fileName={`receipt_${row.payment_reference || row.id}.pdf`}
+                      label="Receipt"
+                    />
                   </div>
                 ),
               },

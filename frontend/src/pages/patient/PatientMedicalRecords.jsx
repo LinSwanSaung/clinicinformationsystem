@@ -103,6 +103,7 @@ const PatientMedicalRecords = () => {
   };
 
   // Download single visit PDF
+  // Download single visit PDF
   const handleDownloadVisitPDF = async (visitId) => {
     try {
       const blob = await api.getBlob(`/visits/${visitId}/export/pdf`, {

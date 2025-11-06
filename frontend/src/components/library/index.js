@@ -22,3 +22,6 @@ export { FormModal, FormCard } from './forms';
 
 // List components
 export { RecordListItem } from './lists';
+
+// Buttons
+export { PdfDownloadButton } from './buttons/PdfDownloadButton';

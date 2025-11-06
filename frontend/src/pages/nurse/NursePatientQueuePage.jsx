@@ -1,19 +1,8 @@
-import React, { useState, useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
-import { 
-  Users, 
-  Clock, 
-  CheckCircle, 
-  Activity,
-  Search,
-  Filter,
-  RefreshCw,
-  UserCheck,
-  ArrowLeft
-} from 'lucide-react';
+import { Search, RefreshCw, UserCheck, ArrowLeft } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import PageLayout from '@/components/PageLayout';
 import useDebounce from '@/utils/useDebounce';
@@ -24,12 +13,13 @@ import { useQuery } from '@tanstack/react-query';
 import { useAuth } from '@/contexts/AuthContext';
 import { POLLING_INTERVALS } from '@/constants/polling';
 import { ROLES } from '@/constants/roles';
+import { LoadingSpinner, EmptyState } from '@/components/library';
 
 // Animation variants
 const pageVariants = {
   initial: { opacity: 0, y: 20 },
-  animate: { opacity: 1, y: 0, transition: { duration: 0.4, ease: "easeOut" } },
-  exit: { opacity: 0, y: -20, transition: { duration: 0.3 } }
+  animate: { opacity: 1, y: 0, transition: { duration: 0.4, ease: 'easeOut' } },
+  exit: { opacity: 0, y: -20, transition: { duration: 0.3 } },
 };
 
 const containerVariants = {
@@ -38,15 +28,15 @@ const containerVariants = {
     opacity: 1,
     transition: {
       staggerChildren: 0.1,
-      delayChildren: 0.2
-    }
-  }
+      delayChildren: 0.2,
+    },
+  },
 };
 
 const NursePatientQueuePage = () => {
   const navigate = useNavigate();
   const { user } = useAuth();
-  
+
   // State management
   const [doctors, setDoctors] = useState([]);
   const [selectedDoctor, setSelectedDoctor] = useState(null);
@@ -85,8 +75,6 @@ const NursePatientQueuePage = () => {
     setIsRefreshing(false);
   }, [doctorsQuery.isLoading, doctorsQuery.error, doctorsQuery.data]);
 
-  // Remove manual interval; handled by React Query
-
   // Manual refresh
   const handleRefresh = async () => {
     try {
@@ -98,12 +86,15 @@ const NursePatientQueuePage = () => {
   };
 
   // Filter doctors based on search and those who have patients
-  const filteredDoctors = doctors.filter(doctor => {
+  const filteredDoctors = doctors.filter((doctor) => {
     // Only show doctors who have patients in queue or are currently consulting
     const hasPatients = doctor.queueStatus?.tokens?.length > 0;
-    if (!hasPatients) return false;
+    if (!hasPatients) {
+      return false;
+    }
 
-    const matchesSearch = !debouncedSearchTerm || 
+    const matchesSearch =
+      !debouncedSearchTerm ||
       doctor.first_name?.toLowerCase().includes(debouncedSearchTerm.toLowerCase()) ||
       doctor.last_name?.toLowerCase().includes(debouncedSearchTerm.toLowerCase()) ||
       doctor.specialty?.toLowerCase().includes(debouncedSearchTerm.toLowerCase());
@@ -124,52 +115,45 @@ const NursePatientQueuePage = () => {
   // Get nurse-specific stats for doctor card
   const getNurseStats = (doctor) => {
     const tokens = doctor.queueStatus?.tokens || [];
-    const readyPatients = tokens.filter(token => 
-      token.status === 'waiting' || token.status === 'called'
+    const readyPatients = tokens.filter(
+      (token) => token.status === 'waiting' || token.status === 'called'
     ).length;
-    const notReadyPatients = tokens.filter(token => 
-      token.status === 'waiting' && !token.vitals_taken
+    const notReadyPatients = tokens.filter(
+      (token) => token.status === 'waiting' && !token.vitals_taken
     ).length;
-    
+
     return {
       totalPatients: tokens.length,
       waitingPatients: readyPatients,
-      completedToday: notReadyPatients // Reusing for "not ready" count
+      completedToday: notReadyPatients, // Reusing for "not ready" count
     };
   };
 
   // Render patients for selected doctor
   const renderPatients = () => {
-    if (!selectedDoctor) return null;
+    if (!selectedDoctor) {
+      return null;
+    }
 
     const tokens = selectedDoctor.queueStatus?.tokens || [];
-    const patientsNeedingCare = tokens.filter(token => 
-      token.status === 'waiting' || token.status === 'called'
+    const patientsNeedingCare = tokens.filter(
+      (token) => token.status === 'waiting' || token.status === 'called'
     );
 
     return (
-      <motion.div
-        initial="initial"
-        animate="animate"
-        exit="exit"
-        variants={pageVariants}
-      >
-        <PageLayout 
+      <motion.div initial="initial" animate="animate" exit="exit" variants={pageVariants}>
+        <PageLayout
           title={`Dr. ${selectedDoctor.first_name} ${selectedDoctor.last_name} - Patients`}
           subtitle={`${patientsNeedingCare.length} patients need nursing care`}
         >
           <div className="space-y-6">
             {/* Header Actions */}
             <div className="flex items-center justify-between">
-              <Button 
-                variant="outline" 
-                onClick={handleBackToDoctors}
-                className="gap-2"
-              >
+              <Button variant="outline" onClick={handleBackToDoctors} className="gap-2">
                 <ArrowLeft className="h-4 w-4" />
                 Back to Doctors
               </Button>
-              
+
               <Button onClick={handleRefresh} variant="outline" className="gap-2">
                 <RefreshCw className={`h-4 w-4 ${isRefreshing ? 'animate-spin' : ''}`} />
                 Refresh
@@ -177,7 +161,7 @@ const NursePatientQueuePage = () => {
             </div>
 
             {/* Patients Grid */}
-            <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
+            <div className="grid grid-cols-1 gap-6 md:grid-cols-2 xl:grid-cols-3">
               <AnimatePresence>
                 {patientsNeedingCare.map((token) => (
                   <PatientCard
@@ -191,7 +175,7 @@ const NursePatientQueuePage = () => {
                       status: token.status,
                       appointmentTime: token.issued_time,
                       vitals: token.vitals || {},
-                      conditions: token.patient?.conditions || []
+                      conditions: token.patient?.conditions || [],
                     }}
                     showVitalsButton={true}
                     onVitalsClick={(patient) => {
@@ -203,14 +187,13 @@ const NursePatientQueuePage = () => {
               </AnimatePresence>
             </div>
 
+            {/* Empty State */}
             {patientsNeedingCare.length === 0 && (
-              <div className="text-center py-12">
-                <Users className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
-                <h3 className="text-lg font-semibold mb-2">No patients need care</h3>
-                <p className="text-muted-foreground">
-                  All patients for Dr. {selectedDoctor.first_name} {selectedDoctor.last_name} are up to date
-                </p>
-              </div>
+              <EmptyState
+                title="No patients need care"
+                description="All patients are up to date with nursing care"
+                className="py-12"
+              />
             )}
           </div>
         </PageLayout>
@@ -227,28 +210,17 @@ const NursePatientQueuePage = () => {
   if (isLoading) {
     return (
       <PageLayout title="Patient Care Management" subtitle="Loading doctors and patient queues...">
-        <div className="space-y-6">
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-            {Array.from({ length: 6 }, (_, i) => (
-              <div key={i} className="animate-pulse">
-                <div className="h-64 bg-gray-200 rounded-lg"></div>
-              </div>
-            ))}
-          </div>
+        <div className="py-12">
+          <LoadingSpinner label="Loading queues..." size="lg" />
         </div>
       </PageLayout>
     );
   }
 
   return (
-    <motion.div
-      initial="initial"
-      animate="animate"
-      exit="exit"
-      variants={pageVariants}
-    >
-      <PageLayout 
-        title="Patient Care Management" 
+    <motion.div initial="initial" animate="animate" exit="exit" variants={pageVariants}>
+      <PageLayout
+        title="Patient Care Management"
         subtitle="Monitor doctors' queues and provide nursing care"
         fullWidth
       >
@@ -258,7 +230,7 @@ const NursePatientQueuePage = () => {
             <motion.div
               initial={{ opacity: 0, y: -20 }}
               animate={{ opacity: 1, y: 0 }}
-              className="bg-red-50 border border-red-200 rounded-lg p-4"
+              className="rounded-lg border border-red-200 bg-red-50 p-4"
             >
               <p className="text-red-600">{error}</p>
               <Button onClick={() => setError(null)} variant="outline" size="sm" className="mt-2">
@@ -268,16 +240,16 @@ const NursePatientQueuePage = () => {
           )}
 
           {/* Controls */}
-          <div className="flex flex-col md:flex-row gap-4 items-start md:items-center justify-between">
+          <div className="flex flex-col items-start justify-between gap-4 md:flex-row md:items-center">
             <div className="flex items-center gap-4">
               <div className="relative">
-                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 transform text-muted-foreground" />
                 <Input
                   type="text"
                   placeholder="Search doctors..."
                   value={searchTerm}
                   onChange={(e) => setSearchTerm(e.target.value)}
-                  className="pl-10 w-64"
+                  className="w-64 pl-10"
                 />
               </div>
             </div>
@@ -286,7 +258,7 @@ const NursePatientQueuePage = () => {
               <div className="flex items-center gap-2 text-sm text-muted-foreground">
                 <span>Last updated: {lastUpdated.toLocaleTimeString()}</span>
               </div>
-              
+
               <Button
                 onClick={handleRefresh}
                 variant="outline"
@@ -303,7 +275,7 @@ const NursePatientQueuePage = () => {
           {/* Doctors Grid */}
           <motion.div
             layout
-            className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6"
+            className="grid grid-cols-1 gap-6 md:grid-cols-2 xl:grid-cols-3"
             variants={containerVariants}
             initial="hidden"
             animate="visible"
@@ -326,17 +298,11 @@ const NursePatientQueuePage = () => {
 
           {/* Empty State */}
           {filteredDoctors.length === 0 && !isLoading && (
-            <motion.div
-              initial={{ opacity: 0, scale: 0.9 }}
-              animate={{ opacity: 1, scale: 1 }}
-              className="text-center py-12"
-            >
-              <Users className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
-              <h3 className="text-lg font-semibold mb-2">No patients need care</h3>
-              <p className="text-muted-foreground mb-4">
-                All doctors' patients are currently up to date with nursing care
-              </p>
-            </motion.div>
+            <EmptyState
+              title="No patients need care"
+              description="All doctors' patients are currently up to date with nursing care"
+              className="py-12"
+            />
           )}
         </div>
       </PageLayout>

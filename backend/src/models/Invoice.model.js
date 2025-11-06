@@ -14,7 +14,8 @@ class InvoiceModel extends BaseModel {
   async getInvoiceById(id) {
     const { data, error } = await this.supabase
       .from(this.tableName)
-      .select(`
+      .select(
+        `
         *,
         patient:patients(id, first_name, last_name, date_of_birth, phone),
         visit:visits(id, visit_type, chief_complaint, status),
@@ -22,7 +23,8 @@ class InvoiceModel extends BaseModel {
         payment_transactions(*),
         created_by_user:users!invoices_created_by_fkey(id, first_name, last_name, role),
         completed_by_user:users!invoices_completed_by_fkey(id, first_name, last_name, role)
-      `)
+      `
+      )
       .eq('id', id)
       .single();
 
@@ -35,16 +37,18 @@ class InvoiceModel extends BaseModel {
    */
   async getInvoiceByVisit(visitId) {
     console.log('[InvoiceModel] Querying invoice for visit_id:', visitId);
-    
+
     const { data, error } = await this.supabase
       .from(this.tableName)
-      .select(`
+      .select(
+        `
         *,
         patient:patients(id, first_name, last_name, date_of_birth, phone),
         visit:visits(id, visit_type, chief_complaint, status),
         invoice_items(*),
         payment_transactions(*)
-      `)
+      `
+      )
       .eq('visit_id', visitId)
       .order('created_at', { ascending: false })
       .limit(1)
@@ -52,12 +56,12 @@ class InvoiceModel extends BaseModel {
 
     console.log('[InvoiceModel] Query result - Error:', error?.message || 'none');
     console.log('[InvoiceModel] Query result - Data:', data ? `Found invoice ${data.id}` : 'null');
-    
+
     if (error) {
       console.error('[InvoiceModel] Database error:', error);
       throw error;
     }
-    
+
     return data; // Will be null if not found, which is fine
   }
 
@@ -67,12 +71,14 @@ class InvoiceModel extends BaseModel {
   async getPendingInvoices() {
     const { data, error } = await this.supabase
       .from(this.tableName)
-      .select(`
+      .select(
+        `
         *,
         patient:patients(id, first_name, last_name, phone, email),
         visit:visits(id, visit_type, chief_complaint),
         invoice_items(*)
-      `)
+      `
+      )
       .in('status', ['pending', 'partial'])
       .order('created_at', { ascending: false });
 
@@ -85,40 +91,42 @@ class InvoiceModel extends BaseModel {
    */
   async getCompletedInvoices(options = {}) {
     const { limit = 50, offset = 0 } = options;
-    
+
     const { data, error } = await this.supabase
       .from(this.tableName)
-      .select(`
+      .select(
+        `
         *,
         patients!invoices_patient_id_fkey(id, first_name, last_name, phone, email, patient_number),
         visits!invoices_visit_id_fkey(id, visit_type, visit_date, doctor_id),
         invoice_items(*),
         payment_transactions(*)
-      `)
+      `
+      )
       .eq('status', 'paid')
       .order('completed_at', { ascending: false })
       .range(offset, offset + limit - 1);
 
     if (error) throw error;
-    
+
     // Manually fetch doctor and completed_by user info for each invoice
     if (data && data.length > 0) {
-      const doctorIds = [...new Set(data.map(inv => inv.visits?.doctor_id).filter(Boolean))];
-      const completedByIds = [...new Set(data.map(inv => inv.completed_by).filter(Boolean))];
+      const doctorIds = [...new Set(data.map((inv) => inv.visits?.doctor_id).filter(Boolean))];
+      const completedByIds = [...new Set(data.map((inv) => inv.completed_by).filter(Boolean))];
       const allUserIds = [...new Set([...doctorIds, ...completedByIds])];
-      
+
       const { data: users } = await this.supabase
         .from('users')
         .select('id, first_name, last_name, role')
         .in('id', allUserIds);
-      
+
       const userMap = {};
-      users?.forEach(user => {
+      users?.forEach((user) => {
         userMap[user.id] = user;
       });
-      
+
       // Attach doctor and completed_by user info
-      data.forEach(invoice => {
+      data.forEach((invoice) => {
         if (invoice.visits?.doctor_id) {
           invoice.visits.doctor = userMap[invoice.visits.doctor_id];
         }
@@ -127,7 +135,7 @@ class InvoiceModel extends BaseModel {
         }
       });
     }
-    
+
     return data || [];
   }
 
@@ -137,12 +145,14 @@ class InvoiceModel extends BaseModel {
   async getInvoicesByPatient(patientId) {
     const { data, error } = await this.supabase
       .from(this.tableName)
-      .select(`
+      .select(
+        `
         *,
         visit:visits(id, visit_type, visit_date),
         invoice_items(*),
         payment_transactions(*)
-      `)
+      `
+      )
       .eq('patient_id', patientId)
       .order('created_at', { ascending: false });
 
@@ -189,7 +199,7 @@ class InvoiceModel extends BaseModel {
         status: 'paid',
         completed_by: completedBy,
         completed_at: new Date(),
-        updated_at: new Date()
+        updated_at: new Date(),
       })
       .eq('id', id)
       .select()
@@ -210,7 +220,7 @@ class InvoiceModel extends BaseModel {
         cancelled_by: cancelledBy,
         cancelled_at: new Date(),
         cancelled_reason: reason,
-        updated_at: new Date()
+        updated_at: new Date(),
       })
       .eq('id', id)
       .select()
@@ -226,11 +236,13 @@ class InvoiceModel extends BaseModel {
   async getPatientOutstandingInvoices(patientId) {
     const { data, error } = await this.supabase
       .from(this.tableName)
-      .select(`
+      .select(
+        `
         *,
         visit:visits(id, visit_type, visit_date),
         patient:patients(id, first_name, last_name, patient_number)
-      `)
+      `
+      )
       .eq('patient_id', patientId)
       .gt('balance_due', 0)
       .order('created_at', { ascending: false });
@@ -278,7 +290,7 @@ class InvoiceModel extends BaseModel {
         amount: amountPaid,
         payment_method: paymentData.payment_method,
         payment_notes: paymentData.notes,
-        processed_by: paymentData.processed_by
+        received_by: paymentData.processed_by, // Use 'received_by' to match schema column name
       })
       .select()
       .single();
@@ -294,7 +306,7 @@ class InvoiceModel extends BaseModel {
       hold_reason: paymentData.hold_reason || 'Partial payment - balance due',
       hold_date: new Date().toISOString(),
       payment_due_date: paymentData.payment_due_date,
-      updated_at: new Date().toISOString()
+      updated_at: new Date().toISOString(),
     };
 
     // If fully paid, mark as completed
@@ -315,7 +327,7 @@ class InvoiceModel extends BaseModel {
 
     return {
       invoice: updatedInvoice,
-      transaction
+      transaction,
     };
   }
 
@@ -325,10 +337,12 @@ class InvoiceModel extends BaseModel {
   async getPaymentHistory(invoiceId) {
     const { data, error } = await this.supabase
       .from('payment_transactions')
-      .select(`
+      .select(
+        `
         *,
         processed_by_user:users!processed_by(first_name, last_name, role)
-      `)
+      `
+      )
       .eq('invoice_id', invoiceId)
       .order('payment_date', { ascending: false });
 
@@ -347,7 +361,7 @@ class InvoiceModel extends BaseModel {
         hold_reason: holdData.reason,
         hold_date: new Date().toISOString(),
         payment_due_date: holdData.payment_due_date,
-        updated_at: new Date().toISOString()
+        updated_at: new Date().toISOString(),
       })
       .eq('id', invoiceId)
       .select()
@@ -366,7 +380,7 @@ class InvoiceModel extends BaseModel {
       .update({
         on_hold: false,
         hold_reason: null,
-        updated_at: new Date().toISOString()
+        updated_at: new Date().toISOString(),
       })
       .eq('id', invoiceId)
       .select()

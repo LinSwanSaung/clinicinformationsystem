@@ -5,7 +5,7 @@ import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Separator } from '@/components/ui/separator';
 import { Skeleton } from '@/components/ui/skeleton';
-import ErrorState from '@/components/ErrorState';
+import { ErrorState } from '@/components/library/feedback/ErrorState';
 import { AlertTriangle, Pill, ActivitySquare, Stethoscope } from 'lucide-react';
 
 // Myanmar date translation

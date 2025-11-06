@@ -11,7 +11,7 @@ import {
 import { Button } from '../../components/ui/button';
 import { Input } from '../../components/ui/input';
 import PageLayout from '../../components/PageLayout';
-import { LoadingSpinner, StatusBadge, TableToolbar } from '@/components/library';
+import { LoadingSpinner, StatusBadge, TableToolbar, ConfirmDialog } from '@/components/library';
 import {
   Users,
   Plus,
@@ -40,6 +40,21 @@ const EmployeeManagement = () => {
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState('');
   // showDeleted replaced by selectedStatus
+
+  // Confirm dialogs state
+  const [confirmState, setConfirmState] = useState({
+    open: false,
+    type: null, // 'delete' | 'toggle'
+    employeeId: null,
+    nextActive: null,
+  });
+
+  const openDeleteConfirm = (id) =>
+    setConfirmState({ open: true, type: 'delete', employeeId: id, nextActive: null });
+  const openToggleConfirm = (id, nextActive) =>
+    setConfirmState({ open: true, type: 'toggle', employeeId: id, nextActive });
+  const closeConfirm = () =>
+    setConfirmState({ open: false, type: null, employeeId: null, nextActive: null });
 
   const loadData = useCallback(async () => {
     try {
@@ -104,15 +119,13 @@ const EmployeeManagement = () => {
   });
 
   const handleDeleteEmployee = async (id) => {
-    if (confirm('Are you sure you want to delete this employee?')) {
-      try {
-        await employeeService.deleteEmployee(id);
-        // Re-fetch to reflect server truth (tombstone)
-        await loadData();
-      } catch (error) {
-        console.error('Error deleting employee:', error);
-        setError('Failed to delete employee. Please try again.');
-      }
+    try {
+      await employeeService.deleteEmployee(id);
+      // Re-fetch to reflect server truth (tombstone)
+      await loadData();
+    } catch (error) {
+      console.error('Error deleting employee:', error);
+      setError('Failed to delete employee. Please try again.');
     }
   };
 
@@ -727,7 +740,7 @@ const EmployeeManagement = () => {
                     <Button
                       size="sm"
                       variant="outline"
-                      onClick={() => handleToggleActive(employee.id)}
+                      onClick={() => openToggleConfirm(employee.id, !employee.is_active)}
                       className="flex-1"
                       disabled={!!employee.deleted_at}
                     >
@@ -736,7 +749,7 @@ const EmployeeManagement = () => {
                     <Button
                       size="sm"
                       variant="destructive"
-                      onClick={() => handleDeleteEmployee(employee.id)}
+                      onClick={() => openDeleteConfirm(employee.id)}
                       disabled={!!employee.deleted_at}
                     >
                       <Trash2 className="h-3 w-3" />
@@ -767,6 +780,39 @@ const EmployeeManagement = () => {
             </CardContent>
           </Card>
         )}
+
+        {/* Confirm: Delete Employee */}
+        <ConfirmDialog
+          isOpen={confirmState.open && confirmState.type === 'delete'}
+          onOpenChange={(open) => (open ? null : closeConfirm())}
+          onConfirm={() => {
+            const id = confirmState.employeeId;
+            closeConfirm();
+            return handleDeleteEmployee(id);
+          }}
+          title="Delete employee"
+          description="This action will permanently delete the employee record."
+          confirmText="Delete"
+          variant="destructive"
+        />
+
+        {/* Confirm: Toggle Active */}
+        <ConfirmDialog
+          isOpen={confirmState.open && confirmState.type === 'toggle'}
+          onOpenChange={(open) => (open ? null : closeConfirm())}
+          onConfirm={() => {
+            const id = confirmState.employeeId;
+            closeConfirm();
+            return handleToggleActive(id);
+          }}
+          title={confirmState.nextActive ? 'Activate employee' : 'Deactivate employee'}
+          description={
+            confirmState.nextActive
+              ? 'The employee will be marked as active.'
+              : 'The employee will be marked as inactive.'
+          }
+          confirmText={confirmState.nextActive ? 'Activate' : 'Deactivate'}
+        />
       </div>
     </PageLayout>
   );

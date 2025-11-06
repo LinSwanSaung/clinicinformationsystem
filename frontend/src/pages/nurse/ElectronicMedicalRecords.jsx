@@ -4,7 +4,7 @@ import PageLayout from '../../components/PageLayout';
 import { Card } from '../../components/ui/card';
 import { Button } from '../../components/ui/button';
 import VisitHistoryCard from '../../components/medical/VisitHistoryCard';
-import LoadingState from '../../components/LoadingState';
+import { LoadingSpinner } from '../../components/library/feedback/LoadingSpinner';
 import PatientInformationHeader from '../../components/medical/PatientInformationHeader';
 import NavigationTabs from '../../components/ui/NavigationTabs';
 import PatientVitalsDisplay from '../../components/medical/PatientVitalsDisplay';
@@ -359,7 +359,7 @@ const ElectronicMedicalRecords = () => {
       </div>
 
       {loading ? (
-        <LoadingState message="Loading visit history..." />
+        <LoadingSpinner label="Loading visit history..." />
       ) : visitHistory && visitHistory.length > 0 ? (
         <div className="space-y-4">
           {visitHistory.map((visit, index) => (
@@ -442,7 +442,7 @@ const ElectronicMedicalRecords = () => {
             {/* Tab Content */}
             <div className="min-h-[400px]">
               {/* Loading State */}
-              {loading && <LoadingState message="Loading patient medical data..." />}
+              {loading && <LoadingSpinner label="Loading patient medical data..." />}
 
               {/* Overview Tab */}
               {!loading && activeTab === 'overview' && (

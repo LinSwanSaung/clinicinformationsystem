@@ -7,7 +7,7 @@ import { FormModal } from '@/components/library';
 import AllergyForm from '../../components/medical/forms/AllergyForm';
 import DiagnosisForm from '../../components/medical/forms/DiagnosisForm';
 import VisitHistoryCard from '../../components/medical/VisitHistoryCard';
-import LoadingState from '../../components/LoadingState';
+import { LoadingSpinner } from '../../components/library/feedback/LoadingSpinner';
 import PatientInformationHeader from '../../components/medical/PatientInformationHeader';
 import NavigationTabs from '../../components/ui/NavigationTabs';
 import PatientVitalsDisplay from '../../components/medical/PatientVitalsDisplay';
@@ -511,7 +511,7 @@ const PatientMedicalRecordManagement = () => {
       </div>
       
       {loading ? (
-        <LoadingState message="Loading visit history..." />
+        <LoadingSpinner label="Loading visit history..." />
       ) : visitHistory && visitHistory.length > 0 ? (
         <div className="space-y-4">
           {visitHistory.map((visit, index) => (

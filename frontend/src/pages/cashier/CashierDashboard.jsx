@@ -65,6 +65,7 @@ import useDebounce from '@/utils/useDebounce';
 import invoiceService from '../../services/invoiceService';
 import { useInvoices } from '@/hooks/useInvoices';
 import api from '../../services/api';
+import { PaymentDetailModal } from '@/components/library';
 
 // Animation variants
 const pageVariants = {
@@ -1323,14 +1324,15 @@ const CashierDashboard = () => {
         </div>
 
         {/* Invoice Detail Modal */}
-        <Dialog open={showInvoiceDetail} onOpenChange={setShowInvoiceDetail}>
-          <DialogContent className="max-h-[90vh] max-w-6xl overflow-y-auto">
-            <DialogHeader>
-              <DialogTitle>Process Invoice - {selectedInvoice?.id}</DialogTitle>
-            </DialogHeader>
-
-            {selectedInvoice && (
-              <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
+        <PaymentDetailModal
+          open={showInvoiceDetail}
+          onOpenChange={setShowInvoiceDetail}
+          invoice={selectedInvoice}
+          onPay={() => handleProcessPayment()}
+          isProcessing={isProcessing}
+        >
+          {selectedInvoice && (
+            <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
                 {/* Main Content */}
                 <div className="space-y-6 lg:col-span-2">
                   {/* Patient Information */}
@@ -2119,8 +2121,7 @@ const CashierDashboard = () => {
                 </div>
               </div>
             )}
-          </DialogContent>
-        </Dialog>
+        </PaymentDetailModal>
 
         {/* Payment Confirmation Dialog */}
         <Dialog open={showPaymentDialog} onOpenChange={setShowPaymentDialog}>

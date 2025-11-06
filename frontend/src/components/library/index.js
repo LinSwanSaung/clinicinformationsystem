@@ -25,3 +25,6 @@ export { RecordListItem } from './lists';
 
 // Buttons
 export { PdfDownloadButton } from './buttons/PdfDownloadButton';
+
+// Modals
+export { PaymentDetailModal } from './modals/PaymentDetailModal';

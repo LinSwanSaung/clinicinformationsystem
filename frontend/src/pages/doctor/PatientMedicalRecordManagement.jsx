@@ -3,7 +3,7 @@ import { useLocation, useNavigate } from 'react-router-dom';
 import PageLayout from '../../components/PageLayout';
 import { Card } from '../../components/ui/card';
 import { Button } from '../../components/ui/button';
-import ModalComponent from '../../components/ui/ModalComponent';
+import { FormModal } from '@/components/library';
 import AllergyForm from '../../components/medical/forms/AllergyForm';
 import DiagnosisForm from '../../components/medical/forms/DiagnosisForm';
 import VisitHistoryCard from '../../components/medical/VisitHistoryCard';
@@ -672,40 +672,40 @@ const PatientMedicalRecordManagement = () => {
       </div>
 
       {/* Allergy Modal - DOCTOR ACCESS ONLY */}
-      <ModalComponent
+      <FormModal
         isOpen={isAllergyModalOpen}
-        onClose={() => setIsAllergyModalOpen(false)}
+        onOpenChange={setIsAllergyModalOpen}
         title="Add New Allergy"
         size="md"
-        onSave={handleSaveAllergy}
-        saveText="Add Allergy"
+        onSubmit={handleSaveAllergy}
+        submitText="Add Allergy"
         isLoading={loading}
-        canSave={newAllergy.allergy_name.trim()}
+        submitDisabled={!newAllergy.allergy_name.trim()}
       >
         <AllergyForm 
           allergy={newAllergy}
           onChange={setNewAllergy}
           disabled={loading}
         />
-      </ModalComponent>
+      </FormModal>
 
       {/* Diagnosis Modal - DOCTOR ACCESS ONLY */}
-      <ModalComponent
+      <FormModal
         isOpen={isDiagnosisModalOpen}
-        onClose={() => setIsDiagnosisModalOpen(false)}
+        onOpenChange={setIsDiagnosisModalOpen}
         title="Add New Diagnosis"
         size="md"
-        onSave={handleSaveDiagnosis}
-        saveText="Add Diagnosis"
+        onSubmit={handleSaveDiagnosis}
+        submitText="Add Diagnosis"
         isLoading={loading}
-        canSave={newDiagnosis.diagnosis_name.trim()}
+        submitDisabled={!newDiagnosis.diagnosis_name.trim()}
       >
         <DiagnosisForm 
           diagnosis={newDiagnosis}
           onChange={setNewDiagnosis}
           disabled={loading}
         />
-      </ModalComponent>
+      </FormModal>
     </PageLayout>
   );
 };

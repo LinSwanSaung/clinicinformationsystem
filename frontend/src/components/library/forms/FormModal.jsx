@@ -28,6 +28,7 @@ export function FormModal({
   className,
   size = 'default',
   formId,
+  confirmLoadingText,
 }) {
   const firstFocusableRef = useRef(null);
   const lastFocusableRef = useRef(null);
@@ -121,7 +122,7 @@ export function FormModal({
               {cancelText}
             </Button>
             <Button type="submit" disabled={submitDisabled || isLoading} ref={lastFocusableRef}>
-              {isLoading ? 'Submitting...' : submitText}
+              {isLoading ? (confirmLoadingText || 'Submitting...') : submitText}
             </Button>
           </DialogFooter>
         </form>

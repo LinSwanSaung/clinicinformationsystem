@@ -23,6 +23,7 @@ import prescriptionService from '../../services/prescriptionService';
 import doctorNotesService from '../../services/doctorNotesService';
 import documentService from '../../services/documentService';
 import api from '../../services/api';
+import { PdfDownloadButton } from '@/components/library';
 import { 
   User,
   Activity,
@@ -661,6 +662,15 @@ const PatientMedicalRecordManagement = () => {
                   onUploadFile={handleUploadFile}
                   onViewFile={handleViewFile}
                   onDownloadFile={handleDownloadFile}
+                  renderDownloadButton={(file) => (
+                    <PdfDownloadButton
+                      size="sm"
+                      variant="outline"
+                      endpoint={`/documents/${file.id}/download`}
+                      fileName={file.name || `document-${file.id}.pdf`}
+                      label="Download"
+                    />
+                  )}
                 />
               )}
             </div>

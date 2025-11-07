@@ -38,10 +38,9 @@ backend/
 │   └── utils/                # Utility functions
 ├── database/
 │   ├── schema.sql            # Single source of truth for schema
+│   ├── verify-schema.js      # Schema verification script
 │   └── seeds/                # Sample data
-├── scripts/
-│   └── verify-schema.js              # Schema verification
-└── docs/                      # Production documentation
+└── docs/                     # Production documentation
 ```
 
 ## 🔐 Authentication & Authorization

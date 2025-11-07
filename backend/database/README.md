@@ -21,17 +21,22 @@ This directory contains the database schema and related files for the RealCIS Cl
 
 ## Migrations
 
-### `_archived_migrations/`
+**All historical migrations have been removed.** The `schema.sql` file is the **single source of truth**.
 
-Contains historical migration files that were applied to existing deployments. These are archived for reference but are **not used for fresh installations**.
+**Why migrations were removed:**
 
-**Note:** Migrations have been archived because:
+- ✅ Schema verification confirmed `schema.sql` matches the current database exactly (20 tables verified)
+- ✅ Fresh installs bootstrap directly from `schema.sql`
+- ✅ Existing deployments already have all migrations applied
+- ✅ Maintaining duplicate migration files was a maintenance burden
 
-- The schema.sql file is comprehensive and up-to-date
-- Fresh installs can bootstrap from schema.sql
-- Existing deployments already have migrations applied
+**Verification:**
+Run `npm run db:verify-schema` or `node scripts/verify-schema-comprehensive.js` to verify `schema.sql` matches your database.
 
-If you need to reference historical migrations, see the `_archived_migrations/` directory.
+**If you need to reference historical changes:**
+
+- Check git history for previous migration files (they were removed in commit `2ffc928`)
+- All changes are reflected in the current `schema.sql`
 
 ## Seeds
 

@@ -1,12 +1,14 @@
 #!/usr/bin/env node
 
 /**
- * Comprehensive Schema Verification Script
+ * Schema Verification Script
  * 
  * Compares database/schema.sql with the actual database schema.
  * 
  * Usage:
- *   node scripts/verify-schema-comprehensive.js
+ *   npm run db:verify-schema
+ *   or
+ *   node database/verify-schema.js
  * 
  * This script:
  * 1. Connects to the database

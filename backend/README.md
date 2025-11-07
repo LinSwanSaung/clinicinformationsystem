@@ -40,7 +40,7 @@ backend/
 │   ├── schema.sql            # Single source of truth for schema
 │   └── seeds/                # Sample data
 ├── scripts/
-│   └── verify-schema-comprehensive.js  # Schema verification
+│   └── verify-schema.js              # Schema verification
 └── docs/                      # Production documentation
 ```
 

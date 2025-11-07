@@ -36,7 +36,7 @@ This directory contains the database schema and related files for the RealCIS Cl
 - ✅ Maintaining duplicate migration files was a maintenance burden
 
 **Verification:**
-Run `npm run db:verify-schema` or `node scripts/verify-schema-comprehensive.js` to verify `schema.sql` matches your database.
+Run `npm run db:verify-schema` or `node database/verify-schema.js` to verify `schema.sql` matches your database.
 
 **If you need to reference historical changes:**
 

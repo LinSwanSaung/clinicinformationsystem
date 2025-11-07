@@ -31,7 +31,7 @@
     "db:test": "node database/migrate.js test",
     "db:seed": "node database/seed.js",
     "db:reset": "npm run db:migrate && npm run db:seed",
-    "db:verify-schema": "node scripts/verify-schema-comprehensive.js"
+    "db:verify-schema": "node database/verify-schema.js"
   },
   "keywords": [
     "clinic",

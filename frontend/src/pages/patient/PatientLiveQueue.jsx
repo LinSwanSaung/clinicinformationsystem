@@ -20,9 +20,9 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/com
 import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Alert, AlertDescription } from '@/components/ui/alert';
-import PageLayout from '@/components/PageLayout';
-import patientPortalService from '@/services/patientPortalService';
-import queueService from '@/services/queueService';
+import PageLayout from '@/components/layout/PageLayout';
+import { patientPortalService } from '@/features/patients';
+import { queueService } from '@/features/queue';
 import clinicSettingsService from '@/services/clinicSettingsService';
 
 const pageVariants = {

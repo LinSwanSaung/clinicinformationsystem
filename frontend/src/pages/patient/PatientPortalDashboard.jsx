@@ -1,14 +1,10 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
-import PageLayout from '@/components/PageLayout';
-import ProfileSummary from '@/components/patient/ProfileSummary';
-import UpcomingAppointments from '@/components/patient/UpcomingAppointments';
-import LatestVisitSummary from '@/components/patient/LatestVisitSummary';
-import VitalsSnapshot from '@/components/patient/VitalsSnapshot';
-import PortalSearchResults from '@/components/patient/PortalSearchResults';
-import AIHealthBlog from '@/components/patient/AIHealthBlog';
-import patientPortalService from '@/services/patientPortalService';
+import PageLayout from '@/components/layout/PageLayout';
+import { ProfileSummary, UpcomingAppointments, VitalsSnapshot, PortalSearchResults, AIHealthBlog } from '@/features/patient-portal';
+import { LatestVisitSummary } from '@/features/visits';
+import { patientPortalService } from '@/features/patients';
 import { Separator } from '@/components/ui/separator';
 
 const PatientPortalDashboard = () => {

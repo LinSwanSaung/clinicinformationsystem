@@ -2,25 +2,17 @@ import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { ArrowLeft, AlertCircle } from 'lucide-react';
-import PageLayout from '../../components/PageLayout';
+import PageLayout from '@/components/layout/PageLayout';
 import { Button } from '../../components/ui/button';
 import { Alert, AlertDescription } from '../../components/ui/alert';
 import { Skeleton } from '../../components/ui/skeleton';
 
 // Import reusable medical components (read-only versions)
-import PatientInformationHeader from '../../components/medical/PatientInformationHeader';
+import { PatientInformationHeader, patientPortalService } from '@/features/patients';
 import NavigationTabs from '../../components/ui/NavigationTabs';
-import PatientVitalsDisplay from '../../components/medical/PatientVitalsDisplay';
-import MedicalInformationPanel from '../../components/medical/MedicalInformationPanel';
-import ClinicalNotesDisplay from '../../components/medical/ClinicalNotesDisplay';
-import VisitHistoryCard from '../../components/medical/VisitHistoryCard';
-
-import patientPortalService from '../../services/patientPortalService';
-import { allergyService } from '../../services/allergyService';
-import { diagnosisService } from '../../services/diagnosisService';
-import { visitService } from '../../services/visitService';
-import vitalsService from '../../services/vitalsService';
-import api from '../../services/api';
+import { PatientVitalsDisplay, MedicalInformationPanel, ClinicalNotesDisplay, allergyService, diagnosisService, vitalsService } from '@/features/medical';
+import { VisitHistoryCard, visitService } from '@/features/visits';
+import api from '@/services/api';
 
 const PatientMedicalRecords = () => {
   const navigate = useNavigate();

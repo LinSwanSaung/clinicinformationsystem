@@ -1,0 +1,121 @@
+{
+  "routes": {
+    "purpose": "Express route handlers - HTTP endpoints",
+    "primary_consumers": ["app.js"],
+    "notable_files": [
+      "routes/auth.routes.js",
+      "routes/patient.routes.js",
+      "routes/visit.routes.js",
+      "routes/invoice.routes.js",
+      "routes/queue.routes.js"
+    ],
+    "notes": "23 route files, one per domain. Routes delegate to services, use middleware (auth, validators)."
+  },
+  "services": {
+    "purpose": "Business logic layer",
+    "primary_consumers": ["routes"],
+    "notable_files": [
+      "services/Queue.service.js (~1,400 lines - token lifecycle, queue operations)",
+      "services/Visit.service.js (~1,000 lines - visit CRUD, EMR, PDF)",
+      "services/Invoice.service.js (~400+ lines - invoice lifecycle)",
+      "services/Patient.service.js",
+      "services/Auth.service.js"
+    ],
+    "submodules": {
+      "repositories": "Data access layer (7 repos: AppointmentsRepo, BillingRepo, InvoicesRepo, PatientsRepo, PrescriptionsRepo, VisitsRepo, VitalsRepo)",
+      "transactions": "Transaction utilities (TransactionRunner for compensation-based transactions)"
+    },
+    "notes": "28 service files. Some services use repositories, others use models directly. Large files (Queue, Visit) could be split."
+  },
+  "models": {
+    "purpose": "Data models - database operations",
+    "primary_consumers": ["services", "repositories"],
+    "notable_files": [
+      "models/BaseModel.js (base class for all models)",
+      "models/Patient.model.js",
+      "models/Visit.model.js",
+      "models/Invoice.model.js",
+      "models/QueueToken.model.js"
+    ],
+    "notes": "17 model files, all extend BaseModel. BaseModel provides Supabase CRUD operations."
+  },
+  "middleware": {
+    "purpose": "Express middleware",
+    "primary_consumers": ["app.js", "routes"],
+    "notable_files": [
+      "middleware/auth.js (JWT authentication - app + Supabase tokens)",
+      "middleware/errorHandler.js (centralized error handling)",
+      "middleware/activeVisitCheck.js (validates active visit)",
+      "middleware/rateLimiter.js (rate limiting)",
+      "middleware/requestLogger.js (request logging)"
+    ],
+    "notes": "5 middleware files. auth.js supports both app-issued and Supabase-issued JWTs."
+  },
+  "validators": {
+    "purpose": "Request validation",
+    "primary_consumers": ["routes"],
+    "notable_files": [
+      "validators/auth.validator.js",
+      "validators/patient.validator.js",
+      "validators/queue.validator.js",
+      "validators/base.validator.js"
+    ],
+    "notes": "4 validator files. Uses express-validator/joi."
+  },
+  "utils": {
+    "purpose": "Utility functions",
+    "primary_consumers": ["services", "routes", "middleware"],
+    "notable_files": [
+      "utils/auditLogger.js (audit log helper)",
+      "utils/responseHelper.js (response formatting)",
+      "utils/dateHelper.js (date utilities)",
+      "utils/fileLogger.js (file logging)"
+    ],
+    "notes": "4 utility files."
+  },
+  "errors": {
+    "purpose": "Custom error classes",
+    "primary_consumers": ["services", "middleware"],
+    "notable_files": [
+      "errors/ApplicationError.js (structured error: statusCode, code, details)"
+    ],
+    "notes": "Single error class: ApplicationError for structured error responses."
+  },
+  "config": {
+    "purpose": "Configuration",
+    "primary_consumers": ["app.js", "services", "models"],
+    "notable_files": [
+      "config/database.js (Supabase client initialization)",
+      "config/app.config.js (app-level config)"
+    ],
+    "notes": "2 config files. database.js exports supabase client."
+  },
+  "constants": {
+    "purpose": "Application constants",
+    "primary_consumers": ["routes", "services", "middleware"],
+    "notable_files": ["constants/roles.js (ROLES enum)"],
+    "notes": "Single file: roles.js for role definitions."
+  },
+  "jobs": {
+    "purpose": "Scheduled jobs (cron)",
+    "primary_consumers": ["app.js"],
+    "notable_files": [
+      "jobs/autoCancelAppointments.js (end-of-day appointment auto-cancel)"
+    ],
+    "notes": "Single job: autoCancelAppointments for stale appointment cleanup."
+  },
+  "database": {
+    "purpose": "Database migrations and schema",
+    "primary_consumers": ["migrations (manual execution)"],
+    "notable_files": [
+      "database/schema.sql (main schema - 2,200+ lines)",
+      "database/v2schema.sql (legacy schema - should be consolidated)",
+      "database/migrations/ (31 SQL migration files)"
+    ],
+    "submodules": {
+      "migrations": "31 SQL migration files (some duplicate numbering: multiple 002_*, 003_*, etc.)",
+      "seeds": "Sample data for development (2 files)"
+    },
+    "notes": "Schema fragmentation: schema.sql + v2schema.sql + 31 migrations. Should consolidate."
+  }
+}

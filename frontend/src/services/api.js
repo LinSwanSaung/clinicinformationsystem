@@ -1,4 +1,4 @@
-import { getAbortSignal, handleUnauthorized } from './sessionGuard';
+import { getAbortSignal, handleUnauthorized } from '@/features/auth';
 
 // API Base Configuration
 const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:3001/api';

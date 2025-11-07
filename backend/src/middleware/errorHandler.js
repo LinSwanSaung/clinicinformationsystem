@@ -3,9 +3,11 @@
  * Centralizes error handling across the application
  */
 
+import logger from '../config/logger.js';
+
 export const errorHandler = (error, req, res, next) => {
   // Log error for debugging
-  console.error('Error:', {
+  logger.error('Error:', {
     message: error.message,
     code: error.code,
     stack: error.stack,

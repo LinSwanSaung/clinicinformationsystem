@@ -2,17 +2,23 @@ import QueueTokenModel from '../models/QueueToken.model.js';
 import AppointmentModel from '../models/Appointment.model.js';
 import patientModel from '../models/Patient.model.js';
 import VisitService from './Visit.service.js';
-import { supabase } from '../config/database.js';
+import {
+  getDoctorAvailabilityForDay,
+  getQueueTokensByDoctorAndDate as repoGetQueueTokensByDoctorAndDate,
+  getQueueTokenById as repoGetQueueTokenById,
+  updateQueueToken as repoUpdateQueueToken,
+  getMaxTokenNumber,
+} from './repositories/QueueRepo.js';
 import { logAuditEvent } from '../utils/auditLogger.js';
 import { ApplicationError } from '../errors/ApplicationError.js';
 import { TransactionRunner } from './transactions/TransactionRunner.js';
+import logger from '../config/logger.js';
 
 class QueueService {
   constructor() {
     this.queueTokenModel = new QueueTokenModel();
     this.appointmentModel = new AppointmentModel();
     this.visitService = new VisitService();
-    this.supabase = supabase;
     this.patientModel = patientModel; // Use the exported instance
   }
 
@@ -32,14 +38,16 @@ class QueueService {
       const currentTime = now.toTimeString().slice(0, 5); // HH:MM format
 
       // Get doctor's availability for today
-      const { data: availabilityData, error: availError } = await this.supabase
-        .from('doctor_availability')
-        .select('*')
-        .eq('doctor_id', doctorId)
-        .eq('day_of_week', currentDay)
-        .eq('is_active', true);
+      let availabilityData;
+      try {
+        availabilityData = await getDoctorAvailabilityForDay(doctorId, currentDay);
+      } catch (availError) {
+        // TODO: Replace console.* with logger
+        logger.warn('Error fetching doctor availability:', availError);
+        availabilityData = null;
+      }
 
-      if (availError || !availabilityData || availabilityData.length === 0) {
+      if (!availabilityData || availabilityData.length === 0) {
         return {
           canAccept: false,
           reason: 'Doctor is not available today',
@@ -75,12 +83,17 @@ class QueueService {
       const remainingMinutes = Math.floor((endTime - now) / (1000 * 60));
 
       // Get current queue count for this doctor
-      const { data: currentQueue, error: queueError } = await this.supabase
-        .from('queue_tokens')
-        .select('id, status')
-        .eq('doctor_id', doctorId)
-        .in('status', ['waiting', 'called', 'in_consultation'])
-        .eq('issued_date', now.toISOString().split('T')[0]);
+      let currentQueue = [];
+      try {
+        currentQueue = await repoGetQueueTokensByDoctorAndDate(
+          doctorId,
+          now.toISOString().split('T')[0],
+          ['waiting', 'called', 'in_consultation']
+        );
+      } catch (queueError) {
+        // TODO: Replace console.* with logger
+        logger.warn('Error fetching queue tokens:', queueError);
+      }
 
       const queueCount = currentQueue?.length || 0;
 
@@ -963,17 +976,15 @@ class QueueService {
   async delayToken(tokenId, reason = null) {
     try {
       // Get current token
-      const { data: currentToken, error: fetchError } = await this.supabase
-        .from('queue_tokens')
-        .select('*')
-        .eq('id', tokenId)
-        .single();
-
-      if (fetchError || !currentToken) {
+      let currentToken;
+      try {
+        currentToken = await repoGetQueueTokenById(tokenId);
+      } catch (fetchError) {
         throw new Error('Token not found');
       }
 
-      console.log(`[DELAY TOKEN] Token ID: ${tokenId}, Current Status: ${currentToken.status}`);
+      // TODO: Replace console.* with logger
+      logger.debug(`[DELAY TOKEN] Token ID: ${tokenId}, Current Status: ${currentToken.status}`);
 
       // Can only delay if status is waiting or called
       if (!['waiting', 'called'].includes(currentToken.status)) {
@@ -983,20 +994,13 @@ class QueueService {
       }
 
       // Update token to delayed status
-      const { data: updatedToken, error: updateError } = await this.supabase
-        .from('queue_tokens')
-        .update({
-          status: 'delayed',
-          previous_status: currentToken.status,
-          delay_reason: reason,
-          delayed_at: new Date().toISOString(),
-          updated_at: new Date().toISOString(),
-        })
-        .eq('id', tokenId)
-        .select()
-        .single();
-
-      if (updateError) throw updateError;
+      const updatedToken = await repoUpdateQueueToken(tokenId, {
+        status: 'delayed',
+        previous_status: currentToken.status,
+        delay_reason: reason,
+        delayed_at: new Date().toISOString(),
+        updated_at: new Date().toISOString(),
+      });
 
       return {
         success: true,
@@ -1004,7 +1008,8 @@ class QueueService {
         message: 'Patient marked as delayed',
       };
     } catch (error) {
-      console.error('Error delaying token:', error);
+      // TODO: Replace console.* with logger
+      logger.error('Error delaying token:', error);
       throw error;
     }
   }
@@ -1016,13 +1021,10 @@ class QueueService {
   async undelayToken(tokenId) {
     try {
       // Get current token
-      const { data: currentToken, error: fetchError } = await this.supabase
-        .from('queue_tokens')
-        .select('*')
-        .eq('id', tokenId)
-        .single();
-
-      if (fetchError || !currentToken) {
+      let currentToken;
+      try {
+        currentToken = await repoGetQueueTokenById(tokenId);
+      } catch (fetchError) {
         throw new Error('Token not found');
       }
 
@@ -1031,30 +1033,19 @@ class QueueService {
       }
 
       // Get the highest token number for this doctor/date
-      const { data: maxTokenData, error: maxError } = await this.supabase
-        .from('queue_tokens')
-        .select('token_number')
-        .eq('doctor_id', currentToken.doctor_id)
-        .eq('issued_date', currentToken.issued_date)
-        .order('token_number', { ascending: false })
-        .limit(1);
-
-      const newTokenNumber = (maxTokenData?.[0]?.token_number || 0) + 1;
+      const maxTokenNumber = await getMaxTokenNumber(
+        currentToken.doctor_id,
+        currentToken.issued_date
+      );
+      const newTokenNumber = maxTokenNumber + 1;
 
       // Update token - move to end of queue with new token number
-      const { data: updatedToken, error: updateError } = await this.supabase
-        .from('queue_tokens')
-        .update({
-          status: 'waiting', // Reset to waiting status
-          token_number: newTokenNumber, // Assign new token number at end of queue
-          undelayed_at: new Date().toISOString(),
-          updated_at: new Date().toISOString(),
-        })
-        .eq('id', tokenId)
-        .select()
-        .single();
-
-      if (updateError) throw updateError;
+      const updatedToken = await repoUpdateQueueToken(tokenId, {
+        status: 'waiting', // Reset to waiting status
+        token_number: newTokenNumber, // Assign new token number at end of queue
+        undelayed_at: new Date().toISOString(),
+        updated_at: new Date().toISOString(),
+      });
 
       return {
         success: true,

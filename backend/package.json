@@ -4,6 +4,19 @@
   "description": "RealCIS Clinic Information System - Backend API",
   "main": "src/app.js",
   "type": "module",
+  "imports": {
+    "#src/*": "./src/*",
+    "#routes/*": "./src/routes/*",
+    "#services/*": "./src/services/*",
+    "#repos/*": "./src/services/repositories/*",
+    "#middleware/*": "./src/middleware/*",
+    "#config/*": "./src/config/*",
+    "#utils/*": "./src/utils/*",
+    "#constants/*": "./src/constants/*",
+    "#validators/*": "./src/validators/*",
+    "#models/*": "./src/models/*",
+    "#errors/*": "./src/errors/*"
+  },
   "scripts": {
     "start": "node src/app.js",
     "dev": "nodemon src/app.js",
@@ -17,7 +30,8 @@
     "db:migrate": "node database/migrate.js",
     "db:test": "node database/migrate.js test",
     "db:seed": "node database/seed.js",
-    "db:reset": "npm run db:migrate && npm run db:seed"
+    "db:reset": "npm run db:migrate && npm run db:seed",
+    "db:verify-schema": "node scripts/verify-schema.js"
   },
   "keywords": [
     "clinic",

@@ -54,22 +54,24 @@ supabase db push
 After running the migration, verify it worked:
 
 1. **Check `invoices` table has new columns:**
+
    ```sql
-   SELECT column_name 
-   FROM information_schema.columns 
-   WHERE table_name = 'invoices' 
+   SELECT column_name
+   FROM information_schema.columns
+   WHERE table_name = 'invoices'
    AND column_name IN ('amount_paid', 'balance_due', 'on_hold');
    ```
 
 2. **Check `payment_transactions` table exists:**
+
    ```sql
    SELECT * FROM payment_transactions LIMIT 1;
    ```
 
 3. **Check invoice status constraint:**
    ```sql
-   SELECT constraint_name, check_clause 
-   FROM information_schema.check_constraints 
+   SELECT constraint_name, check_clause
+   FROM information_schema.check_constraints
    WHERE constraint_name = 'valid_invoice_status';
    ```
 
@@ -82,7 +84,7 @@ If something goes wrong, you can rollback:
 DROP TABLE IF EXISTS payment_transactions CASCADE;
 
 -- Remove new columns from invoices
-ALTER TABLE invoices 
+ALTER TABLE invoices
   DROP COLUMN IF EXISTS amount_paid,
   DROP COLUMN IF EXISTS balance_due,
   DROP COLUMN IF EXISTS on_hold,
@@ -92,7 +94,7 @@ ALTER TABLE invoices
 
 -- Restore original status constraint
 ALTER TABLE invoices DROP CONSTRAINT IF EXISTS valid_invoice_status;
-ALTER TABLE invoices ADD CONSTRAINT valid_invoice_status 
+ALTER TABLE invoices ADD CONSTRAINT valid_invoice_status
   CHECK (status IN ('draft', 'pending', 'paid', 'cancelled', 'refunded'));
 ```
 
@@ -103,7 +105,7 @@ ALTER TABLE invoices ADD CONSTRAINT valid_invoice_status
 ✅ **Payment History** - View all payment transactions  
 ✅ **Outstanding Balance** - Query patient's unpaid invoices  
 ✅ **2 Invoice Limit** - Prevent patients from accumulating >2 unpaid invoices  
-✅ **Payment Tracking** - Who processed payment, when, method used  
+✅ **Payment Tracking** - Who processed payment, when, method used
 
 ## Testing the Migration
 
@@ -129,12 +131,15 @@ DELETE FROM invoices WHERE id = 'test-invoice-id';
 ## Troubleshooting
 
 ### Error: "column already exists"
+
 - **Solution:** Migration already ran successfully, no action needed
 
 ### Error: "relation payment_transactions does not exist"
+
 - **Solution:** Run the migration SQL manually in Supabase SQL Editor
 
 ### Error: "permission denied"
+
 - **Solution:** Make sure you're using SUPABASE_SERVICE_KEY, not SUPABASE_ANON_KEY
 
 ## Next Steps
@@ -150,6 +155,7 @@ After successful migration:
 ## Support
 
 If you encounter issues:
+
 1. Check Supabase logs in dashboard
 2. Verify your `.env` file has correct credentials
 3. Try running SQL manually in Supabase SQL Editor

@@ -1,5 +1,14 @@
-import PatientDiagnosisModel from '../models/PatientDiagnosis.model.js';
-import { supabaseAdmin } from '../config/database.js';
+import {
+  getDiagnosesByPatient as repoGetDiagnosesByPatient,
+  getDiagnosesByVisit as repoGetDiagnosesByVisit,
+  getDiagnosisById as repoGetDiagnosisById,
+  createDiagnosis as repoCreateDiagnosis,
+  updateDiagnosis as repoUpdateDiagnosis,
+  updateDiagnosisStatus as repoUpdateDiagnosisStatus,
+  softDeleteDiagnosis as repoSoftDeleteDiagnosis,
+  getActiveDiagnoses as repoGetActiveDiagnoses,
+  getFirstDoctorId,
+} from './repositories/PatientDiagnosisRepo.js';
 
 class PatientDiagnosisService {
   /**
@@ -7,7 +16,7 @@ class PatientDiagnosisService {
    */
   async getDiagnosesByPatient(patientId, includeResolved = false) {
     try {
-      return await PatientDiagnosisModel.getByPatientId(patientId, includeResolved);
+      return await repoGetDiagnosesByPatient(patientId, includeResolved);
     } catch (error) {
       throw new Error(`Failed to fetch diagnoses: ${error.message}`);
     }
@@ -18,7 +27,7 @@ class PatientDiagnosisService {
    */
   async getDiagnosesByVisit(visitId) {
     try {
-      return await PatientDiagnosisModel.getByVisitId(visitId);
+      return await repoGetDiagnosesByVisit(visitId);
     } catch (error) {
       throw new Error(`Failed to fetch visit diagnoses: ${error.message}`);
     }
@@ -29,7 +38,7 @@ class PatientDiagnosisService {
    */
   async getDiagnosisById(id) {
     try {
-      return await PatientDiagnosisModel.findById(id);
+      return await repoGetDiagnosisById(id);
     } catch (error) {
       throw new Error(`Failed to fetch diagnosis: ${error.message}`);
     }
@@ -52,22 +61,14 @@ class PatientDiagnosisService {
 
       // If diagnosed_by is not provided, use the first doctor in the system (dev mode)
       if (!diagnosisData.diagnosed_by) {
-        // In a real app, this would come from the authenticated user
-        // For now, we'll use a default doctor ID - you may need to adjust this
-        const { data: doctors } = await supabaseAdmin
-          .from('users')
-          .select('id')
-          .eq('role', 'doctor')
-          .limit(1);
-        
-        if (doctors && doctors.length > 0) {
-          diagnosisData.diagnosed_by = doctors[0].id;
-        } else {
+        const doctorId = await getFirstDoctorId();
+        if (!doctorId) {
           throw new Error('No doctor available to assign diagnosis');
         }
+        diagnosisData.diagnosed_by = doctorId;
       }
 
-      return await PatientDiagnosisModel.create(diagnosisData);
+      return await repoCreateDiagnosis(diagnosisData);
     } catch (error) {
       throw new Error(`Failed to create diagnosis: ${error.message}`);
     }
@@ -79,12 +80,12 @@ class PatientDiagnosisService {
   async updateDiagnosis(id, diagnosisData) {
     try {
       // Check if diagnosis exists
-      const existingDiagnosis = await PatientDiagnosisModel.findById(id);
+      const existingDiagnosis = await repoGetDiagnosisById(id);
       if (!existingDiagnosis) {
         throw new Error('Diagnosis not found');
       }
 
-      return await PatientDiagnosisModel.update(id, diagnosisData);
+      return await repoUpdateDiagnosis(id, diagnosisData);
     } catch (error) {
       throw new Error(`Failed to update diagnosis: ${error.message}`);
     }
@@ -96,12 +97,12 @@ class PatientDiagnosisService {
   async updateDiagnosisStatus(id, status, resolvedDate = null) {
     try {
       // Check if diagnosis exists
-      const existingDiagnosis = await PatientDiagnosisModel.findById(id);
+      const existingDiagnosis = await repoGetDiagnosisById(id);
       if (!existingDiagnosis) {
         throw new Error('Diagnosis not found');
       }
 
-      return await PatientDiagnosisModel.updateStatus(id, status, resolvedDate);
+      return await repoUpdateDiagnosisStatus(id, status, resolvedDate);
     } catch (error) {
       throw new Error(`Failed to update diagnosis status: ${error.message}`);
     }
@@ -113,12 +114,12 @@ class PatientDiagnosisService {
   async deleteDiagnosis(id) {
     try {
       // Check if diagnosis exists
-      const existingDiagnosis = await PatientDiagnosisModel.findById(id);
+      const existingDiagnosis = await repoGetDiagnosisById(id);
       if (!existingDiagnosis) {
         throw new Error('Diagnosis not found');
       }
 
-      return await PatientDiagnosisModel.softDelete(id);
+      return await repoSoftDeleteDiagnosis(id);
     } catch (error) {
       throw new Error(`Failed to delete diagnosis: ${error.message}`);
     }
@@ -129,7 +130,7 @@ class PatientDiagnosisService {
    */
   async getAllActiveDiagnoses() {
     try {
-      return await PatientDiagnosisModel.getActiveDiagnoses();
+      return await repoGetActiveDiagnoses();
     } catch (error) {
       throw new Error(`Failed to fetch active diagnoses: ${error.message}`);
     }

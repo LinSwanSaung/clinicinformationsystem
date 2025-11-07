@@ -45,6 +45,16 @@ module.exports = {
               'Import Supabase only from src/config/database.js or within src/services/repositories/**. Create/extend a repo instead.',
           },
         ],
+        patterns: [
+          {
+            group: ['\\.\\./\\.\\./\\.\\./.*'],
+            message: 'Use path aliases instead of deep relative imports (../../../).',
+          },
+          {
+            group: ['\\.\\./\\.\\./.*'],
+            message: 'Prefer path aliases over deep relative imports (../../).',
+          },
+        ],
       },
     ],
   },

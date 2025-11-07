@@ -1,5 +1,9 @@
 import NotificationModel from '../models/Notification.model.js';
-import { supabase } from '../config/database.js';
+import {
+  createNotification as repoCreateNotification,
+  getReceptionistIds,
+} from './repositories/NotificationsRepo.js';
+import logger from '../config/logger.js';
 
 /**
  * Notification Service
@@ -8,7 +12,15 @@ class NotificationService {
   /**
    * Create notification for user(s)
    */
-  async createNotification({ userId, userIds, title, message, type = 'info', relatedEntityType, relatedEntityId }) {
+  async createNotification({
+    userId,
+    userIds,
+    title,
+    message,
+    type = 'info',
+    relatedEntityType,
+    relatedEntityId,
+  }) {
     try {
       const notifications = [];
       const targetUsers = userIds || [userId];
@@ -20,16 +32,16 @@ class NotificationService {
           message,
           type,
           related_entity_type: relatedEntityType,
-          related_entity_id: relatedEntityId
+          related_entity_id: relatedEntityId,
         };
 
-        const notification = await NotificationModel.createNotification(notificationData);
+        const notification = await repoCreateNotification(notificationData);
         notifications.push(notification);
       }
 
       return notifications;
     } catch (error) {
-      console.error('[NotificationService] Error creating notification:', error);
+      logger.error('[NotificationService] Error creating notification:', error);
       throw new Error(`Failed to create notification: ${error.message}`);
     }
   }
@@ -39,31 +51,22 @@ class NotificationService {
    */
   async notifyReceptionists({ title, message, type = 'info', relatedEntityType, relatedEntityId }) {
     try {
-      // Get all receptionist users
-      const { data: receptionists, error } = await supabase
-        .from('users')
-        .select('id')
-        .eq('role', 'receptionist')
-        .eq('is_active', true);
+      const receptionistIds = await getReceptionistIds();
 
-      if (error) throw error;
-
-      if (!receptionists || receptionists.length === 0) {
+      if (receptionistIds.length === 0) {
         return [];
       }
 
-      const receptionistIds = receptionists.map(r => r.id);
-      
       return await this.createNotification({
         userIds: receptionistIds,
         title,
         message,
         type,
         relatedEntityType,
-        relatedEntityId
+        relatedEntityId,
       });
     } catch (error) {
-      console.error('[NotificationService] Error notifying receptionists:', error);
+      logger.error('[NotificationService] Error notifying receptionists:', error);
       throw new Error(`Failed to notify receptionists: ${error.message}`);
     }
   }

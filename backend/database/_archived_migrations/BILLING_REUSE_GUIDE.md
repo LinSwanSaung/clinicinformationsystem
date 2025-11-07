@@ -1,6 +1,7 @@
 # Billing System - Reusing Existing Services
 
 ## ✅ Migration Updated
+
 - **Removed**: `medicine_inventory` table (no inventory tracking)
 - **Kept**: 4 core tables (services, invoices, invoice_items, payment_transactions)
 - **Medicine Prices**: Cashier enters manually per transaction
@@ -8,74 +9,88 @@
 ## 🔄 Existing Services to Reuse
 
 ### 1. **Visit.service.js** ✅
+
 **What we can reuse:**
+
 - `getVisitById()` - Get visit details for invoice creation
 - `updateVisit()` - Update visit status when invoice is completed
 - `completeVisit()` - Mark visit as completed when invoice is paid
 
 **Integration points:**
+
 ```javascript
 // When creating invoice
 const visit = await VisitService.getVisitById(visitId);
 const invoice = await InvoiceService.createInvoice({
   visit_id: visit.id,
-  patient_id: visit.patient_id
+  patient_id: visit.patient_id,
 });
 ```
 
 ### 2. **Prescription.service.js** ✅
+
 **What we can reuse:**
+
 - `getPrescriptionsByVisit()` - Get medicines prescribed during visit
 - Prescription data for adding medicines to invoice items
 
 **Integration points:**
+
 ```javascript
 // When building invoice, get prescribed medicines
 const prescriptions = await PrescriptionService.getPrescriptionsByVisit(visitId);
-prescriptions.forEach(rx => {
+prescriptions.forEach((rx) => {
   invoiceItems.push({
     item_type: 'medicine',
     item_id: rx.id,
     item_name: rx.medication_name,
-    quantity: rx.quantity
+    quantity: rx.quantity,
     // Price entered by cashier
   });
 });
 ```
 
 ### 3. **Patient.service.js** ✅
+
 **What we can reuse:**
+
 - `getPatientById()` - Get patient details for invoice header
 - Patient information for billing records
 
 **Integration points:**
+
 ```javascript
 // Get patient info for invoice
 const patient = await PatientService.getPatientById(patientId);
 const invoice = {
   patient_id: patient.id,
-  patient_name: patient.full_name // for display
+  patient_name: patient.full_name, // for display
 };
 ```
 
 ### 4. **Auth.service.js** ✅
+
 **What we can reuse:**
+
 - User authentication for cashier/doctor roles
 - `getUserById()` - Track who created/completed invoices
 
 **Integration points:**
+
 ```javascript
 // Track cashier actions
 const invoice = await InvoiceService.createInvoice({
-  created_by: req.user.id,  // from Auth middleware
-  completed_by: cashierId
+  created_by: req.user.id, // from Auth middleware
+  completed_by: cashierId,
 });
 ```
 
 ## 🆕 New Services Needed
 
 ### 1. **Service.service.js** (NEW)
+
 **Purpose**: Manage billable services catalog
+
 ```javascript
 class ServiceService {
   async getActiveServices() // Get all active services for selection
@@ -87,7 +102,9 @@ class ServiceService {
 ```
 
 ### 2. **Invoice.service.js** (NEW)
+
 **Purpose**: Manage invoices
+
 ```javascript
 class InvoiceService {
   async createInvoice(visitId, patientId, createdBy)
@@ -103,7 +120,9 @@ class InvoiceService {
 ```
 
 ### 3. **Payment.service.js** (NEW)
+
 **Purpose**: Handle payments
+
 ```javascript
 class PaymentService {
   async recordPayment(invoiceId, paymentData, cashierId)
@@ -115,6 +134,7 @@ class PaymentService {
 ## 📋 Implementation Plan
 
 ### Phase 1: Backend Foundation (Do First)
+
 1. ✅ Run migration: `003_billing_system.sql`
 2. Create Models:
    - `Service.model.js` (using BaseModel pattern)
@@ -132,6 +152,7 @@ class PaymentService {
 5. Register routes in `app.js`
 
 ### Phase 2: Frontend Integration
+
 1. Create Frontend Services:
    - `serviceService.js` (frontend/src/services/)
    - `invoiceService.js`
@@ -145,6 +166,7 @@ class PaymentService {
    - `InvoicePage.jsx` (view/edit invoice)
 
 ### Phase 3: Workflow Integration
+
 1. **Doctor adds services during consultation:**
    - Add ServiceSelector to PatientMedicalRecord
    - Create draft invoice items when doctor selects services
@@ -182,11 +204,12 @@ CASHIER WORKFLOW:
 ## 💡 Key Integration Points
 
 ### Invoice Auto-Creation
+
 ```javascript
 // In Queue.service.js - when starting consultation
 async startConsultation(tokenId, doctorId) {
   // ... existing visit creation code ...
-  
+
   // NEW: Auto-create invoice
   await InvoiceService.createInvoice({
     visit_id: visit.id,
@@ -197,11 +220,12 @@ async startConsultation(tokenId, doctorId) {
 ```
 
 ### Prescription to Invoice Items
+
 ```javascript
 // In Invoice.service.js
 async addPrescriptionsToInvoice(invoiceId, visitId) {
   const prescriptions = await PrescriptionService.getPrescriptionsByVisit(visitId);
-  
+
   for (const rx of prescriptions) {
     await this.addInvoiceItem(invoiceId, {
       item_type: 'medicine',
@@ -216,19 +240,20 @@ async addPrescriptionsToInvoice(invoiceId, visitId) {
 ```
 
 ### Complete Payment → Complete Visit
+
 ```javascript
 // In Invoice.service.js
 async completeInvoice(invoiceId, paymentData, cashierId) {
   // Record payment
   await PaymentService.recordPayment(invoiceId, paymentData, cashierId);
-  
+
   // Update invoice
   const invoice = await this.updateInvoice(invoiceId, {
     status: 'paid',
     completed_by: cashierId,
     completed_at: new Date()
   });
-  
+
   // Complete associated visit
   await VisitService.completeVisit(invoice.visit_id, {
     completed_by: cashierId

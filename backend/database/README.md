@@ -1,149 +1,69 @@
-# Database Schema Setup Instructions
+# Database Schema Management
 
 ## Overview
-This document contains instructions for setting up the RealCIS database schema in Supabase.
 
-## Schema Status
-✅ **Schema is ready for deployment - ALL ISSUES RESOLVED**
-- All 7 database functions are properly defined
-- All 14 triggers are correctly configured
-- All 12 RLS policies use DROP IF EXISTS before CREATE
-- All 9 INSERT statements have proper conflict handling
-- PostgreSQL/Supabase compatibility validated
-- **ZERO duplicate key errors**
-- **ZERO "already exists" errors**
-- **100% idempotent design - PERFECT SCORE**
+This directory contains the database schema and related files for the RealCIS Clinic Information System.
 
-## Recent Fixes
-🔧 **Fixed Patient Number Conflicts**: Added explicit patient numbers and `ON CONFLICT (patient_number) DO NOTHING`
-🔧 **Fixed RLS Policy Conflicts**: Added `DROP POLICY IF EXISTS` before all `CREATE POLICY` statements
-🔧 **Fixed Appointment Conflicts**: Added `ON CONFLICT DO NOTHING` to appointment insertions
-🔧 **Enhanced Sample Data**: All sample data now handles conflicts gracefully
-🔧 **Comprehensive Testing**: Validated all 9 INSERT statements for conflict handling
+## Schema Files
 
-## Tables Included
-1. **users** - System users (admin, doctor, nurse, receptionist)
-2. **patients** - Patient records with auto-generated patient numbers
-3. **appointments** - Appointment management with status tracking
-4. **visits** - Visit records with vital signs and BMI calculation
-5. **prescriptions** - Prescription management
-6. **doctor_notes** - Doctor notes for visits
-7. **doctor_availability** - Doctor schedule/availability management
-8. **queue_tokens** - Token-based queue system
-9. **appointment_queue** - Queue management for appointments
+### `schema.sql`
 
-## Key Features
-- **Auto-generated IDs**: Patient numbers and token numbers
-- **Automatic calculations**: BMI calculation from height/weight
-- **Queue management**: Position calculation and token generation
-- **Data validation**: Doctor role validation for availability
-- **Audit trails**: Updated_at timestamps for all tables
-- **Sample data**: Realistic test data for development
+**Single source of truth** for the database schema. This file contains the complete, up-to-date schema definition including:
 
-## How to Deploy
+- All tables, columns, constraints
+- Indexes
+- Views
+- Functions
+- RLS policies
+- Extensions
 
-### Step 1: Access Supabase SQL Editor
-1. Log into your Supabase dashboard
-2. Navigate to the SQL Editor
-3. Create a new query
+**For fresh installations:** Run `schema.sql` directly in your Supabase SQL Editor to bootstrap the entire database.
 
-### Step 2: Run the Schema
-1. Copy the entire contents of `backend/database/schema.sql`
-2. Paste into the SQL Editor
-3. Click "Run" to execute
+## Migrations
 
-### Step 3: Verify Installation
-After running the schema, verify the installation by checking:
-- All 9 tables are created
-- All functions and triggers are in place
-- Sample data is loaded
+### `_archived_migrations/`
 
-## Schema Safety
-- The schema is **idempotent** - safe to run multiple times
-- Uses `CREATE OR REPLACE` for functions
-- Uses `DROP TRIGGER IF EXISTS` for triggers
-- Uses `INSERT ... ON CONFLICT DO NOTHING` for sample data
+Contains historical migration files that were applied to existing deployments. These are archived for reference but are **not used for fresh installations**.
 
-## Sample Data Included
-- 4 users (admin, doctor, nurse, receptionist)
-- 3 patients with complete records
-- Doctor availability schedules
-- Queue tokens and appointment queue entries
+**Note:** Migrations have been archived because:
 
-## Row Level Security (RLS)
-- Policies are defined but not yet fully implemented
-- Ready for production security hardening
-- Currently allows authenticated users full access
+- The schema.sql file is comprehensive and up-to-date
+- Fresh installs can bootstrap from schema.sql
+- Existing deployments already have migrations applied
 
-## Next Steps
-1. Deploy this schema to Supabase
-2. Implement backend API endpoints
-3. Connect frontend to real data
-4. Refine RLS policies for production
+If you need to reference historical migrations, see the `_archived_migrations/` directory.
 
-## Support
-The schema has been thoroughly tested and validated. If you encounter any issues during deployment, the most common causes are:
-- Missing Supabase extensions (uuid-ossp is required)
-- Permissions issues (ensure you have database admin access)
-- Network connectivity problems
+## Seeds
 
-All functions use standard PostgreSQL/Supabase compatible syntax and should work without modification.
-   - `seeds/001_sample_data.sql`
+### `seeds/`
 
-## Testing
+Contains seed data files for development/testing:
 
-After running the migrations, you can test the database connection:
+- `001_sample_data.sql` - Sample users, patients, etc.
+- `002_visit_history.sql` - Sample visit history
+
+## Verification
+
+To verify that `schema.sql` matches your current database:
 
 ```bash
-npm run db:test
+npm run db:verify-schema
 ```
 
-## Sample Data
+This will:
 
-The schema includes sample data for development:
+1. Apply schema.sql to a clean database
+2. Generate a schema dump
+3. Compare with your current database schema
+4. Report any differences
 
-### Default Users
-- **Admin**: admin@clinic.com / admin123
-- **Doctor**: dr.smith@clinic.com / doctor123
-- **Doctor**: dr.johnson@clinic.com / doctor123
-- **Nurse**: nurse.williams@clinic.com / nurse123
-- **Nurse**: nurse.brown@clinic.com / nurse123
-- **Receptionist**: reception@clinic.com / reception123
+## Schema Changes
 
-### Sample Patients
-- Alice Anderson (A+, Hypertension)
-- Robert Wilson (O-, Diabetes Type 2)
-- Maria Garcia (B+, No conditions)
-- James Taylor (AB+, Asthma)
-- Linda Martinez (A-, High cholesterol)
+When making schema changes:
 
-## Security Features
+1. **Update `schema.sql`** - This is the single source of truth
+2. **Test locally** - Apply schema.sql to a test database
+3. **Verify** - Run `npm run db:verify-schema`
+4. **Document** - Update this README if needed
 
-- **Row Level Security (RLS)** enabled on all tables
-- **Password hashing** with bcrypt
-- **Role-based access control**
-- **Audit logging** for all changes
-- **Data validation** with constraints
-
-## Performance Features
-
-- **Indexes** on frequently queried columns
-- **Triggers** for automatic timestamp updates
-- **Views** for common queries
-- **Functions** for calculated fields (BMI, age)
-
-## Backup and Maintenance
-
-Supabase automatically handles:
-- Daily backups
-- Point-in-time recovery
-- Database monitoring
-- Performance optimization
-
-## Support
-
-For issues with the database schema or migrations, check:
-1. Supabase Dashboard logs
-2. Backend server logs
-3. Network connectivity
-4. Environment variables (.env file)
+**Do not** create new migration files. Update `schema.sql` directly.

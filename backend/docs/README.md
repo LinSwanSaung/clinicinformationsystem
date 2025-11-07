@@ -2,27 +2,12 @@
 
 This directory contains production-ready documentation for the RealCIS backend.
 
-## 📚 Documentation Index
+## 📚 Documentation
 
-### Architecture & Design
+### Core Documentation
 
-- **[BACKEND_BOUNDARIES.md](./BACKEND_BOUNDARIES.md)** - Architectural boundaries, import rules, and layer separation
-- **[MIDDLEWARE_ORDER.md](./MIDDLEWARE_ORDER.md)** - Middleware execution order and configuration
-
-### Database
-
-- **[SCHEMA_VERIFICATION.md](./SCHEMA_VERIFICATION.md)** - Schema verification guide and procedures
-- **[DOCTOR_AVAILABILITY.md](./DOCTOR_AVAILABILITY.md)** - Doctor availability system documentation
-
-### Features
-
-- **[DOCTOR_UNAVAILABILITY_SYSTEM.md](./DOCTOR_UNAVAILABILITY_SYSTEM.md)** - Doctor unavailability management system
-- **[LOGGER_GUIDE.md](./LOGGER_GUIDE.md)** - Logging system usage and best practices
-
-### Setup & Operations
-
-- **[SUPABASE_SETUP.md](./SUPABASE_SETUP.md)** - Supabase configuration and setup guide
-- **[ROLLBACK.md](./ROLLBACK.md)** - Rollback procedures and recovery steps
+- **[ARCHITECTURE.md](./ARCHITECTURE.md)** - Architecture, design patterns, middleware, logging, and import boundaries
+- **[SETUP_AND_OPERATIONS.md](./SETUP_AND_OPERATIONS.md)** - Setup, configuration, deployment, database operations, and troubleshooting
 
 ## 🔍 Quick Reference
 
@@ -36,20 +21,17 @@ npm run db:verify-schema
 
 - Production: `LOG_LEVEL=info`
 - Development: `LOG_LEVEL=debug`
-- See [LOGGER_GUIDE.md](./LOGGER_GUIDE.md) for details
 
 ### Middleware Order
 
-1. Request Logger
-2. Rate Limiter
-3. CORS
-4. Body Parser
+1. CORS
+2. Body Parsing
+3. Request Logging
+4. Rate Limiting
 5. Authentication
 6. Authorization
-7. Routes
+7. Route Handlers
 8. Error Handler
-
-See [MIDDLEWARE_ORDER.md](./MIDDLEWARE_ORDER.md) for full details.
 
 ## 📖 Additional Resources
 

@@ -1,22 +1,21 @@
-import React from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { MedicationForm } from './MedicationForm';
 
-export const DoctorNotesForm = ({ 
-  formData, 
-  onChange, 
-  onSubmit, 
+export const DoctorNotesForm = ({
+  formData,
+  onChange,
+  onSubmit,
   onCancel,
   isEditing = false,
-  className = "" 
+  className = '',
 }) => {
   const handleInputChange = (field, value) => {
-    onChange(prev => ({ ...prev, [field]: value }));
+    onChange((prev) => ({ ...prev, [field]: value }));
   };
 
   const handleMedicationChange = (medications) => {
-    onChange(prev => ({ ...prev, medications }));
+    onChange((prev) => ({ ...prev, medications }));
   };
 
   const handleSubmit = (e) => {
@@ -31,7 +30,7 @@ export const DoctorNotesForm = ({
   return (
     <form onSubmit={handleSubmit} className={`space-y-6 ${className}`}>
       <div>
-        <label className="block text-sm font-medium text-gray-700 mb-2">
+        <label className="mb-2 block text-sm font-medium text-gray-700">
           Diagnosis <span className="text-red-500">*</span>
         </label>
         <Input
@@ -44,11 +43,11 @@ export const DoctorNotesForm = ({
       </div>
 
       <div>
-        <label className="block text-sm font-medium text-gray-700 mb-2">
+        <label className="mb-2 block text-sm font-medium text-gray-700">
           Clinical Notes <span className="text-red-500">*</span>
         </label>
         <textarea
-          className="w-full px-3 py-2 text-sm border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent min-h-[120px] resize-none"
+          className="min-h-[120px] w-full resize-none rounded-md border border-gray-300 px-3 py-2 text-sm focus:border-transparent focus:outline-none focus:ring-2 focus:ring-blue-500"
           value={formData.note || ''}
           onChange={(e) => handleInputChange('note', e.target.value)}
           placeholder="Enter your clinical observations, treatment plan, and recommendations..."
@@ -61,18 +60,14 @@ export const DoctorNotesForm = ({
         onChange={handleMedicationChange}
       />
 
-      <div className="flex justify-end space-x-3 pt-4 border-t">
-        <Button
-          type="button"
-          variant="outline"
-          onClick={onCancel}
-        >
+      <div className="flex justify-end space-x-3 border-t pt-4">
+        <Button type="button" variant="outline" onClick={onCancel}>
           Cancel
         </Button>
         <Button
           type="submit"
           disabled={!isValid}
-          className="bg-blue-600 hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed"
+          className="bg-blue-600 hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-50"
         >
           {isEditing ? 'Update Note' : 'Save Note'}
         </Button>

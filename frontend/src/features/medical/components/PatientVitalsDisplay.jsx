@@ -1,15 +1,16 @@
-import React from 'react';
 import { useTranslation } from 'react-i18next';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { 
-  Activity,
-  Heart,
-  ThermometerSnowflake,
-  Scale
-} from 'lucide-react';
+import { Activity, Heart, ThermometerSnowflake, Scale } from 'lucide-react';
 
-const PatientVitalsDisplay = ({ vitals, onAddVitals, onEditVitals, showAddButton = false, showEditButton = false, className = "" }) => {
+const PatientVitalsDisplay = ({
+  vitals,
+  onAddVitals,
+  onEditVitals,
+  showAddButton = false,
+  showEditButton = false,
+  className = '',
+}) => {
   const { t } = useTranslation();
   // Helper function to safely get vitals values - handles both snake_case and camelCase
   const getVitalValue = (snakeCase, camelCase) => {
@@ -31,7 +32,7 @@ const PatientVitalsDisplay = ({ vitals, onAddVitals, onEditVitals, showAddButton
           return vitals.bp;
         }
         return systolic && diastolic ? `${systolic}/${diastolic}` : null;
-      })()
+      })(),
     },
     {
       key: 'heartRate',
@@ -39,7 +40,7 @@ const PatientVitalsDisplay = ({ vitals, onAddVitals, onEditVitals, showAddButton
       icon: Activity,
       color: 'text-green-500',
       unit: 'bpm',
-      value: getVitalValue('heart_rate', 'heartRate')
+      value: getVitalValue('heart_rate', 'heartRate'),
     },
     {
       key: 'temp',
@@ -51,7 +52,7 @@ const PatientVitalsDisplay = ({ vitals, onAddVitals, onEditVitals, showAddButton
         // Also check legacy 'temp' property
         return unit === 'F' || unit === 'f' ? '°F' : '°C';
       })(),
-      value: getVitalValue('temperature', 'temp')
+      value: getVitalValue('temperature', 'temp'),
     },
     {
       key: 'weight',
@@ -59,33 +60,28 @@ const PatientVitalsDisplay = ({ vitals, onAddVitals, onEditVitals, showAddButton
       icon: Scale,
       color: 'text-purple-500',
       unit: getVitalValue('weight_unit', 'weightUnit') || 'kg',
-      value: vitals?.weight
-    }
+      value: vitals?.weight,
+    },
   ];
 
   return (
     <Card className={`p-6 ${className}`}>
-      <div className="flex items-center justify-between mb-6">
+      <div className="mb-6 flex items-center justify-between">
         <div className="flex items-center space-x-3">
           <Activity size={24} className="text-emerald-600" />
           <h3 className="text-lg font-bold">{t('patient.medicalRecords.currentVitals')}</h3>
         </div>
         <div className="flex space-x-2">
           {showAddButton && (
-            <Button 
-              variant="outline" 
-              size="sm" 
-              className="text-sm px-4 py-2"
-              onClick={onAddVitals}
-            >
+            <Button variant="outline" size="sm" className="px-4 py-2 text-sm" onClick={onAddVitals}>
               + {t('patient.medicalRecords.addVitals')}
             </Button>
           )}
           {showEditButton && (
-            <Button 
-              variant="outline" 
-              size="sm" 
-              className="text-sm px-4 py-2"
+            <Button
+              variant="outline"
+              size="sm"
+              className="px-4 py-2 text-sm"
               onClick={onEditVitals}
             >
               {t('patient.medicalRecords.editVitals')}
@@ -93,23 +89,32 @@ const PatientVitalsDisplay = ({ vitals, onAddVitals, onEditVitals, showAddButton
           )}
         </div>
       </div>
-      
+
       {vitals ? (
         <div className="space-y-4">
-          {vitalsData.map(({ key, label, icon: Icon, color, unit, value }) => 
-            value && (
-              <div key={key} className="flex items-center justify-between p-4 bg-gray-50 rounded-lg">
-                <div className="flex items-center space-x-3">
-                  <Icon size={20} className={color} />
-                  <span className="text-sm font-medium">{label}</span>
+          {vitalsData.map(
+            ({ key, label, icon: Icon, color, unit, value }) =>
+              value && (
+                <div
+                  key={key}
+                  className="flex items-center justify-between rounded-lg bg-gray-50 p-4"
+                >
+                  <div className="flex items-center space-x-3">
+                    <Icon size={20} className={color} />
+                    <span className="text-sm font-medium">{label}</span>
+                  </div>
+                  <span className="text-lg font-bold">
+                    {value}
+                    {unit}
+                  </span>
                 </div>
-                <span className="font-bold text-lg">{value}{unit}</span>
-              </div>
-            )
+              )
           )}
         </div>
       ) : (
-        <p className="text-gray-500 italic text-sm">{t('patient.medicalRecords.noVitalsRecorded')}</p>
+        <p className="text-sm italic text-gray-500">
+          {t('patient.medicalRecords.noVitalsRecorded')}
+        </p>
       )}
     </Card>
   );

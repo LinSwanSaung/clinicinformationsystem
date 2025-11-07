@@ -1,12 +1,11 @@
-import React from "react";
-import { Button } from "@/components/ui/button";
+import { Button } from '@/components/ui/button';
 
 export default function ActionButtons({
   buttons,
-  variant = "default",
-  size = "default",
-  className = "",
-  spacing = "gap-4"
+  variant = 'default',
+  size = 'default',
+  className = '',
+  spacing = 'gap-4',
 }) {
   if (!buttons || buttons.length === 0) {
     return null;

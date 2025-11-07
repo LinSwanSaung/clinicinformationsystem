@@ -1,9 +1,8 @@
 import { LoadingSpinner, EmptyState } from '@/components/library';
 /* eslint-disable no-unused-vars, no-useless-catch, react-hooks/exhaustive-deps, no-constant-condition */
-import React, { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import {
-  ArrowLeft,
   Calendar as CalendarIcon,
   Clock,
   Search,
@@ -15,7 +14,6 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Calendar } from '@/components/ui/calendar';
-import { Badge } from '@/components/ui/badge';
 import {
   Select,
   SelectContent,
@@ -25,7 +23,6 @@ import {
 } from '@/components/ui/select';
 import { SearchableSelect } from '@/components/ui/SearchableSelect';
 import { Textarea } from '@/components/ui/textarea';
-import appointmentService from '../services/appointmentService';
 import doctorAvailabilityService from '../services/doctorAvailabilityService';
 import { patientService } from '@/features/patients';
 import { userService } from '@/features/admin';
@@ -35,7 +32,6 @@ import { useCreateAppointment } from '../hooks/useCreateAppointment';
 import { useUpdateAppointmentStatus } from '../hooks/useUpdateAppointmentStatus';
 import Alert from '@/components/Alert';
 import PageLayout from '@/components/layout/PageLayout';
-import AppointmentCard from '../components/AppointmentCard';
 import AppointmentPatientCard from '../components/AppointmentPatientCard';
 import AppointmentDetailModal from '../components/AppointmentDetailModal';
 
@@ -1420,9 +1416,11 @@ const AppointmentsPage = () => {
             ) : filteredAppointments.length === 0 ? (
               <EmptyState
                 title={searchTerm ? 'No appointments found' : 'No appointments'}
-                description={searchTerm
-                  ? 'No appointments found matching your search.'
-                  : 'No appointments scheduled for this date.'}
+                description={
+                  searchTerm
+                    ? 'No appointments found matching your search.'
+                    : 'No appointments scheduled for this date.'
+                }
               />
             ) : (
               <div className="grid gap-3 sm:grid-cols-2 sm:gap-4 md:gap-6 lg:grid-cols-3">

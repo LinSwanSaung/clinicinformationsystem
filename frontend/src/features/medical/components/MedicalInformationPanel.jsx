@@ -1,107 +1,126 @@
-import React from 'react';
 import { useTranslation } from 'react-i18next';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { FileText, AlertCircle, ClipboardList, Pill } from 'lucide-react';
 
-const MedicalInformationPanel = ({ 
-  patient, 
+const MedicalInformationPanel = ({
+  patient,
   onAddAllergy,
   onAddDiagnosis,
-  className = "",
-  showActionButtons = true
+  className = '',
+  showActionButtons = true,
 }) => {
   const { t } = useTranslation();
-  
+
   return (
     <Card className={`p-6 lg:col-span-2 ${className}`}>
-      <div className="flex items-center space-x-3 mb-6">
+      <div className="mb-6 flex items-center space-x-3">
         <FileText size={24} className="text-blue-600" />
         <h3 className="text-lg font-bold">{t('patient.medicalRecords.medicalInformation')}</h3>
       </div>
-      
+
       <div className="space-y-6">
         {/* Known Allergies */}
         <div>
-          <div className="flex items-center justify-between mb-4">
-            <h4 className="font-bold text-gray-800 flex items-center text-sm">
+          <div className="mb-4 flex items-center justify-between">
+            <h4 className="flex items-center text-sm font-bold text-gray-800">
               <AlertCircle size={18} className="mr-2 text-amber-500" />
               {t('patient.medicalRecords.knownAllergies')}
             </h4>
             {showActionButtons && onAddAllergy && (
-              <Button variant="outline" size="sm" className="text-xs px-3 py-1" onClick={onAddAllergy}>
+              <Button
+                variant="outline"
+                size="sm"
+                className="px-3 py-1 text-xs"
+                onClick={onAddAllergy}
+              >
                 + {t('patient.medicalRecords.addAllergy')}
               </Button>
             )}
           </div>
-          <div className="bg-amber-50 p-4 rounded-lg border border-amber-200">
+          <div className="rounded-lg border border-amber-200 bg-amber-50 p-4">
             {patient.allergies && patient.allergies.length > 0 ? (
               <div className="flex flex-wrap gap-2">
                 {patient.allergies.map((allergy, index) => (
-                  <Badge key={index} variant="destructive" className="bg-red-100 text-red-800 border-red-300 text-sm px-3 py-1">
+                  <Badge
+                    key={index}
+                    variant="destructive"
+                    className="border-red-300 bg-red-100 px-3 py-1 text-sm text-red-800"
+                  >
                     {allergy}
                   </Badge>
                 ))}
               </div>
             ) : (
-              <p className="text-amber-700 text-base">{t('patient.medicalRecords.noKnownAllergies')}</p>
+              <p className="text-base text-amber-700">
+                {t('patient.medicalRecords.noKnownAllergies')}
+              </p>
             )}
           </div>
         </div>
 
         {/* Diagnosis History */}
         <div>
-          <div className="flex items-center justify-between mb-4">
-            <h4 className="font-bold text-gray-800 flex items-center text-sm">
+          <div className="mb-4 flex items-center justify-between">
+            <h4 className="flex items-center text-sm font-bold text-gray-800">
               <ClipboardList size={18} className="mr-2 text-blue-500" />
               {t('patient.medicalRecords.diagnosisHistory')}
             </h4>
             {showActionButtons && onAddDiagnosis && (
-              <Button variant="outline" size="sm" className="text-xs px-3 py-1" onClick={onAddDiagnosis}>
+              <Button
+                variant="outline"
+                size="sm"
+                className="px-3 py-1 text-xs"
+                onClick={onAddDiagnosis}
+              >
                 + {t('patient.medicalRecords.addDiagnosis')}
               </Button>
             )}
           </div>
-          <div className="bg-blue-50 p-4 rounded-lg border border-blue-200">
+          <div className="rounded-lg border border-blue-200 bg-blue-50 p-4">
             {patient.diagnosisHistory && patient.diagnosisHistory.length > 0 ? (
               <div className="space-y-2">
                 {patient.diagnosisHistory.map((diagnosis, index) => (
-                  <div key={index} className="flex justify-between items-center">
+                  <div key={index} className="flex items-center justify-between">
                     <span className="text-base">{diagnosis.condition}</span>
                     <span className="text-sm text-gray-500">{diagnosis.date}</span>
                   </div>
                 ))}
               </div>
             ) : (
-              <p className="text-blue-700 text-base">{t('patient.medicalRecords.noDiagnosisHistory')}</p>
+              <p className="text-base text-blue-700">
+                {t('patient.medicalRecords.noDiagnosisHistory')}
+              </p>
             )}
           </div>
         </div>
 
         {/* Current Medications */}
         <div>
-          <div className="flex items-center justify-between mb-4">
-            <h4 className="font-bold text-gray-800 flex items-center text-sm">
+          <div className="mb-4 flex items-center justify-between">
+            <h4 className="flex items-center text-sm font-bold text-gray-800">
               <Pill size={18} className="mr-2 text-green-500" />
               {t('patient.medicalRecords.currentMedications')}
             </h4>
           </div>
-          <div className="bg-green-50 p-4 rounded-lg border border-green-200">
+          <div className="rounded-lg border border-green-200 bg-green-50 p-4">
             {patient.currentMedications && patient.currentMedications.length > 0 ? (
               <div className="space-y-2">
                 {patient.currentMedications.map((medication, index) => (
-                  <div key={index} className="flex justify-between items-center">
+                  <div key={index} className="flex items-center justify-between">
                     <div>
                       <span className="text-base font-medium">{medication.name}</span>
-                      <span className="text-sm text-gray-600 ml-2">({medication.dosage})</span>
+                      <span className="ml-2 text-sm text-gray-600">({medication.dosage})</span>
                     </div>
                     <span className="text-sm text-gray-500">{medication.frequency}</span>
                   </div>
                 ))}
               </div>
             ) : (
-              <p className="text-green-700 text-base">{t('patient.medicalRecords.noCurrentMedications')}</p>
+              <p className="text-base text-green-700">
+                {t('patient.medicalRecords.noCurrentMedications')}
+              </p>
             )}
           </div>
         </div>

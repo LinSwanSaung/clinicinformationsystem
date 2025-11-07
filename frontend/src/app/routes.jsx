@@ -1,13 +1,24 @@
-import React from 'react';
 import { Routes, Route, Navigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import { ROLES } from '../constants/roles';
 import { AdminLogin } from '../features/auth';
-import { AdminDashboard, EmployeeManagement, PatientAccountRegistration, DoctorAvailability, AuditLogs, PendingItems, PaymentTransactions } from '../features/admin';
+import {
+  AdminDashboard,
+  EmployeeManagement,
+  PatientAccountRegistration,
+  DoctorAvailability,
+  AuditLogs,
+  PendingItems,
+  PaymentTransactions,
+} from '../features/admin';
 import { AppointmentsPage } from '../features/appointments';
 import { PatientListPage, PatientDetailPage, RegisterPatientPage } from '../features/patients';
 import { LiveQueuePage, DoctorQueueDetailPage, NursePatientQueuePage } from '../features/queue';
-import { ElectronicMedicalRecords, PatientMedicalRecord, PatientMedicalRecordManagement } from '../features/visits';
+import {
+  ElectronicMedicalRecords,
+  PatientMedicalRecord,
+  PatientMedicalRecordManagement,
+} from '../features/visits';
 import ReceptionistDashboard from '../pages/role-dashboards/ReceptionistDashboard';
 import NurseDashboard from '../pages/role-dashboards/NurseDashboard';
 import DoctorDashboard from '../pages/role-dashboards/DoctorDashboard';
@@ -303,4 +314,3 @@ export function AppRoutes() {
     </Routes>
   );
 }
-

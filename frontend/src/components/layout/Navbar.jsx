@@ -1,5 +1,5 @@
-/* eslint-disable no-unused-vars, no-console */
-import React, { useState, useEffect } from 'react';
+/* eslint-disable no-console */
+import { useState, useEffect } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
 import { ROLES } from '@/constants/roles';
@@ -7,7 +7,6 @@ import { Button } from '@/components/ui/button';
 import {
   LogOut,
   UserCircle,
-  BellRing,
   Settings,
   ChevronDown,
   Heart,
@@ -37,17 +36,19 @@ const Navbar = () => {
   const { user, logout } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
-  const [showNotifications, setShowNotifications] = useState(false);
+  // const [showNotifications, setShowNotifications] = useState(false); // TODO: Implement notifications
   const [userDetails, setUserDetails] = useState(null);
 
   useEffect(() => {
     const loadUserDetails = async () => {
-      if (!user?.role) return;
+      if (!user?.role) {
+        return;
+      }
 
       // Only fetch employee details for roles that have permission (admin, receptionist, nurse)
       // Cashiers, pharmacists, doctors, and patients should use user data from auth context
       const allowedRoles = [ROLES.ADMIN, ROLES.RECEPTIONIST, ROLES.NURSE];
-      
+
       if (allowedRoles.includes(user.role)) {
         try {
           const employees = await employeeService.getEmployeesByRole(user.role);
@@ -57,13 +58,15 @@ const Navbar = () => {
           console.error('Error loading user details:', error);
           // Fallback: use user from auth context
           setUserDetails({
-            name: `${user.first_name || ''} ${user.last_name || ''}`.trim() || user.email || user.role,
+            name:
+              `${user.first_name || ''} ${user.last_name || ''}`.trim() || user.email || user.role,
           });
         }
       } else {
         // For other roles, use user data from auth context directly
         setUserDetails({
-          name: `${user.first_name || ''} ${user.last_name || ''}`.trim() || user.email || user.role,
+          name:
+            `${user.first_name || ''} ${user.last_name || ''}`.trim() || user.email || user.role,
         });
       }
     };

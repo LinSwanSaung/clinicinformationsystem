@@ -1,6 +1,7 @@
 // ESLint flat config for React + Vite (ESLint v9)
 import js from '@eslint/js';
 import globals from 'globals';
+import react from 'eslint-plugin-react';
 import reactHooks from 'eslint-plugin-react-hooks';
 import reactRefresh from 'eslint-plugin-react-refresh';
 import unusedImports from 'eslint-plugin-unused-imports';
@@ -12,7 +13,7 @@ export default [
   {
     files: ['**/*.{js,jsx}'],
     languageOptions: {
-      ecmaVersion: 2023,
+      ecmaVersion: 'latest',
       sourceType: 'module',
       parserOptions: {
         ecmaFeatures: { jsx: true },
@@ -23,15 +24,27 @@ export default [
       },
     },
     plugins: {
+      react: react,
       'react-hooks': reactHooks,
       'react-refresh': reactRefresh,
       'unused-imports': unusedImports,
     },
+    settings: {
+      react: {
+        version: 'detect',
+      },
+    },
     rules: {
       ...js.configs.recommended.rules,
+      ...react.configs.recommended.rules,
+      ...react.configs['jsx-runtime'].rules,
       'react-hooks/rules-of-hooks': 'error',
       'react-hooks/exhaustive-deps': 'warn',
       'react-refresh/only-export-components': ['warn', { allowConstantExport: true }],
+      'react/react-in-jsx-scope': 'off', // Not needed with automatic JSX runtime
+      'react/jsx-uses-react': 'off', // Not needed with automatic JSX runtime
+      'react/jsx-uses-vars': 'error', // Detect JSX usage for unused-imports
+      'react/prop-types': 'off', // Not using PropTypes in this project
       'no-unused-vars': 'off', // Turn off base rule in favor of unused-imports
       'unused-imports/no-unused-imports': 'error',
       'unused-imports/no-unused-vars': ['warn', { args: 'after-used', ignoreRestSiblings: true, varsIgnorePattern: '^_' }],

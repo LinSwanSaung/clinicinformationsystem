@@ -1,16 +1,5 @@
-import React from 'react';
 import { motion } from 'framer-motion';
-import {
-  Clock,
-  User,
-  Stethoscope,
-  AlertCircle,
-  CheckCircle,
-  AlertTriangle,
-  XCircle,
-  MoreHorizontal,
-  ChevronDown
-} from 'lucide-react';
+import { Clock, User, Stethoscope, AlertCircle, MoreHorizontal, ChevronDown } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import {
@@ -30,7 +19,7 @@ const AppointmentCard = ({
   getStatusDisplayName,
   isAppointmentOverdue,
   showActions = true,
-  className = ""
+  className = '',
 }) => {
   const StatusIcon = getStatusIcon(appointment.status);
   const isOverdue = isAppointmentOverdue ? isAppointmentOverdue(appointment) : false;
@@ -44,21 +33,23 @@ const AppointmentCard = ({
       exit={{ opacity: 0, y: -20 }}
       transition={{ delay: index * 0.05, duration: 0.3 }}
       whileHover={{ scale: 1.01, y: -2 }}
-      className={`bg-background border rounded-lg p-3 sm:p-4 hover:shadow-md transition-all duration-200 ${
+      className={`rounded-lg border bg-background p-3 transition-all duration-200 hover:shadow-md sm:p-4 ${
         isOverdue ? 'border-orange-200 bg-orange-50' : 'border-border'
       } ${className}`}
     >
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-        <div className="flex items-center space-x-3 sm:space-x-4 min-w-0 flex-1">
+      <div className="flex flex-col justify-between gap-3 sm:flex-row sm:items-center">
+        <div className="flex min-w-0 flex-1 items-center space-x-3 sm:space-x-4">
           <div className="flex items-center space-x-2 sm:space-x-3">
-            <div className={`w-2 h-2 rounded-full flex-shrink-0 ${
-              isOverdue ? 'bg-orange-500' : 'bg-primary'
-            }`}></div>
+            <div
+              className={`h-2 w-2 flex-shrink-0 rounded-full ${
+                isOverdue ? 'bg-orange-500' : 'bg-primary'
+              }`}
+            ></div>
             <div className="min-w-0 flex-1">
-              <div className="flex flex-col sm:flex-row sm:items-center gap-1 sm:gap-2">
+              <div className="flex flex-col gap-1 sm:flex-row sm:items-center sm:gap-2">
                 <div className="flex items-center gap-2">
-                  <User className="h-3 w-3 sm:h-4 sm:w-4 text-muted-foreground flex-shrink-0" />
-                  <span className="font-semibold text-foreground text-sm sm:text-base truncate">
+                  <User className="h-3 w-3 flex-shrink-0 text-muted-foreground sm:h-4 sm:w-4" />
+                  <span className="truncate text-sm font-semibold text-foreground sm:text-base">
                     {appointment.patient_name}
                   </span>
                 </div>
@@ -68,25 +59,25 @@ const AppointmentCard = ({
                     animate={{ scale: 1 }}
                     className="flex items-center"
                   >
-                    <Badge className="bg-orange-100 text-orange-800 border-orange-200 text-xs">
-                      <AlertCircle className="h-3 w-3 mr-1" />
+                    <Badge className="border-orange-200 bg-orange-100 text-xs text-orange-800">
+                      <AlertCircle className="mr-1 h-3 w-3" />
                       Overdue
                     </Badge>
                   </motion.div>
                 )}
               </div>
-              <div className="flex flex-col sm:flex-row sm:items-center gap-1 sm:gap-4 text-xs sm:text-sm text-muted-foreground mt-1">
+              <div className="mt-1 flex flex-col gap-1 text-xs text-muted-foreground sm:flex-row sm:items-center sm:gap-4 sm:text-sm">
                 <div className="flex items-center gap-1">
                   <Clock className="h-3 w-3 flex-shrink-0" />
                   <span>{appointment.appointment_time}</span>
                 </div>
                 <div className="flex items-center gap-1">
                   <Stethoscope className="h-3 w-3 flex-shrink-0" />
-                  <span className="px-2 py-1 bg-blue-50 text-blue-700 border border-blue-200 rounded-md text-xs font-medium truncate">
+                  <span className="truncate rounded-md border border-blue-200 bg-blue-50 px-2 py-1 text-xs font-medium text-blue-700">
                     {appointment.doctor_name}
                   </span>
                 </div>
-                <span className="px-2 py-1 bg-purple-50 text-purple-700 border border-purple-200 rounded-md text-xs font-medium truncate">
+                <span className="truncate rounded-md border border-purple-200 bg-purple-50 px-2 py-1 text-xs font-medium text-purple-700">
                   {appointment.visit_type}
                 </span>
               </div>
@@ -94,12 +85,10 @@ const AppointmentCard = ({
           </div>
         </div>
 
-        <div className="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-3">
-          <Badge className={`${getStatusColor(appointment.status)} flex items-center gap-1 w-fit`}>
+        <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:gap-3">
+          <Badge className={`${getStatusColor(appointment.status)} flex w-fit items-center gap-1`}>
             <StatusIcon className="h-3 w-3" />
-            <span className="text-xs">
-              {getStatusDisplayName(appointment.status)}
-            </span>
+            <span className="text-xs">{getStatusDisplayName(appointment.status)}</span>
           </Badge>
 
           {showActions && actions.length > 0 && (
@@ -108,7 +97,7 @@ const AppointmentCard = ({
                 <Button
                   variant="outline"
                   size="sm"
-                  className="flex items-center gap-1 text-xs px-2 h-7"
+                  className="flex h-7 items-center gap-1 px-2 text-xs"
                 >
                   <MoreHorizontal className="h-3 w-3" />
                   <span className="hidden sm:inline">Actions</span>
@@ -122,16 +111,16 @@ const AppointmentCard = ({
                     onClick={() => onStatusUpdate(appointment.id, action.value)}
                     className={`text-xs ${action.className}`}
                   >
-                    <action.icon className="h-3 w-3 mr-2" />
+                    <action.icon className="mr-2 h-3 w-3" />
                     {action.label}
                   </DropdownMenuItem>
                 ))}
               </DropdownMenuContent>
             </DropdownMenu>
           )}
-          
+
           {appointment.status === 'ready' && (
-            <Badge className="bg-green-50 text-green-700 border-green-200 text-xs">
+            <Badge className="border-green-200 bg-green-50 text-xs text-green-700">
               <span className="hidden sm:inline">✓ Ready/Checked In</span>
               <span className="sm:hidden">✓ Ready</span>
             </Badge>

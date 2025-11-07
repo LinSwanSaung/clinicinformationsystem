@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useState, useEffect } from 'react';
+import { createContext, useContext, useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { authService } from '@/features/auth';
 
@@ -21,7 +21,7 @@ export const AuthProvider = ({ children }) => {
   const login = async (email, password) => {
     try {
       const result = await authService.login({ email, password });
-      
+
       if (result.success) {
         setUser(result.data);
         // Centralize role-based redirect via /dashboard
@@ -52,7 +52,9 @@ export const AuthProvider = ({ children }) => {
     const result = await authService.bindPatientAccount(patientNumber, dateOfBirth);
 
     if (result.success) {
-      const updatedUser = result.data.user ? { ...result.data.user, token: result.data.token } : user;
+      const updatedUser = result.data.user
+        ? { ...result.data.user, token: result.data.token }
+        : user;
       if (updatedUser) {
         setUser(updatedUser);
       }
@@ -87,22 +89,24 @@ export const AuthProvider = ({ children }) => {
 
   if (loading) {
     return (
-      <div className="min-h-screen flex items-center justify-center">
-        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
+      <div className="flex min-h-screen items-center justify-center">
+        <div className="h-8 w-8 animate-spin rounded-full border-b-2 border-primary"></div>
       </div>
     );
   }
 
   return (
-    <AuthContext.Provider value={{ 
-      user, 
-      login, 
-      logout, 
-      getUserRole, 
-      isAuthenticated,
-      registerPatientAccount,
-      bindPatientRecord
-    }}>
+    <AuthContext.Provider
+      value={{
+        user,
+        login,
+        logout,
+        getUserRole,
+        isAuthenticated,
+        registerPatientAccount,
+        bindPatientRecord,
+      }}
+    >
       {children}
     </AuthContext.Provider>
   );

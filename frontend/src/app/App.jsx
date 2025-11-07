@@ -1,4 +1,3 @@
-import React from 'react';
 import { BrowserRouter as Router } from 'react-router-dom';
 import { AppProviders } from './providers';
 import { AppRoutes } from './routes';
@@ -16,4 +15,3 @@ function App() {
 }
 
 export default App;
-

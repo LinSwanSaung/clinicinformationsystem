@@ -1,4 +1,3 @@
-import React from 'react';
 import { motion } from 'framer-motion';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -7,7 +6,7 @@ import {
   SelectTrigger,
   SelectContent,
   SelectItem,
-  SelectValue
+  SelectValue,
 } from '@/components/ui/select';
 
 const PortalFiltersBar = ({ filters, onChange, onClear, t }) => {
@@ -24,14 +23,17 @@ const PortalFiltersBar = ({ filters, onChange, onClear, t }) => {
       initial={{ opacity: 0, y: -8 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.25, ease: 'easeOut' }}
-      className="mt-6 rounded-xl border border-border/70 bg-muted/40 p-4 shadow-inner"
+      className="border-border/70 bg-muted/40 mt-6 rounded-xl border p-4 shadow-inner"
       role="region"
       aria-label={t('filters.ariaLabel')}
     >
       <div className="flex flex-col gap-4 md:flex-row md:items-end md:justify-between">
-        <div className="grid gap-3 sm:grid-cols-2 md:grid-cols-3 flex-1">
+        <div className="grid flex-1 gap-3 sm:grid-cols-2 md:grid-cols-3">
           <div className="flex flex-col gap-1">
-            <label htmlFor="filter-from" className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+            <label
+              htmlFor="filter-from"
+              className="text-xs font-medium uppercase tracking-wide text-muted-foreground"
+            >
               {t('filters.from')}
             </label>
             <Input
@@ -42,7 +44,10 @@ const PortalFiltersBar = ({ filters, onChange, onClear, t }) => {
             />
           </div>
           <div className="flex flex-col gap-1">
-            <label htmlFor="filter-to" className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+            <label
+              htmlFor="filter-to"
+              className="text-xs font-medium uppercase tracking-wide text-muted-foreground"
+            >
               {t('filters.to')}
             </label>
             <Input

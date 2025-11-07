@@ -1,4 +1,3 @@
-import React from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -8,22 +7,24 @@ const typeConfig = {
   visits: {
     labelKey: 'search.results.visit',
     icon: Stethoscope,
-    badgeClass: 'bg-blue-100 text-blue-800'
+    badgeClass: 'bg-blue-100 text-blue-800',
   },
   medications: {
     labelKey: 'search.results.medication',
     icon: Pill,
-    badgeClass: 'bg-emerald-100 text-emerald-800'
+    badgeClass: 'bg-emerald-100 text-emerald-800',
   },
   articles: {
     labelKey: 'search.results.article',
     icon: BookOpen,
-    badgeClass: 'bg-purple-100 text-purple-800'
-  }
+    badgeClass: 'bg-purple-100 text-purple-800',
+  },
 };
 
 const PortalSearchResults = ({ results, isActive, t }) => {
-  if (!isActive) return null;
+  if (!isActive) {
+    return null;
+  }
 
   const hasResults = Array.isArray(results) && results.length > 0;
 
@@ -39,9 +40,7 @@ const PortalSearchResults = ({ results, isActive, t }) => {
         <h2 className="text-lg font-semibold text-foreground">
           {t('search.resultsTitle', { count: results.length })}
         </h2>
-        <p className="text-sm text-muted-foreground">
-          {t('search.resultsSubtitle')}
-        </p>
+        <p className="text-sm text-muted-foreground">{t('search.resultsSubtitle')}</p>
       </header>
       {hasResults ? (
         <ul className="grid gap-4 md:grid-cols-2">
@@ -58,10 +57,13 @@ const PortalSearchResults = ({ results, isActive, t }) => {
                   exit={{ opacity: 0, y: -10 }}
                   transition={{ duration: 0.2 }}
                 >
-                  <Card className="h-full border border-border/70 shadow-sm hover:shadow-md transition-shadow focus-within:ring-2 focus-within:ring-primary focus-within:ring-offset-2">
+                  <Card className="border-border/70 h-full border shadow-sm transition-shadow focus-within:ring-2 focus-within:ring-primary focus-within:ring-offset-2 hover:shadow-md">
                     <CardContent className="flex h-full flex-col gap-3 p-4">
                       <div className="flex items-center justify-between gap-3">
-                        <Badge className={`${config.badgeClass} flex items-center gap-1`} variant="secondary">
+                        <Badge
+                          className={`${config.badgeClass} flex items-center gap-1`}
+                          variant="secondary"
+                        >
                           <Icon className="h-3 w-3" aria-hidden="true" />
                           <span>{t(config.labelKey)}</span>
                         </Badge>
@@ -75,19 +77,17 @@ const PortalSearchResults = ({ results, isActive, t }) => {
                       <div className="space-y-2">
                         <h3 className="text-base font-semibold text-foreground">{item.title}</h3>
                         {item.description && (
-                          <p className="text-sm text-muted-foreground line-clamp-3">
+                          <p className="line-clamp-3 text-sm text-muted-foreground">
                             {item.description}
                           </p>
                         )}
                         {item.meta && (
-                          <p className="text-xs text-muted-foreground/80 font-mono">
-                            {item.meta}
-                          </p>
+                          <p className="text-muted-foreground/80 font-mono text-xs">{item.meta}</p>
                         )}
                       </div>
                       <button
                         type="button"
-                        className="mt-auto text-sm font-medium text-primary hover:underline focus-visible:outline focus-visible:outline-2 focus-visible:outline-primary rounded"
+                        className="mt-auto rounded text-sm font-medium text-primary hover:underline focus-visible:outline focus-visible:outline-2 focus-visible:outline-primary"
                       >
                         {t('search.viewDetails')}
                       </button>
@@ -99,7 +99,7 @@ const PortalSearchResults = ({ results, isActive, t }) => {
           </AnimatePresence>
         </ul>
       ) : (
-        <div className="rounded-xl border border-dashed border-muted-foreground/30 bg-muted/10 p-6 text-center text-sm text-muted-foreground">
+        <div className="border-muted-foreground/30 bg-muted/10 rounded-xl border border-dashed p-6 text-center text-sm text-muted-foreground">
           {t('search.noResults')}
         </div>
       )}

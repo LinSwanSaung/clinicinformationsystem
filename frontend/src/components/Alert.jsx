@@ -1,16 +1,8 @@
-import React from 'react';
 import { AlertCircle, CheckCircle2, XCircle } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 
-const Alert = ({ 
-  title, 
-  message, 
-  type = 'success', 
-  onClose,
-  onConfirm,
-  showConfirm = false
-}) => {
+const Alert = ({ title, message, type = 'success', onClose, onConfirm, showConfirm = false }) => {
   const alertStyles = {
     success: {
       icon: <CheckCircle2 className="h-6 w-6 text-green-500" />,
@@ -47,20 +39,14 @@ const Alert = ({
             <p className="mt-2 text-sm text-gray-600">{message}</p>
           </div>
         </div>
-        
+
         <div className="mt-6 flex justify-end gap-3">
           {showConfirm && (
-            <Button
-              onClick={onConfirm}
-              className={style.button}
-            >
+            <Button onClick={onConfirm} className={style.button}>
               Confirm
             </Button>
           )}
-          <Button
-            variant="outline"
-            onClick={onClose}
-          >
+          <Button variant="outline" onClick={onClose}>
             {showConfirm ? 'Cancel' : 'Close'}
           </Button>
         </div>

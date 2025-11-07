@@ -1,18 +1,17 @@
-import React from "react";
-import { Card } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
-import { Edit, Trash2, UserCheck, UserX, Mail, Phone, Calendar, Clock } from "lucide-react";
+import { Card } from '@/components/ui/card';
+import { Button } from '@/components/ui/button';
+import { Badge } from '@/components/ui/badge';
+import { Edit, Trash2, UserCheck, UserX, Mail, Phone, Calendar, Clock } from 'lucide-react';
 
 export default function EmployeeCard({ employee, onEdit, onToggleActive, onDelete }) {
   return (
-    <Card className="hover:shadow-lg transition-shadow">
-      <div className="p-6 space-y-4">
+    <Card className="transition-shadow hover:shadow-lg">
+      <div className="space-y-4 p-6">
         {/* Header */}
         <div className="flex items-start justify-between">
           <div className="flex items-center gap-3">
-            <div className="w-12 h-12 bg-primary/10 rounded-full flex items-center justify-center">
-              <span className="text-primary font-semibold">
+            <div className="bg-primary/10 flex h-12 w-12 items-center justify-center rounded-full">
+              <span className="font-semibold text-primary">
                 {(employee.first_name?.[0] || '') + (employee.last_name?.[0] || '')}
               </span>
             </div>
@@ -20,7 +19,7 @@ export default function EmployeeCard({ employee, onEdit, onToggleActive, onDelet
               <h3 className="text-lg font-semibold text-card-foreground">
                 {employee.first_name} {employee.last_name}
               </h3>
-              <p className="text-sm text-muted-foreground capitalize">{employee.role}</p>
+              <p className="text-sm capitalize text-muted-foreground">{employee.role}</p>
             </div>
           </div>
           <div className="flex items-center gap-1">
@@ -48,17 +47,20 @@ export default function EmployeeCard({ employee, onEdit, onToggleActive, onDelet
           </div>
           <div className="flex items-center gap-2 text-sm text-muted-foreground">
             <Clock className="h-4 w-4" />
-            <span>Last login: {employee.last_login ? new Date(employee.last_login).toLocaleDateString() : 'Never'}</span>
+            <span>
+              Last login:{' '}
+              {employee.last_login ? new Date(employee.last_login).toLocaleDateString() : 'Never'}
+            </span>
           </div>
         </div>
-        
+
         {/* Status and Specialty */}
-        <div className="pt-3 border-t">
-          <div className="flex items-center justify-between mb-3">
+        <div className="border-t pt-3">
+          <div className="mb-3 flex items-center justify-between">
             <span className="text-sm font-medium text-foreground">
               {employee.specialty || 'General'}
             </span>
-            <Badge variant={employee.is_active ? "default" : "destructive"}>
+            <Badge variant={employee.is_active ? 'default' : 'destructive'}>
               {employee.is_active ? 'Active' : 'Inactive'}
             </Badge>
           </div>
@@ -66,28 +68,19 @@ export default function EmployeeCard({ employee, onEdit, onToggleActive, onDelet
 
         {/* Actions */}
         <div className="flex gap-2">
-          <Button 
-            size="sm" 
-            variant="outline"
-            onClick={() => onEdit(employee)}
-            className="flex-1"
-          >
-            <Edit className="h-3 w-3 mr-1" />
+          <Button size="sm" variant="outline" onClick={() => onEdit(employee)} className="flex-1">
+            <Edit className="mr-1 h-3 w-3" />
             Edit
           </Button>
-          <Button 
-            size="sm" 
+          <Button
+            size="sm"
             variant="outline"
             onClick={() => onToggleActive(employee.id)}
             className="flex-1"
           >
             {employee.is_active ? 'Deactivate' : 'Activate'}
           </Button>
-          <Button 
-            size="sm" 
-            variant="destructive"
-            onClick={() => onDelete(employee.id)}
-          >
+          <Button size="sm" variant="destructive" onClick={() => onDelete(employee.id)}>
             <Trash2 className="h-3 w-3" />
           </Button>
         </div>

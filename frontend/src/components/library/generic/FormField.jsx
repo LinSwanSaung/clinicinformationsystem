@@ -1,10 +1,15 @@
-import React from "react";
-import { Input } from "@/components/ui/input";
-import { Textarea } from "@/components/ui/textarea";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Input } from '@/components/ui/input';
+import { Textarea } from '@/components/ui/textarea';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
 
 export default function FormField({
-  type = "text",
+  type = 'text',
   label,
   name,
   value,
@@ -12,10 +17,10 @@ export default function FormField({
   placeholder,
   required = false,
   options = [],
-  className = "",
+  className = '',
   error,
   disabled = false,
-  rows = 3
+  rows = 3,
 }) {
   const handleChange = (e) => {
     const newValue = e.target ? e.target.value : e;
@@ -24,11 +29,11 @@ export default function FormField({
 
   const renderInput = () => {
     switch (type) {
-      case "textarea":
+      case 'textarea':
         return (
           <Textarea
             name={name}
-            value={value || ""}
+            value={value || ''}
             onChange={handleChange}
             placeholder={placeholder}
             required={required}
@@ -37,15 +42,13 @@ export default function FormField({
             className={`bg-background text-foreground ${error ? 'border-destructive' : ''}`}
           />
         );
-      
-      case "select":
+
+      case 'select':
         return (
-          <Select 
-            value={value || ""} 
-            onValueChange={handleChange}
-            disabled={disabled}
-          >
-            <SelectTrigger className={`bg-background text-foreground ${error ? 'border-destructive' : ''}`}>
+          <Select value={value || ''} onValueChange={handleChange} disabled={disabled}>
+            <SelectTrigger
+              className={`bg-background text-foreground ${error ? 'border-destructive' : ''}`}
+            >
               <SelectValue placeholder={placeholder} />
             </SelectTrigger>
             <SelectContent>
@@ -57,13 +60,13 @@ export default function FormField({
             </SelectContent>
           </Select>
         );
-      
+
       default:
         return (
           <Input
             type={type}
             name={name}
-            value={value || ""}
+            value={value || ''}
             onChange={handleChange}
             placeholder={placeholder}
             required={required}
@@ -79,13 +82,11 @@ export default function FormField({
       {label && (
         <label className="text-sm font-medium text-foreground">
           {label}
-          {required && <span className="text-destructive ml-1">*</span>}
+          {required && <span className="ml-1 text-destructive">*</span>}
         </label>
       )}
       {renderInput()}
-      {error && (
-        <p className="text-sm text-destructive">{error}</p>
-      )}
+      {error && <p className="text-sm text-destructive">{error}</p>}
     </div>
   );
 }

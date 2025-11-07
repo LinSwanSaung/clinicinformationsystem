@@ -24,7 +24,7 @@ import {
 } from 'lucide-react';
 import { patientAccountService } from '@/features/patients';
 import api from '@/services/api';
-import { DataTable, SearchBar, StatusBadge, FormModal, LinkedPatientBadge } from '@/components/library';
+import { DataTable, SearchBar, FormModal, LinkedPatientBadge } from '@/components/library';
 
 const defaultAccountForm = {
   first_name: '',

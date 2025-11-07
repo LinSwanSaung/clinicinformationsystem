@@ -1,26 +1,19 @@
-import React from "react";
-import { Button } from "@/components/ui/button";
-import { Link } from "react-router-dom";
+import { Button } from '@/components/ui/button';
+import { Link } from 'react-router-dom';
 
-export default function PageHeader({ 
-  title, 
-  subtitle, 
-  actionButton,
-  className = "",
-  children
-}) {
+export default function PageHeader({ title, subtitle, actionButton, className = '', children }) {
   return (
-    <div className={`flex justify-between items-center ${className}`}>
+    <div className={`flex items-center justify-between ${className}`}>
       <div>
         <h2 className="text-2xl font-semibold text-foreground">{title}</h2>
-        {subtitle && (
-          <p className="text-lg text-muted-foreground mt-1">{subtitle}</p>
-        )}
+        {subtitle && <p className="mt-1 text-lg text-muted-foreground">{subtitle}</p>}
       </div>
       <div className="flex gap-4">
         {actionButton && (
           <Link to={actionButton.href}>
-            <Button className={`flex items-center gap-3 ${actionButton.className || 'bg-primary text-primary-foreground hover:bg-primary/90 text-lg py-6 px-8'}`}>
+            <Button
+              className={`flex items-center gap-3 ${actionButton.className || 'hover:bg-primary/90 bg-primary px-8 py-6 text-lg text-primary-foreground'}`}
+            >
               {actionButton.icon && <actionButton.icon className="h-6 w-6" />}
               {actionButton.label}
             </Button>

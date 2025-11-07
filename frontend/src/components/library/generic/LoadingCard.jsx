@@ -1,9 +1,8 @@
-import React from "react";
-import { Card } from "@/components/ui/card";
+import { Card } from '@/components/ui/card';
 
-export default function LoadingCard({ message = "Loading..." }) {
+export default function LoadingCard({ message = 'Loading...' }) {
   return (
-    <Card className="p-12 text-center bg-card">
+    <Card className="bg-card p-12 text-center">
       <p className="text-xl text-muted-foreground">{message}</p>
     </Card>
   );

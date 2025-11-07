@@ -1,10 +1,16 @@
 import { useState, useEffect, useRef } from 'react';
 import { Search, ChevronDown, X, Check } from 'lucide-react';
-import { Button } from './button';
-import { Input } from './input';
-import { Popover, PopoverContent, PopoverTrigger } from './popover';
-import { Card } from './card';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
+import { Card } from '@/components/ui/card';
 
+/**
+ * SearchableSelect - Searchable dropdown select component
+ * 
+ * Application-level component that provides a searchable dropdown select.
+ * Uses UI primitives (Button, Input, Popover, Card) to build a complex input component.
+ */
 const SearchableSelect = ({
   options = [],
   value,
@@ -168,3 +174,4 @@ const SearchableSelect = ({
 };
 
 export { SearchableSelect };
+

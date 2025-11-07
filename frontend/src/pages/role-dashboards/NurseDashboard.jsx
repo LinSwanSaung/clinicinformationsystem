@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import PageLayout from '@/components/layout/PageLayout';
@@ -28,6 +28,7 @@ import { useQuery } from '@tanstack/react-query';
 import { useAuth } from '@/contexts/AuthContext';
 import { ROLES } from '@/constants/roles';
 import { POLLING_INTERVALS } from '@/constants/polling';
+import logger from '@/utils/logger';
 
 /**
  * Helper function to fetch appropriate vitals for a token
@@ -38,34 +39,34 @@ const fetchTokenVitals = async (token) => {
     const patientId = token.patient?.id || token.patient_id;
     const visitId = token.visit_id || token.current_visit_id;
     
-    console.log(`🔍 [NURSE] Fetching vitals - Token #${token.token_number}, PatientID: ${patientId}, VisitID: ${visitId}`);
-    console.log(`🔍 [NURSE] Token object keys:`, Object.keys(token));
-    console.log(`🔍 [NURSE] Has visit_id property?`, 'visit_id' in token, 'Value:', token.visit_id);
+    logger.debug(`🔍 [NURSE] Fetching vitals - Token #${token.token_number}, PatientID: ${patientId}, VisitID: ${visitId}`);
+    logger.debug(`🔍 [NURSE] Token object keys:`, Object.keys(token));
+    logger.debug(`🔍 [NURSE] Has visit_id property?`, 'visit_id' in token, 'Value:', token.visit_id);
     
     if (!visitId) {
-      console.log(`❌ [NURSE] Token #${token.token_number} has no visit_id - treating as fresh visit`);
+      logger.debug(`❌ [NURSE] Token #${token.token_number} has no visit_id - treating as fresh visit`);
       return null;
     }
     
     // Fetch vitals for this specific visit only
     try {
       const vitalsResponse = await vitalsService.getVisitVitals(visitId);
-      console.log(`📊 [NURSE] Vitals API response for visit ${visitId}:`, vitalsResponse);
+      logger.debug(`📊 [NURSE] Vitals API response for visit ${visitId}:`, vitalsResponse);
       
       // Check if we have actual vitals data (not empty array)
       if (vitalsResponse.success && vitalsResponse.data && vitalsResponse.data.length > 0) {
-        console.log(`✅ [NURSE] Found vitals for visit ${visitId}:`, vitalsResponse.data[0]);
+        logger.debug(`✅ [NURSE] Found vitals for visit ${visitId}:`, vitalsResponse.data[0]);
         return vitalsResponse.data[0]; // Return first vitals record
       }
-      console.log(`❌ [NURSE] No vitals found for visit ${visitId} - showing "Add Vitals & Notes"`);
+      logger.debug(`❌ [NURSE] No vitals found for visit ${visitId} - showing "Add Vitals & Notes"`);
     } catch (error) {
-      console.error('[NURSE] Failed to fetch visit vitals:', error);
+      logger.error('[NURSE] Failed to fetch visit vitals:', error);
     }
     
     // No vitals for this visit - return null to show "Add Vitals & Notes"
     return null;
   } catch (error) {
-    console.error('[NURSE] Failed to fetch vitals for token:', token.id, error);
+    logger.error('[NURSE] Failed to fetch vitals for token:', token.id, error);
     return null;
   }
 };
@@ -105,7 +106,7 @@ const NurseDashboard = () => {
       return;
     }
     if (doctorsQuery.error) {
-      console.error('Failed to load doctors and queues:', doctorsQuery.error);
+      logger.error('Failed to load doctors and queues:', doctorsQuery.error);
       setDoctors([]);
       setLoading(false);
       return;
@@ -165,11 +166,11 @@ const NurseDashboard = () => {
       setSelectedDoctor(doctor);
       
       // Fetch fresh queue data from the backend instead of using cached data
-      console.log('🔄 [NURSE] Fetching fresh queue data for doctor:', doctor.id);
+      logger.debug('🔄 [NURSE] Fetching fresh queue data for doctor:', doctor.id);
       const queueResponse = await queueService.getDoctorQueueStatus(doctor.id);
       
       if (!queueResponse.success) {
-        console.error('Failed to fetch queue status:', queueResponse);
+        logger.error('Failed to fetch queue status:', queueResponse);
         setPatients([]);
         return;
       }
@@ -177,16 +178,16 @@ const NurseDashboard = () => {
       // Get both tokens (walk-ins) and appointments (scheduled) from the fresh queue data
       const queueTokens = queueResponse.data?.tokens || [];
       const queueAppointments = queueResponse.data?.appointments || [];
-      console.log(`📋 [NURSE] Received ${queueTokens.length} tokens and ${queueAppointments.length} appointments from backend`);
+      logger.debug(`📋 [NURSE] Received ${queueTokens.length} tokens and ${queueAppointments.length} appointments from backend`);
       
       // Debug: Log first token structure to see if visit_id is included
       if (queueTokens.length > 0) {
-        console.log('🔍 [NURSE] First token structure:', JSON.stringify(queueTokens[0], null, 2));
+        logger.debug('🔍 [NURSE] First token structure:', JSON.stringify(queueTokens[0], null, 2));
       }
       
       // Filter out cancelled appointments - only show active queue tokens
       const activeTokens = queueTokens.filter(token => token.status !== 'cancelled');
-      console.log(`📋 [NURSE] Filtered to ${activeTokens.length} active tokens (excluded ${queueTokens.length - activeTokens.length} cancelled)`);
+      logger.debug(`📋 [NURSE] Filtered to ${activeTokens.length} active tokens (excluded ${queueTokens.length - activeTokens.length} cancelled)`);
       
       // Use only queue tokens (no appointment queue)
       const allPatients = activeTokens.map(t => ({ ...t, queueType: 'token' }));
@@ -204,7 +205,7 @@ const NurseDashboard = () => {
       });
       
       const uniquePatients = Array.from(patientMap.values());
-      console.log(`📋 [NURSE] Deduplicated ${allPatients.length} entries to ${uniquePatients.length} unique patients`);
+      logger.debug(`📋 [NURSE] Deduplicated ${allPatients.length} entries to ${uniquePatients.length} unique patients`);
       
       // Fetch vitals for each patient using the new per-visit logic
       const patientsWithVitals = await Promise.all(
@@ -217,7 +218,7 @@ const NurseDashboard = () => {
               latestVitals: vitals
             };
             
-            console.log(`[NURSE] Patient #${patient.token_number} after vitals fetch:`, {
+            logger.debug(`[NURSE] Patient #${patient.token_number} after vitals fetch:`, {
               token_number: patient.token_number,
               visit_id: patient.visit_id,
               hasLatestVitals: !!patientWithVitals.latestVitals,
@@ -226,7 +227,7 @@ const NurseDashboard = () => {
             
             return patientWithVitals;
           } catch (error) {
-            console.log(`No vitals found for patient ${patient.patient?.id}`);
+            logger.debug(`No vitals found for patient ${patient.patient?.id}`);
             return {
               ...patient,
               latestVitals: null
@@ -235,11 +236,11 @@ const NurseDashboard = () => {
         })
       );
       
-      console.log('✅ [NURSE] Patient list updated with fresh vitals and appointments');
-      console.log('[NURSE] Total patients with vitals data:', patientsWithVitals.length);
+      logger.debug('✅ [NURSE] Patient list updated with fresh vitals and appointments');
+      logger.debug('[NURSE] Total patients with vitals data:', patientsWithVitals.length);
       setPatients(patientsWithVitals);
     } catch (error) {
-      console.error('Failed to load patients:', error);
+      logger.error('Failed to load patients:', error);
       setPatients([]);
     } finally {
       setLoading(false);
@@ -669,7 +670,7 @@ const NurseDashboard = () => {
                         onSaveVitals={async (patientId, vitalsForm, notes, visitId = null) => {
                           try {
                             if (!patientId || typeof patientId !== 'string') {
-                              console.error('[NURSE] Invalid patient ID provided when saving vitals:', patientId);
+                              logger.error('[NURSE] Invalid patient ID provided when saving vitals:', patientId);
                               alert('Unable to determine the patient record. Please refresh and try again.');
                               return;
                             }
@@ -756,23 +757,23 @@ const NurseDashboard = () => {
                               priority_level: vitalsForm.priorityLevel || 'normal' // Add priority level
                             };
                             
-                            console.log('💾 [NURSE] Saving vitals:', vitalsData);
+                            logger.debug('💾 [NURSE] Saving vitals:', vitalsData);
                             const result = await vitalsService.saveVitals(patientId, vitalsData);
-                            console.log('✅ [NURSE] Vitals saved, result:', result);
+                            logger.debug('✅ [NURSE] Vitals saved, result:', result);
                             
                             // Wait longer for backend to process and update the queue
                             await new Promise(resolve => setTimeout(resolve, 1000));
                             
                             // Refresh the patient data to show updated vitals
                             if (selectedDoctor) {
-                              console.log('🔄 [NURSE] Refreshing patient list after vitals save...');
+                              logger.debug('🔄 [NURSE] Refreshing patient list after vitals save...');
                               await handleViewPatients(selectedDoctor);
-                              console.log('✅ [NURSE] Patient list refreshed');
+                              logger.debug('✅ [NURSE] Patient list refreshed');
                             }
                             
                             alert('Vitals saved successfully!');
                           } catch (error) {
-                            console.error('Failed to save vitals:', error);
+                            logger.error('Failed to save vitals:', error);
                             
                             // Check for specific error from backend
                             if (error.response?.data?.code === 'NO_ACTIVE_VISIT') {
@@ -797,11 +798,11 @@ const NurseDashboard = () => {
                                 await handleViewPatients(selectedDoctor);
                               }
                             } else {
-                              console.error('No active token found for patient:', patientId);
+                              logger.error('No active token found for patient:', patientId);
                               alert('Could not find active token for this patient.');
                             }
                           } catch (error) {
-                            console.error('Failed to mark patient ready:', error);
+                            logger.error('Failed to mark patient ready:', error);
                             alert('Failed to mark patient ready. Please try again.');
                           }
                         }}
@@ -822,41 +823,41 @@ const NurseDashboard = () => {
                               }
                             }
                           } catch (error) {
-                            console.error('Failed to unmark patient ready:', error);
+                            logger.error('Failed to unmark patient ready:', error);
                             alert('Failed to unmark patient ready. Please try again.');
                           }
                         }}
                         onDelayPatient={async (tokenOrQueueId, reason) => {
                           try {
-                            console.log('🔍 Searching for patient with ID:', tokenOrQueueId);
-                            console.log('🔍 Available patient IDs:', patients.map(p => ({ id: p.id, name: `${p.patient?.first_name} ${p.patient?.last_name}`, token: p.token_number })));
+                            logger.debug('🔍 Searching for patient with ID:', tokenOrQueueId);
+                            logger.debug('🔍 Available patient IDs:', patients.map(p => ({ id: p.id, name: `${p.patient?.first_name} ${p.patient?.last_name}`, token: p.token_number })));
                             
                             // Find the token/queue entry by ID (not by patient ID)
                             const patient = patients.find(p => p.id === tokenOrQueueId);
                             if (!patient) {
-                              console.error('❌ Patient not found. TokenOrQueueId:', tokenOrQueueId);
-                              console.error('   Available IDs in patients array:', patients.map(p => p.id));
+                              logger.error('❌ Patient not found. TokenOrQueueId:', tokenOrQueueId);
+                              logger.error('   Available IDs in patients array:', patients.map(p => p.id));
                               alert('Patient not found in current list. Please refresh the page and try again.');
                               return;
                             }
                             
-                            console.log('🔄 Delaying patient:', patient);
-                            console.log('   Token/Queue ID:', patient.id);
-                            console.log('   Queue Type:', patient.queueType);
-                            console.log('   Has appointment_id:', !!patient.appointment_id);
-                            console.log('   Has token_number vs queue_position:', patient.token_number, patient.queue_position);
-                            console.log('   Current Status:', patient.status);
+                            logger.debug('🔄 Delaying patient:', patient);
+                            logger.debug('   Token/Queue ID:', patient.id);
+                            logger.debug('   Queue Type:', patient.queueType);
+                            logger.debug('   Has appointment_id:', !!patient.appointment_id);
+                            logger.debug('   Has token_number vs queue_position:', patient.token_number, patient.queue_position);
+                            logger.debug('   Current Status:', patient.status);
                             
                             // Determine if this is an appointment or token
                             // Appointments have appointment_id, tokens don't
                             const isAppointment = patient.queueType === 'appointment' || patient.appointment_id;
                             
-                            console.log('   → Treating as:', isAppointment ? 'APPOINTMENT' : 'TOKEN');
+                            logger.debug('   → Treating as:', isAppointment ? 'APPOINTMENT' : 'TOKEN');
                             
                             // Call the appropriate delay API based on queue type
                             // Delay the token
                             await queueService.delayToken(patient.id, reason);
-                            console.log('✅ Token queue patient delayed');
+                            logger.debug('✅ Token queue patient delayed');
                             alert('✅ Patient has been marked as delayed');
                             
                             // Refresh the patient data
@@ -864,7 +865,7 @@ const NurseDashboard = () => {
                               await handleViewPatients(selectedDoctor);
                             }
                           } catch (error) {
-                            console.error('❌ Failed to delay patient:', error);
+                            logger.error('❌ Failed to delay patient:', error);
                             alert('❌ Failed to delay patient: ' + (error.message || 'Please try again.'));
                           }
                         }}
@@ -873,15 +874,15 @@ const NurseDashboard = () => {
                             // Find the token/queue entry by ID (not by patient ID)
                             const patient = patients.find(p => p.id === tokenOrQueueId);
                             if (patient) {
-                              console.log('🔄 Undelaying patient:', patient);
-                              console.log('   Token/Queue ID:', patient.id);
-                              console.log('   Queue Type:', patient.queueType);
-                              console.log('   Has appointment_id:', !!patient.appointment_id);
+                              logger.debug('🔄 Undelaying patient:', patient);
+                              logger.debug('   Token/Queue ID:', patient.id);
+                              logger.debug('   Queue Type:', patient.queueType);
+                              logger.debug('   Has appointment_id:', !!patient.appointment_id);
                               
                               // Determine if this is an appointment or token
                               // Undelay the token
                               const result = await queueService.undelayToken(patient.id);
-                              console.log('✅ Token queue patient undelayed. New token:', result.newTokenNumber);
+                              logger.debug('✅ Token queue patient undelayed. New token:', result.newTokenNumber);
                               alert(`Patient has been added back to the queue with token #${result.newTokenNumber}`);
                               
                               // Refresh the patient data
@@ -890,7 +891,7 @@ const NurseDashboard = () => {
                               }
                             }
                           } catch (error) {
-                            console.error('Failed to remove delay:', error);
+                            logger.error('Failed to remove delay:', error);
                             alert('Failed to remove delay: ' + (error.message || 'Please try again.'));
                           }
                         }}

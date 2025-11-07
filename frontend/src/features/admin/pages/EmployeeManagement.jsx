@@ -26,6 +26,7 @@ import {
   Clock,
 } from 'lucide-react';
 import { employeeService } from '@/features/admin';
+import logger from '@/utils/logger';
 
 const EmployeeManagement = () => {
   const navigate = useNavigate();
@@ -78,7 +79,7 @@ const EmployeeManagement = () => {
       setEmployees(employeesData);
       setRoles(rolesData);
     } catch (error) {
-      console.error('Error loading data:', error);
+      logger.error('Error loading data:', error);
       setError(`Failed to load employees: ${error.message}`);
     } finally {
       setIsLoading(false);
@@ -124,7 +125,7 @@ const EmployeeManagement = () => {
       // Re-fetch to reflect server truth (tombstone)
       await loadData();
     } catch (error) {
-      console.error('Error deleting employee:', error);
+      logger.error('Error deleting employee:', error);
       setError('Failed to delete employee. Please try again.');
     }
   };
@@ -143,7 +144,7 @@ const EmployeeManagement = () => {
           : []
       );
     } catch (error) {
-      console.error('Error updating employee:', error);
+      logger.error('Error updating employee:', error);
       setError('Failed to update employee status. Please try again.');
     }
   };
@@ -176,7 +177,7 @@ const EmployeeManagement = () => {
 
       return updatedEmployee;
     } catch (error) {
-      console.error('Error updating employee:', error);
+      logger.error('Error updating employee:', error);
       setError('Failed to update employee. Please try again.');
       throw error;
     }
@@ -216,7 +217,7 @@ const EmployeeManagement = () => {
           license_number: '',
         });
       } catch (error) {
-        console.error('Error creating employee:', error);
+        logger.error('Error creating employee:', error);
         setFormError(error.message || 'Failed to create employee. Please try again.');
       } finally {
         setIsSubmitting(false);
@@ -404,7 +405,7 @@ const EmployeeManagement = () => {
 
         setEditingEmployee(null);
       } catch (error) {
-        console.error('Error updating employee:', error);
+        logger.error('Error updating employee:', error);
         setFormError(error.message || 'Failed to update employee. Please try again.');
       } finally {
         setIsSubmitting(false);

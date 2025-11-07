@@ -25,6 +25,7 @@ import {
 import { patientAccountService } from '@/features/patients';
 import api from '@/services/api';
 import { DataTable, SearchBar, FormModal, LinkedPatientBadge } from '@/components/library';
+import logger from '@/utils/logger';
 
 const defaultAccountForm = {
   first_name: '',
@@ -91,7 +92,7 @@ const PatientAccountRegistration = () => {
       setAccounts(Array.isArray(response.data) ? response.data : []);
       setTotalAccounts(response.total ?? 0);
     } catch (err) {
-      console.error('Failed to load patient accounts:', err);
+      logger.error('Failed to load patient accounts:', err);
       setError(err.message || 'Failed to load patient accounts.');
       setAccounts([]);
     } finally {
@@ -208,7 +209,7 @@ const PatientAccountRegistration = () => {
       setSelectedPatient(null);
       setBindLookupError('Multiple patients found. Select one from the suggestions.');
     } catch (err) {
-      console.error('Failed to look up patient:', err);
+      logger.error('Failed to look up patient:', err);
       setBindLookupError(err.message || 'Failed to search for patient.');
       setSelectedPatient(null);
       lastManualBindQueryRef.current = '';
@@ -254,7 +255,7 @@ const PatientAccountRegistration = () => {
         if (isCancelled) {
           return;
         }
-        console.error('Failed to search patients for binding:', err);
+        logger.error('Failed to search patients for binding:', err);
         setBindLookupError((prev) => prev || err.message || 'Failed to search for patient.');
         setBindSuggestions([]);
       } finally {
@@ -298,7 +299,7 @@ const PatientAccountRegistration = () => {
         try {
           await patientAccountService.bindAccount(newAccount.id, selectedPatient.id);
         } catch (bindErr) {
-          console.error('Failed to link patient after creating account:', bindErr);
+          logger.error('Failed to link patient after creating account:', bindErr);
           setCreateError(bindErr.message || 'Account created but failed to link patient.');
         }
       }
@@ -310,7 +311,7 @@ const PatientAccountRegistration = () => {
       resetCreateForm();
       setIsCreateDialogOpen(false);
     } catch (err) {
-      console.error('Failed to create patient account:', err);
+      logger.error('Failed to create patient account:', err);
       setCreateError(err.message || 'Failed to create patient account.');
     } finally {
       setCreateSubmitting(false);
@@ -414,7 +415,7 @@ const PatientAccountRegistration = () => {
       );
       closeEditDialog();
     } catch (err) {
-      console.error('Failed to update patient account:', err);
+      logger.error('Failed to update patient account:', err);
       setEditError(err.message || 'Failed to update patient account.');
     } finally {
       setEditSubmitting(false);
@@ -437,7 +438,7 @@ const PatientAccountRegistration = () => {
       const patients = response?.data || [];
       setPatientResults(Array.isArray(patients) ? patients : []);
     } catch (err) {
-      console.error('Failed to search patients:', err);
+      logger.error('Failed to search patients:', err);
       setPatientError(err.message || 'Failed to fetch patients.');
       setPatientResults([]);
     } finally {
@@ -472,7 +473,7 @@ const PatientAccountRegistration = () => {
       }
       closeBindDialog();
     } catch (err) {
-      console.error('Failed to bind patient account:', err);
+      logger.error('Failed to bind patient account:', err);
       setPatientError(err.message || 'Failed to bind account.');
     } finally {
       setBinding(false);
@@ -490,7 +491,7 @@ const PatientAccountRegistration = () => {
         setAccounts((prev) => prev.map((item) => (item.id === updated.id ? updated : item)));
       }
     } catch (err) {
-      console.error('Failed to unbind account:', err);
+      logger.error('Failed to unbind account:', err);
       setError(err.message || 'Failed to unbind account.');
     }
   };

@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import { useParams, useNavigate, useLocation } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import { invoiceService } from '@/features/billing';
@@ -41,6 +41,7 @@ import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { FormModal } from '@/components/library';
 import PageLayout from '@/components/layout/PageLayout';
+import logger from '@/utils/logger';
 
 // Animation variants
 const pageVariants = {
@@ -81,7 +82,7 @@ const InvoiceManagement = () => {
           setLoading(true);
           setError(null);
           const data = await invoiceService.getInvoiceById(invoiceId);
-          console.log('Invoice loaded:', data);
+          logger.debug('Invoice loaded:', data);
           
           // Transform backend data to match UI expectations
           const transformedInvoice = {
@@ -117,7 +118,7 @@ const InvoiceManagement = () => {
           
           setInvoice(transformedInvoice);
         } catch (error) {
-          console.error('Error loading invoice:', error);
+          logger.error('Error loading invoice:', error);
           setError('Failed to load invoice details');
         } finally {
           setLoading(false);
@@ -221,7 +222,7 @@ const InvoiceManagement = () => {
         setInvoice(prev => ({ ...prev, status: 'partial' }));
       }
       
-      console.log('Payment processed successfully');
+      logger.debug('Payment processed successfully');
       setShowPaymentDialog(false);
       
       // Navigate back to dashboard
@@ -234,7 +235,7 @@ const InvoiceManagement = () => {
       }, 1000);
       
     } catch (error) {
-      console.error('Payment processing error:', error);
+      logger.error('Payment processing error:', error);
       setError('Failed to process payment');
     } finally {
       setIsProcessing(false);

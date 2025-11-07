@@ -1,4 +1,5 @@
 import apiService from '@/services/api';
+import logger from '@/utils/logger';
 
 class PatientService {
   async getAllPatients() {
@@ -61,7 +62,7 @@ class PatientService {
       const response = await apiService.get(`/patients?is_active=${isActive}`);
       return response;
     } catch (error) {
-      console.error('Failed to fetch patients by status:', error);
+      logger.error('Failed to fetch patients by status:', error);
       throw error;
     }
   }
@@ -72,7 +73,7 @@ class PatientService {
       const response = await apiService.get('/patients/stats');
       return response;
     } catch (error) {
-      console.error('Failed to fetch patient stats:', error);
+      logger.error('Failed to fetch patient stats:', error);
       throw error;
     }
   }
@@ -83,7 +84,7 @@ class PatientService {
       const response = await apiService.get(`/patients/recent?limit=${limit}`);
       return response;
     } catch (error) {
-      console.error('Failed to fetch recent patients:', error);
+      logger.error('Failed to fetch recent patients:', error);
       throw error;
     }
   }
@@ -94,7 +95,7 @@ class PatientService {
       const response = await apiService.get('/patients/upcoming-appointments');
       return response;
     } catch (error) {
-      console.error('Failed to fetch patients with upcoming appointments:', error);
+      logger.error('Failed to fetch patients with upcoming appointments:', error);
       throw error;
     }
   }
@@ -105,7 +106,7 @@ class PatientService {
       const response = await apiService.patch(`/patients/${id}/status`, { is_active: isActive });
       return response;
     } catch (error) {
-      console.error(`Failed to toggle patient status for ${id}:`, error);
+      logger.error(`Failed to toggle patient status for ${id}:`, error);
       throw error;
     }
   }
@@ -116,7 +117,7 @@ class PatientService {
       const response = await apiService.get('/patients/nurse');
       return response;
     } catch (error) {
-      console.error('Failed to fetch nurse patients:', error);
+      logger.error('Failed to fetch nurse patients:', error);
       throw error;
     }
   }
@@ -127,7 +128,7 @@ class PatientService {
       const response = await apiService.get('/patients/doctor');
       return response;
     } catch (error) {
-      console.error('Failed to fetch doctor patients:', error);
+      logger.error('Failed to fetch doctor patients:', error);
       throw error;
     }
   }

@@ -1,5 +1,6 @@
 import DoctorAvailabilityService from './DoctorAvailability.service.js';
 import cron from 'node-cron';
+import logger from '../config/logger.js';
 
 class TokenSchedulerService {
   constructor() {
@@ -14,7 +15,6 @@ class TokenSchedulerService {
    */
   start() {
     if (this.isRunning) {
-      console.log('[TokenScheduler] Already running');
       return;
     }
 
@@ -22,24 +22,18 @@ class TokenSchedulerService {
     // For testing, use every minute: * * * * *
     this.scheduledTask = cron.schedule('*/5 * * * *', async () => {
       try {
-        console.log('[TokenScheduler] Running automatic token check...');
-        
         const result = await this.doctorAvailabilityService.checkAndMarkMissedTokens();
         
         if (result.count > 0) {
-          console.log(`[TokenScheduler] ✓ Marked ${result.count} tokens as missed`);
-          console.log('[TokenScheduler] Missed tokens:', result.missedTokens);
-        } else {
-          console.log('[TokenScheduler] ✓ No tokens need to be marked as missed');
+          logger.info(`Marked ${result.count} tokens as missed`);
         }
       } catch (error) {
-        console.error('[TokenScheduler] Error during automatic check:', error);
+        logger.error('[TokenScheduler] Error during automatic check:', error);
       }
     });
 
     this.isRunning = true;
-    console.log('[TokenScheduler] ✓ Started - Running every 5 minutes');
-    console.log('[TokenScheduler] Will automatically mark tokens as "missed" during doctor breaks and after working hours');
+    logger.info('[TokenScheduler] Started - Running every 5 minutes');
   }
 
   /**
@@ -49,7 +43,7 @@ class TokenSchedulerService {
     if (this.scheduledTask) {
       this.scheduledTask.stop();
       this.isRunning = false;
-      console.log('[TokenScheduler] Stopped');
+      logger.info('[TokenScheduler] Stopped');
     }
   }
 
@@ -69,12 +63,11 @@ class TokenSchedulerService {
    */
   async triggerManualCheck() {
     try {
-      console.log('[TokenScheduler] Manual check triggered...');
       const result = await this.doctorAvailabilityService.checkAndMarkMissedTokens();
-      console.log(`[TokenScheduler] Manual check complete: ${result.count} tokens processed`);
+      logger.info(`Manual check complete: ${result.count} tokens processed`);
       return result;
     } catch (error) {
-      console.error('[TokenScheduler] Error during manual check:', error);
+      logger.error('[TokenScheduler] Error during manual check:', error);
       throw error;
     }
   }

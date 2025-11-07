@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import PageLayout from '@/components/layout/PageLayout';
 import { Card } from '@/components/ui/card';
@@ -8,9 +8,10 @@ import { AllergyForm, DiagnosisForm, PatientVitalsDisplay, MedicalInformationPan
 import { VisitHistoryCard, visitService } from '@/features/visits';
 import { LoadingSpinner } from '@/components/library/feedback/LoadingSpinner';
 import { PatientInformationHeader, PatientSearchInterface, patientService } from '@/features/patients';
-import NavigationTabs from '@/components/ui/NavigationTabs';
+import { NavigationTabs } from '@/components/library';
 import api from '@/services/api';
 import { PdfDownloadButton } from '@/components/library';
+import logger from '@/utils/logger';
 import { 
   User,
   Activity,
@@ -75,7 +76,7 @@ const PatientMedicalRecordManagement = () => {
           setPatientsData(response.data);
         }
       } catch (error) {
-        console.error('Error loading patients:', error);
+        logger.error('Error loading patients:', error);
         setPatientsData([]);
       }
     };
@@ -118,7 +119,7 @@ const PatientMedicalRecordManagement = () => {
         : null;
       
       setHasActiveVisit(!!activeVisit);
-      console.log('🔍 [DOCTOR EMR] Active visit check:', { 
+      logger.debug('🔍 [DOCTOR EMR] Active visit check:', { 
         hasActiveVisit: !!activeVisit, 
         activeVisitId: activeVisit?.id,
         visitStatus: activeVisit?.status,
@@ -184,7 +185,7 @@ const PatientMedicalRecordManagement = () => {
                       }))
                   : [];
               } catch (error) {
-                console.error('Error fetching prescriptions for visit:', note.visit_id, error);
+                logger.error('Error fetching prescriptions for visit:', note.visit_id, error);
               }
             }
             
@@ -200,7 +201,7 @@ const PatientMedicalRecordManagement = () => {
           setDoctorNotes([]);
         }
       } catch (error) {
-        console.error('Failed to fetch doctor notes:', error);
+        logger.error('Failed to fetch doctor notes:', error);
         setDoctorNotes([]);
       }
 
@@ -225,11 +226,11 @@ const PatientMedicalRecordManagement = () => {
         })) : [];
         setPatientFiles(formattedDocs);
       } catch (error) {
-        console.error('Failed to fetch patient documents:', error);
+        logger.error('Failed to fetch patient documents:', error);
         setPatientFiles([]);
       }
     } catch (error) {
-      console.error('Error loading patient medical data:', error);
+      logger.error('Error loading patient medical data:', error);
       setAllergies([]);
       setDiagnoses([]);
       setVisitHistory([]);
@@ -277,12 +278,12 @@ const PatientMedicalRecordManagement = () => {
 
   // Medical action handlers - DOCTOR CAN ADD DIAGNOSIS AND ALLERGY
   const handleAddVitals = () => {
-    console.log('Vitals are managed by nurses');
+    logger.debug('Vitals are managed by nurses');
     alert('Vitals are managed by nursing staff. Please ask a nurse to record vitals.');
   };
 
   const handleEditVitals = () => {
-    console.log('Vitals are managed by nurses');
+    logger.debug('Vitals are managed by nurses');
     alert('Vitals are managed by nursing staff. Please ask a nurse to update vitals.');
   };
 
@@ -333,7 +334,7 @@ const PatientMedicalRecordManagement = () => {
       setIsAllergyModalOpen(false);
       alert('Allergy added successfully!');
     } catch (error) {
-      console.error('Error saving allergy:', error);
+      logger.error('Error saving allergy:', error);
       
       // Check for specific error from backend
       if (error.response?.data?.code === 'NO_ACTIVE_VISIT') {
@@ -393,7 +394,7 @@ const PatientMedicalRecordManagement = () => {
       setIsDiagnosisModalOpen(false);
       alert('Diagnosis added successfully!');
     } catch (error) {
-      console.error('Error saving diagnosis:', error);
+      logger.error('Error saving diagnosis:', error);
       
       // Check for specific error from backend
       if (error.response?.data?.code === 'NO_ACTIVE_VISIT') {
@@ -407,17 +408,17 @@ const PatientMedicalRecordManagement = () => {
   };
 
   const handleAddMedication = () => {
-    console.log('Add medication for patient:', selectedPatient?.id);
+    logger.debug('Add medication for patient:', selectedPatient?.id);
     // TODO: Implement medication management
   };
 
   const handleAddNote = () => {
-    console.log('Add doctor note for patient:', selectedPatient?.id);
+    logger.debug('Add doctor note for patient:', selectedPatient?.id);
     // TODO: Implement doctor notes
   };
 
   const handleEditNote = (note, index) => {
-    console.log('Edit doctor note:', note, 'at index:', index);
+    logger.debug('Edit doctor note:', note, 'at index:', index);
     // TODO: Implement doctor notes editing
   };
 
@@ -450,7 +451,7 @@ const PatientMedicalRecordManagement = () => {
         }
         
       } catch (error) {
-        console.error('Error uploading files:', error);
+        logger.error('Error uploading files:', error);
         alert(`Failed to upload files: ${error.message || 'Please try again.'}`);
       } finally {
         setUploadingFiles(false);
@@ -484,7 +485,7 @@ const PatientMedicalRecordManagement = () => {
       window.URL.revokeObjectURL(url);
       document.body.removeChild(a);
     } catch (error) {
-      console.error('Download error:', error);
+      logger.error('Download error:', error);
       alert('Failed to download file: ' + error.message);
     }
   };

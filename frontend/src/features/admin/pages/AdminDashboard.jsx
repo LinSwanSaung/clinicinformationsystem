@@ -11,6 +11,7 @@ import { doctorAvailabilityService } from '@/features/appointments';
 import { visitService } from '@/features/visits';
 import { formatTimeRange } from '@/utils/timeUtils';
 import { StatCard } from '@/components/library';
+import logger from '@/utils/logger';
 
 const AdminDashboard = () => {
   const navigate = useNavigate();
@@ -151,7 +152,7 @@ const AdminDashboard = () => {
         });
       } catch (error) {
         if (mounted) {
-          console.error('Failed to load dashboard stats', error);
+          logger.error('Failed to load dashboard stats', error);
           setStatsError(error.message || 'Failed to load dashboard statistics.');
         }
       } finally {

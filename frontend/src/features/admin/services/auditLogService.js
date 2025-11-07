@@ -1,4 +1,5 @@
 import api from '@/services/api';
+import logger from '@/utils/logger';
 
 /**
  * Audit Log Service
@@ -15,7 +16,7 @@ class AuditLogService {
       const response = await api.get('/audit-logs', { params });
       return response;
     } catch (error) {
-      console.error('Error fetching audit logs:', error);
+      logger.error('Error fetching audit logs:', error);
       throw error;
     }
   }
@@ -29,7 +30,7 @@ class AuditLogService {
       const response = await api.get('/audit-logs/filters');
       return response?.data || { actions: [], entities: [] };
     } catch (error) {
-      console.error('Error fetching filter options:', error);
+      logger.error('Error fetching filter options:', error);
       return { actions: [], entities: [] };
     }
   }

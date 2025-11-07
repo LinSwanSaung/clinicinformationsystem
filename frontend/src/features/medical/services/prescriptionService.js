@@ -1,4 +1,5 @@
 import api from '@/services/api';
+import logger from '@/utils/logger';
 
 /**
  * Prescription Service
@@ -11,7 +12,7 @@ export const createPrescription = async (prescriptionData) => {
     const response = await api.post('/prescriptions', prescriptionData);
     return response.data?.data || response.data;
   } catch (error) {
-    console.error('Error creating prescription:', error);
+    logger.error('Error creating prescription:', error);
     throw error;
   }
 };
@@ -24,7 +25,7 @@ export const getPrescriptionsByPatient = async (patientId, includeInactive = fal
     });
     return response.data?.data || response.data;
   } catch (error) {
-    console.error('Error fetching patient prescriptions:', error);
+    logger.error('Error fetching patient prescriptions:', error);
     throw error;
   }
 };
@@ -35,7 +36,7 @@ export const getPrescriptionsByVisit = async (visitId) => {
     const response = await api.get(`/prescriptions/visit/${visitId}`);
     return response.data?.data || response.data;
   } catch (error) {
-    console.error('Error fetching visit prescriptions:', error);
+    logger.error('Error fetching visit prescriptions:', error);
     throw error;
   }
 };
@@ -46,7 +47,7 @@ export const updatePrescriptionStatus = async (prescriptionId, status) => {
     const response = await api.patch(`/prescriptions/${prescriptionId}/status`, { status });
     return response.data?.data || response.data;
   } catch (error) {
-    console.error('Error updating prescription status:', error);
+    logger.error('Error updating prescription status:', error);
     throw error;
   }
 };
@@ -57,7 +58,7 @@ export const cancelPrescription = async (prescriptionId) => {
     const response = await api.delete(`/prescriptions/${prescriptionId}`);
     return response.data?.data || response.data;
   } catch (error) {
-    console.error('Error cancelling prescription:', error);
+    logger.error('Error cancelling prescription:', error);
     throw error;
   }
 };

@@ -15,6 +15,7 @@ import PageLayout from '@/components/layout/PageLayout';
 import { ArrowLeft, Calendar, Clock, Plus, Stethoscope, Mail, Phone } from 'lucide-react';
 import { userService } from '@/features/admin';
 import { doctorAvailabilityService } from '@/features/appointments';
+import logger from '@/utils/logger';
 import {
   validateTimeFormat,
   convert12HrTo24Hr,
@@ -69,14 +70,14 @@ const DoctorAvailability = () => {
         }
         setAvailability(availabilityByDoctor);
       } catch (availError) {
-        console.error('Error loading availability (using fallback):', availError);
+        logger.error('Error loading availability (using fallback):', availError);
 
         // Instead of failing, set empty availability and continue
-        console.log('Using empty availability due to backend issues');
+        logger.debug('Using empty availability due to backend issues');
         setAvailability({});
       }
     } catch (error) {
-      console.error('Error loading doctors:', error);
+      logger.error('Error loading doctors:', error);
       setError('Failed to load doctors. Please try again.');
     } finally {
       setIsLoading(false);
@@ -402,14 +403,14 @@ const ScheduleDialog = ({ isOpen, onClose, doctor, onScheduleAdded }) => {
         end_time: endTime24,
       };
 
-      console.log('Setting availability:', availabilityData);
+      logger.debug('Setting availability:', availabilityData);
 
       // Try to save to backend
       try {
         await doctorAvailabilityService.createAvailability(availabilityData);
-        console.log('Γ£à Availability saved successfully');
+        logger.debug('Γ£à Availability saved successfully');
       } catch (backendError) {
-        console.error('Backend error:', backendError);
+        logger.error('Backend error:', backendError);
         throw new Error('Failed to save availability. Please try again.');
       }
 
@@ -424,7 +425,7 @@ const ScheduleDialog = ({ isOpen, onClose, doctor, onScheduleAdded }) => {
 
       onScheduleAdded();
     } catch (error) {
-      console.error('Error setting availability:', error);
+      logger.error('Error setting availability:', error);
       setFormError(error.message);
     } finally {
       setIsSubmitting(false);

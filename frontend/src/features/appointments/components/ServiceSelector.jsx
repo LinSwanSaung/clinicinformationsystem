@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { Plus, X, Search, DollarSign, Package, Check } from 'lucide-react';
 import serviceService from '@/services/serviceService';
 import invoiceService from '@/features/billing/services/invoiceService';
+import logger from '@/utils/logger';
 
 const ServiceSelector = ({ visitId, onServicesAdded }) => {
   const [services, setServices] = useState([]);
@@ -28,7 +29,7 @@ const ServiceSelector = ({ visitId, onServicesAdded }) => {
       const data = response.data || response || [];
       setServices(Array.isArray(data) ? data : []);
     } catch (error) {
-      console.error('Error loading services:', error);
+      logger.error('Error loading services:', error);
       setError('Failed to load services. Please check your connection and try refreshing.');
       setServices([]);
     } finally {
@@ -43,22 +44,22 @@ const ServiceSelector = ({ visitId, onServicesAdded }) => {
 
       // Always try to get by visit ID first (most reliable)
       try {
-        console.log('Fetching invoice by visit ID:', visitId);
+        logger.debug('Fetching invoice by visit ID:', visitId);
         const response = await invoiceService.getInvoiceByVisit(visitId);
-        console.log('Raw invoice response:', response);
+        logger.debug('Raw invoice response:', response);
         invoiceData = response;
       } catch (error) {
-        console.log('No existing invoice found by visit, will create new one...', error);
+        logger.debug('No existing invoice found by visit, will create new one...', error);
       }
 
       // If we have an invoice in state but no data from API, try by ID
       if (!invoiceData && invoice && invoice.id) {
         try {
-          console.log('Fetching invoice by ID:', invoice.id);
+          logger.debug('Fetching invoice by ID:', invoice.id);
           invoiceData = await invoiceService.getInvoiceById(invoice.id);
-          console.log('Invoice fetched by ID:', invoiceData);
+          logger.debug('Invoice fetched by ID:', invoiceData);
         } catch (error) {
-          console.error('Error fetching invoice by ID:', error);
+          logger.error('Error fetching invoice by ID:', error);
         }
       }
 
@@ -66,24 +67,24 @@ const ServiceSelector = ({ visitId, onServicesAdded }) => {
       if (!invoiceData) {
         try {
           invoiceData = await invoiceService.createInvoice(visitId);
-          console.log('Invoice created successfully:', invoiceData);
+          logger.debug('Invoice created successfully:', invoiceData);
         } catch (createError) {
-          console.error('Error creating invoice:', createError);
+          logger.error('Error creating invoice:', createError);
           throw new Error('Failed to create invoice. Please ensure you have an active visit.');
         }
       }
 
       setInvoice(invoiceData);
 
-      console.log('Final invoice loaded:', invoiceData);
-      console.log('Invoice items:', invoiceData?.invoice_items);
-      console.log('Invoice items type:', Array.isArray(invoiceData?.invoice_items));
+      logger.debug('Final invoice loaded:', invoiceData);
+      logger.debug('Invoice items:', invoiceData?.invoice_items);
+      logger.debug('Invoice items type:', Array.isArray(invoiceData?.invoice_items));
 
       // Load existing services from invoice
       if (invoiceData && invoiceData.invoice_items && Array.isArray(invoiceData.invoice_items)) {
         const existingServices = invoiceData.invoice_items
           .filter((item) => {
-            console.log('Processing item:', item);
+            logger.debug('Processing item:', item);
             return item.item_type === 'service';
           })
           .map((item) => ({
@@ -94,15 +95,15 @@ const ServiceSelector = ({ visitId, onServicesAdded }) => {
             unit_price: item.unit_price,
             notes: item.notes,
           }));
-        console.log('Existing services found:', existingServices);
-        console.log('Setting addedServices to:', existingServices.length, 'items');
+        logger.debug('Existing services found:', existingServices);
+        logger.debug('Setting addedServices to:', existingServices.length, 'items');
         setAddedServices(existingServices);
       } else {
-        console.log('No invoice items found or not an array, clearing addedServices');
+        logger.debug('No invoice items found or not an array, clearing addedServices');
         setAddedServices([]);
       }
     } catch (error) {
-      console.error('Error in loadOrCreateInvoice:', error);
+      logger.error('Error in loadOrCreateInvoice:', error);
       setError(error.message || 'Failed to load or create invoice. Please try again.');
     }
   };
@@ -164,20 +165,20 @@ const ServiceSelector = ({ visitId, onServicesAdded }) => {
       setSaving(true);
 
       // Add each service to the invoice
-      console.log('Adding services to invoice:', invoice.id);
+      logger.debug('Adding services to invoice:', invoice.id);
       for (const service of selectedServices) {
-        console.log('Adding service:', service);
+        logger.debug('Adding service:', service);
         const result = await invoiceService.addServiceItem(invoice.id, service);
-        console.log('Service added, result:', result);
+        logger.debug('Service added, result:', result);
       }
 
       // Small delay to ensure database is updated
       await new Promise((resolve) => setTimeout(resolve, 500));
 
       // Reload invoice to update added services
-      console.log('Services saved, reloading invoice...');
+      logger.debug('Services saved, reloading invoice...');
       await loadOrCreateInvoice();
-      console.log('Invoice reloaded, addedServices state:', addedServices);
+      logger.debug('Invoice reloaded, addedServices state:', addedServices);
 
       if (onServicesAdded) {
         onServicesAdded();
@@ -186,7 +187,7 @@ const ServiceSelector = ({ visitId, onServicesAdded }) => {
       alert('Services added to invoice successfully!');
       setSelectedServices([]);
     } catch (error) {
-      console.error('Error saving services:', error);
+      logger.error('Error saving services:', error);
       alert('Failed to save services. Please try again.');
     } finally {
       setSaving(false);

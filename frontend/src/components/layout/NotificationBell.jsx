@@ -5,6 +5,7 @@ import { useQuery } from '@tanstack/react-query';
 import { isAuthenticated as isAuthed } from '@/features/auth';
 import { POLLING_INTERVALS } from '@/constants/polling';
 import { EmptyState } from '@/components/library';
+import logger from '@/utils/logger';
 
 const NotificationBell = () => {
   const [notifications, setNotifications] = useState([]);
@@ -36,7 +37,7 @@ const NotificationBell = () => {
       // response is already the data array from notificationService
       setNotifications(response || []);
     } catch (error) {
-      console.error('Error fetching notifications:', error);
+      logger.error('Error fetching notifications:', error);
       setNotifications([]); // Set empty array on error
     } finally {
       setLoading(false);
@@ -58,7 +59,7 @@ const NotificationBell = () => {
       // Decrease unread count
       setUnreadCount(prev => Math.max(0, prev - 1));
     } catch (error) {
-      console.error('Error marking notification as read:', error);
+      logger.error('Error marking notification as read:', error);
     }
   };
 
@@ -74,7 +75,7 @@ const NotificationBell = () => {
       
       setUnreadCount(0);
     } catch (error) {
-      console.error('Error marking all as read:', error);
+      logger.error('Error marking all as read:', error);
     }
   };
 

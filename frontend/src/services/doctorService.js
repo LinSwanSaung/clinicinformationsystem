@@ -4,6 +4,7 @@
  */
 
 import apiService from './api.js';
+import logger from '@/utils/logger';
 
 class DoctorService {
   /**
@@ -15,7 +16,7 @@ class DoctorService {
       const response = await apiService.get('/users?role=doctor');
       return response;
     } catch (error) {
-      console.error('Failed to fetch doctors:', error);
+      logger.error('Failed to fetch doctors:', error);
       throw error;
     }
   }
@@ -29,7 +30,7 @@ class DoctorService {
       const response = await apiService.get('/users?role=doctor&is_active=true');
       return response;
     } catch (error) {
-      console.error('Failed to fetch available doctors:', error);
+      logger.error('Failed to fetch available doctors:', error);
       throw error;
     }
   }
@@ -44,7 +45,7 @@ class DoctorService {
       const response = await apiService.get(`/users/${id}`);
       return response;
     } catch (error) {
-      console.error('Failed to fetch doctor details:', error);
+      logger.error('Failed to fetch doctor details:', error);
       return null;
     }
   }
@@ -59,7 +60,7 @@ class DoctorService {
       const response = await apiService.get(`/users?role=doctor&specialty=${encodeURIComponent(specialization)}`);
       return response;
     } catch (error) {
-      console.error('Failed to fetch doctors by specialization:', error);
+      logger.error('Failed to fetch doctors by specialization:', error);
       throw error;
     }
   }
@@ -75,7 +76,7 @@ class DoctorService {
       const response = await apiService.put(`/users/${id}`, { is_active: isActive });
       return response;
     } catch (error) {
-      console.error('Failed to update doctor availability:', error);
+      logger.error('Failed to update doctor availability:', error);
       return null;
     }
   }
@@ -95,7 +96,7 @@ class DoctorService {
         appointments: response
       };
     } catch (error) {
-      console.error('Failed to fetch doctor schedule:', error);
+      logger.error('Failed to fetch doctor schedule:', error);
       return null;
     }
   }
@@ -115,7 +116,7 @@ class DoctorService {
       const response = await apiService.get(`/appointments?${queryParams}`);
       return response;
     } catch (error) {
-      console.error('Failed to fetch doctor appointments:', error);
+      logger.error('Failed to fetch doctor appointments:', error);
       throw error;
     }
   }

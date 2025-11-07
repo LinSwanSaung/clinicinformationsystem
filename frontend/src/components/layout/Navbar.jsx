@@ -24,6 +24,7 @@ import { employeeService } from '@/features/admin';
 import NotificationBell from './NotificationBell';
 import LanguageSwitcher from './LanguageSwitcher';
 import {
+import logger from '@/utils/logger';
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
@@ -55,7 +56,7 @@ const Navbar = () => {
           const userDetail = employees.find((emp) => emp.email.includes(user?.role.toLowerCase()));
           setUserDetails(userDetail);
         } catch (error) {
-          console.error('Error loading user details:', error);
+          logger.error('Error loading user details:', error);
           // Fallback: use user from auth context
           setUserDetails({
             name:

@@ -1,6 +1,7 @@
 import { Star, Clock, Users } from 'lucide-react';
 import { useState, useEffect } from 'react';
 import doctorService from '@/services/doctorService';
+import logger from '@/utils/logger';
 
 export default function AvailableDoctors({ onAppointDoctor }) {
   const [availableDoctors, setAvailableDoctors] = useState([]);
@@ -14,7 +15,7 @@ export default function AvailableDoctors({ onAppointDoctor }) {
         setAvailableDoctors(doctors);
         setIsLoading(false);
       } catch (error) {
-        console.error('Error loading available doctors:', error);
+        logger.error('Error loading available doctors:', error);
         setIsLoading(false);
       }
     };

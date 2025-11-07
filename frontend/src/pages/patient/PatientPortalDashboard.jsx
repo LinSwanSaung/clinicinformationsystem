@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import PageLayout from '@/components/layout/PageLayout';
@@ -6,6 +6,7 @@ import { ProfileSummary, UpcomingAppointments, VitalsSnapshot, PortalSearchResul
 import { LatestVisitSummary } from '@/features/visits';
 import { patientPortalService } from '@/features/patients';
 import { Separator } from '@/components/ui/separator';
+import logger from '@/utils/logger';
 
 const PatientPortalDashboard = () => {
   const navigate = useNavigate();
@@ -33,7 +34,7 @@ const PatientPortalDashboard = () => {
         setProfileState({ data: response?.data ?? null, loading: false, error: null });
       }
     } catch (error) {
-      console.error('[loadProfile] Error:', error);
+      logger.error('[loadProfile] Error:', error);
       if (isMounted.current) {
         setProfileState((prev) => ({ ...prev, loading: false, error: error.message }));
       }
@@ -51,7 +52,7 @@ const PatientPortalDashboard = () => {
         setVisitsState({ data: response?.data ?? [], loading: false, error: null });
       }
     } catch (error) {
-      console.error('[loadVisits] Error:', error);
+      logger.error('[loadVisits] Error:', error);
       if (isMounted.current) {
         setVisitsState((prev) => ({ ...prev, loading: false, error: error.message }));
       }
@@ -69,7 +70,7 @@ const PatientPortalDashboard = () => {
         setAppointmentsState({ data: response?.data ?? [], loading: false, error: null });
       }
     } catch (error) {
-      console.error('[loadAppointments] Error:', error);
+      logger.error('[loadAppointments] Error:', error);
       if (isMounted.current) {
         setAppointmentsState((prev) => ({ ...prev, loading: false, error: error.message }));
       }
@@ -84,26 +85,26 @@ const PatientPortalDashboard = () => {
 
   const lastVisit = useMemo(() => {
     if (!Array.isArray(visitsState.data) || visitsState.data.length === 0) {
-      console.log('[lastVisit] No visits data available');
+      logger.debug('[lastVisit] No visits data available');
       return null;
     }
     
-    console.log('[lastVisit] All visits:', visitsState.data);
+    logger.debug('[lastVisit] All visits:', visitsState.data);
     
     // Include both completed and in-progress visits
     // This allows patients to see their ongoing visit and measured vitals
     const relevantVisits = visitsState.data.filter(v => {
-      console.log('[lastVisit] Visit status:', v.status, 'for visit:', v);
+      logger.debug('[lastVisit] Visit status:', v.status, 'for visit:', v);
       return v.status === 'completed' || v.status === 'in-progress' || v.status === 'in_progress';
     });
     
-    console.log('[lastVisit] Relevant visits:', relevantVisits);
+    logger.debug('[lastVisit] Relevant visits:', relevantVisits);
     
     if (relevantVisits.length === 0) return null;
     
     // Sort by date, most recent first
     const sorted = relevantVisits.sort((a, b) => new Date(b.visit_date) - new Date(a.visit_date));
-    console.log('[lastVisit] Selected visit:', sorted[0]);
+    logger.debug('[lastVisit] Selected visit:', sorted[0]);
     return sorted[0];
   }, [visitsState.data]);
 
@@ -113,8 +114,8 @@ const PatientPortalDashboard = () => {
   }, [visitsState.data]);
 
   const profileData = profileState.data?.data ?? profileState.data;
-  console.log('[PatientPortalDashboard] profileState:', profileState);
-  console.log('[PatientPortalDashboard] profileData:', profileData);
+  logger.debug('[PatientPortalDashboard] profileState:', profileState);
+  logger.debug('[PatientPortalDashboard] profileData:', profileData);
 
   return (
     <PageLayout
@@ -154,10 +155,10 @@ const PatientPortalDashboard = () => {
           />
           
           {/* AI Health Blog - based on last diagnosis */}
-          {console.log('[PatientPortalDashboard] Rendering AIHealthBlog check:', { hasProfileData: !!profileData, patientId: profileData?.patient?.id })}
+          {logger.debug('[PatientPortalDashboard] Rendering AIHealthBlog check:', { hasProfileData: !!profileData, patientId: profileData?.patient?.id })}
           {profileData?.patient?.id && (
             <>
-              {console.log('[PatientPortalDashboard] Rendering AIHealthBlog with patientId:', profileData.patient.id)}
+              {logger.debug('[PatientPortalDashboard] Rendering AIHealthBlog with patientId:', profileData.patient.id)}
               <AIHealthBlog patientId={profileData.patient.id} language={i18n.language} />
             </>
           )}

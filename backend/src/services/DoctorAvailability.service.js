@@ -267,7 +267,6 @@ class DoctorAvailabilityService {
         bookedSlots: (existingAppointments || []).map((a) => a.appointment_time),
       };
     } catch (error) {
-      // TODO: Replace console.* with logger
       logger.error('[DoctorAvailabilityService] Error checking time slot:', error);
       throw new Error(`Failed to check time slot availability: ${error.message}`);
     }
@@ -278,7 +277,6 @@ class DoctorAvailabilityService {
    */
   async getAvailableTimeSlots(doctorId, date) {
     try {
-      // TODO: Replace console.* with logger
       logger.debug('[DoctorAvailabilityService] Getting available time slots:', { doctorId, date });
 
       // 1. Get day of week (handle timezone correctly)
@@ -288,12 +286,10 @@ class DoctorAvailabilityService {
 
       // 2. Get doctor's availability
       const availability = await this.getAvailabilityByDoctorId(doctorId);
-      // TODO: Replace console.* with logger
       logger.debug('[DoctorAvailabilityService] Doctor availability:', availability);
       logger.debug('[DoctorAvailabilityService] Looking for dayOfWeek:', dayOfWeek);
 
       const daySchedule = availability.find((a) => a.day_of_week === dayOfWeek && a.is_active);
-      // TODO: Replace console.* with logger
       logger.debug('[DoctorAvailabilityService] Found day schedule:', daySchedule);
 
       if (!daySchedule) {
@@ -311,7 +307,6 @@ class DoctorAvailabilityService {
 
       // 4. Generate all possible time slots (30-minute intervals)
       const allSlots = this.generateTimeSlots(daySchedule.start_time, daySchedule.end_time, 30);
-      // TODO: Replace console.* with logger
       logger.debug(
         '[DoctorAvailabilityService] Generated slots from',
         daySchedule.start_time,
@@ -340,7 +335,6 @@ class DoctorAvailabilityService {
         availableCount: availableSlots.length,
       };
     } catch (error) {
-      // TODO: Replace console.* with logger
       logger.error('[DoctorAvailabilityService] Error getting available slots:', error);
       throw new Error(`Failed to get available time slots: ${error.message}`);
     }
@@ -394,7 +388,6 @@ class DoctorAvailabilityService {
         message: `Processed ${data?.length || 0} tokens during doctor unavailability check`,
       };
     } catch (error) {
-      // TODO: Replace console.* with logger
       logger.error('[DoctorAvailability] Error checking missed tokens:', error);
       throw error;
     }
@@ -418,7 +411,6 @@ class DoctorAvailabilityService {
         count: data?.length || 0,
       };
     } catch (error) {
-      // TODO: Replace console.* with logger
       logger.error('[DoctorAvailability] Error checking doctor missed tokens:', error);
       throw error;
     }
@@ -446,7 +438,6 @@ class DoctorAvailabilityService {
         message: `Cancelled ${data?.length || 0} waiting tokens for doctor`,
       };
     } catch (error) {
-      // TODO: Replace console.* with logger
       logger.error('[DoctorAvailability] Error cancelling doctor tokens:', error);
       throw error;
     }
@@ -469,7 +460,6 @@ class DoctorAvailabilityService {
         isAvailable: data || false,
       };
     } catch (error) {
-      // TODO: Replace console.* with logger
       logger.error('[DoctorAvailability] Error checking doctor availability:', error);
       throw error;
     }
@@ -492,7 +482,6 @@ class DoctorAvailabilityService {
         hasAvailability: data || false,
       };
     } catch (error) {
-      // TODO: Replace console.* with logger
       logger.error('[DoctorAvailability] Error checking remaining availability:', error);
       throw error;
     }
@@ -515,7 +504,6 @@ class DoctorAvailabilityService {
         nextAvailableTime: data,
       };
     } catch (error) {
-      // TODO: Replace console.* with logger
       logger.error('[DoctorAvailability] Error getting next available time:', error);
       throw error;
     }
@@ -559,7 +547,6 @@ class DoctorAvailabilityService {
         ...status,
       };
     } catch (error) {
-      // TODO: Replace console.* with logger
       logger.error('[DoctorAvailability] Error getting availability status:', error);
       throw error;
     }
@@ -595,7 +582,6 @@ class DoctorAvailabilityService {
         doctors: doctorStatuses,
       };
     } catch (error) {
-      // TODO: Replace console.* with logger
       logger.error('[DoctorAvailability] Error getting all doctors status:', error);
       throw error;
     }
@@ -603,3 +589,4 @@ class DoctorAvailabilityService {
 }
 
 export default DoctorAvailabilityService;
+

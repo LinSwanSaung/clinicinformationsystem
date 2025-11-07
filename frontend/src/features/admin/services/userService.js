@@ -1,4 +1,5 @@
 import apiService from '@/services/api';
+import logger from '@/utils/logger';
 
 class UserService {
   // Get all users, optionally with query params (e.g., { params: { is_active: true, role: 'doctor' } })
@@ -33,7 +34,7 @@ class UserService {
       const response = await apiService.patch(`/users/${id}/status`, { is_active: isActive });
       return response;
     } catch (error) {
-      console.error(`Failed to toggle user status for ${id}:`, error);
+      logger.error(`Failed to toggle user status for ${id}:`, error);
       throw error;
     }
   }
@@ -57,7 +58,7 @@ class UserService {
         data: [],
       };
     } catch (error) {
-      console.error(`Failed to fetch users with role ${role}:`, error);
+      logger.error(`Failed to fetch users with role ${role}:`, error);
       return {
         success: false,
         data: [],

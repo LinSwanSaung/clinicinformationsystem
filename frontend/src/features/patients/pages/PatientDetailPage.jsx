@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -25,6 +25,7 @@ import { patientService } from '@/features/patients';
 import { allergyService, diagnosisService } from '@/features/medical';
 import PageLayout from '@/components/layout/PageLayout';
 import { FormModal } from '@/components/library';
+import logger from '@/utils/logger';
 
 const PatientDetailPage = () => {
   const { id } = useParams();
@@ -106,7 +107,7 @@ const PatientDetailPage = () => {
         alert('Failed to update patient information');
       }
     } catch (error) {
-      console.error('Error updating patient:', error);
+      logger.error('Error updating patient:', error);
       alert('Error updating patient information');
     } finally {
       setIsSaving(false);
@@ -126,7 +127,7 @@ const PatientDetailPage = () => {
             const allergiesData = await allergyService.getAllergiesByPatient(id);
             setAllergies(Array.isArray(allergiesData) ? allergiesData : []);
           } catch (allergyError) {
-            console.error('Error loading allergies:', allergyError);
+            logger.error('Error loading allergies:', allergyError);
             setAllergies([]);
           }
           
@@ -134,14 +135,14 @@ const PatientDetailPage = () => {
             const diagnosesData = await diagnosisService.getDiagnosesByPatient(id, true);
             setDiagnoses(Array.isArray(diagnosesData) ? diagnosesData : []);
           } catch (diagnosisError) {
-            console.error('Error loading diagnoses:', diagnosisError);
+            logger.error('Error loading diagnoses:', diagnosisError);
             setDiagnoses([]);
           }
         } else {
           setError('Patient not found');
         }
       } catch (error) {
-        console.error('Error loading patient:', error);
+        logger.error('Error loading patient:', error);
         setError('Failed to load patient details');
       } finally {
         setIsLoading(false);

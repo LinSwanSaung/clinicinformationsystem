@@ -2,16 +2,22 @@ import { useState, useEffect } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import PageLayout from '@/components/layout/PageLayout';
 import { Card } from '@/components/ui/card';
-import { Modal } from '@/components/ui/modal';
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog';
 import { DoctorNotesForm, DiagnosisForm, AllergyForm } from '@/features/medical';
 import { User, Activity, Calendar, FileText, DollarSign, AlertCircle } from 'lucide-react';
 
 // Import our reusable medical components
 import { PatientInformationHeader } from '@/features/patients';
-import NavigationTabs from '@/components/ui/NavigationTabs';
+import { NavigationTabs } from '@/components/library';
 import { ServiceSelector } from '@/features/appointments';
 import { PatientVitalsDisplay, MedicalInformationPanel, ClinicalNotesDisplay, PatientDocumentManager, allergyService, diagnosisService, prescriptionService, doctorNotesService, documentService } from '@/features/medical';
 import { VisitHistoryCard, visitService } from '@/features/visits';
+import logger from '@/utils/logger';
 
 const PatientMedicalRecord = () => {
   const location = useLocation();
@@ -158,7 +164,7 @@ const PatientMedicalRecord = () => {
             setActiveVisitId(activeVisit.id);
             setHasActiveVisit(true);
             setVisitCheckComplete(true);
-            console.log('🔍 [DOCTOR PMR] Active visit found:', {
+            logger.debug('🔍 [DOCTOR PMR] Active visit found:', {
               visitId: activeVisit.id,
               status: activeVisit.status,
               normalizedStatus: normalizeStatus(activeVisit.status),
@@ -168,7 +174,7 @@ const PatientMedicalRecord = () => {
             setActiveVisitId(null);
             setHasActiveVisit(false);
             setVisitCheckComplete(true);
-            console.log(
+            logger.debug(
               '🔍 [DOCTOR PMR] No active visit found - patient cannot have medical data added',
               {
                 patientId: selectedPatient.id,
@@ -183,7 +189,7 @@ const PatientMedicalRecord = () => {
           }
         } catch (error) {
           // No active visit found
-          console.error('🔍 [DOCTOR PMR] Error checking active visit:', error);
+          logger.error('🔍 [DOCTOR PMR] Error checking active visit:', error);
           setActiveVisitId(null);
           setHasActiveVisit(false);
           setVisitCheckComplete(true);
@@ -253,7 +259,7 @@ const PatientMedicalRecord = () => {
                           }))
                       : [];
                   } catch (error) {
-                    console.error('Error fetching prescriptions for visit:', note.visit_id, error);
+                    logger.error('Error fetching prescriptions for visit:', note.visit_id, error);
                   }
                 }
 
@@ -268,7 +274,7 @@ const PatientMedicalRecord = () => {
             setDoctorNotesList(formattedNotes);
           }
         } catch (error) {
-          console.error('Failed to fetch doctor notes:', error);
+          logger.error('Failed to fetch doctor notes:', error);
         }
 
         // Get prescriptions from most recent visit for "Current Medications" overview
@@ -302,7 +308,7 @@ const PatientMedicalRecord = () => {
             : [];
           setPatientFiles(formattedDocs);
         } catch (error) {
-          console.error('Failed to fetch patient documents:', error);
+          logger.error('Failed to fetch patient documents:', error);
           setPatientFiles([]);
         }
 
@@ -326,7 +332,7 @@ const PatientMedicalRecord = () => {
 
         setFullPatientData(enrichedPatient);
       } catch (error) {
-        console.error('Failed to fetch patient data:', error);
+        logger.error('Failed to fetch patient data:', error);
         setFullPatientData(selectedPatient); // Fallback to basic data
       } finally {
         setLoading(false);
@@ -438,7 +444,7 @@ const PatientMedicalRecord = () => {
           await Promise.all(updatePromises);
         }
       } catch (error) {
-        console.error('Error fetching/updating previous prescriptions:', error);
+        logger.error('Error fetching/updating previous prescriptions:', error);
       }
 
       // Step 2: Save the doctor note to the database
@@ -473,7 +479,7 @@ const PatientMedicalRecord = () => {
           });
           savedPrescriptions.push(prescription);
         } catch (error) {
-          console.error('Error saving prescription:', error);
+          logger.error('Error saving prescription:', error);
 
           // Check for specific error from backend
           if (error.response?.data?.code === 'NO_ACTIVE_VISIT') {
@@ -494,7 +500,7 @@ const PatientMedicalRecord = () => {
       // Refresh the page to show updated data
       window.location.reload();
     } catch (error) {
-      console.error('Error saving note:', error);
+      logger.error('Error saving note:', error);
       alert('Failed to save note: ' + (error.message || 'Unknown error'));
     }
   };
@@ -612,7 +618,7 @@ const PatientMedicalRecord = () => {
       // Refresh the page to show new diagnosis
       window.location.reload();
     } catch (error) {
-      console.error('Error adding diagnosis:', error);
+      logger.error('Error adding diagnosis:', error);
 
       // Check for specific error from backend
       if (error.response?.data?.code === 'NO_ACTIVE_VISIT') {
@@ -684,7 +690,7 @@ const PatientMedicalRecord = () => {
       // Refresh the page to show new allergy
       window.location.reload();
     } catch (error) {
-      console.error('Error adding allergy:', error);
+      logger.error('Error adding allergy:', error);
 
       // Check for specific error from backend
       if (error.response?.data?.code === 'NO_ACTIVE_VISIT') {
@@ -731,7 +737,7 @@ const PatientMedicalRecord = () => {
           setPatientFiles(Array.isArray(documents) ? documents : []);
         }
       } catch (error) {
-        console.error('Error uploading files:', error);
+        logger.error('Error uploading files:', error);
         alert(`Failed to upload files: ${error.message || 'Please try again.'}`);
       } finally {
         setUploadingFiles(false);
@@ -869,7 +875,7 @@ const PatientMedicalRecord = () => {
               visitId={activeVisitId}
               onServicesAdded={() => {
                 // Optionally refresh data or show success message
-                console.log('Services added successfully');
+                logger.debug('Services added successfully');
               }}
             />
           )}
@@ -886,104 +892,104 @@ const PatientMedicalRecord = () => {
         </div>
 
         {/* Add Note Modal */}
-        <Modal
-          isOpen={isAddNoteModalOpen}
-          onClose={closeAllModals}
-          title="Add Doctor's Note"
-          size="large"
-        >
-          <DoctorNotesForm
-            formData={noteFormData}
-            onChange={setNoteFormData}
-            onSubmit={handleSaveNote}
-            onCancel={closeAllModals}
-            isEditing={false}
-          />
-        </Modal>
+        <Dialog open={isAddNoteModalOpen} onOpenChange={(open) => !open && closeAllModals()}>
+          <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
+            <DialogHeader>
+              <DialogTitle>Add Doctor's Note</DialogTitle>
+            </DialogHeader>
+            <DoctorNotesForm
+              formData={noteFormData}
+              onChange={setNoteFormData}
+              onSubmit={handleSaveNote}
+              onCancel={closeAllModals}
+              isEditing={false}
+            />
+          </DialogContent>
+        </Dialog>
 
         {/* Edit Note Modal */}
-        <Modal
-          isOpen={isEditNoteModalOpen}
-          onClose={closeAllModals}
-          title="Edit Doctor's Note"
-          size="large"
-        >
-          <DoctorNotesForm
-            formData={noteFormData}
-            onChange={setNoteFormData}
-            onSubmit={handleUpdateNote}
-            onCancel={closeAllModals}
-            isEditing={true}
-          />
-        </Modal>
+        <Dialog open={isEditNoteModalOpen} onOpenChange={(open) => !open && closeAllModals()}>
+          <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
+            <DialogHeader>
+              <DialogTitle>Edit Doctor's Note</DialogTitle>
+            </DialogHeader>
+            <DoctorNotesForm
+              formData={noteFormData}
+              onChange={setNoteFormData}
+              onSubmit={handleUpdateNote}
+              onCancel={closeAllModals}
+              isEditing={true}
+            />
+          </DialogContent>
+        </Dialog>
 
         {/* Add Diagnosis Modal */}
-        <Modal
-          isOpen={isAddDiagnosisModalOpen}
-          onClose={() => setIsAddDiagnosisModalOpen(false)}
-          title="Add Diagnosis"
-          size="small"
-        >
-          <div className="space-y-4">
-            {!activeVisitId && (
-              <div className="rounded-md border border-yellow-200 bg-yellow-50 p-3 text-sm text-yellow-800">
-                Patient does not have an active visit. This diagnosis will be recorded without
-                linking to a visit.
+        <Dialog open={isAddDiagnosisModalOpen} onOpenChange={setIsAddDiagnosisModalOpen}>
+          <DialogContent className="max-w-md">
+            <DialogHeader>
+              <DialogTitle>Add Diagnosis</DialogTitle>
+            </DialogHeader>
+            <div className="space-y-4">
+              {!activeVisitId && (
+                <div className="rounded-md border border-yellow-200 bg-yellow-50 p-3 text-sm text-yellow-800">
+                  Patient does not have an active visit. This diagnosis will be recorded without
+                  linking to a visit.
+                </div>
+              )}
+              <DiagnosisForm
+                diagnosis={diagnosisFormData}
+                onChange={setDiagnosisFormData}
+                disabled={false}
+              />
+              <div className="flex justify-end space-x-3 border-t pt-4">
+                <button
+                  onClick={() => setIsAddDiagnosisModalOpen(false)}
+                  className="rounded-md border border-gray-300 px-4 py-2 text-gray-700 hover:bg-gray-50"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={handleSaveDiagnosis}
+                  className="rounded-md bg-blue-600 px-4 py-2 text-white hover:bg-blue-700"
+                >
+                  Save Diagnosis
+                </button>
               </div>
-            )}
-            <DiagnosisForm
-              diagnosis={diagnosisFormData}
-              onChange={setDiagnosisFormData}
-              disabled={false}
-            />
-            <div className="flex justify-end space-x-3 border-t pt-4">
-              <button
-                onClick={() => setIsAddDiagnosisModalOpen(false)}
-                className="rounded-md border border-gray-300 px-4 py-2 text-gray-700 hover:bg-gray-50"
-              >
-                Cancel
-              </button>
-              <button
-                onClick={handleSaveDiagnosis}
-                className="rounded-md bg-blue-600 px-4 py-2 text-white hover:bg-blue-700"
-              >
-                Save Diagnosis
-              </button>
             </div>
-          </div>
-        </Modal>
+          </DialogContent>
+        </Dialog>
 
         {/* Add Allergy Modal */}
-        <Modal
-          isOpen={isAddAllergyModalOpen}
-          onClose={() => setIsAddAllergyModalOpen(false)}
-          title="Add Allergy"
-          size="small"
-        >
-          <div className="space-y-4">
-            {!activeVisitId && (
-              <div className="rounded-md border border-yellow-200 bg-yellow-50 p-3 text-sm text-yellow-800">
-                Patient does not have an active visit. This allergy will be recorded without linking
-                to a visit.
+        <Dialog open={isAddAllergyModalOpen} onOpenChange={setIsAddAllergyModalOpen}>
+          <DialogContent className="max-w-md">
+            <DialogHeader>
+              <DialogTitle>Add Allergy</DialogTitle>
+            </DialogHeader>
+            <div className="space-y-4">
+              {!activeVisitId && (
+                <div className="rounded-md border border-yellow-200 bg-yellow-50 p-3 text-sm text-yellow-800">
+                  Patient does not have an active visit. This allergy will be recorded without linking
+                  to a visit.
+                </div>
+              )}
+              <AllergyForm allergy={allergyFormData} onChange={setAllergyFormData} disabled={false} />
+              <div className="flex justify-end space-x-3 border-t pt-4">
+                <button
+                  onClick={() => setIsAddAllergyModalOpen(false)}
+                  className="rounded-md border border-gray-300 px-4 py-2 text-gray-700 hover:bg-gray-50"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={handleSaveAllergy}
+                  className="rounded-md bg-blue-600 px-4 py-2 text-white hover:bg-blue-700"
+                >
+                  Save Allergy
+                </button>
               </div>
-            )}
-            <AllergyForm allergy={allergyFormData} onChange={setAllergyFormData} disabled={false} />
-            <div className="flex justify-end space-x-3 border-t pt-4">
-              <button
-                onClick={() => setIsAddAllergyModalOpen(false)}
-                className="rounded-md border border-gray-300 px-4 py-2 text-gray-700 hover:bg-gray-50"
-              >
-                Cancel
-              </button>
-              <button
-                onClick={handleSaveAllergy}
-                className="rounded-md bg-blue-600 px-4 py-2 text-white hover:bg-blue-700"
-              >
-                Save Allergy
-              </button>
             </div>
-          </div>
-        </Modal>
+          </DialogContent>
+        </Dialog>
       </div>
     </PageLayout>
   );

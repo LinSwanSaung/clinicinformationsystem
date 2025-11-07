@@ -1,4 +1,5 @@
 import api from './api';
+import logger from '@/utils/logger';
 
 class ClinicSettingsService {
   async getSettings() {
@@ -9,7 +10,7 @@ class ClinicSettingsService {
         data: response.data
       };
     } catch (error) {
-      console.error('Error fetching clinic settings:', error);
+      logger.error('Error fetching clinic settings:', error);
       return {
         success: false,
         error: error.response?.data?.message || 'Failed to fetch clinic settings'
@@ -25,7 +26,7 @@ class ClinicSettingsService {
         data: response.data
       };
     } catch (error) {
-      console.error('Error updating clinic settings:', error);
+      logger.error('Error updating clinic settings:', error);
       return {
         success: false,
         error: error.response?.data?.message || 'Failed to update clinic settings'
@@ -42,7 +43,7 @@ class ClinicSettingsService {
       }
       return 15; // Default fallback
     } catch (error) {
-      console.error('Error fetching consultation duration:', error);
+      logger.error('Error fetching consultation duration:', error);
       return 15; // Default fallback
     }
   }
@@ -56,7 +57,7 @@ class ClinicSettingsService {
       }
       return 7; // Default fallback
     } catch (error) {
-      console.error('Error fetching late threshold:', error);
+      logger.error('Error fetching late threshold:', error);
       return 7; // Default fallback
     }
   }

@@ -1,4 +1,5 @@
 import api from '@/services/api';
+import logger from '@/utils/logger';
 
 /**
  * Enhanced Allergy Service with caching and performance optimizations
@@ -47,7 +48,7 @@ class AllergyService {
 
       return allergies;
     } catch (error) {
-      console.error('Error fetching patient allergies:', error);
+      logger.error('Error fetching patient allergies:', error);
       throw error;
     }
   }
@@ -60,7 +61,7 @@ class AllergyService {
       const response = await api.get(`/patient-allergies/${id}`);
       return response.data.data;
     } catch (error) {
-      console.error('Error fetching allergy:', error);
+      logger.error('Error fetching allergy:', error);
       throw error;
     }
   }
@@ -79,7 +80,7 @@ class AllergyService {
       
       return response.data.data;
     } catch (error) {
-      console.error('Error creating allergy:', error);
+      logger.error('Error creating allergy:', error);
       throw error;
     }
   }
@@ -98,7 +99,7 @@ class AllergyService {
       
       return response.data.data;
     } catch (error) {
-      console.error('Error updating allergy:', error);
+      logger.error('Error updating allergy:', error);
       throw error;
     }
   }
@@ -117,7 +118,7 @@ class AllergyService {
       
       return response.data;
     } catch (error) {
-      console.error('Error deleting allergy:', error);
+      logger.error('Error deleting allergy:', error);
       throw error;
     }
   }
@@ -130,7 +131,7 @@ class AllergyService {
       const response = await api.get('/patient-allergies/active/all');
       return response.data.data;
     } catch (error) {
-      console.error('Error fetching active allergies:', error);
+      logger.error('Error fetching active allergies:', error);
       throw error;
     }
   }

@@ -39,6 +39,7 @@ import {
 import PageLayout from '@/components/layout/PageLayout';
 import { adminService } from '@/features/admin';
 import { StatusBadge, DataTable } from '@/components/library';
+import logger from '@/utils/logger';
 
 const PendingItems = () => {
   const [pendingItems, setPendingItems] = useState([]);
@@ -65,10 +66,10 @@ const PendingItems = () => {
       setLoading(true);
       setError('');
       const data = await adminService.getPendingItems();
-      console.log('[FRONTEND] Received pending items:', data);
+      logger.debug('[FRONTEND] Received pending items:', data);
       setPendingItems(data || []);
     } catch (err) {
-      console.error('Failed to load pending items:', err);
+      logger.error('Failed to load pending items:', err);
       setError(err.message || 'Failed to load pending items');
     } finally {
       setLoading(false);
@@ -123,7 +124,7 @@ const PendingItems = () => {
       return true;
     });
 
-    console.log('[FRONTEND] Filtered items:', filtered.length, 'from', pendingItems.length);
+    logger.debug('[FRONTEND] Filtered items:', filtered.length, 'from', pendingItems.length);
     return filtered;
   }, [pendingItems, moduleFilter, statusFilter, ageFilter]);
 
@@ -194,7 +195,7 @@ const PendingItems = () => {
       closeOverrideModal();
       loadPendingItems(); // Refresh the list
     } catch (err) {
-      console.error('Failed to override record:', err);
+      logger.error('Failed to override record:', err);
       setError(err.message || 'Failed to resolve record');
     } finally {
       setOverrideSubmitting(false);

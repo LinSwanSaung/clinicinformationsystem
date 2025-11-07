@@ -1,5 +1,5 @@
 /* eslint-disable no-unused-vars, no-useless-catch, react-hooks/exhaustive-deps, no-console */
-import React, { useState, useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import {
@@ -55,6 +55,7 @@ import { queueService } from '@/features/queue';
 import { useAuth } from '@/contexts/AuthContext';
 import PageLayout from '@/components/layout/PageLayout';
 import useDebounce from '@/hooks/useDebounce';
+import logger from '@/utils/logger';
 
 const ReceptionistDashboard = () => {
   const navigate = useNavigate();
@@ -136,7 +137,7 @@ const ReceptionistDashboard = () => {
           doctor_id: app.doctor?.id || app.doctor_id,
         }));
 
-      console.log("[ReceptionistDashboard] Today's appointments:", todayAppts);
+      logger.debug("[ReceptionistDashboard] Today's appointments:", todayAppts);
 
       setTodayAppointments(todayAppts);
       setFilteredAppointments(todayAppts);
@@ -163,7 +164,7 @@ const ReceptionistDashboard = () => {
 
       setIsLoading(false);
     } catch (error) {
-      console.error('Error loading dashboard data:', error);
+      logger.error('Error loading dashboard data:', error);
       setIsLoading(false);
     }
   };
@@ -220,7 +221,7 @@ const ReceptionistDashboard = () => {
   const handleMarkReady = async (appointmentId) => {
     // Prevent double-clicking
     if (processingAppointments.has(appointmentId)) {
-      console.log(
+      logger.debug(
         '[ReceptionistDashboard] Already processing this appointment, ignoring duplicate call'
       );
       return;
@@ -235,7 +236,7 @@ const ReceptionistDashboard = () => {
         throw new Error('Appointment not found');
       }
 
-      console.log('[ReceptionistDashboard] Marking appointment as ready:', appointmentId);
+      logger.debug('[ReceptionistDashboard] Marking appointment as ready:', appointmentId);
 
       let priority;
 
@@ -270,14 +271,14 @@ const ReceptionistDashboard = () => {
       const response = await queueService.issueToken(tokenData);
 
       if (response.success) {
-        console.log('[ReceptionistDashboard] Token created successfully:', response.data);
+        logger.debug('[ReceptionistDashboard] Token created successfully:', response.data);
         // Reload data to get updated appointment status
         await loadDashboardData();
       } else {
         throw new Error(response.message || 'Failed to create queue token');
       }
     } catch (error) {
-      console.error('[ReceptionistDashboard] Error marking appointment as ready:', error);
+      logger.error('[ReceptionistDashboard] Error marking appointment as ready:', error);
       alert(`Failed to mark as ready: ${error.message}`);
     } finally {
       // Remove from processing set
@@ -295,7 +296,7 @@ const ReceptionistDashboard = () => {
   const handleMarkLate = async (appointmentId) => {
     // Prevent double-clicking
     if (processingAppointments.has(appointmentId)) {
-      console.log(
+      logger.debug(
         '[ReceptionistDashboard] Already processing this appointment, ignoring duplicate call'
       );
       return;
@@ -303,19 +304,19 @@ const ReceptionistDashboard = () => {
 
     try {
       setProcessingAppointments((prev) => new Set(prev).add(appointmentId));
-      console.log('[ReceptionistDashboard] Manually marking appointment as late:', appointmentId);
+      logger.debug('[ReceptionistDashboard] Manually marking appointment as late:', appointmentId);
 
       const response = await mutateAppointmentStatus({ appointmentId, status: 'late' });
 
       if (response.success) {
-        console.log('[ReceptionistDashboard] Appointment marked as late (no token created yet)');
+        logger.debug('[ReceptionistDashboard] Appointment marked as late (no token created yet)');
         await refetchAppointments();
         await loadDashboardData();
       } else {
         throw new Error(response.message || 'Failed to mark as late');
       }
     } catch (error) {
-      console.error('[ReceptionistDashboard] Error marking appointment as late:', error);
+      logger.error('[ReceptionistDashboard] Error marking appointment as late:', error);
       alert(`Failed to mark as late: ${error.message}`);
     } finally {
       setProcessingAppointments((prev) => {
@@ -330,7 +331,7 @@ const ReceptionistDashboard = () => {
   const handleMarkNoShow = async (appointmentId) => {
     // Prevent double-clicking
     if (processingAppointments.has(appointmentId)) {
-      console.log(
+      logger.debug(
         '[ReceptionistDashboard] Already processing this appointment, ignoring duplicate call'
       );
       return;
@@ -338,19 +339,19 @@ const ReceptionistDashboard = () => {
 
     try {
       setProcessingAppointments((prev) => new Set(prev).add(appointmentId));
-      console.log('[ReceptionistDashboard] Marking appointment as no-show:', appointmentId);
+      logger.debug('[ReceptionistDashboard] Marking appointment as no-show:', appointmentId);
 
       const response = await mutateAppointmentStatus({ appointmentId, status: 'no_show' });
 
       if (response.success) {
-        console.log('[ReceptionistDashboard] Appointment marked as no-show');
+        logger.debug('[ReceptionistDashboard] Appointment marked as no-show');
         await refetchAppointments();
         await loadDashboardData();
       } else {
         throw new Error(response.message || 'Failed to mark as no-show');
       }
     } catch (error) {
-      console.error('[ReceptionistDashboard] Error marking appointment as no-show:', error);
+      logger.error('[ReceptionistDashboard] Error marking appointment as no-show:', error);
       alert(`Failed to mark as no-show: ${error.message}`);
     } finally {
       setProcessingAppointments((prev) => {
@@ -363,7 +364,7 @@ const ReceptionistDashboard = () => {
 
   // Main action handler
   const updateAppointmentStatus = async (appointmentId, action) => {
-    console.log('[ReceptionistDashboard] Action triggered:', { appointmentId, action });
+    logger.debug('[ReceptionistDashboard] Action triggered:', { appointmentId, action });
 
     switch (action) {
       case 'mark-ready':

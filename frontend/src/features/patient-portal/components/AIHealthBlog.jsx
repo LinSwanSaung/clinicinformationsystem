@@ -1,10 +1,11 @@
-import React, { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useTranslation } from "react-i18next";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Sparkles, RefreshCw, AlertCircle, Heart, PartyPopper } from "lucide-react";
 import ReactMarkdown from "react-markdown";
 import api from '@/services/api';
+import logger from '@/utils/logger';
 
 const TYPE_EMOJI = {
   "diagnosis-based": "🩺",
@@ -50,11 +51,11 @@ const AIHealthBlog = ({ patientId, language }) => {
         }
         setError(null);
 
-        console.log('[AIHealthBlog] Fetching health advice with language:', activeLanguage);
+        logger.debug('[AIHealthBlog] Fetching health advice with language:', activeLanguage);
         const result = await api.get(`/ai/health-advice/${patientId}`, {
           params: { lang: activeLanguage }
         });
-        console.log('[AIHealthBlog] Received health advice:', { type: result?.data?.type, hasContent: !!result?.data?.content });
+        logger.debug('[AIHealthBlog] Received health advice:', { type: result?.data?.type, hasContent: !!result?.data?.content });
 
         if (!result?.success) {
           throw new Error(result?.message || "Failed to fetch health advice");

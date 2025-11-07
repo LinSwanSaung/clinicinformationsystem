@@ -4,6 +4,7 @@ import { asyncHandler, AppError } from '../middleware/errorHandler.js';
 import { ROLES } from '../constants/roles.js';
 import { logAuditEvent } from '../utils/auditLogger.js';
 import { supabase } from '../config/database.js';
+import logger from '../config/logger.js';
 
 const router = express.Router();
 
@@ -48,20 +49,8 @@ router.get(
   asyncHandler(async (req, res) => {
     const pendingItems = [];
 
-    console.log('[ADMIN] Fetching pending items...');
-
-    // Debug: Get ALL visits to see what we have
-    const { data: allVisits, error: allVisitsError } = await supabase
-      .from('visits')
-      .select('id, status, updated_at, created_at')
-      .order('created_at', { ascending: false })
-      .limit(5);
-
-    console.log('[ADMIN] All visits (last 5):', allVisits);
-
     // Get pending visits (in_progress or active visits older than 5 minutes - for testing)
     const fiveMinutesAgo = new Date(Date.now() - 5 * 60 * 1000).toISOString();
-    console.log('[ADMIN] Checking for visits updated before:', fiveMinutesAgo);
 
     const { data: visitsData, error: visitsError } = await supabase
       .from('visits')
@@ -87,17 +76,8 @@ router.get(
       .lt('updated_at', fiveMinutesAgo)
       .order('updated_at', { ascending: true });
 
-    console.log('[ADMIN] Visits query result:', { count: visitsData?.length, error: visitsError });
-
     if (visitsError) {
-      console.error('[ADMIN] Visits query error:', visitsError);
-    }
-
-    if (visitsData && visitsData.length > 0) {
-      console.log(
-        '[ADMIN] Found visits:',
-        visitsData.map((v) => ({ id: v.id, status: v.status, updated: v.updated_at }))
-      );
+      logger.error('[ADMIN] Visits query error:', visitsError);
     }
 
     if (!visitsError && visitsData) {
@@ -247,7 +227,6 @@ router.get(
       );
     }
 
-    console.log('[ADMIN] Total pending items found:', pendingItems.length);
 
     res.json(pendingItems);
   })
@@ -334,7 +313,6 @@ router.post(
 
     // CASCADE CANCELLATION: If cancelling/completing, update related records
     if (newStatus === 'cancelled' || newStatus === 'completed') {
-      console.log(`[ADMIN] Cascading ${newStatus} status to related records...`);
 
       try {
         // Get the full record to find related IDs
@@ -353,7 +331,6 @@ router.post(
                 .from('queue_tokens')
                 .update({ status: newStatus, updated_at: new Date().toISOString() })
                 .eq('visit_id', fullRecord.id);
-              console.log(`[ADMIN] Updated queue_token for visit ${fullRecord.id}`);
             }
 
             // Update appointment if linked
@@ -390,14 +367,12 @@ router.post(
                   updated_at: new Date().toISOString(),
                 })
                 .eq('id', relatedVisit.id);
-              console.log(`[ADMIN] Updated visit ${relatedVisit.id}`);
 
               // Update queue token linked to this visit
               await supabase
                 .from('queue_tokens')
                 .update({ status: newStatus, updated_at: new Date().toISOString() })
                 .eq('visit_id', relatedVisit.id);
-              console.log(`[ADMIN] Updated queue_token for visit ${relatedVisit.id}`);
             }
           }
 
@@ -414,7 +389,6 @@ router.post(
                   updated_at: new Date().toISOString(),
                 })
                 .eq('id', fullRecord.visit_id);
-              console.log(`[ADMIN] Updated visit ${fullRecord.visit_id}`);
             }
 
             // Update appointment if linked

@@ -2,6 +2,7 @@
  * Service for managing doctor availability
  */
 import apiService from '@/services/api';
+import logger from '@/utils/logger';
 
 class DoctorAvailabilityService {
   /**
@@ -209,7 +210,7 @@ class DoctorAvailabilityService {
       );
       return response.data;
     } catch (error) {
-      console.error('Error checking time slot availability:', error);
+      logger.error('Error checking time slot availability:', error);
       throw error;
     }
   }
@@ -225,7 +226,7 @@ class DoctorAvailabilityService {
       );
       return response.data;
     } catch (error) {
-      console.error('Error getting available time slots:', error);
+      logger.error('Error getting available time slots:', error);
       throw error;
     }
   }

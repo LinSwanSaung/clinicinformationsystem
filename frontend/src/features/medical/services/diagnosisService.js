@@ -1,4 +1,5 @@
 import api from '@/services/api';
+import logger from '@/utils/logger';
 
 /**
  * Enhanced Diagnosis Service with caching and performance optimizations
@@ -49,7 +50,7 @@ class DiagnosisService {
 
       return diagnoses;
     } catch (error) {
-      console.error('Error fetching patient diagnoses:', error);
+      logger.error('Error fetching patient diagnoses:', error);
       throw error;
     }
   }
@@ -62,7 +63,7 @@ class DiagnosisService {
       const response = await api.get(`/patient-diagnoses/visit/${visitId}`);
       return response.data.data;
     } catch (error) {
-      console.error('Error fetching visit diagnoses:', error);
+      logger.error('Error fetching visit diagnoses:', error);
       throw error;
     }
   }
@@ -75,7 +76,7 @@ class DiagnosisService {
       const response = await api.get(`/patient-diagnoses/${id}`);
       return response.data.data;
     } catch (error) {
-      console.error('Error fetching diagnosis:', error);
+      logger.error('Error fetching diagnosis:', error);
       throw error;
     }
   }
@@ -94,7 +95,7 @@ class DiagnosisService {
       
       return response.data.data;
     } catch (error) {
-      console.error('Error creating diagnosis:', error);
+      logger.error('Error creating diagnosis:', error);
       throw error;
     }
   }
@@ -113,7 +114,7 @@ class DiagnosisService {
       
       return response.data.data;
     } catch (error) {
-      console.error('Error updating diagnosis:', error);
+      logger.error('Error updating diagnosis:', error);
       throw error;
     }
   }
@@ -135,7 +136,7 @@ class DiagnosisService {
       
       return response.data.data;
     } catch (error) {
-      console.error('Error updating diagnosis status:', error);
+      logger.error('Error updating diagnosis status:', error);
       throw error;
     }
   }
@@ -154,7 +155,7 @@ class DiagnosisService {
       
       return response.data;
     } catch (error) {
-      console.error('Error deleting diagnosis:', error);
+      logger.error('Error deleting diagnosis:', error);
       throw error;
     }
   }
@@ -167,7 +168,7 @@ class DiagnosisService {
       const response = await api.get('/patient-diagnoses/active/all');
       return response.data.data;
     } catch (error) {
-      console.error('Error fetching active diagnoses:', error);
+      logger.error('Error fetching active diagnoses:', error);
       throw error;
     }
   }

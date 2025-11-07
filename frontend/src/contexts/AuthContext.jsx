@@ -1,6 +1,7 @@
 import { createContext, useContext, useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { authService } from '@/features/auth';
+import logger from '@/utils/logger';
 
 const AuthContext = createContext(null);
 
@@ -31,7 +32,7 @@ export const AuthProvider = ({ children }) => {
         return { success: false, message: result.message };
       }
     } catch (error) {
-      console.error('Login failed:', error);
+      logger.error('Login failed:', error);
       return { success: false, message: 'Login failed. Please try again.' };
     }
   };
@@ -70,7 +71,7 @@ export const AuthProvider = ({ children }) => {
       setUser(null);
       navigate('/');
     } catch (error) {
-      console.error('Logout failed:', error);
+      logger.error('Logout failed:', error);
       // Still clear local state even if API call fails
       setUser(null);
       navigate('/');

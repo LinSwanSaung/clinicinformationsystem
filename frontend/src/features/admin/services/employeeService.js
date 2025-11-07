@@ -4,6 +4,7 @@
  * Now using real backend API through userService
  */
 import userService from './userService';
+import logger from '@/utils/logger';
 
 class EmployeeService {
   constructor() {
@@ -41,7 +42,7 @@ class EmployeeService {
         throw new Error(response.message || 'Failed to fetch employees');
       }
     } catch (error) {
-      console.error('Failed to fetch employees:', error);
+      logger.error('Failed to fetch employees:', error);
       throw error;
     }
   }
@@ -60,7 +61,7 @@ class EmployeeService {
         throw new Error(response.message || 'Employee not found');
       }
     } catch (error) {
-      console.error(`Failed to fetch employee ${id}:`, error);
+      logger.error(`Failed to fetch employee ${id}:`, error);
       throw error;
     }
   }
@@ -79,7 +80,7 @@ class EmployeeService {
         throw new Error(response.message || 'Failed to create employee');
       }
     } catch (error) {
-      console.error('Failed to create employee:', error);
+      logger.error('Failed to create employee:', error);
       throw error;
     }
   }
@@ -99,7 +100,7 @@ class EmployeeService {
         throw new Error(response.message || 'Failed to update employee');
       }
     } catch (error) {
-      console.error(`Failed to update employee ${id}:`, error);
+      logger.error(`Failed to update employee ${id}:`, error);
       throw error;
     }
   }
@@ -120,7 +121,7 @@ class EmployeeService {
       // Fallback
       return true;
     } catch (error) {
-      console.error(`Failed to delete employee ${id}:`, error);
+      logger.error(`Failed to delete employee ${id}:`, error);
       throw error;
     }
   }
@@ -148,7 +149,7 @@ class EmployeeService {
         throw new Error(response.message || 'Failed to fetch employees by role');
       }
     } catch (error) {
-      console.error(`Failed to fetch employees with role ${role}:`, error);
+      logger.error(`Failed to fetch employees with role ${role}:`, error);
       throw error;
     }
   }
@@ -168,7 +169,7 @@ class EmployeeService {
         throw new Error(response.message || 'Failed to update employee status');
       }
     } catch (error) {
-      console.error(`Failed to toggle status for employee ${id}:`, error);
+      logger.error(`Failed to toggle status for employee ${id}:`, error);
       throw error;
     }
   }
@@ -188,7 +189,7 @@ class EmployeeService {
         throw new Error(response.message || 'Failed to reset password');
       }
     } catch (error) {
-      console.error(`Failed to reset password for employee ${id}:`, error);
+      logger.error(`Failed to reset password for employee ${id}:`, error);
       throw error;
     }
   }

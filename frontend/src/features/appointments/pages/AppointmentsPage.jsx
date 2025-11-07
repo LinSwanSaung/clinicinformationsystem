@@ -21,7 +21,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
-import { SearchableSelect } from '@/components/ui/SearchableSelect';
+import { SearchableSelect } from '@/components/library';
 import { Textarea } from '@/components/ui/textarea';
 import doctorAvailabilityService from '../services/doctorAvailabilityService';
 import { patientService } from '@/features/patients';
@@ -30,7 +30,8 @@ import clinicSettingsService from '@/services/clinicSettingsService';
 import { useAppointments } from '../hooks/useAppointments';
 import { useCreateAppointment } from '../hooks/useCreateAppointment';
 import { useUpdateAppointmentStatus } from '../hooks/useUpdateAppointmentStatus';
-import Alert from '@/components/Alert';
+import { AlertModal } from '@/components/library';
+import logger from '@/utils/logger';
 import PageLayout from '@/components/layout/PageLayout';
 import AppointmentPatientCard from '../components/AppointmentPatientCard';
 import AppointmentDetailModal from '../components/AppointmentDetailModal';
@@ -133,7 +134,7 @@ const AppointmentsPage = () => {
       try {
         const duration = await clinicSettingsService.getConsultationDuration();
         setConsultationDuration(duration);
-        console.log('Consultation duration loaded:', duration, 'minutes');
+        logger.debug('Consultation duration loaded:', duration, 'minutes');
       } catch (settingsError) {
         console.warn('Could not load consultation duration, using default:', settingsError);
         // Keep default value of 15
@@ -198,10 +199,6 @@ const AppointmentsPage = () => {
   useEffect(() => {
     const loadAvailableTimeSlots = async () => {
       if (!newAppointment.doctorId || !selectedDate) {
-        console.log('[AppointmentsPage] Cannot load slots - missing doctorId or date:', {
-          doctorId: newAppointment.doctorId,
-          selectedDate,
-        });
         setAvailableTimeSlots([]);
         return;
       }
@@ -216,18 +213,10 @@ const AppointmentsPage = () => {
         const day = String(selectedDate.getDate()).padStart(2, '0');
         const dateStr = `${year}-${month}-${day}`;
 
-        console.log('[AppointmentsPage] Loading time slots for:', {
-          doctorId: newAppointment.doctorId,
-          date: dateStr,
-          dayOfWeek: selectedDate.toLocaleDateString('en-US', { weekday: 'long' }),
-        });
-
         const result = await doctorAvailabilityService.getAvailableTimeSlots(
           newAppointment.doctorId,
           dateStr
         );
-
-        console.log('[AppointmentsPage] Available time slots result:', result);
 
         if (result && result.slots) {
           setAvailableTimeSlots(result.slots);
@@ -239,10 +228,6 @@ const AppointmentsPage = () => {
             !result.slots.includes(newAppointment.time) &&
             lastTimeClearKeyRef.current !== clearKey
           ) {
-            console.log(
-              '[AppointmentsPage] Selected time not available, clearing:',
-              newAppointment.time
-            );
             lastTimeClearKeyRef.current = clearKey;
             setNewAppointment((prev) => ({ ...prev, time: '' }));
           }
@@ -251,15 +236,13 @@ const AppointmentsPage = () => {
           if (result.slots.length === 0) {
             const errorMsg =
               result.message || 'No available time slots for this doctor on the selected date';
-            console.log('[AppointmentsPage] No slots available:', errorMsg);
             setTimeSlotError(errorMsg);
           }
         } else {
-          console.warn('[AppointmentsPage] Invalid result structure:', result);
           setTimeSlotError('Failed to load time slots - invalid response');
         }
       } catch (error) {
-        console.error('[AppointmentsPage] Error loading time slots:', error);
+        logger.error('[AppointmentsPage] Error loading time slots:', error);
         setTimeSlotError(
           `Failed to load available time slots: ${error.message || 'Unknown error'}`
         );
@@ -437,12 +420,12 @@ const AppointmentsPage = () => {
 
         setAvailableWeekdays(weekdays);
       } else {
-        console.warn('❌ No availability data found for doctor:', doctorId);
+        logger.warn('No availability data found for doctor:', doctorId);
         // Fallback - assume Monday to Friday availability
         setAvailableWeekdays([1, 2, 3, 4, 5]);
       }
     } catch (error) {
-      console.error('Error loading doctor availability:', error);
+      logger.error('Error loading doctor availability:', error);
       // Fallback - assume Monday to Friday availability
       setAvailableWeekdays([1, 2, 3, 4, 5]);
     } finally {
@@ -591,7 +574,6 @@ const AppointmentsPage = () => {
         status: 'scheduled',
       };
 
-      console.log('[AppointmentsPage] Creating appointment:', appointmentData);
 
       const result = await createAppointmentMutation.mutateAsync(appointmentData);
 
@@ -633,28 +615,24 @@ const AppointmentsPage = () => {
         setError(result.message || 'Failed to schedule appointment. Please try again.');
       }
     } catch (error) {
-      console.error('[AppointmentsPage] Error creating appointment:', error);
+      logger.error('[AppointmentsPage] Error creating appointment:', error);
       setError(error.message || 'Failed to schedule appointment. Please try again.');
     }
   };
 
   const handleStatusChange = async (appointmentId, newStatus) => {
     try {
-      console.log('Frontend: Updating status for appointment', appointmentId, 'to', newStatus);
       const result = await updateAppointmentStatusMutation.mutateAsync({
         appointmentId,
         status: newStatus,
       });
-      console.log('Frontend: API response:', result);
 
-      if (result.success) {
-        console.log('Frontend: Status updated successfully');
-      } else {
-        console.error('Frontend: API returned failure:', result);
+      if (!result.success) {
+        logger.error('API returned failure:', result);
         setError('Failed to update appointment status.');
       }
     } catch (error) {
-      console.error('Frontend: Error in handleStatusChange:', error);
+      logger.error('Error in handleStatusChange:', error);
       setError('Failed to update appointment status.');
     }
   };
@@ -666,24 +644,21 @@ const AppointmentsPage = () => {
 
   const handleCancelAppointment = async (appointmentId) => {
     try {
-      console.log('[AppointmentsPage] Cancelling appointment:', appointmentId);
       const result = await updateAppointmentStatusMutation.mutateAsync({
         appointmentId,
         status: 'cancelled',
       });
-      console.log('[AppointmentsPage] Cancel result:', result);
 
       if (result.success) {
-        console.log('Appointment cancelled successfully');
         // Show success message
         setShowAlert(true);
         setTimeout(() => setShowAlert(false), 3000);
       } else {
-        console.error('[AppointmentsPage] Cancel failed:', result);
+        logger.error('[AppointmentsPage] Cancel failed:', result);
         setError(result.message || 'Failed to cancel appointment. Please try again.');
       }
     } catch (error) {
-      console.error('[AppointmentsPage] Error cancelling appointment:', error);
+      logger.error('[AppointmentsPage] Error cancelling appointment:', error);
       setError(
         error.response?.data?.message ||
           error.message ||
@@ -694,24 +669,23 @@ const AppointmentsPage = () => {
 
   const handleRescheduleAppointment = async (appointment) => {
     // Pre-fill the appointment form with existing data for rescheduling
-    console.log('[AppointmentsPage] Rescheduling appointment:', appointment);
     const patient = patients.find((p) => p.id === appointment.patient_id);
     const doctor = availableDoctors.find((d) => d.id === appointment.doctor_id);
 
     if (!patient) {
-      console.error('[AppointmentsPage] Patient not found:', appointment.patient_id);
+      logger.error('[AppointmentsPage] Patient not found:', appointment.patient_id);
       setError('Patient not found. Please refresh the page.');
       return;
     }
 
     if (!doctor) {
-      console.error('[AppointmentsPage] Doctor not found:', appointment.doctor_id);
+      logger.error('[AppointmentsPage] Doctor not found:', appointment.doctor_id);
       setError('Doctor not found. Please refresh the page.');
       return;
     }
 
     if (patient && doctor) {
-      console.log(
+      logger.debug(
         '[AppointmentsPage] Setting up reschedule with patient:',
         patient.first_name,
         'and doctor:',
@@ -719,7 +693,7 @@ const AppointmentsPage = () => {
       );
 
       // First cancel the existing appointment
-      console.log('[AppointmentsPage] Cancelling original appointment before rescheduling');
+      logger.debug('[AppointmentsPage] Cancelling original appointment before rescheduling');
       await handleCancelAppointment(appointment.id);
 
       // Then set up the form for new appointment
@@ -748,14 +722,14 @@ const AppointmentsPage = () => {
     <PageLayout title="Appointments" subtitle="Schedule and manage patient appointments" fullWidth>
       <div className="space-y-4 p-3 sm:space-y-6 sm:p-4 md:space-y-8 md:p-8">
         {showAlert && (
-          <Alert
+          <AlertModal
             type="success"
             message="Appointment scheduled successfully!"
             onClose={() => setShowAlert(false)}
           />
         )}
 
-        {error && <Alert type="error" message={error} onClose={() => setError('')} />}
+        {error && <AlertModal type="error" message={error} onClose={() => setError('')} />}
 
         <div className="flex flex-col items-start justify-between gap-3 sm:flex-row sm:items-center sm:gap-4">
           <div className="flex-1" />

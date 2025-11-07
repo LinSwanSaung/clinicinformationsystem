@@ -53,21 +53,18 @@ class AIService {
       apiKey: process.env.GITHUB_TOKEN
     });
     this.model = process.env.AI_MODEL || "gpt-4o-mini";
-    console.log('[AIService] Initialized with GitHub Models (OpenAI SDK)');
-    console.log('[AIService] Model:', this.model);
+    // AIService initialized with GitHub Models
   }
 
   getLanguageConfig(language) {
     const key = (language || 'en').toLowerCase();
     const normalizedKey = key === 'mm' || key === 'my-mm' || key === 'my' ? 'my' : key;
     const config = LANGUAGE_CONFIGS[normalizedKey] || LANGUAGE_CONFIGS.en;
-    console.log('[AIService] Language config lookup:', { input: language, normalized: normalizedKey, found: !!LANGUAGE_CONFIGS[normalizedKey] });
     return config;
   }
 
   async generateHealthAdvice(diagnosisName, patientAge = null, patientGender = null, language = 'en') {
     try {
-      console.log('[AIService] Generating health advice with GitHub Models (gpt-4o-mini)...');
       const langConfig = this.getLanguageConfig(language);
       const { headings } = langConfig;
 
@@ -114,14 +111,13 @@ Keep paragraphs short (1-2 sentences each) and use bullet lists where it improve
         generatedAt: new Date().toISOString()
       };
     } catch (error) {
-      console.error('[AIService] Error generating health advice:', error);
+      logger.error('[AIService] Error generating health advice:', error);
       throw new Error(`Failed to generate health advice: ${error.message}`);
     }
   }
 
   async generateWellnessTips(language = 'en') {
     try {
-      console.log('[AIService] Generating wellness tips with GitHub Models (gpt-4o-mini)...');
       const langConfig = this.getLanguageConfig(language);
       const sections = langConfig.wellnessSections;
 
@@ -156,7 +152,7 @@ Keep the tone motivating, friendly, and realistic.`;
         generatedAt: new Date().toISOString()
       };
     } catch (error) {
-      console.error('[AIService] Error generating wellness tips:', error);
+      logger.error('[AIService] Error generating wellness tips:', error);
       throw new Error(`Failed to generate wellness tips: ${error.message}`);
     }
   }

@@ -1,10 +1,11 @@
-import React, { useState, useEffect } from "react";
+import { useState, useEffect } from 'react';
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { UserCircle, Calendar, FileText } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { allergyService } from '@/features/medical';
+import logger from '@/utils/logger';
 
 export default function ReceptionistPatientCard({ patient, onBookAppointment }) {
   const navigate = useNavigate();
@@ -20,7 +21,7 @@ export default function ReceptionistPatientCard({ patient, onBookAppointment }) 
           const allergiesData = await allergyService.getAllergiesByPatient(patient.id);
           setAllergies(Array.isArray(allergiesData) ? allergiesData : []);
         } catch (error) {
-          console.error('Error loading allergies:', error);
+          logger.error('Error loading allergies:', error);
           setAllergies([]);
         } finally {
           setLoadingAllergies(false);

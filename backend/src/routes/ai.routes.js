@@ -3,6 +3,7 @@ import { authenticate } from '../middleware/auth.js';
 import aiService from '../services/OpenAI.service.js';
 import diagnosisService from '../services/PatientDiagnosis.service.js';
 import patientService from '../services/Patient.service.js';
+import logger from '../config/logger.js';
 
 const router = express.Router();
 
@@ -15,7 +16,7 @@ router.get('/models', authenticate, async (req, res) => {
     const models = await aiService.listAvailableModels();
     res.json({ success: true, models });
   } catch (error) {
-    console.error('[AI Route] Error listing models:', error);
+    logger.error('[AI Route] Error listing models:', error);
     res.status(500).json({ 
       success: false, 
       error: error.message 
@@ -32,7 +33,6 @@ router.get('/health-advice/:patientId', authenticate, async (req, res) => {
     const { patientId } = req.params;
     const { lang = 'en' } = req.query;
     
-    console.log('[AI Route] Health advice request:', { patientId, language: lang });
 
     // Get patient's latest diagnosis
     const diagnoses = await diagnosisService.getDiagnosesByPatient(patientId);
@@ -83,7 +83,7 @@ router.get('/health-advice/:patientId', authenticate, async (req, res) => {
       }
     });
   } catch (error) {
-    console.error('[AI Route] Error generating health advice:', error);
+    logger.error('[AI Route] Error generating health advice:', error);
     res.status(500).json({
       success: false,
       error: error.message || 'Failed to generate health advice'
@@ -109,7 +109,7 @@ router.get('/wellness-tips', authenticate, async (req, res) => {
       }
     });
   } catch (error) {
-    console.error('[AI Route] Error generating wellness tips:', error);
+    logger.error('[AI Route] Error generating wellness tips:', error);
     res.status(500).json({
       success: false,
       error: error.message || 'Failed to generate wellness tips'

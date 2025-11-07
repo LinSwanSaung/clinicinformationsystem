@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { motion } from 'framer-motion';
@@ -24,6 +24,7 @@ import PageLayout from '@/components/layout/PageLayout';
 import { patientPortalService } from '@/features/patients';
 import { queueService } from '@/features/queue';
 import clinicSettingsService from '@/services/clinicSettingsService';
+import logger from '@/utils/logger';
 
 const pageVariants = {
   initial: { opacity: 0, y: 20 },
@@ -80,7 +81,7 @@ const PatientLiveQueue = () => {
 
       setLastUpdated(new Date());
     } catch (err) {
-      console.error('Failed to load queue status:', err);
+      logger.error('Failed to load queue status:', err);
       setError(err.message || 'Failed to load queue status');
     } finally {
       setIsLoading(false);

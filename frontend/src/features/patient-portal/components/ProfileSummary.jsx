@@ -71,18 +71,11 @@ const ProfileSummary = ({ data, lastVisit, loading, error, onRetry }) => {
   const patient = data?.patient;
   const user = data?.user;
 
-  // Debug logging
-  console.log('[ProfileSummary] Raw data:', data);
-  console.log('[ProfileSummary] Patient:', patient);
-  console.log('[ProfileSummary] User:', user);
-
   const fullName = patient
     ? `${patient.first_name ?? ''} ${patient.last_name ?? ''}`.trim()
     : user
       ? `${user.first_name ?? ''} ${user.last_name ?? ''}`.trim()
       : t('patient.profile.unknownName');
-
-  console.log('[ProfileSummary] Full name calculated:', fullName);
 
   const patientNumber = patient?.patient_number ?? t('patient.profile.noPatientCode');
 
@@ -105,15 +98,6 @@ const ProfileSummary = ({ data, lastVisit, loading, error, onRetry }) => {
   const patientGreeting = fullName
     ? t('patient.profile.greeting', { name: fullName })
     : t('patient.profile.genericGreeting');
-
-  console.log('[ProfileSummary] Translation result:', patientGreeting);
-  console.log('[ProfileSummary] i18n language:', i18n.language);
-  console.log('[ProfileSummary] Translation store:', i18n.store.data);
-  console.log(
-    '[ProfileSummary] Direct translation test:',
-    i18n.t('patient.profile.greeting', { name: 'Test' })
-  );
-  console.log('[ProfileSummary] Has key?:', i18n.exists('patient.profile.greeting'));
 
   return (
     <motion.div {...motionProps}>

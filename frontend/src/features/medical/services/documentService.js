@@ -1,4 +1,5 @@
 import api from '@/services/api';
+import logger from '@/utils/logger';
 
 /**
  * Document Service
@@ -16,7 +17,7 @@ class DocumentService {
       const response = await api.post('/documents/upload', formData);
       return response.data;
     } catch (error) {
-      console.error('Error uploading document:', error);
+      logger.error('Error uploading document:', error);
       throw error.response?.data || error;
     }
   }
@@ -47,7 +48,7 @@ class DocumentService {
         data: results
       };
     } catch (error) {
-      console.error('Error uploading multiple documents:', error);
+      logger.error('Error uploading multiple documents:', error);
       throw error;
     }
   }
@@ -63,7 +64,7 @@ class DocumentService {
       // Backend returns the array directly, not wrapped in { data: [...] }
       return Array.isArray(response) ? response : [];
     } catch (error) {
-      console.error('Error fetching patient documents:', error);
+      logger.error('Error fetching patient documents:', error);
       return []; // Return empty array on error instead of throwing
     }
   }
@@ -80,7 +81,7 @@ class DocumentService {
       });
       return response.data;
     } catch (error) {
-      console.error('Error downloading document:', error);
+      logger.error('Error downloading document:', error);
       throw error.response?.data || error;
     }
   }
@@ -95,7 +96,7 @@ class DocumentService {
       const response = await api.delete(`/documents/${documentId}`);
       return response.data;
     } catch (error) {
-      console.error('Error deleting document:', error);
+      logger.error('Error deleting document:', error);
       throw error.response?.data || error;
     }
   }

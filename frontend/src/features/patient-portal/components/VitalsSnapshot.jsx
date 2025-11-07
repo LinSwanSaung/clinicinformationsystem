@@ -1,4 +1,4 @@
-﻿import React, { useMemo } from 'react';
+﻿import { useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 import { motion } from 'framer-motion';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
@@ -6,6 +6,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { ErrorState } from '@/components/library/feedback/ErrorState';
 import { Activity, ArrowUp, ArrowDown, Minus } from 'lucide-react';
 import { LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid, Legend } from 'recharts';
+import logger from '@/utils/logger';
 
 const VitalsSkeleton = () => (
   <Card className="p-6">
@@ -37,7 +38,7 @@ const prepareVitalSeries = (visits = []) => {
     .sort((a, b) => new Date(a.visit_date) - new Date(b.visit_date))
     .slice(-6); // Last 6 data points
 
-  console.log('[VitalsSnapshot] Total visits with vitals:', sorted.length);
+  logger.debug('[VitalsSnapshot] Total visits with vitals:', sorted.length);
 
   const chartData = sorted.map((visit) => {
     const vitals = visit.vitals;
@@ -56,7 +57,7 @@ const prepareVitalSeries = (visits = []) => {
       recordedAt: visit.vitals.recorded_at || visit.visit_date
     };
     
-    console.log('[VitalsSnapshot] Data point:', dataPoint);
+    logger.debug('[VitalsSnapshot] Data point:', dataPoint);
     return dataPoint;
   });
 
@@ -122,8 +123,8 @@ const VitalCard = React.memo(({ title, value, unit, delta, chartData, dataKey, c
   const validValues = useMemo(() => {
     if (!chartData || chartData.length < 1) return [];
     const values = chartData.map(d => d[dataKey]).filter(v => v !== null && Number.isFinite(v));
-    console.log(`[VitalCard ${title}] Raw data:`, chartData);
-    console.log(`[VitalCard ${title}] dataKey: ${dataKey}, values:`, values);
+    logger.debug(`[VitalCard ${title}] Raw data:`, chartData);
+    logger.debug(`[VitalCard ${title}] dataKey: ${dataKey}, values:`, values);
     return values;
   }, [chartData, dataKey, title]);
 
@@ -136,7 +137,7 @@ const VitalCard = React.memo(({ title, value, unit, delta, chartData, dataKey, c
     const min = Math.min(...validValues);
     const max = Math.max(...validValues);
     
-    console.log(`[VitalCard ${title}] Domain calc - min: ${min}, max: ${max}`);
+    logger.debug(`[VitalCard ${title}] Domain calc - min: ${min}, max: ${max}`);
     
     // Handle flat line case (single point or all same values)
     if (min === max) {
@@ -152,7 +153,7 @@ const VitalCard = React.memo(({ title, value, unit, delta, chartData, dataKey, c
     ];
   }, [validValues, hasValidData, title]);
 
-  console.log(`[VitalCard ${title}] validValues:`, validValues.length, 'showDots:', showDots, 'hasValidData:', hasValidData);
+  logger.debug(`[VitalCard ${title}] validValues:`, validValues.length, 'showDots:', showDots, 'hasValidData:', hasValidData);
 
   return (
     <motion.div
@@ -281,15 +282,15 @@ const BloodPressureCard = React.memo(({ chartData, latest, previous }) => {
       if (d.systolic !== null && Number.isFinite(d.systolic)) allValues.push(d.systolic);
       if (d.diastolic !== null && Number.isFinite(d.diastolic)) allValues.push(d.diastolic);
     });
-    console.log('[BloodPressureCard] Chart data:', chartData);
-    console.log('[BloodPressureCard] Valid BP values:', allValues);
+    logger.debug('[BloodPressureCard] Chart data:', chartData);
+    logger.debug('[BloodPressureCard] Valid BP values:', allValues);
     return allValues;
   }, [chartData]);
 
   const hasValidData = validValues.length >= 1;
   const showDots = validValues.length <= 6; // Show dots when we have 3 or fewer readings (6 values max for 2 lines)
 
-  console.log('[BloodPressureCard] hasValidData:', hasValidData, 'showDots:', showDots, 'validValues count:', validValues.length);
+  logger.debug('[BloodPressureCard] hasValidData:', hasValidData, 'showDots:', showDots, 'validValues count:', validValues.length);
 
   const computedDomain = useMemo(() => {
     if (!hasValidData) return [40, 160];

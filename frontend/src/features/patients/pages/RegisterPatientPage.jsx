@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
   Card,
@@ -19,9 +19,10 @@ import {
   Save,
   ArrowLeft
 } from 'lucide-react';
-import Alert from '@/components/Alert';
+import { AlertModal } from '@/components/library';
 import PageLayout from '@/components/layout/PageLayout';
 import { patientService } from '@/features/patients';
+import logger from '@/utils/logger';
 
 const RegisterPatient = () => {
   const navigate = useNavigate();
@@ -77,9 +78,9 @@ const RegisterPatient = () => {
         date_of_birth: formData.date_of_birth.toISOString().split('T')[0], // Format as YYYY-MM-DD
       };
 
-      console.log('Sending patient data:', patientData);
+      logger.debug('Sending patient data:', patientData);
       const response = await patientService.createPatient(patientData);
-      console.log('Response from server:', response);
+      logger.debug('Response from server:', response);
       
       if (response.success) {
         setAlertType('success');
@@ -96,7 +97,7 @@ const RegisterPatient = () => {
         setShowAlert(true);
       }
     } catch (error) {
-      console.error('Error registering patient:', error);
+      logger.error('Error registering patient:', error);
       setAlertType('error');
       setAlertMessage(`Failed to register patient: ${error.message || 'Please try again.'}`);
       setShowAlert(true);
@@ -114,7 +115,7 @@ const RegisterPatient = () => {
       >
         <div className="max-w-4xl mx-auto p-6">
           {showAlert && (
-            <Alert 
+            <AlertModal 
               type={alertType}
               message={alertMessage}
               onClose={() => setShowAlert(false)}

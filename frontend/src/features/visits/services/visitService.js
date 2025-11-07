@@ -1,4 +1,5 @@
 import api from '@/services/api';
+import logger from '@/utils/logger';
 
 /**
  * Visit Service for comprehensive visit history management
@@ -78,7 +79,7 @@ class VisitService {
 
       return visitHistory;
     } catch (error) {
-      console.error('Error fetching patient visit history:', error);
+      logger.error('Error fetching patient visit history:', error);
       throw error;
     }
   }
@@ -91,7 +92,7 @@ class VisitService {
       const response = await api.get(`/visits/${visitId}/details`);
       return response.data.data;
     } catch (error) {
-      console.error('Error fetching visit details:', error);
+      logger.error('Error fetching visit details:', error);
       throw error;
     }
   }
@@ -110,7 +111,7 @@ class VisitService {
       
       return response.data.data;
     } catch (error) {
-      console.error('Error creating visit:', error);
+      logger.error('Error creating visit:', error);
       throw error;
     }
   }
@@ -129,7 +130,7 @@ class VisitService {
       
       return response.data.data;
     } catch (error) {
-      console.error('Error updating visit:', error);
+      logger.error('Error updating visit:', error);
       throw error;
     }
   }
@@ -148,7 +149,7 @@ class VisitService {
       
       return response.data.data;
     } catch (error) {
-      console.error('Error completing visit:', error);
+      logger.error('Error completing visit:', error);
       throw error;
     }
   }
@@ -180,7 +181,7 @@ class VisitService {
       const response = await api.get(`/visits?${params}`);
       return response.data.data || [];
     } catch (error) {
-      console.error('Error fetching all visits:', error);
+      logger.error('Error fetching all visits:', error);
       throw error;
     }
   }
@@ -201,7 +202,7 @@ class VisitService {
       // API returns { success, data: {...} }
       return response.data || response;
     } catch (error) {
-      console.error('Error fetching visit statistics:', error);
+      logger.error('Error fetching visit statistics:', error);
       throw error;
     }
   }
@@ -220,7 +221,7 @@ class VisitService {
       
       return response.data;
     } catch (error) {
-      console.error('Error deleting visit:', error);
+      logger.error('Error deleting visit:', error);
       throw error;
     }
   }

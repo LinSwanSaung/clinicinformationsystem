@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../../contexts/AuthContext';
 import PageLayout from '@/components/layout/PageLayout';
@@ -21,6 +21,7 @@ import { PatientCard, PatientStats } from '@/features/patients';
 import { patientService } from '@/features/patients';
 import { queueService } from '@/features/queue';
 import { vitalsService } from '@/features/medical';
+import logger from '@/utils/logger';
 
 /**
  * Helper function to fetch appropriate vitals for a token
@@ -29,21 +30,21 @@ import { vitalsService } from '@/features/medical';
 const fetchTokenVitals = async (token) => {
   try {
     if (!token.visit_id) {
-      console.log(`❌ Token #${token.token_number} has no visit_id - treating as fresh visit`);
+      logger.debug(`❌ Token #${token.token_number} has no visit_id - treating as fresh visit`);
       return null;
     }
     
-    console.log(`🔍 Fetching vitals for token #${token.token_number} - visit_id: ${token.visit_id}`);
+    logger.debug(`🔍 Fetching vitals for token #${token.token_number} - visit_id: ${token.visit_id}`);
     
     // Fetch vitals for this specific visit only
     try {
       const vitalsResponse = await vitalsService.getVisitVitals(token.visit_id);
       // Check if we have actual vitals data (not empty array)
       if (vitalsResponse.success && vitalsResponse.data && vitalsResponse.data.length > 0) {
-        console.log(`✅ Found vitals for visit ${token.visit_id}:`, vitalsResponse.data[0]);
+        logger.debug(`✅ Found vitals for visit ${token.visit_id}:`, vitalsResponse.data[0]);
         return vitalsResponse.data[0]; // Return first vitals record
       }
-      console.log(`❌ No vitals found for visit ${token.visit_id} - showing "Add Vitals & Notes"`);
+      logger.debug(`❌ No vitals found for visit ${token.visit_id} - showing "Add Vitals & Notes"`);
     } catch (error) {
       console.warn('Failed to fetch visit vitals:', error);
     }
@@ -168,7 +169,7 @@ const DoctorDashboard = () => {
         
         // Filter out cancelled appointments
         const activeTokens = tokens.filter(token => token.status !== 'cancelled');
-        console.log(`📋 [DOCTOR] Filtered to ${activeTokens.length} active tokens (excluded ${tokens.length - activeTokens.length} cancelled)`);
+        logger.debug(`📋 [DOCTOR] Filtered to ${activeTokens.length} active tokens (excluded ${tokens.length - activeTokens.length} cancelled)`);
         
         // Fetch vitals for each patient in the queue
         const tokensWithVitals = await Promise.all(
@@ -177,12 +178,12 @@ const DoctorDashboard = () => {
             if (vitals) {
               token.patient.vitals = vitals;
               token.patient.vitalsRecorded = true;
-              console.log(`✅ [DOCTOR] ${token.patient.first_name} - vitalsRecorded: true, vitals:`, vitals);
+              logger.debug(`✅ [DOCTOR] ${token.patient.first_name} - vitalsRecorded: true, vitals:`, vitals);
             } else {
               // No vitals found - this should trigger "Add Vitals & Notes" button
               token.patient.vitals = null;
               token.patient.vitalsRecorded = false;
-              console.log(`❌ [DOCTOR] ${token.patient.first_name} - vitalsRecorded: false, should show "Add Vitals & Notes"`);
+              logger.debug(`❌ [DOCTOR] ${token.patient.first_name} - vitalsRecorded: false, should show "Add Vitals & Notes"`);
             }
             return token;
           })
@@ -199,7 +200,7 @@ const DoctorDashboard = () => {
         setPatients(patientsResponse.data);
       }
     } catch (error) {
-      console.error('Failed to load doctor data:', error);
+      logger.error('Failed to load doctor data:', error);
       // Fallback to empty data
       setQueueData([]);
       setPatients([]);
@@ -219,7 +220,7 @@ const DoctorDashboard = () => {
         
         // Filter out cancelled appointments
         const activeTokens = newTokens.filter(token => token.status !== 'cancelled');
-        console.log(`📋 [DOCTOR REFRESH] Filtered to ${activeTokens.length} active tokens (excluded ${newTokens.length - activeTokens.length} cancelled)`);
+        logger.debug(`📋 [DOCTOR REFRESH] Filtered to ${activeTokens.length} active tokens (excluded ${newTokens.length - activeTokens.length} cancelled)`);
         
         // Fetch vitals for each patient in the queue
         const tokensWithVitals = await Promise.all(
@@ -305,7 +306,7 @@ const DoctorDashboard = () => {
           : p
       ));
     } catch (error) {
-      console.error('Failed to start consultation:', error);
+      logger.error('Failed to start consultation:', error);
     }
   };
 
@@ -318,7 +319,7 @@ const DoctorDashboard = () => {
           : p
       ));
     } catch (error) {
-      console.error('Failed to complete visit:', error);
+      logger.error('Failed to complete visit:', error);
     }
   };
 
@@ -346,7 +347,7 @@ const DoctorDashboard = () => {
         }, 500);
       }
     } catch (error) {
-      console.error('Failed to complete consultation:', error);
+      logger.error('Failed to complete consultation:', error);
       showNotification('error', `Failed to complete consultation: ${error.message}`);
     } finally {
       setRefreshing(false);
@@ -364,7 +365,7 @@ const DoctorDashboard = () => {
         showNotification('success', 'Next patient called successfully!');
       }
     } catch (error) {
-      console.error('Failed to call next patient:', error);
+      logger.error('Failed to call next patient:', error);
       showNotification('error', `Failed to call next patient: ${error.message}`);
     } finally {
       setRefreshing(false);
@@ -374,10 +375,10 @@ const DoctorDashboard = () => {
   const handleCallNextAndStart = async () => {
     try {
       setRefreshing(true);
-      console.log('[UI] Calling next patient and starting consultation...');
+      logger.debug('[UI] Calling next patient and starting consultation...');
       const response = await queueService.callNextAndStart(currentDoctorId);
       
-      console.log('[UI] Response:', response);
+      logger.debug('[UI] Response:', response);
 
       // Check if response exists
       if (!response) {
@@ -391,7 +392,7 @@ const DoctorDashboard = () => {
           ? `${response.activeToken.patient.first_name} ${response.activeToken.patient.last_name}` 
           : 'a patient';
         
-        console.log('[UI] Active consultation detected:', activePatient);
+        logger.debug('[UI] Active consultation detected:', activePatient);
         
         const confirmed = window.confirm(
           `You have an active consultation with ${activePatient} (Token #${response.activeToken?.token_number}).\n\n` +
@@ -399,10 +400,10 @@ const DoctorDashboard = () => {
         );
         
         if (confirmed) {
-          console.log('[UI] User confirmed, ending active consultation...');
+          logger.debug('[UI] User confirmed, ending active consultation...');
           await handleForceEndConsultation();
           // Try again after ending
-          console.log('[UI] Retrying call next and start...');
+          logger.debug('[UI] Retrying call next and start...');
           const retryResponse = await queueService.callNextAndStart(currentDoctorId);
           if (retryResponse && retryResponse.success) {
             await refreshQueue();
@@ -412,17 +413,17 @@ const DoctorDashboard = () => {
           }
         }
       } else if (response.success) {
-        console.log('[UI] ✅ Consultation started successfully');
+        logger.debug('[UI] ✅ Consultation started successfully');
         await refreshQueue();
         showNotification('success', response.message);
       } else {
-        console.log('[UI] ℹ️ Response not successful:', response.message);
+        logger.debug('[UI] ℹ️ Response not successful:', response.message);
         showNotification('info', response.message);
       }
     } catch (error) {
-      console.error('[UI] ❌ Failed to call next and start:', error);
+      logger.error('[UI] ❌ Failed to call next and start:', error);
       const errorMsg = error.response?.data?.message || error.message || 'Unknown error occurred';
-      console.error('[UI] Error message:', errorMsg);
+      logger.error('[UI] Error message:', errorMsg);
       showNotification('error', errorMsg);
     } finally {
       setRefreshing(false);
@@ -431,10 +432,10 @@ const DoctorDashboard = () => {
 
   const handleForceEndConsultation = async () => {
     try {
-      console.log('[UI] Ending active consultation...');
+      logger.debug('[UI] Ending active consultation...');
       const response = await queueService.forceEndConsultation(currentDoctorId);
       
-      console.log('[UI] End consultation response:', response);
+      logger.debug('[UI] End consultation response:', response);
 
       // Check if response exists
       if (!response) {
@@ -443,17 +444,17 @@ const DoctorDashboard = () => {
       }
 
       if (response.success) {
-        console.log('[UI] ✅ Consultation ended successfully');
+        logger.debug('[UI] ✅ Consultation ended successfully');
         await refreshQueue();
         showNotification('success', response.message);
       } else {
-        console.log('[UI] ℹ️ No active consultation to end:', response.message);
+        logger.debug('[UI] ℹ️ No active consultation to end:', response.message);
         showNotification('info', response.message);
       }
     } catch (error) {
-      console.error('[UI] ❌ Failed to end consultation:', error);
+      logger.error('[UI] ❌ Failed to end consultation:', error);
       const errorMsg = error.response?.data?.message || error.message || 'Unknown error occurred';
-      console.error('[UI] Error message:', errorMsg);
+      logger.error('[UI] Error message:', errorMsg);
       showNotification('error', errorMsg);
     }
   };

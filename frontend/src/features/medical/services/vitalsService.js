@@ -2,6 +2,7 @@
  * Service for managing patient vitals
  */
 import apiService from '@/services/api';
+import logger from '@/utils/logger';
 
 class VitalsService {
   /**
@@ -17,7 +18,7 @@ class VitalsService {
       const response = await apiService.post('/vitals', payload);
       return response;
     } catch (error) {
-      console.error('VitalsService - Error:', error);
+      logger.error('VitalsService - Error:', error);
       throw new Error(error.response?.data?.message || error.message || 'Failed to save vitals');
     }
   }

@@ -86,7 +86,6 @@ class VisitService {
         throw new Error(`Missing required fields: ${missingFields.join(', ')}`);
       }
 
-      console.log('[VISIT] Creating new visit record for patient:', visitData.patient_id);
 
       // Set default values and remove fields not in schema
       // eslint-disable-next-line no-unused-vars
@@ -101,7 +100,6 @@ class VisitService {
 
       const visit = await this.visitModel.create(visitToCreate);
 
-      console.log('[VISIT] ✅ Visit record created:', visit.id);
 
       return {
         success: true,
@@ -109,7 +107,7 @@ class VisitService {
         message: 'Visit created successfully',
       };
     } catch (error) {
-      console.error('[VISIT] ❌ Error creating visit:', error);
+      logger.error('[VISIT] Error creating visit:', error);
       throw error;
     }
   }

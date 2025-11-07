@@ -2,6 +2,7 @@ import VitalsModel from '../models/Vitals.model.js';
 import VisitModel from '../models/Visit.model.js';
 import QueueTokenModel from '../models/QueueToken.model.js';
 import { logAuditEvent } from '../utils/auditLogger.js';
+import logger from '../config/logger.js';
 
 class VitalsService {
   constructor() {
@@ -37,7 +38,7 @@ class VitalsService {
 
           }
         } catch (error) {
-          console.warn(`[VITALS] ⚠️ Error finding active visit:`, error.message);
+          logger.warn('Error finding active visit:', error);
         }
       }
       
@@ -83,7 +84,7 @@ class VitalsService {
           note: 'Nurse recorded patient vitals'
         });
       } catch (logError) {
-        console.error('[AUDIT] Failed to log vitals creation:', logError.message);
+        logger.error('[AUDIT] Failed to log vitals creation:', logError);
       }
       
       // Update queue token priority if priority level is provided
@@ -91,7 +92,6 @@ class VitalsService {
         try {
           // Find the queue token for this visit (queue_tokens has visit_id column)
           const token = await this.queueTokenModel.getTokenByVisitId(visitId);
-          console.log(`[VITALS] Looking for token with visit_id ${visitId}:`, token ? `Token #${token.token_number} (ID: ${token.id})` : 'not found');
 
           if (token && token.id) {
             // Map priority level to numeric priority (5 = highest)
@@ -112,13 +112,13 @@ class VitalsService {
           }
         } catch (priorityError) {
           // Don't fail the vitals creation if priority update fails
-          console.warn(`[VITALS] ⚠️ Failed to update token priority:`, priorityError.message);
+          logger.warn('Failed to update token priority:', priorityError);
         }
       }
       
       return vitals;
     } catch (error) {
-      console.error(`[VITALS] ❌ Failed to create vitals:`, error.message);
+      logger.error('Failed to create vitals:', error);
       throw new Error(`Failed to create vitals: ${error.message}`);
     }
   }
@@ -224,7 +224,7 @@ class VitalsService {
       
       return result;
     } catch (error) {
-      console.error(`[VITALS] ❌ Error in getCurrentVisitVitals:`, error.message);
+      logger.error('Error in getCurrentVisitVitals:', error);
       throw new Error(`Failed to fetch current visit vitals: ${error.message}`);
     }
   }

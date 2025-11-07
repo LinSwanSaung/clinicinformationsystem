@@ -1,5 +1,5 @@
 /* eslint-disable no-unused-vars, no-useless-catch, react-hooks/exhaustive-deps, no-console */
-import React, { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
@@ -66,6 +66,7 @@ import { invoiceService } from '@/features/billing';
 import { useInvoices } from '@/features/billing';
 import api from '@/services/api';
 import { PaymentDetailModal } from '@/components/library';
+import logger from '@/utils/logger';
 
 // Animation variants
 const pageVariants = {
@@ -298,7 +299,7 @@ const CashierDashboard = () => {
 
       setInvoiceHistory(formattedHistory);
     } catch (error) {
-      console.error('Failed to load invoice history:', error);
+      logger.error('Failed to load invoice history:', error);
       setHistoryError('Failed to load invoice history');
     } finally {
       setHistoryLoading(false);
@@ -316,7 +317,7 @@ const CashierDashboard = () => {
       });
       setInvoiceModalOpen(true);
     } catch (error) {
-      console.error('Failed to fetch invoice:', error);
+      logger.error('Failed to fetch invoice:', error);
       alert('Failed to load invoice details');
     }
   };
@@ -344,7 +345,7 @@ const CashierDashboard = () => {
       document.body.removeChild(link);
       window.URL.revokeObjectURL(url);
     } catch (error) {
-      console.error('Failed to download receipt:', error);
+      logger.error('Failed to download receipt:', error);
       alert('Failed to download receipt. Please try again.');
     }
   };
@@ -353,7 +354,7 @@ const CashierDashboard = () => {
     try {
       setLastRefreshTime(new Date());
     } catch (error) {
-      console.error('Auto-refresh error:', error);
+      logger.error('Auto-refresh error:', error);
     }
   };
 
@@ -364,7 +365,7 @@ const CashierDashboard = () => {
       await refetchPending();
       setLastRefreshTime(new Date());
     } catch (error) {
-      console.error('Manual refresh error:', error);
+      logger.error('Manual refresh error:', error);
       setError('Failed to refresh invoice data');
     } finally {
       setIsRefreshing(false);
@@ -483,7 +484,7 @@ const CashierDashboard = () => {
           setInvoiceLimitReached(false);
         }
       } catch (error) {
-        console.error('Error fetching outstanding balance:', error);
+        logger.error('Error fetching outstanding balance:', error);
         setOutstandingBalance(null);
         setInvoiceLimitReached(false);
       }
@@ -563,7 +564,7 @@ const CashierDashboard = () => {
       const updatedInvoice = await invoiceService.getInvoiceById(selectedInvoice.id);
       setSelectedInvoice(updatedInvoice);
     } catch (error) {
-      console.error('Error removing service:', error);
+      logger.error('Error removing service:', error);
       setError('Failed to remove service');
     } finally {
       setIsProcessing(false);
@@ -593,7 +594,7 @@ const CashierDashboard = () => {
       setNewService({ name: '', price: '', description: '' });
       setShowAddServiceDialog(false);
     } catch (error) {
-      console.error('Error adding service:', error);
+      logger.error('Error adding service:', error);
       setError('Failed to add service');
     } finally {
       setIsProcessing(false);
@@ -626,7 +627,7 @@ const CashierDashboard = () => {
       const updatedInvoice = await invoiceService.getInvoiceById(selectedInvoice.id);
       setSelectedInvoice(updatedInvoice);
     } catch (error) {
-      console.error('Error updating service:', error);
+      logger.error('Error updating service:', error);
       setError('Failed to update service');
     } finally {
       setIsProcessing(false);
@@ -704,7 +705,7 @@ const CashierDashboard = () => {
           return;
         }
       } catch (error) {
-        console.error('Error checking invoice limit:', error);
+        logger.error('Error checking invoice limit:', error);
         setError('Failed to verify patient invoice limit');
         return;
       }
@@ -735,7 +736,7 @@ const CashierDashboard = () => {
       // Reload the invoice list
       await refetchPending();
     } catch (error) {
-      console.error('Error loading prescriptions:', error);
+      logger.error('Error loading prescriptions:', error);
       setError('Failed to load prescriptions');
     } finally {
       setIsProcessing(false);
@@ -853,7 +854,7 @@ const CashierDashboard = () => {
       setHoldReason('');
       setPaymentDueDate('');
     } catch (error) {
-      console.error('Payment processing error:', error);
+      logger.error('Payment processing error:', error);
       setError('Failed to process payment: ' + error.message);
     } finally {
       setIsProcessing(false);

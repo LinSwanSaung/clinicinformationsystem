@@ -1,4 +1,5 @@
 import apiService from './api.js';
+import logger from '@/utils/logger';
 
 const notificationService = {
   /**
@@ -11,7 +12,7 @@ const notificationService = {
       });
       return response.data;
     } catch (error) {
-      console.error('Error fetching notifications:', error);
+      logger.error('Error fetching notifications:', error);
       throw error.response?.data || error;
     }
   },
@@ -24,7 +25,7 @@ const notificationService = {
       const response = await apiService.get('/notifications/unread-count');
       return response.data;
     } catch (error) {
-      console.error('Error fetching unread count:', error);
+      logger.error('Error fetching unread count:', error);
       throw error.response?.data || error;
     }
   },
@@ -37,7 +38,7 @@ const notificationService = {
       const response = await apiService.put(`/notifications/${notificationId}/read`);
       return response.data;
     } catch (error) {
-      console.error('Error marking notification as read:', error);
+      logger.error('Error marking notification as read:', error);
       throw error.response?.data || error;
     }
   },
@@ -50,7 +51,7 @@ const notificationService = {
       const response = await apiService.put('/notifications/read-all');
       return response.data;
     } catch (error) {
-      console.error('Error marking all as read:', error);
+      logger.error('Error marking all as read:', error);
       throw error.response?.data || error;
     }
   },
@@ -63,7 +64,7 @@ const notificationService = {
       const response = await apiService.delete(`/notifications/${notificationId}`);
       return response.data;
     } catch (error) {
-      console.error('Error deleting notification:', error);
+      logger.error('Error deleting notification:', error);
       throw error.response?.data || error;
     }
   }

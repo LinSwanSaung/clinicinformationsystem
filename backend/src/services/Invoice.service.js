@@ -7,6 +7,7 @@ import NotificationService from './Notification.service.js';
 import { ApplicationError } from '../errors/ApplicationError.js';
 import { TransactionRunner } from './transactions/TransactionRunner.js';
 import { logAuditEvent } from '../utils/auditLogger.js';
+import logger from '../config/logger.js';
 
 /**
  * Invoice Service - Business logic for invoices
@@ -50,7 +51,7 @@ class InvoiceService {
 
       return invoice;
     } catch (error) {
-      console.error('[InvoiceService] Error in createInvoice:', error);
+      logger.error('[InvoiceService] Error in createInvoice:', error);
       throw new Error(`Failed to create invoice: ${error.message}`);
     }
   }
@@ -78,7 +79,7 @@ class InvoiceService {
       const invoice = await InvoiceModel.getInvoiceByVisit(visitId);
       return invoice;
     } catch (error) {
-      console.error('[InvoiceService] Error getting invoice:', error.message);
+      logger.error('[InvoiceService] Error getting invoice:', error);
       throw new Error(`Failed to get invoice by visit: ${error.message}`);
     }
   }
@@ -346,7 +347,6 @@ class InvoiceService {
 
       // 2. Idempotency check: if invoice is already paid, return existing data
       if (invoice.status === 'paid') {
-        console.log('[InvoiceService] Invoice already paid, returning existing data');
         return invoice;
       }
 
@@ -377,7 +377,6 @@ class InvoiceService {
           },
           async () => {
             // Compensation: revert invoice status if visit completion fails
-            console.log(`[InvoiceService] Rolling back invoice completion: ${invoiceId}`);
             await InvoiceModel.updateById(invoiceId, {
               status: invoice.status, // Revert to previous status
               completed_by: null,
@@ -401,11 +400,9 @@ class InvoiceService {
           async () => {
             // Compensation: if visit completion fails, we need to rollback invoice
             // (This is handled by the transaction runner calling all compensations)
-            console.log(`[InvoiceService] Visit completion failed, invoice will be rolled back`);
           }
         );
 
-        console.log('[InvoiceService] ✅ Invoice and visit completed successfully');
 
         // 6. Log visit status change for audit
         try {
@@ -446,7 +443,7 @@ class InvoiceService {
           });
         } catch (notifError) {
           // Log error but don't fail the invoice completion
-          console.error('[InvoiceService] Failed to send notification:', notifError);
+          logger.error('[InvoiceService] Failed to send notification:', notifError);
         }
 
         return completedInvoice;
@@ -463,7 +460,7 @@ class InvoiceService {
         );
       }
     } catch (error) {
-      console.error('[InvoiceService] Error completing invoice:', error);
+      logger.error('[InvoiceService] Error completing invoice:', error);
       if (error instanceof ApplicationError) {
         throw error;
       }
@@ -553,7 +550,7 @@ class InvoiceService {
             relatedEntityId: invoiceId,
           });
         } catch (notifError) {
-          console.error('[InvoiceService] Failed to send notification:', notifError);
+          logger.error('[InvoiceService] Failed to send notification:', notifError);
         }
       }
 

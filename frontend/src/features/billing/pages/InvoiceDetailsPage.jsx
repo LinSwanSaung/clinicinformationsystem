@@ -11,6 +11,7 @@ import {
   CreditCard
 } from 'lucide-react';
 import { invoiceService } from '@/features/billing';
+import logger from '@/utils/logger';
 
 const InvoiceDetailsPage = () => {
   const { id } = useParams();
@@ -48,12 +49,12 @@ const InvoiceDetailsPage = () => {
       setLoading(true);
       setError(null);
       const data = await invoiceService.getInvoiceById(id);
-      console.log('Invoice loaded:', data);
+      logger.debug('Invoice loaded:', data);
       setInvoice(data);
       // Set payment amount to balance
       setPayment(prev => ({ ...prev, amount: parseFloat(data.balance || 0) }));
     } catch (error) {
-      console.error('Error loading invoice:', error);
+      logger.error('Error loading invoice:', error);
       setError('Failed to load invoice. Please try again.');
     } finally {
       setLoading(false);
@@ -85,7 +86,7 @@ const InvoiceDetailsPage = () => {
       await loadInvoice();
       alert('Medicine added successfully!');
     } catch (error) {
-      console.error('Error adding medicine:', error);
+      logger.error('Error adding medicine:', error);
       alert('Failed to add medicine. Please try again.');
     } finally {
       setSaving(false);
@@ -105,7 +106,7 @@ const InvoiceDetailsPage = () => {
       await loadInvoice();
       setShowPaymentForm(false);
     } catch (error) {
-      console.error('Error processing payment:', error);
+      logger.error('Error processing payment:', error);
       alert('Failed to process payment. Please try again.');
     } finally {
       setSaving(false);
@@ -125,7 +126,7 @@ const InvoiceDetailsPage = () => {
       alert('Invoice completed successfully!');
       navigate('/cashier/dashboard');
     } catch (error) {
-      console.error('Error completing invoice:', error);
+      logger.error('Error completing invoice:', error);
       alert('Failed to complete invoice. Please try again.');
     } finally {
       setSaving(false);

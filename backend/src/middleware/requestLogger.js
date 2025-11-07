@@ -3,14 +3,15 @@
  * Logs incoming requests with relevant information
  */
 
+import logger from '../config/logger.js';
+
 export const requestLogger = (req, res, next) => {
   const start = Date.now();
   
-  // Log request details
-  console.log(`📨 ${req.method} ${req.url}`, {
+  // Log request details (debug level - only in development)
+  logger.debug(`Request: ${req.method} ${req.url}`, {
     ip: req.ip,
     userAgent: req.get('User-Agent'),
-    timestamp: new Date().toISOString()
   });
 
   // Override res.end to log response details
@@ -18,11 +19,17 @@ export const requestLogger = (req, res, next) => {
   res.end = function(...args) {
     const duration = Date.now() - start;
     
-    console.log(`📤 ${req.method} ${req.url} - ${res.statusCode}`, {
-      duration: `${duration}ms`,
-      contentLength: res.get('Content-Length') || 0,
-      timestamp: new Date().toISOString()
-    });
+    // Only log slow requests or errors in production
+    if (res.statusCode >= 400 || duration > 1000) {
+      logger.warn(`Response: ${req.method} ${req.url} - ${res.statusCode}`, {
+        duration: `${duration}ms`,
+        statusCode: res.statusCode,
+      });
+    } else {
+      logger.debug(`Response: ${req.method} ${req.url} - ${res.statusCode}`, {
+        duration: `${duration}ms`,
+      });
+    }
 
     originalEnd.apply(this, args);
   };

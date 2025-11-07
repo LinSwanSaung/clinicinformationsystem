@@ -8,6 +8,7 @@
  * This utility provides a service-layer transaction-like pattern.
  */
 import { supabase } from '../../config/database.js';
+import logger from '../../config/logger.js';
 
 export class TransactionRunner {
   constructor() {
@@ -47,7 +48,7 @@ export class TransactionRunner {
         await this.compensations[i]();
       } catch (error) {
         errors.push(error);
-        console.error(`[TransactionRunner] Compensation ${i} failed:`, error);
+        logger.error(`[TransactionRunner] Compensation ${i} failed:`, error);
       }
     }
     this.operations = [];

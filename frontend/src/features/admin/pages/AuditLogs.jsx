@@ -5,6 +5,7 @@ import { Button } from '@/components/ui/button';
 import { Filter } from 'lucide-react';
 import { auditLogService } from '@/features/admin';
 import { DataTable, StatusBadge } from '@/components/library';
+import logger from '@/utils/logger';
 
 const AuditLogs = () => {
   const [logs, setLogs] = useState([]);
@@ -33,7 +34,7 @@ const AuditLogs = () => {
       const options = await auditLogService.getFilterOptions();
       setFilterOptions(options);
     } catch (error) {
-      console.error('Failed to load filter options:', error);
+      logger.error('Failed to load filter options:', error);
     }
   };
 
@@ -60,7 +61,7 @@ const AuditLogs = () => {
       setLogs(response?.data || []);
       setTotal(response?.total || 0);
     } catch (error) {
-      console.error('Failed to load audit logs:', error);
+      logger.error('Failed to load audit logs:', error);
       setLogs([]);
     } finally {
       setLoading(false);

@@ -1,4 +1,5 @@
 import apiService from '@/services/api';
+import logger from '@/utils/logger';
 
 class AuthService {
   constructor() {
@@ -26,7 +27,7 @@ class AuthService {
       
       throw new Error(response.message || 'Login failed');
     } catch (error) {
-      console.error('Login error:', error);
+      logger.error('Login error:', error);
       return {
         success: false,
         message: error.message || 'Login failed'
@@ -42,7 +43,7 @@ class AuthService {
       localStorage.removeItem('user');
       return { success: true };
     } catch (error) {
-      console.error('Logout failed:', error);
+      logger.error('Logout failed:', error);
       // Clear local storage even if API call fails
       localStorage.removeItem('authToken');
       localStorage.removeItem('user');
@@ -57,7 +58,7 @@ class AuthService {
       try {
         return JSON.parse(userStr);
       } catch (error) {
-        console.error('Failed to parse user data:', error);
+        logger.error('Failed to parse user data:', error);
         return null;
       }
     }
@@ -86,7 +87,7 @@ class AuthService {
       });
       return response;
     } catch (error) {
-      console.error('Password change failed:', error);
+      logger.error('Password change failed:', error);
       throw error;
     }
   }
@@ -102,7 +103,7 @@ class AuthService {
       }
       throw new Error('Token refresh failed');
     } catch (error) {
-      console.error('Token refresh failed:', error);
+      logger.error('Token refresh failed:', error);
       this.logout();
       throw error;
     }
@@ -114,7 +115,7 @@ class AuthService {
       const response = await apiService.get('/auth/verify');
       return response.success;
     } catch (error) {
-      console.error('Token verification failed:', error);
+      logger.error('Token verification failed:', error);
       return false;
     }
   }
@@ -137,7 +138,7 @@ class AuthService {
 
       throw new Error(response.message || 'Registration failed');
     } catch (error) {
-      console.error('Patient registration error:', error);
+      logger.error('Patient registration error:', error);
       return {
         success: false,
         message: error.message || 'Registration failed'
@@ -172,7 +173,7 @@ class AuthService {
 
       throw new Error(response.message || 'Failed to link patient record');
     } catch (error) {
-      console.error('Bind patient error:', error);
+      logger.error('Bind patient error:', error);
       return {
         success: false,
         message: error.message || 'Failed to link patient record'

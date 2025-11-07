@@ -1,6 +1,7 @@
 import express from 'express';
 import clinicSettingsService from '../services/ClinicSettings.service.js';
 import { authenticate, authorize } from '../middleware/auth.js';
+import logger from '../config/logger.js';
 
 const router = express.Router();
 
@@ -15,7 +16,7 @@ router.get('/', authenticate, async (req, res) => {
       timestamp: new Date().toISOString(),
     });
   } catch (error) {
-    console.error('Error fetching clinic settings:', error);
+    logger.error('Error fetching clinic settings:', error);
     res.status(500).json({
       success: false,
       message: 'Failed to fetch clinic settings',
@@ -68,7 +69,7 @@ router.put('/', authenticate, authorize('admin'), async (req, res) => {
       timestamp: new Date().toISOString(),
     });
   } catch (error) {
-    console.error('Error updating clinic settings:', error);
+    logger.error('Error updating clinic settings:', error);
     res.status(500).json({
       success: false,
       message: 'Failed to update clinic settings',

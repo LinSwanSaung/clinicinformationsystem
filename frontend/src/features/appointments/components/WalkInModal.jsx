@@ -28,6 +28,7 @@ import useDebounce from '@/hooks/useDebounce';
 import appointmentService from '../services/appointmentService';
 import { queueService } from '@/features/queue';
 import apiService from '@/services/api';
+import logger from '@/utils/logger';
 
 const WalkInModal = ({ isOpen, onClose, onSubmit }) => {
   const [step, setStep] = useState(1); // 1: Select Patient, 2: Select Doctor
@@ -134,7 +135,7 @@ const WalkInModal = ({ isOpen, onClose, onSubmit }) => {
         setPatients([]);
       }
     } catch (error) {
-      console.error('Error searching patients:', error);
+      logger.error('Error searching patients:', error);
       setPatients([]);
 
       // Show user-friendly error message if needed
@@ -173,14 +174,14 @@ const WalkInModal = ({ isOpen, onClose, onSubmit }) => {
           nextAvailable: null, // Could be calculated from availability data
         }));
 
-        console.log('Available doctors for walk-in:', doctorsWithAvailability);
+        logger.debug('Available doctors for walk-in:', doctorsWithAvailability);
         setDoctors(doctorsWithAvailability);
       } else {
-        console.error('Failed to load available doctors');
+        logger.error('Failed to load available doctors');
         setDoctors([]);
       }
     } catch (error) {
-      console.error('Error loading doctors:', error);
+      logger.error('Error loading doctors:', error);
       setDoctors([]);
     } finally {
       setIsLoadingDoctors(false);
@@ -225,13 +226,13 @@ const WalkInModal = ({ isOpen, onClose, onSubmit }) => {
 
       // Get available doctors from backend
       const today = new Date().toISOString().split('T')[0];
-      console.log('Checking appointments for patient:', patient.id, 'on date:', today);
+      logger.debug('Checking appointments for patient:', patient.id, 'on date:', today);
 
       const response = await appointmentService.checkPatientActiveAppointments(patient.id);
-      console.log('Appointment check response:', response);
+      logger.debug('Appointment check response:', response);
 
       if (response.success && response.data && response.data.length > 0) {
-        console.log('Active appointments found:', response.data);
+        logger.debug('Active appointments found:', response.data);
 
         // Filter for truly active appointments (only today's waiting/in-progress)
         const activeToday = response.data.filter((appointment) => {
@@ -242,7 +243,7 @@ const WalkInModal = ({ isOpen, onClose, onSubmit }) => {
           return appointmentDate === today && (status === 'waiting' || status === 'in-progress');
         });
 
-        console.log('Filtered active appointments for today:', activeToday);
+        logger.debug('Filtered active appointments for today:', activeToday);
 
         if (activeToday.length > 0) {
           setPatientHasActiveAppointment(true);
@@ -254,13 +255,13 @@ const WalkInModal = ({ isOpen, onClose, onSubmit }) => {
           return false;
         }
       } else {
-        console.log('No active appointments found');
+        logger.debug('No active appointments found');
         setPatientHasActiveAppointment(false);
         setActiveAppointmentDetails(null);
         return false;
       }
     } catch (error) {
-      console.error('Error checking patient appointments:', error);
+      logger.error('Error checking patient appointments:', error);
       // On error, allow the process to continue but log the issue
       setPatientHasActiveAppointment(false);
       setActiveAppointmentDetails(null);
@@ -274,7 +275,7 @@ const WalkInModal = ({ isOpen, onClose, onSubmit }) => {
   const checkPatientActiveTokens = async (patient, doctorId = null) => {
     try {
       // Use the correct debug API route format
-      console.log('Checking queue tokens for patient:', patient.id, 'doctor:', doctorId);
+      logger.debug('Checking queue tokens for patient:', patient.id, 'doctor:', doctorId);
 
       // Make API call to check for existing tokens via central api
       const result = await apiService.get(`/queue/debug/patient/${patient.id}/tokens`);
@@ -290,7 +291,7 @@ const WalkInModal = ({ isOpen, onClose, onSubmit }) => {
         }
 
         if (activeTokens.length > 0) {
-          console.log('Active tokens found:', activeTokens);
+          logger.debug('Active tokens found:', activeTokens);
           return {
             hasActiveToken: true,
             tokens: activeTokens,
@@ -303,7 +304,7 @@ const WalkInModal = ({ isOpen, onClose, onSubmit }) => {
         tokens: [],
       };
     } catch (error) {
-      console.error('Error checking patient queue tokens:', error);
+      logger.error('Error checking patient queue tokens:', error);
       return {
         hasActiveToken: false,
         tokens: [],
@@ -352,7 +353,7 @@ const WalkInModal = ({ isOpen, onClose, onSubmit }) => {
         });
       }
     } catch (error) {
-      console.error('Error checking doctor capacity:', error);
+      logger.error('Error checking doctor capacity:', error);
       setCapacityWarning({
         type: 'error',
         message: error.message || 'Failed to check doctor capacity. Please try again.',
@@ -420,7 +421,7 @@ const WalkInModal = ({ isOpen, onClose, onSubmit }) => {
       await onSubmit(walkInData);
       onClose();
     } catch (error) {
-      console.error('Error creating walk-in appointment:', error);
+      logger.error('Error creating walk-in appointment:', error);
 
       // Check if the error is about an existing token
       if (error.message && error.message.includes('already has an active token')) {

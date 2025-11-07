@@ -1,4 +1,5 @@
 import api from '@/services/api';
+import logger from '@/utils/logger';
 
 const doctorNotesService = {
   /**
@@ -9,7 +10,7 @@ const doctorNotesService = {
       const response = await api.post('/doctor-notes', noteData);
       return response.data;
     } catch (error) {
-      console.error('Error creating doctor note:', error);
+      logger.error('Error creating doctor note:', error);
       throw error;
     }
   },
@@ -22,7 +23,7 @@ const doctorNotesService = {
       const response = await api.get(`/doctor-notes/visit/${visitId}`);
       return response.data;
     } catch (error) {
-      console.error('Error fetching notes by visit:', error);
+      logger.error('Error fetching notes by visit:', error);
       throw error;
     }
   },
@@ -35,7 +36,7 @@ const doctorNotesService = {
       const response = await api.get(`/doctor-notes/patient/${patientId}`);
       return response.data;
     } catch (error) {
-      console.error('Error fetching notes by patient:', error);
+      logger.error('Error fetching notes by patient:', error);
       throw error;
     }
   },
@@ -48,7 +49,7 @@ const doctorNotesService = {
       const response = await api.put(`/doctor-notes/${noteId}`, noteData);
       return response.data;
     } catch (error) {
-      console.error('Error updating doctor note:', error);
+      logger.error('Error updating doctor note:', error);
       throw error;
     }
   },
@@ -61,7 +62,7 @@ const doctorNotesService = {
       const response = await api.delete(`/doctor-notes/${noteId}`);
       return response.data;
     } catch (error) {
-      console.error('Error deleting doctor note:', error);
+      logger.error('Error deleting doctor note:', error);
       throw error;
     }
   }

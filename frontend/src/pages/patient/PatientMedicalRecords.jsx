@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { ArrowLeft, AlertCircle } from 'lucide-react';
@@ -9,10 +9,11 @@ import { Skeleton } from '../../components/ui/skeleton';
 
 // Import reusable medical components (read-only versions)
 import { PatientInformationHeader, patientPortalService } from '@/features/patients';
-import NavigationTabs from '../../components/ui/NavigationTabs';
+import { NavigationTabs } from '@/components/library';
 import { PatientVitalsDisplay, MedicalInformationPanel, ClinicalNotesDisplay, allergyService, diagnosisService, vitalsService } from '@/features/medical';
 import { VisitHistoryCard, visitService } from '@/features/visits';
 import api from '@/services/api';
+import logger from '@/utils/logger';
 
 const PatientMedicalRecords = () => {
   const navigate = useNavigate();
@@ -59,23 +60,23 @@ const PatientMedicalRecords = () => {
       // Load all medical data in parallel
       const [allergiesRes, diagnosesRes, visitsRes, vitalsRes, prescriptionsRes] = await Promise.all([
         allergyService.getAllergiesByPatient(patientId).catch(err => {
-          console.error('Failed to load allergies:', err);
+          logger.error('Failed to load allergies:', err);
           return [];
         }),
         diagnosisService.getDiagnosesByPatient(patientId).catch(err => {
-          console.error('Failed to load diagnoses:', err);
+          logger.error('Failed to load diagnoses:', err);
           return [];
         }),
         patientPortalService.getVisits(20, 0).catch(err => {
-          console.error('Failed to load visits:', err);
+          logger.error('Failed to load visits:', err);
           return { data: [] };
         }),
         patientPortalService.getLatestVitals().catch(err => {
-          console.error('Failed to load vitals:', err);
+          logger.error('Failed to load vitals:', err);
           return { data: null };
         }),
         patientPortalService.getPrescriptions(true).catch(err => { // Include all prescriptions (active + inactive)
-          console.error('Failed to load prescriptions:', err);
+          logger.error('Failed to load prescriptions:', err);
           return { data: [] };
         })
       ]);
@@ -87,7 +88,7 @@ const PatientMedicalRecords = () => {
       setPrescriptions(Array.isArray(prescriptionsRes?.data) ? prescriptionsRes.data : []);
 
     } catch (err) {
-      console.error('Failed to load patient data:', err);
+      logger.error('Failed to load patient data:', err);
       setError(err.message || 'Failed to load medical records');
     } finally {
       setLoading(false);
@@ -110,7 +111,7 @@ const PatientMedicalRecords = () => {
       window.URL.revokeObjectURL(url);
       document.body.removeChild(a);
     } catch (err) {
-      console.error('Failed to download visit PDF:', err);
+      logger.error('Failed to download visit PDF:', err);
       alert('Failed to download visit summary. Please try again.');
     }
   };

@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Card } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -18,6 +18,7 @@ import {
   User,
 } from 'lucide-react';
 import { FormModal } from '@/components/library';
+import logger from '@/utils/logger';
 
 // Removed bespoke Dialog in favor of library FormModal (accessible)
 
@@ -117,7 +118,7 @@ const PatientCard = ({
       // Nurse-specific buttons based on patient status
       if (patient.status === 'waiting') {
         // Check if vitals exist for this patient/visit
-        console.log(`[PatientCard] Token #${patient.token_number} - Checking vitals:`, {
+        logger.debug(`[PatientCard] Token #${patient.token_number} - Checking vitals:`, {
           hasLatestVitals: !!patient.latestVitals,
           latestVitals: patient.latestVitals,
           vitalsKeys: patient.latestVitals ? Object.keys(patient.latestVitals) : []
@@ -130,7 +131,7 @@ const PatientCard = ({
           patient.latestVitals.weight
         );
         
-        console.log(`[PatientCard] Token #${patient.token_number} - Has vitals?`, hasVitals);
+        logger.debug(`[PatientCard] Token #${patient.token_number} - Has vitals?`, hasVitals);
         
         // For waiting patients, first they need vitals, then can be marked ready
         if (!hasVitals) {
@@ -407,7 +408,7 @@ const PatientCard = ({
               const resolvedPatientId = patient?.patientId ?? patient?.patient_id ?? patient?.patient?.id ?? patient?.id;
               if (!resolvedPatientId) {
                 // eslint-disable-next-line no-console
-                console.error('[PatientCard] Unable to resolve patient ID for vitals save:', patient);
+                logger.error('[PatientCard] Unable to resolve patient ID for vitals save:', patient);
                 alert('Could not determine patient ID. Please refresh and try again.');
                 return;
               }

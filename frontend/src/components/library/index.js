@@ -3,6 +3,7 @@ export { LoadingSpinner } from './feedback/LoadingSpinner';
 export { EmptyState } from './feedback/EmptyState';
 export { ErrorState } from './feedback/ErrorState';
 export { ConfirmDialog } from './feedback/ConfirmDialog';
+export { AlertModal } from './feedback/AlertModal';
 
 // Status components
 export { StatusBadge } from './status/StatusBadge';
@@ -13,6 +14,8 @@ export { StatCard } from './dashboard/StatCard';
 
 // Input components
 export { SearchBar } from './inputs/SearchBar';
+export { SearchableSelect } from './inputs/SearchableSelect';
+export { default as NavigationTabs } from './inputs/NavigationTabs';
 
 // DataTable kit
 export { DataTable } from './DataTable';

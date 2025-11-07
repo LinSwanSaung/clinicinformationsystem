@@ -1,9 +1,10 @@
-import React, { useState } from 'react';
+import { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Stethoscope, Lock, Mail } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
+import logger from '@/utils/logger';
 
 const AdminLogin = () => {
   const [email, setEmail] = useState('');
@@ -24,7 +25,7 @@ const AdminLogin = () => {
       }
     } catch (error) {
       setError('Login failed. Please try again.');
-      console.error('Login error:', error);
+      logger.error('Login error:', error);
     } finally {
       setIsLoading(false);
     }

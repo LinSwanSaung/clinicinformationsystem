@@ -6,9 +6,10 @@ import { Button } from '@/components/ui/button';
 import { VisitHistoryCard, visitService } from '@/features/visits';
 import { LoadingSpinner } from '@/components/library/feedback/LoadingSpinner';
 import { PatientInformationHeader, PatientSearchInterface, patientService } from '@/features/patients';
-import NavigationTabs from '@/components/ui/NavigationTabs';
+import { NavigationTabs } from '@/components/library';
 import { PatientVitalsDisplay, MedicalInformationPanel, ClinicalNotesDisplay, PatientDocumentManager, allergyService, diagnosisService, prescriptionService, doctorNotesService } from '@/features/medical';
 import { User, Activity, Calendar, FileText, ArrowLeft, AlertCircle } from 'lucide-react';
+import logger from '@/utils/logger';
 
 const ElectronicMedicalRecords = () => {
   const location = useLocation();
@@ -50,7 +51,7 @@ const ElectronicMedicalRecords = () => {
           setPatientsData(response.data);
         }
       } catch (error) {
-        console.error('Error loading patients:', error);
+        logger.error('Error loading patients:', error);
         setPatientsData([]);
       }
     };
@@ -121,7 +122,7 @@ const ElectronicMedicalRecords = () => {
       const hasActive = !!activeVisit;
       setHasActiveVisit(hasActive);
       setVisitCheckComplete(true);
-      console.log('🔍 [NURSE EMR] Active visit check:', {
+      logger.debug('🔍 [NURSE EMR] Active visit check:', {
         hasActiveVisit: hasActive,
         visitStatus: activeVisit?.status,
         normalizedStatus: activeVisit ? normalizeStatus(activeVisit.status) : null,
@@ -189,7 +190,7 @@ const ElectronicMedicalRecords = () => {
                           }))
                       : [];
                   } catch (error) {
-                    console.error('Error fetching prescriptions for visit:', note.visit_id, error);
+                    logger.error('Error fetching prescriptions for visit:', note.visit_id, error);
                   }
                 }
                 return {
@@ -205,7 +206,7 @@ const ElectronicMedicalRecords = () => {
             setDoctorNotes([]);
           }
         } catch (error) {
-          console.error('Failed to fetch doctor notes:', error);
+          logger.error('Failed to fetch doctor notes:', error);
           setDoctorNotes([]);
           if (
             String(error?.message || '')
@@ -217,7 +218,7 @@ const ElectronicMedicalRecords = () => {
         }
       }
     } catch (error) {
-      console.error('Error loading patient medical data:', error);
+      logger.error('Error loading patient medical data:', error);
       setAllergies([]);
       setDiagnoses([]);
       setVisitHistory([]);
@@ -272,7 +273,7 @@ const ElectronicMedicalRecords = () => {
       console.warn('[NURSE EMR] Cannot add vitals - No active visit');
       return;
     }
-    console.log('Add vitals for patient:', selectedPatient?.id);
+    logger.debug('Add vitals for patient:', selectedPatient?.id);
     // TODO: Navigate to vitals entry or open modal
   };
 
@@ -281,7 +282,7 @@ const ElectronicMedicalRecords = () => {
       console.warn('[NURSE EMR] Cannot edit vitals - No active visit');
       return;
     }
-    console.log('Edit vitals for patient:', selectedPatient?.id);
+    logger.debug('Edit vitals for patient:', selectedPatient?.id);
     // TODO: Navigate to vitals entry or open modal
   };
 
@@ -318,7 +319,7 @@ const ElectronicMedicalRecords = () => {
           `Successfully selected ${files.length} file(s) for upload:\n${files.map((f) => f.name).join('\n')}\n\nFile upload API integration pending.`
         );
       } catch (error) {
-        console.error('Error uploading files:', error);
+        logger.error('Error uploading files:', error);
         alert('Failed to upload files. Please try again.');
       } finally {
         setLoading(false);
@@ -329,14 +330,14 @@ const ElectronicMedicalRecords = () => {
   };
 
   const handleViewFile = (file) => {
-    console.log('View file:', file);
+    logger.debug('View file:', file);
     alert(
       `File viewing functionality will open: ${file.name}\n\nThis requires backend integration.`
     );
   };
 
   const handleDownloadFile = (file) => {
-    console.log('Download file:', file);
+    logger.debug('Download file:', file);
     alert(`File download functionality for: ${file.name}\n\nThis requires backend integration.`);
   };
 

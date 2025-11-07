@@ -55,7 +55,6 @@ class AppointmentService {
    */
   async createAppointment(appointmentData) {
     try {
-      console.log('[AppointmentService] Creating appointment:', appointmentData);
 
       // Validate required fields
       const requiredFields = ['patient_id', 'doctor_id', 'appointment_date', 'appointment_time'];
@@ -93,7 +92,6 @@ class AppointmentService {
         throw new Error(`Cannot book appointment: ${availability.reason}`);
       }
 
-      console.log('[AppointmentService] Time slot is available, proceeding with creation');
 
       // Set default values
       const appointmentToCreate = {
@@ -183,7 +181,7 @@ class AppointmentService {
       
       return updatedAppointment;
     } catch (error) {
-      console.error('Service Error:', error.message);
+      logger.error('Service Error:', error);
       throw error;
     }
   }

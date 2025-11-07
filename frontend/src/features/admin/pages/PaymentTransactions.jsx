@@ -13,6 +13,7 @@ import {
 import { DollarSign, Eye, Filter } from 'lucide-react';
 import api from '@/services/api';
 import { DataTable, PdfDownloadButton } from '@/components/library';
+import logger from '@/utils/logger';
 
 const PaymentTransactions = () => {
   const [payments, setPayments] = useState([]);
@@ -46,8 +47,8 @@ const PaymentTransactions = () => {
       });
 
       const response = await api.get(`/payments/admin/all-transactions?${params}`);
-      console.log('API Response:', response);
-      console.log('Full response.data:', response.data);
+      logger.debug('API Response:', response);
+      logger.debug('Full response.data:', response.data);
 
       // Handle response structure - check if data is wrapped or direct
       if (Array.isArray(response.data)) {
@@ -63,7 +64,7 @@ const PaymentTransactions = () => {
         setTotal(0);
       }
     } catch (error) {
-      console.error('Failed to fetch payments:', error);
+      logger.error('Failed to fetch payments:', error);
       setPayments([]);
       setTotal(0);
     } finally {
@@ -77,7 +78,7 @@ const PaymentTransactions = () => {
       setSelectedPayment({ ...payment, invoiceDetails: response.data.data });
       setInvoiceModalOpen(true);
     } catch (error) {
-      console.error('Failed to fetch invoice:', error);
+      logger.error('Failed to fetch invoice:', error);
     }
   };
 

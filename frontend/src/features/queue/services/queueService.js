@@ -1,5 +1,6 @@
 import api from '@/services/api';
 import { doctorAvailabilityService } from '@/features/appointments';
+import logger from '@/utils/logger';
 
 class QueueService {
   constructor() {
@@ -79,10 +80,10 @@ class QueueService {
     try {
       // api.post returns the data directly (not response.data)
       const data = await api.post(`${this.baseURL}/call-next-and-start/${doctorId}`);
-      console.log('[queueService] callNextAndStart data:', data);
+      logger.debug('[queueService] callNextAndStart data:', data);
       return data;
     } catch (error) {
-      console.error('[queueService] callNextAndStart error:', error);
+      logger.error('[queueService] callNextAndStart error:', error);
       // For fetch-based api, error message is already extracted
       throw error;
     }
@@ -95,10 +96,10 @@ class QueueService {
     try {
       // api.post returns the data directly (not response.data)
       const data = await api.post(`${this.baseURL}/force-end-consultation/${doctorId}`);
-      console.log('[queueService] forceEndConsultation data:', data);
+      logger.debug('[queueService] forceEndConsultation data:', data);
       return data;
     } catch (error) {
-      console.error('[queueService] forceEndConsultation error:', error);
+      logger.error('[queueService] forceEndConsultation error:', error);
       // For fetch-based api, error message is already extracted
       throw error;
     }
@@ -152,9 +153,9 @@ class QueueService {
       const response = await api.put(`${this.baseURL}/token/${tokenId}/start-consultation`);
       return response.data;
     } catch (error) {
-      console.error('🚨 QueueService startConsultation error:', error);
-      console.error('🚨 Error response:', error.response);
-      console.error('🚨 Error data:', error.response?.data);
+      logger.error('🚨 QueueService startConsultation error:', error);
+      logger.error('🚨 Error response:', error.response);
+      logger.error('🚨 Error data:', error.response?.data);
       throw new Error(error.response?.data?.message || error.message || 'Failed to start consultation');
     }
   }
@@ -422,7 +423,7 @@ class QueueService {
 
       return { success: true, data: summary };
     } catch (error) {
-      console.error('Error in getQueueSummary:', error);
+      logger.error('Error in getQueueSummary:', error);
       throw new Error('Failed to fetch queue summary');
     }
   }
@@ -454,7 +455,7 @@ class QueueService {
       
       return Math.round(totalWaitTime / waitingTokens.length);
     } catch (error) {
-      console.error('Error calculating average wait time:', error);
+      logger.error('Error calculating average wait time:', error);
       return 0;
     }
   }

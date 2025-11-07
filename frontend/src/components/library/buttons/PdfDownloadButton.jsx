@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Download } from 'lucide-react';
 import api from '@/services/api';
+import logger from '@/utils/logger';
 
 /**
  * PdfDownloadButton
@@ -46,7 +47,7 @@ export function PdfDownloadButton({
       window.URL.revokeObjectURL(url);
     } catch (error) {
       // eslint-disable-next-line no-console
-      console.error('Failed to download PDF:', error);
+      logger.error('Failed to download PDF:', error);
       alert('Failed to download file. Please try again.');
     } finally {
       setDownloading(false);

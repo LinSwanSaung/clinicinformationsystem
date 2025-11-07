@@ -14,10 +14,15 @@ This directory contains the database schema and related files for the RealCIS Cl
 - Indexes
 - Views
 - Functions
+- Triggers
 - RLS policies
 - Extensions
 
 **For fresh installations:** Run `schema.sql` directly in your Supabase SQL Editor to bootstrap the entire database.
+
+**Location:** `backend/database/schema.sql` (consolidated from previous `db/` folder)
+
+**Verification:** This schema has been verified to match the current database exactly (20 tables confirmed).
 
 ## Migrations
 

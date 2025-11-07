@@ -1,6 +1,34 @@
 -- ===============================================
 -- RealCIS Clinic Information System Database
--- Complete Schema - Run this in Supabase SQL Editor
+-- Consolidated Schema (Single Source of Truth)
+-- ===============================================
+-- 
+-- This schema.sql file is the authoritative baseline for fresh database installations.
+-- It consolidates all migrations from backend/database/migrations/ into a single
+-- idempotent schema definition.
+--
+-- Created: Stage 3 Refactor (2025-11-03)
+-- Purpose: Single authoritative schema.sql for fresh installs
+--
+-- Structure:
+--   1. Extensions
+--   2. Types/Enums
+--   3. Tables (with all columns from migrations)
+--   4. Constraints
+--   5. Indexes
+--   6. Views
+--   7. Functions
+--   8. Triggers
+--   9. Row Level Security (RLS) Policies
+--   10. Sample Data (optional)
+--
+-- Usage:
+--   - Fresh install: Run entire file in Supabase SQL Editor
+--   - Existing DB: Check for conflicts before applying
+--   - Testing: Apply to clean DB, run pg_dump --schema-only, compare with this file
+--
+-- Note: Legacy migrations have been moved to db/legacy_migrations/
+--       See db/migration-inventory.md for migration history
 -- ===============================================
 
 -- Enable required extensions
@@ -21,7 +49,7 @@ CREATE TABLE IF NOT EXISTS users (
     specialty VARCHAR(100),
     license_number VARCHAR(100),
     is_active BOOLEAN DEFAULT true,
-    patient_id UUID,
+    patient_id UUID REFERENCES patients(id) ON DELETE SET NULL,
     last_login TIMESTAMPTZ,
     created_at TIMESTAMPTZ DEFAULT NOW(),
     updated_at TIMESTAMPTZ DEFAULT NOW(),
@@ -120,6 +148,8 @@ CREATE TABLE IF NOT EXISTS visits (
     status VARCHAR(20) DEFAULT 'in_progress',
     total_cost DECIMAL(10,2),
     payment_status VARCHAR(20) DEFAULT 'pending',
+    visit_start_time TIMESTAMPTZ,
+    visit_end_time TIMESTAMPTZ,
     created_at TIMESTAMPTZ DEFAULT NOW(),
     updated_at TIMESTAMPTZ DEFAULT NOW(),
     resolved_by_admin BOOLEAN DEFAULT false,
@@ -150,6 +180,7 @@ CREATE TABLE IF NOT EXISTS vitals (
     height_unit VARCHAR(2) DEFAULT 'cm',
     bmi DECIMAL(4,1),
     pain_level INTEGER,
+    priority VARCHAR(20),
     notes TEXT,
     recorded_at TIMESTAMPTZ DEFAULT NOW(),
     created_at TIMESTAMPTZ DEFAULT NOW(),
@@ -185,6 +216,13 @@ CREATE TABLE IF NOT EXISTS prescriptions (
     prescribed_date TIMESTAMPTZ DEFAULT NOW(),
     start_date DATE,
     end_date DATE,
+    -- Enhanced prescription fields
+    medication_category VARCHAR(100),
+    route_of_administration VARCHAR(50),
+    is_current BOOLEAN DEFAULT true,
+    discontinued_date DATE,
+    discontinued_by UUID REFERENCES users(id),
+    discontinuation_reason TEXT,
     created_at TIMESTAMPTZ DEFAULT NOW(),
     updated_at TIMESTAMPTZ DEFAULT NOW(),
     
@@ -242,7 +280,7 @@ CREATE TABLE IF NOT EXISTS audit_logs (
     action VARCHAR(50) NOT NULL,
     old_values JSONB,
     new_values JSONB,
-    user_id UUID REFERENCES users(id),
+    user_id UUID REFERENCES users(id), -- NULL indicates system-generated events
     actor_role VARCHAR(50),
     status VARCHAR(20) DEFAULT 'success',
     reason TEXT,
@@ -269,6 +307,7 @@ CREATE TABLE IF NOT EXISTS audit_logs (
 );
 
 -- Add comments for audit_logs columns
+COMMENT ON COLUMN audit_logs.user_id IS 'User who performed the action. NULL indicates system-generated events or automated processes.';
 COMMENT ON COLUMN audit_logs.actor_role IS 'Role of the user who performed the action (admin, doctor, nurse, etc.)';
 COMMENT ON COLUMN audit_logs.status IS 'Outcome of the action: success, failed, denied, or warning';
 COMMENT ON COLUMN audit_logs.reason IS 'Optional context or reason for the action (especially for overrides, deletions, access changes)';
@@ -341,32 +380,8 @@ CREATE TABLE IF NOT EXISTS queue_tokens (
     UNIQUE(doctor_id, issued_date, token_number)
 );
 
--- Ensure extended queue columns exist for idempotency (if older deployments)
-DO $$
-BEGIN
-    IF NOT EXISTS (
-        SELECT 1 FROM information_schema.columns
-        WHERE table_schema='public' AND table_name='queue_tokens' AND column_name='checkin_time'
-    ) THEN
-        ALTER TABLE queue_tokens
-            ADD COLUMN checkin_time TIMESTAMPTZ,
-            ADD COLUMN ready_at TIMESTAMPTZ,
-            ADD COLUMN in_consult_at TIMESTAMPTZ,
-            ADD COLUMN done_at TIMESTAMPTZ,
-            ADD COLUMN late_at TIMESTAMPTZ,
-            ADD COLUMN consult_expected_minutes INTEGER DEFAULT 15,
-            ADD COLUMN resolved_by_admin BOOLEAN DEFAULT false,
-            ADD COLUMN resolved_reason TEXT;
-    END IF;
-
-    -- Make sure estimated_wait_time has default 7
-    IF EXISTS (
-        SELECT 1 FROM information_schema.columns
-        WHERE table_schema='public' AND table_name='queue_tokens' AND column_name='estimated_wait_time'
-    ) THEN
-        ALTER TABLE queue_tokens ALTER COLUMN estimated_wait_time SET DEFAULT 7;
-    END IF;
-END $$;
+-- NOTE: All queue_tokens columns are already in table definition above
+-- This DO block kept for idempotency on existing databases
 
 -- ===============================================
 -- CLINIC SETTINGS (global thresholds)
@@ -391,6 +406,12 @@ ON CONFLICT (key) DO NOTHING;
 CREATE INDEX IF NOT EXISTS idx_users_email ON users(email);
 CREATE INDEX IF NOT EXISTS idx_users_role ON users(role);
 CREATE INDEX IF NOT EXISTS idx_users_active ON users(is_active);
+CREATE INDEX IF NOT EXISTS idx_users_patient_id ON users(patient_id);
+
+-- Ensure one portal account per patient
+CREATE UNIQUE INDEX IF NOT EXISTS uniq_patient_portal_per_patient
+  ON users(patient_id)
+  WHERE role = 'patient' AND patient_id IS NOT NULL;
 
 -- Patients indexes
 CREATE INDEX IF NOT EXISTS idx_patients_patient_number ON patients(patient_number);
@@ -1039,7 +1060,7 @@ ALTER TABLE medical_documents ENABLE ROW LEVEL SECURITY;
 ALTER TABLE audit_logs ENABLE ROW LEVEL SECURITY;
 ALTER TABLE doctor_availability ENABLE ROW LEVEL SECURITY;
 ALTER TABLE queue_tokens ENABLE ROW LEVEL SECURITY;
-ALTER TABLE appointment_queue ENABLE ROW LEVEL SECURITY;
+-- NOTE: appointment_queue table was removed (replaced by queue_tokens with visit_id)
 ALTER TABLE clinic_settings ENABLE ROW LEVEL SECURITY;
 
 -- Basic policies (can be customized later)
@@ -1470,6 +1491,7 @@ END $$;
 CREATE TABLE IF NOT EXISTS patient_allergies (
     id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
     patient_id UUID NOT NULL REFERENCES patients(id) ON DELETE CASCADE,
+    visit_id UUID REFERENCES visits(id) ON DELETE SET NULL,
     
     -- Allergy details
     allergy_name VARCHAR(200) NOT NULL,
@@ -1518,8 +1540,10 @@ CREATE TABLE IF NOT EXISTS patient_diagnoses (
     
     -- Diagnosis information
     diagnosis_code VARCHAR(20), -- ICD-10 code
+    icd_10_code VARCHAR(20), -- ICD-10 diagnostic code
     diagnosis_name VARCHAR(500) NOT NULL,
     diagnosis_type VARCHAR(50), -- primary, secondary, differential, rule_out
+    category VARCHAR(50) DEFAULT 'primary', -- primary, secondary, comorbidity, rule-out, working, differential
     
     -- Clinical details
     severity VARCHAR(20), -- mild, moderate, severe, critical
@@ -1527,6 +1551,7 @@ CREATE TABLE IF NOT EXISTS patient_diagnoses (
     
     -- Date tracking
     diagnosed_date DATE NOT NULL,
+    diagnosis_date TIMESTAMPTZ DEFAULT NOW(), -- Date when the diagnosis was made
     onset_date DATE, -- when symptoms started
     resolved_date DATE, -- when condition was resolved
     
@@ -1608,58 +1633,8 @@ COMMENT ON COLUMN patient_documents.document_type IS 'Type of document: lab_resu
 COMMENT ON COLUMN patient_documents.file_path IS 'Path in Supabase Storage';
 COMMENT ON COLUMN patient_documents.file_url IS 'Public URL to access the document';
 
--- ===============================================
--- ENHANCE PRESCRIPTIONS TABLE
--- ===============================================
--- Add optional columns if they don't exist
-DO $$
-BEGIN
-    -- Medication category
-    IF NOT EXISTS (
-        SELECT 1 FROM information_schema.columns
-        WHERE table_schema='public' 
-        AND table_name='prescriptions' 
-        AND column_name='medication_category'
-    ) THEN
-        ALTER TABLE prescriptions 
-        ADD COLUMN medication_category VARCHAR(100);
-    END IF;
-    
-    -- Route of administration
-    IF NOT EXISTS (
-        SELECT 1 FROM information_schema.columns
-        WHERE table_schema='public' 
-        AND table_name='prescriptions' 
-        AND column_name='route_of_administration'
-    ) THEN
-        ALTER TABLE prescriptions 
-        ADD COLUMN route_of_administration VARCHAR(50);
-    END IF;
-    
-    -- Is current flag
-    IF NOT EXISTS (
-        SELECT 1 FROM information_schema.columns
-        WHERE table_schema='public' 
-        AND table_name='prescriptions' 
-        AND column_name='is_current'
-    ) THEN
-        ALTER TABLE prescriptions 
-        ADD COLUMN is_current BOOLEAN DEFAULT true;
-    END IF;
-    
-    -- Discontinuation tracking
-    IF NOT EXISTS (
-        SELECT 1 FROM information_schema.columns
-        WHERE table_schema='public' 
-        AND table_name='prescriptions' 
-        AND column_name='discontinued_date'
-    ) THEN
-        ALTER TABLE prescriptions 
-        ADD COLUMN discontinued_date DATE,
-        ADD COLUMN discontinued_by UUID REFERENCES users(id),
-        ADD COLUMN discontinuation_reason TEXT;
-    END IF;
-END $$;
+-- NOTE: All enhanced prescription fields are already in prescriptions table definition above
+-- This section kept for idempotency on existing databases
 
 -- Add indexes for enhanced prescription fields
 CREATE INDEX IF NOT EXISTS idx_prescriptions_current ON prescriptions(is_current);
@@ -1856,42 +1831,23 @@ LIMIT 1;
 -- Purpose: Link each queue token to its specific visit for proper vitals tracking
 -- Date: 2025-10-15
 
--- Add visit_id column to queue_tokens
-ALTER TABLE queue_tokens
-ADD COLUMN IF NOT EXISTS visit_id UUID REFERENCES visits(id) ON DELETE SET NULL;
-
+-- NOTE: visit_id is already in queue_tokens table definition above
 CREATE INDEX IF NOT EXISTS idx_queue_tokens_visit_id ON queue_tokens(visit_id);
 
-ALTER TABLE visits
-ADD COLUMN IF NOT EXISTS visit_start_time TIMESTAMPTZ,
-ADD COLUMN IF NOT EXISTS visit_end_time TIMESTAMPTZ;
-
+-- NOTE: visit_start_time and visit_end_time are already in visits table definition above
 CREATE INDEX IF NOT EXISTS idx_visits_start_time ON visits(visit_start_time);
 CREATE INDEX IF NOT EXISTS idx_visits_end_time ON visits(visit_end_time);
 
--- Add visit_id column to patient_allergies
-ALTER TABLE patient_allergies
-ADD COLUMN IF NOT EXISTS visit_id UUID REFERENCES visits(id);
-
--- Create index for better query performance
+-- NOTE: visit_id is already in patient_allergies table definition above
 CREATE INDEX IF NOT EXISTS idx_patient_allergies_visit_id ON patient_allergies(visit_id);
 
 -- Add comment
 COMMENT ON COLUMN patient_allergies.visit_id IS 'Links the allergy to the specific visit when it was recorded';
 
--- Add category column to patient_diagnoses
-ALTER TABLE patient_diagnoses
-ADD COLUMN IF NOT EXISTS category VARCHAR(50) DEFAULT 'primary';
-
--- Add comment
+-- NOTE: category and diagnosis_date are already in patient_diagnoses table definition above
 COMMENT ON COLUMN patient_diagnoses.category IS 'Category of diagnosis: primary, secondary, comorbidity, rule-out, working, differential';
-
--- Add diagnosis_date column to patient_diagnoses
-ALTER TABLE patient_diagnoses
-ADD COLUMN IF NOT EXISTS diagnosis_date TIMESTAMPTZ DEFAULT NOW();
-
--- Add comment
 COMMENT ON COLUMN patient_diagnoses.diagnosis_date IS 'Date when the diagnosis was made';
+COMMENT ON COLUMN patient_diagnoses.icd_10_code IS 'ICD-10 diagnostic code';
 
 -- ===============================================
 -- PURCHASING/BILLING SYSTEM - New Tables
@@ -1933,10 +1889,18 @@ CREATE TABLE IF NOT EXISTS invoices (
     tax_amount DECIMAL(10, 2) DEFAULT 0.00,
     total_amount DECIMAL(10, 2) NOT NULL DEFAULT 0.00,
     paid_amount DECIMAL(10, 2) DEFAULT 0.00,
+    amount_paid DECIMAL(10, 2) DEFAULT 0,
     balance DECIMAL(10, 2) DEFAULT 0.00,
+    balance_due DECIMAL(10, 2) DEFAULT 0,
+    
+    -- Payment holds
+    on_hold BOOLEAN DEFAULT false,
+    hold_reason TEXT,
+    hold_date TIMESTAMPTZ,
+    payment_due_date DATE,
     
     -- Status and metadata
-    status VARCHAR(20) DEFAULT 'pending', -- pending, partial, paid, cancelled
+    status VARCHAR(20) DEFAULT 'pending', -- draft, pending, partial_paid, paid, cancelled, refunded
     payment_method VARCHAR(50), -- cash, card, insurance, mobile_payment
     payment_notes TEXT,
     
@@ -1952,7 +1916,7 @@ CREATE TABLE IF NOT EXISTS invoices (
     resolved_by_admin BOOLEAN DEFAULT false,
     resolved_reason TEXT,
     
-    CONSTRAINT valid_invoice_status CHECK (status IN ('pending', 'partial', 'paid', 'cancelled')),
+    CONSTRAINT valid_invoice_status CHECK (status IN ('draft', 'pending', 'partial_paid', 'paid', 'cancelled', 'refunded')),
     CONSTRAINT valid_payment_method CHECK (payment_method IN ('cash', 'card', 'insurance', 'mobile_payment', 'mixed'))
 );
 
@@ -1993,14 +1957,18 @@ CREATE TABLE IF NOT EXISTS payment_transactions (
     invoice_id UUID NOT NULL REFERENCES invoices(id) ON DELETE CASCADE,
     
     -- Payment details
-    amount DECIMAL(10, 2) NOT NULL,
+    payment_date TIMESTAMPTZ DEFAULT NOW(),
+    amount DECIMAL(10, 2) NOT NULL CHECK (amount > 0),
     payment_method VARCHAR(50) NOT NULL,
     payment_reference VARCHAR(100), -- receipt number, transaction ID, etc.
     payment_notes TEXT,
     
-    -- Audit
-    received_by UUID REFERENCES users(id), -- cashier
-    received_at TIMESTAMPTZ DEFAULT NOW(),
+    -- Audit (both received_by and processed_by for compatibility)
+    received_by UUID REFERENCES users(id), -- cashier (legacy field)
+    received_at TIMESTAMPTZ DEFAULT NOW(), -- legacy field
+    processed_by UUID REFERENCES users(id), -- cashier (new field)
+    created_at TIMESTAMPTZ DEFAULT NOW(),
+    updated_at TIMESTAMPTZ DEFAULT NOW(),
     
     CONSTRAINT valid_payment_method_tx CHECK (payment_method IN ('cash', 'card', 'insurance', 'mobile_payment'))
 );
@@ -2170,43 +2138,17 @@ COMMENT ON COLUMN notifications.related_entity_id IS 'ID of the related entity';
 -- ===============================================
 
 -- Step 1: Create payment_transactions table for tracking multiple payments per invoice
-CREATE TABLE IF NOT EXISTS payment_transactions (
-    id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
-    invoice_id UUID NOT NULL REFERENCES invoices(id) ON DELETE CASCADE,
-    
-    -- Payment details
-    payment_date TIMESTAMPTZ DEFAULT NOW(),
-    amount DECIMAL(10, 2) NOT NULL CHECK (amount > 0),
-    payment_method VARCHAR(50),
-    payment_notes TEXT,
-    
-    -- Tracking
-    processed_by UUID REFERENCES users(id),
-    created_at TIMESTAMPTZ DEFAULT NOW(),
-    updated_at TIMESTAMPTZ DEFAULT NOW()
-);
+-- NOTE: payment_transactions table is already defined above with all fields
 
--- Step 2: Add payment tracking columns to invoices table
-ALTER TABLE invoices 
-ADD COLUMN IF NOT EXISTS amount_paid DECIMAL(10, 2) DEFAULT 0,
-ADD COLUMN IF NOT EXISTS balance_due DECIMAL(10, 2) DEFAULT 0,
-ADD COLUMN IF NOT EXISTS on_hold BOOLEAN DEFAULT false,
-ADD COLUMN IF NOT EXISTS hold_reason TEXT,
-ADD COLUMN IF NOT EXISTS hold_date TIMESTAMPTZ,
-ADD COLUMN IF NOT EXISTS payment_due_date DATE;
+-- NOTE: All invoice payment tracking columns are already in invoices table definition above
+-- This section kept for idempotency on existing databases
 
--- Step 3: Initialize existing invoices
+-- Initialize existing invoices (for databases that already have data)
 UPDATE invoices
 SET 
-    amount_paid = CASE WHEN status = 'paid' THEN total_amount ELSE 0 END,
-    balance_due = CASE WHEN status = 'paid' THEN 0 ELSE total_amount END,
-    on_hold = CASE WHEN status != 'paid' THEN true ELSE false END
+    amount_paid = CASE WHEN status = 'paid' THEN total_amount ELSE COALESCE(amount_paid, 0) END,
+    balance_due = CASE WHEN status = 'paid' THEN 0 ELSE COALESCE(balance_due, total_amount) END
 WHERE amount_paid IS NULL OR balance_due IS NULL;
-
--- Step 4: Update invoice status constraint to include partial_paid
-ALTER TABLE invoices DROP CONSTRAINT IF EXISTS valid_invoice_status;
-ALTER TABLE invoices ADD CONSTRAINT valid_invoice_status 
-    CHECK (status IN ('draft', 'pending', 'partial_paid', 'paid', 'cancelled', 'refunded'));
 
 -- Step 5: Create indexes for better performance
 CREATE INDEX IF NOT EXISTS idx_payment_transactions_invoice ON payment_transactions(invoice_id);

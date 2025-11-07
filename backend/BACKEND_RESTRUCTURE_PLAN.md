@@ -498,11 +498,11 @@ Open Draft PR to `refactor/integration` with summary and links to artifacts.
 - `SCHEMA_VERIFICATION.md` - Schema verification guide
 - `scripts/verify-schema.js` - Schema verification script
 
-### Files Moved
+### Files Moved (Then Deleted After Verification)
 
-- `database/migrations/*` → `database/_archived_migrations/*` (28 files)
-- `database/v2schema.sql` → `database/_archived_schemas/v2schema.sql`
-- Root-level debug scripts → `scripts/legacy/` (10 files):
+- `database/migrations/*` → `database/_archived_migrations/*` (28 files) → **DELETED** ✅
+- `database/v2schema.sql` → `database/_archived_schemas/v2schema.sql` → **DELETED** ✅
+- Root-level debug scripts → `scripts/legacy/` (10 files) → **DELETED** ✅:
   - `check_appointment_queue.js`
   - `check_audit_logs.js`
   - `check_migration.js`
@@ -514,6 +514,8 @@ Open Draft PR to `refactor/integration` with summary and links to artifacts.
   - `test_existing_audit_table.js`
   - `test_visit_audit.js`
   - `fix_payment_transactions.sql`
+
+**Verification:** Schema verification passed - `schema.sql` matches the current database exactly. All legacy files removed.
 
 ### Files Modified
 

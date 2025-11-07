@@ -1,12 +1,28 @@
-import React, { useEffect, useState, useMemo } from 'react';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../../components/ui/card';
+import { useEffect, useState, useMemo } from 'react';
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from '../../components/ui/card';
 import { Button } from '../../components/ui/button';
-import { Input } from '../../components/ui/input';
 import { Label } from '../../components/ui/label';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../../components/ui/select';
-import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '../../components/ui/dialog';
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '../../components/ui/table';
-import { Badge } from '../../components/ui/badge';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '../../components/ui/select';
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from '../../components/ui/dialog';
 import { Textarea } from '../../components/ui/textarea';
 import {
   AlertTriangle,
@@ -18,11 +34,11 @@ import {
   Calendar,
   User,
   Stethoscope,
-  DollarSign
+  DollarSign,
 } from 'lucide-react';
 import PageLayout from '@/components/PageLayout';
-import api from '@/services/api';
 import adminService from '@/services/Admin.service';
+import { StatusBadge, DataTable } from '@/components/library';
 
 const PendingItems = () => {
   const [pendingItems, setPendingItems] = useState([]);
@@ -40,7 +56,7 @@ const PendingItems = () => {
   const [selectedItem, setSelectedItem] = useState(null);
   const [overrideForm, setOverrideForm] = useState({
     newStatus: '',
-    reason: ''
+    reason: '',
   });
   const [overrideSubmitting, setOverrideSubmitting] = useState(false);
 
@@ -64,12 +80,16 @@ const PendingItems = () => {
   }, []);
 
   const filteredItems = useMemo(() => {
-    const filtered = pendingItems.filter(item => {
+    const filtered = pendingItems.filter((item) => {
       // Module filter
-      if (moduleFilter !== 'all' && item.entityType !== moduleFilter) return false;
+      if (moduleFilter !== 'all' && item.entityType !== moduleFilter) {
+        return false;
+      }
 
       // Status filter
-      if (statusFilter !== 'all' && item.currentStatus !== statusFilter) return false;
+      if (statusFilter !== 'all' && item.currentStatus !== statusFilter) {
+        return false;
+      }
 
       // Age filter
       if (ageFilter !== 'all') {
@@ -78,23 +98,31 @@ const PendingItems = () => {
 
         switch (ageFilter) {
           case '1h':
-            if (ageHours < 1) return false;
+            if (ageHours < 1) {
+              return false;
+            }
             break;
           case '24h':
-            if (ageHours < 24) return false;
+            if (ageHours < 24) {
+              return false;
+            }
             break;
           case '7d':
-            if (ageHours < 168) return false; // 7 * 24
+            if (ageHours < 168) {
+              return false;
+            } // 7 * 24
             break;
           case '30d':
-            if (ageHours < 720) return false; // 30 * 24
+            if (ageHours < 720) {
+              return false;
+            } // 30 * 24
             break;
         }
       }
 
       return true;
     });
-    
+
     console.log('[FRONTEND] Filtered items:', filtered.length, 'from', pendingItems.length);
     return filtered;
   }, [pendingItems, moduleFilter, statusFilter, ageFilter]);
@@ -133,7 +161,7 @@ const PendingItems = () => {
     setSelectedItem(item);
     setOverrideForm({
       newStatus: '',
-      reason: ''
+      reason: '',
     });
     setOverrideModalOpen(true);
   };
@@ -143,13 +171,15 @@ const PendingItems = () => {
     setSelectedItem(null);
     setOverrideForm({
       newStatus: '',
-      reason: ''
+      reason: '',
     });
   };
 
   const handleOverrideSubmit = async (e) => {
     e.preventDefault();
-    if (!selectedItem || !overrideForm.newStatus || !overrideForm.reason.trim()) return;
+    if (!selectedItem || !overrideForm.newStatus || !overrideForm.reason.trim()) {
+      return;
+    }
 
     setOverrideSubmitting(true);
     try {
@@ -157,7 +187,7 @@ const PendingItems = () => {
         entityType: selectedItem.entityType,
         entityId: selectedItem.entityId,
         newStatus: overrideForm.newStatus,
-        reason: overrideForm.reason
+        reason: overrideForm.reason,
       });
 
       setSuccess(`Successfully resolved ${selectedItem.entityType} record`);
@@ -197,21 +227,21 @@ const PendingItems = () => {
             </p>
           </div>
           <Button onClick={loadPendingItems} disabled={loading}>
-            <RefreshCw className={`h-4 w-4 mr-2 ${loading ? 'animate-spin' : ''}`} />
+            <RefreshCw className={`mr-2 h-4 w-4 ${loading ? 'animate-spin' : ''}`} />
             Refresh
           </Button>
         </div>
 
         {error && (
           <div className="flex items-start gap-2 rounded-md border border-red-200 bg-red-50 p-3 text-sm text-red-700">
-            <AlertCircle className="h-5 w-5 mt-0.5" />
+            <AlertCircle className="mt-0.5 h-5 w-5" />
             <span>{error}</span>
           </div>
         )}
 
         {success && (
           <div className="flex items-start gap-2 rounded-md border border-green-200 bg-green-50 p-3 text-sm text-green-700">
-            <CheckCircle2 className="h-5 w-5 mt-0.5" />
+            <CheckCircle2 className="mt-0.5 h-5 w-5" />
             <span>{success}</span>
           </div>
         )}
@@ -225,7 +255,7 @@ const PendingItems = () => {
             </CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
               <div className="space-y-2">
                 <Label htmlFor="module-filter">Module</Label>
                 <Select value={moduleFilter} onValueChange={setModuleFilter}>
@@ -280,99 +310,96 @@ const PendingItems = () => {
         <Card>
           <CardHeader>
             <CardTitle>Pending Records ({filteredItems.length})</CardTitle>
-            <CardDescription>
-              Records that may need administrative attention
-            </CardDescription>
+            <CardDescription>Records that may need administrative attention</CardDescription>
           </CardHeader>
           <CardContent>
-            <div className="border rounded-lg">
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>Module</TableHead>
-                    <TableHead>Patient</TableHead>
-                    <TableHead>Doctor</TableHead>
-                    <TableHead>Status</TableHead>
-                    <TableHead>Last Updated</TableHead>
-                    <TableHead className="w-[100px]">Action</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {loading ? (
-                    <TableRow>
-                      <TableCell colSpan={6} className="text-center py-6 text-muted-foreground">
-                        Loading pending items...
-                      </TableCell>
-                    </TableRow>
-                  ) : filteredItems.length === 0 ? (
-                    <TableRow>
-                      <TableCell colSpan={6} className="text-center py-6 text-muted-foreground">
-                        No pending items found.
-                      </TableCell>
-                    </TableRow>
-                  ) : (
-                    filteredItems.map((item) => (
-                      <TableRow key={`${item.entityType}-${item.entityId}`}>
-                        <TableCell>
-                          <div className="flex items-center gap-2">
-                            {getModuleIcon(item.entityType)}
-                            <span className="capitalize">{item.entityType}</span>
-                          </div>
-                        </TableCell>
-                        <TableCell>
-                          <div>
-                            <div className="font-medium">
-                              {item.patientName}
-                            </div>
-                            <div className="text-sm text-muted-foreground">
-                              {item.patientNumber}
-                            </div>
-                          </div>
-                        </TableCell>
-                        <TableCell>
-                          {item.doctorName ? (
-                            <div className="flex items-center gap-2">
-                              <User className="h-4 w-4" />
-                              {item.doctorName}
-                            </div>
-                          ) : (
-                            <span className="text-muted-foreground">-</span>
-                          )}
-                        </TableCell>
-                        <TableCell>
-                          <Badge variant={getStatusBadgeVariant(item.currentStatus)}>
-                            {item.currentStatus}
-                          </Badge>
-                        </TableCell>
-                        <TableCell>
-                          <span className="text-sm text-muted-foreground">
-                            {new Date(item.lastUpdated).toLocaleString()}
-                          </span>
-                        </TableCell>
-                        <TableCell>
-                          <Button
-                            size="sm"
-                            onClick={() => openOverrideModal(item)}
-                          >
-                            Resolve
-                          </Button>
-                        </TableCell>
-                      </TableRow>
-                    ))
-                  )}
-                </TableBody>
-              </Table>
-            </div>
+            <DataTable
+              columns={[
+                {
+                  key: 'module',
+                  label: 'Module',
+                  render: (_, row) => (
+                    <div className="flex items-center gap-2">
+                      {getModuleIcon(row.entityType)}
+                      <span className="capitalize">{row.entityType}</span>
+                    </div>
+                  ),
+                },
+                {
+                  key: 'patient',
+                  label: 'Patient',
+                  render: (_, row) => (
+                    <div>
+                      <div className="font-medium">{row.patientName}</div>
+                      <div className="text-sm text-muted-foreground">{row.patientNumber}</div>
+                    </div>
+                  ),
+                },
+                {
+                  key: 'doctor',
+                  label: 'Doctor',
+                  render: (_, row) =>
+                    row.doctorName ? (
+                      <div className="flex items-center gap-2">
+                        <User className="h-4 w-4" />
+                        {row.doctorName}
+                      </div>
+                    ) : (
+                      <span className="text-muted-foreground">-</span>
+                    ),
+                },
+                {
+                  key: 'status',
+                  label: 'Status',
+                  render: (_, row) => (
+                    <StatusBadge
+                      status={row.currentStatus}
+                      variant={getStatusBadgeVariant(row.currentStatus)}
+                    />
+                  ),
+                },
+                {
+                  key: 'lastUpdated',
+                  label: 'Last Updated',
+                  render: (_, row) => (
+                    <span className="text-sm text-muted-foreground">
+                      {new Date(row.lastUpdated).toLocaleString()}
+                    </span>
+                  ),
+                },
+                {
+                  key: 'action',
+                  label: 'Action',
+                  className: 'w-[100px]',
+                  render: (_, row) => (
+                    <Button size="sm" onClick={() => openOverrideModal(row)}>
+                      Resolve
+                    </Button>
+                  ),
+                },
+              ]}
+              data={filteredItems}
+              isLoading={loading}
+              emptyText="No pending items found."
+            />
           </CardContent>
         </Card>
 
         {/* Override Modal */}
-        <Dialog open={overrideModalOpen} onOpenChange={(open) => { if (!open) closeOverrideModal(); }}>
+        <Dialog
+          open={overrideModalOpen}
+          onOpenChange={(open) => {
+            if (!open) {
+              closeOverrideModal();
+            }
+          }}
+        >
           <DialogContent className="max-w-md">
             <DialogHeader>
               <DialogTitle>Resolve Pending Record</DialogTitle>
               <DialogDescription>
-                Override the status of this {selectedItem?.entityType} record. This action is irreversible and will be logged.
+                Override the status of this {selectedItem?.entityType} record. This action is
+                irreversible and will be logged.
               </DialogDescription>
             </DialogHeader>
 
@@ -381,18 +408,21 @@ const PendingItems = () => {
                 <Label htmlFor="new-status">New Status</Label>
                 <Select
                   value={overrideForm.newStatus}
-                  onValueChange={(value) => setOverrideForm(prev => ({ ...prev, newStatus: value }))}
+                  onValueChange={(value) =>
+                    setOverrideForm((prev) => ({ ...prev, newStatus: value }))
+                  }
                   required
                 >
                   <SelectTrigger>
                     <SelectValue placeholder="Select new status" />
                   </SelectTrigger>
                   <SelectContent>
-                    {selectedItem && getAvailableStatuses(selectedItem.entityType).map(status => (
-                      <SelectItem key={status} value={status}>
-                        {status.replace('_', ' ').replace(/\b\w/g, l => l.toUpperCase())}
-                      </SelectItem>
-                    ))}
+                    {selectedItem &&
+                      getAvailableStatuses(selectedItem.entityType).map((status) => (
+                        <SelectItem key={status} value={status}>
+                          {status.replace('_', ' ').replace(/\b\w/g, (l) => l.toUpperCase())}
+                        </SelectItem>
+                      ))}
                   </SelectContent>
                 </Select>
               </div>
@@ -402,7 +432,7 @@ const PendingItems = () => {
                 <Textarea
                   id="reason"
                   value={overrideForm.reason}
-                  onChange={(e) => setOverrideForm(prev => ({ ...prev, reason: e.target.value }))}
+                  onChange={(e) => setOverrideForm((prev) => ({ ...prev, reason: e.target.value }))}
                   placeholder="Explain why this record needs to be resolved..."
                   required
                   rows={3}
@@ -411,18 +441,23 @@ const PendingItems = () => {
 
               {selectedItem && (
                 <div className="rounded-md bg-muted p-3 text-sm">
-                  <div className="font-medium mb-1">Record Details:</div>
+                  <div className="mb-1 font-medium">Record Details:</div>
                   <div>Module: {selectedItem.entityType}</div>
                   <div>Patient: {selectedItem.patientName}</div>
                   <div>Current Status: {selectedItem.currentStatus}</div>
                 </div>
               )}
 
-              <DialogFooter className="flex gap-2 justify-end">
+              <DialogFooter className="flex justify-end gap-2">
                 <Button type="button" variant="ghost" onClick={closeOverrideModal}>
                   Cancel
                 </Button>
-                <Button type="submit" disabled={overrideSubmitting || !overrideForm.newStatus || !overrideForm.reason.trim()}>
+                <Button
+                  type="submit"
+                  disabled={
+                    overrideSubmitting || !overrideForm.newStatus || !overrideForm.reason.trim()
+                  }
+                >
                   {overrideSubmitting ? 'Resolving...' : 'Resolve Record'}
                 </Button>
               </DialogFooter>

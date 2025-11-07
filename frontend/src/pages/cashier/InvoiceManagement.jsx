@@ -39,6 +39,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Textarea } from '@/components/ui/textarea';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { FormModal } from '@/components/library';
 import PageLayout from '@/components/PageLayout';
 
 // Animation variants
@@ -755,83 +756,56 @@ const InvoiceManagement = () => {
           </div>
         </div>
 
-        {/* Payment Confirmation Dialog */}
-        <Dialog open={showPaymentDialog} onOpenChange={setShowPaymentDialog}>
-          <DialogContent>
-            <DialogHeader>
-              <DialogTitle>Confirm Payment</DialogTitle>
-              <DialogDescription>
-                Please review the payment details before processing.
-              </DialogDescription>
-            </DialogHeader>
-            
-            <div className="space-y-4">
-              <div className="p-4 bg-muted rounded-lg space-y-2">
-                <div className="flex justify-between">
-                  <span>Patient:</span>
-                  <span className="font-medium">{invoice.patientName}</span>
-                </div>
-                <div className="flex justify-between">
-                  <span>Invoice ID:</span>
-                  <span className="font-medium">{invoice.id}</span>
-                </div>
-                <div className="flex justify-between">
-                  <span>Payment Method:</span>
-                  <span className="font-medium capitalize">{paymentMethod}</span>
-                </div>
-                <Separator />
-                <div className="flex justify-between">
-                  <span>Total Amount:</span>
-                  <span className="font-semibold">${totals.total.toFixed(2)}</span>
-                </div>
-                <div className="flex justify-between text-lg font-bold text-primary">
-                  <span>Payment Amount:</span>
-                  <span>${paymentAmount ? parseFloat(paymentAmount).toFixed(2) : totals.total.toFixed(2)}</span>
-                </div>
-                {paymentAmount && parseFloat(paymentAmount) < totals.total && (
-                  <div className="flex justify-between text-amber-600">
-                    <span>Remaining Balance:</span>
-                    <span>${(totals.total - parseFloat(paymentAmount)).toFixed(2)}</span>
-                  </div>
-                )}
+        {/* Payment Confirmation Dialog via FormModal */}
+        <FormModal
+          isOpen={showPaymentDialog}
+          onOpenChange={setShowPaymentDialog}
+          title="Confirm Payment"
+          onSubmit={handleProcessPayment}
+          submitText="Confirm Payment"
+          cancelText="Cancel"
+          isLoading={isProcessing}
+          confirmLoadingText="Processing..."
+        >
+          <div className="space-y-4">
+            <div className="p-4 bg-muted rounded-lg space-y-2">
+              <div className="flex justify-between">
+                <span>Patient:</span>
+                <span className="font-medium">{invoice.patientName}</span>
               </div>
-
-              {notes && (
-                <div>
-                  <Label className="text-sm font-medium">Notes:</Label>
-                  <p className="text-sm text-muted-foreground mt-1">{notes}</p>
+              <div className="flex justify-between">
+                <span>Invoice ID:</span>
+                <span className="font-medium">{invoice.id}</span>
+              </div>
+              <div className="flex justify-between">
+                <span>Payment Method:</span>
+                <span className="font-medium capitalize">{paymentMethod}</span>
+              </div>
+              <Separator />
+              <div className="flex justify-between">
+                <span>Total Amount:</span>
+                <span className="font-semibold">${totals.total.toFixed(2)}</span>
+              </div>
+              <div className="flex justify-between text-lg font-bold text-primary">
+                <span>Payment Amount:</span>
+                <span>${paymentAmount ? parseFloat(paymentAmount).toFixed(2) : totals.total.toFixed(2)}</span>
+              </div>
+              {paymentAmount && parseFloat(paymentAmount) < totals.total && (
+                <div className="flex justify-between text-amber-600">
+                  <span>Remaining Balance:</span>
+                  <span>${(totals.total - parseFloat(paymentAmount)).toFixed(2)}</span>
                 </div>
               )}
             </div>
 
-            <DialogFooter>
-              <Button
-                variant="outline"
-                onClick={() => setShowPaymentDialog(false)}
-                disabled={isProcessing}
-              >
-                Cancel
-              </Button>
-              <Button
-                onClick={handleProcessPayment}
-                disabled={isProcessing}
-                className="gap-2"
-              >
-                {isProcessing ? (
-                  <>
-                    <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
-                    Processing...
-                  </>
-                ) : (
-                  <>
-                    <CheckCircle className="h-4 w-4" />
-                    Confirm Payment
-                  </>
-                )}
-              </Button>
-            </DialogFooter>
-          </DialogContent>
-        </Dialog>
+            {notes && (
+              <div>
+                <Label className="text-sm font-medium">Notes:</Label>
+                <p className="text-sm text-muted-foreground mt-1">{notes}</p>
+              </div>
+            )}
+          </div>
+        </FormModal>
       </PageLayout>
     </motion.div>
   );

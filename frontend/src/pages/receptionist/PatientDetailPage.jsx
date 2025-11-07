@@ -25,7 +25,7 @@ import patientService from '@/services/patientService';
 import { allergyService } from '@/services/allergyService';
 import { diagnosisService } from '@/services/diagnosisService';
 import PageLayout from '@/components/PageLayout';
-import Modal from '@/components/ui/ModalComponent';
+import { FormModal } from '@/components/library';
 
 const PatientDetailPage = () => {
   const { id } = useParams();
@@ -464,16 +464,16 @@ const PatientDetailPage = () => {
         </div>
 
         {/* Edit Patient Modal */}
-        <Modal
+        <FormModal
           isOpen={isEditModalOpen}
-          onClose={() => setIsEditModalOpen(false)}
+          onOpenChange={setIsEditModalOpen}
           title="Edit Patient Information"
           size="xl"
-          onSave={handleSavePatient}
-          onCancel={() => setIsEditModalOpen(false)}
-          saveText="Save Changes"
-          loading={isSaving}
-          saveDisabled={!editFormData.first_name || !editFormData.last_name}
+          onSubmit={handleSavePatient}
+          cancelText="Cancel"
+          submitText="Save Changes"
+          isLoading={isSaving}
+          submitDisabled={!editFormData.first_name || !editFormData.last_name}
         >
           <div className="space-y-6 max-h-[60vh] overflow-y-auto px-2">
             {/* Personal Information */}
@@ -694,7 +694,7 @@ const PatientDetailPage = () => {
               * Required fields. Note: Detailed allergies and diagnoses are managed separately in the medical records section.
             </p>
           </div>
-        </Modal>
+        </FormModal>
       </PageLayout>
     </div>
   );

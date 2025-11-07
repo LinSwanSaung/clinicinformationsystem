@@ -279,10 +279,8 @@ const getStatusIcon = (status) => {
       // Use the correct debug API route format
       console.log('Checking queue tokens for patient:', patient.id, 'doctor:', doctorId);
       
-      // Make API call to check for existing tokens
-      const url = `http://localhost:3001/api/queue/debug/patient/${patient.id}/tokens`;
-      const response = await fetch(url);
-      const result = await response.json();
+      // Make API call to check for existing tokens via central api
+      const result = await apiService.get(`/queue/debug/patient/${patient.id}/tokens`);
       
       if (result.success && result.data && result.data.tokens.length > 0) {
         // Filter tokens by doctor if specified, and only active statuses

@@ -16,7 +16,7 @@ const router = express.Router();
  */
 router.post(
   '/',
-  authorize(['doctor']),
+  authorize('doctor'),
   requireActiveVisit,
   asyncHandler(async (req, res) => {
     const result = await PrescriptionService.createPrescription(req.body);
@@ -43,7 +43,7 @@ router.post(
  */
 router.get(
   '/patient/:patientId',
-  authorize(['doctor', 'nurse', 'receptionist']),
+  authorize('doctor', 'nurse', 'receptionist'),
   asyncHandler(async (req, res) => {
     const { patientId } = req.params;
     const { includeInactive } = req.query;
@@ -62,7 +62,7 @@ router.get(
  */
 router.get(
   '/visit/:visitId',
-  authorize(['doctor', 'nurse', 'receptionist']),
+  authorize('doctor', 'nurse', 'receptionist'),
   asyncHandler(async (req, res) => {
     const { visitId } = req.params;
     const result = await PrescriptionService.getVisitPrescriptions(visitId);
@@ -77,7 +77,7 @@ router.get(
  */
 router.patch(
   '/:prescriptionId/status',
-  authorize(['doctor']),
+  authorize('doctor'),
   asyncHandler(async (req, res) => {
     const { prescriptionId } = req.params;
     const { status } = req.body;
@@ -105,7 +105,7 @@ router.patch(
  */
 router.delete(
   '/:prescriptionId',
-  authorize(['doctor']),
+  authorize('doctor'),
   asyncHandler(async (req, res) => {
     const { prescriptionId } = req.params;
     const result = await PrescriptionService.cancelPrescription(prescriptionId);

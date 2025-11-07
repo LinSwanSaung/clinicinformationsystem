@@ -4,6 +4,7 @@ import dotenv from 'dotenv';
 
 // Import middleware
 import { errorHandler } from './middleware/errorHandler.js';
+import { authenticate } from './middleware/auth.js';
 import { requestLogger } from './middleware/requestLogger.js';
 
 // Import routes
@@ -32,6 +33,7 @@ import adminRoutes from './routes/admin.routes.js';
 import aiRoutes from './routes/ai.routes.js';
 import { testConnection } from './config/database.js';
 import tokenScheduler from './services/TokenScheduler.service.js';
+import appointmentAutoCancel from './jobs/autoCancelAppointments.js';
 
 // Load environment variables
 dotenv.config();
@@ -45,7 +47,7 @@ app.use((req, res, next) => {
   res.set({
     'Cache-Control': 'no-store, no-cache, must-revalidate, private',
     Pragma: 'no-cache',
-    Expires: '0'
+    Expires: '0',
   });
   next();
 });
@@ -67,8 +69,8 @@ app.get('/health', async (req, res) => {
     timestamp: new Date().toISOString(),
     environment: process.env.NODE_ENV,
     db: {
-      connected: dbConnected
-    }
+      connected: dbConnected,
+    },
   });
 });
 
@@ -86,8 +88,10 @@ app.use('/api/queue', queueRoutes);
 app.use('/api/patient-allergies', patientAllergyRoutes);
 app.use('/api/patient-diagnoses', patientDiagnosisRoutes);
 app.use('/api/visits', visitRoutes);
-app.use('/api/prescriptions', prescriptionRoutes);
-app.use('/api/doctor-notes', doctorNoteRoutes);
+// Protect prescriptions endpoints with authentication
+app.use('/api/prescriptions', authenticate, prescriptionRoutes);
+// Protect doctor-notes endpoints with authentication; roles enforced per-route
+app.use('/api/doctor-notes', authenticate, doctorNoteRoutes);
 app.use('/api/services', serviceRoutes);
 app.use('/api/invoices', invoiceRoutes);
 app.use('/api/payments', paymentRoutes);
@@ -102,7 +106,7 @@ app.use('*', (req, res) => {
   res.status(404).json({
     success: false,
     message: `Route ${req.originalUrl} not found`,
-    timestamp: new Date().toISOString()
+    timestamp: new Date().toISOString(),
   });
 });
 
@@ -114,11 +118,18 @@ app.listen(PORT, () => {
   console.log(`🚀 RealCIS API Server running on port ${PORT}`);
   console.log(`📋 Environment: ${process.env.NODE_ENV}`);
   console.log(`🏥 Health check: http://localhost:${PORT}/health`);
-  
+
   // Start automatic token scheduler
   console.log('\n⏰ Starting Token Scheduler...');
   tokenScheduler.start();
-  console.log('✓ Token Scheduler started - will check for missed tokens every 5 minutes\n');
+  console.log('✓ Token Scheduler started - will check for missed tokens every 5 minutes');
+
+  // Start automatic appointment auto-cancel job
+  console.log('\n⏰ Starting Appointment Auto-Cancel Job...');
+  appointmentAutoCancel.start();
+  console.log(
+    `✓ Appointment Auto-Cancel started - ${appointmentAutoCancel.getScheduleDescription()}\n`
+  );
 });
 
 export default app;

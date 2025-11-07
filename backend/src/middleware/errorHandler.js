@@ -7,11 +7,31 @@ export const errorHandler = (error, req, res, next) => {
   // Log error for debugging
   console.error('Error:', {
     message: error.message,
+    code: error.code,
     stack: error.stack,
     url: req.url,
     method: req.method,
-    timestamp: new Date().toISOString()
+    timestamp: new Date().toISOString(),
   });
+
+  // Handle ApplicationError (structured errors from our services)
+  if (error.name === 'ApplicationError' || error.code) {
+    const statusCode = error.statusCode || 500;
+    const response = {
+      success: false,
+      message: error.message,
+      ...(error.code && { code: error.code }),
+      ...(error.details && { details: error.details }),
+      timestamp: new Date().toISOString(),
+    };
+
+    // Include stack in development
+    if (process.env.NODE_ENV === 'development') {
+      response.stack = error.stack;
+    }
+
+    return res.status(statusCode).json(response);
+  }
 
   // Default error response
   let statusCode = error.statusCode || 500;
@@ -49,7 +69,8 @@ export const errorHandler = (error, req, res, next) => {
     message = 'Upstream service unavailable';
   }
 
-  if (error.code === '23505') { // Unique constraint violation
+  if (error.code === '23505') {
+    // Unique constraint violation
     statusCode = 409;
     message = 'Resource already exists';
   }
@@ -63,7 +84,7 @@ export const errorHandler = (error, req, res, next) => {
     success: false,
     message,
     ...(process.env.NODE_ENV === 'development' && { stack: error.stack }),
-    timestamp: new Date().toISOString()
+    timestamp: new Date().toISOString(),
   });
 };
 

@@ -9,7 +9,8 @@ const PatientDocumentManager = ({
   onViewFile,
   onDownloadFile,
   showUploadButton = true,
-  className = ""
+  className = "",
+  renderDownloadButton,
 }) => {
   return (
     <div className="space-y-6">
@@ -88,17 +89,19 @@ const PatientDocumentManager = ({
                       View
                     </Button>
                   )}
-                  {onDownloadFile && (
-                    <Button 
-                      variant="outline" 
-                      size="sm" 
-                      className="text-xs px-3 py-1"
-                      onClick={() => onDownloadFile(file)}
-                    >
-                      <Download size={14} className="mr-1" />
-                      Download
-                    </Button>
-                  )}
+                  {renderDownloadButton
+                    ? renderDownloadButton(file)
+                    : onDownloadFile && (
+                        <Button 
+                          variant="outline" 
+                          size="sm" 
+                          className="text-xs px-3 py-1"
+                          onClick={() => onDownloadFile(file)}
+                        >
+                          <Download size={14} className="mr-1" />
+                          Download
+                        </Button>
+                      )}
                 </div>
               </div>
             ))}

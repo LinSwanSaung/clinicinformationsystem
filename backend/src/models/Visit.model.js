@@ -14,12 +14,13 @@ class VisitModel extends BaseModel {
    */
   async getPatientVisitHistory(patientId, options = {}) {
     const { limit = 50, offset = 0, includeCompleted = true, includeInProgress = false } = options;
-    
+
     try {
       // Build query
       let query = this.supabase
         .from(this.tableName)
-        .select(`
+        .select(
+          `
           *,
           doctor:users!doctor_id (
             id,
@@ -32,7 +33,8 @@ class VisitModel extends BaseModel {
             appointment_type,
             reason_for_visit
           )
-        `)
+        `
+        )
         .eq('patient_id', patientId);
 
       // Filter by status based on options
@@ -81,12 +83,14 @@ class VisitModel extends BaseModel {
         this.getVisitPrescriptions(visit.id),
         this.getVisitVitals(visit.id),
         this.getVisitServices(visit.id),
-        this.getVisitInvoice(visit.id)
+        this.getVisitInvoice(visit.id),
       ]);
 
       return {
         ...visit,
-        doctor_name: visit.doctor ? `${visit.doctor.first_name} ${visit.doctor.last_name}` : 'Unknown',
+        doctor_name: visit.doctor
+          ? `${visit.doctor.first_name} ${visit.doctor.last_name}`
+          : 'Unknown',
         allergies,
         visit_diagnoses: diagnoses,
         prescriptions,
@@ -94,22 +98,28 @@ class VisitModel extends BaseModel {
         services,
         invoice,
         // Use invoice data if available, otherwise calculate from visit data
-        consultation_fee: invoice?.service_items?.find(s => s.item_name?.toLowerCase().includes('consultation'))?.total_price || this.calculateConsultationFee(visit),
+        consultation_fee:
+          invoice?.service_items?.find((s) => s.item_name?.toLowerCase().includes('consultation'))
+            ?.total_price || this.calculateConsultationFee(visit),
         services_total: invoice?.services_total || this.calculateServicesTotal(services),
         medications_total: invoice?.medications_total || 0,
-        total_cost: invoice?.total_amount || (this.calculateConsultationFee(visit) + this.calculateServicesTotal(services)),
+        total_cost:
+          invoice?.total_amount ||
+          this.calculateConsultationFee(visit) + this.calculateServicesTotal(services),
         payment_status: invoice ? (invoice.status === 'paid' ? 'paid' : 'pending') : 'no_invoice',
         invoice_number: invoice?.invoice_number,
         invoice_status: invoice?.status || 'no_invoice',
         // Add medicine counts
         dispensed_medicine_count: invoice?.medicine_count || 0,
-        prescribed_medicine_count: prescriptions?.length || 0
+        prescribed_medicine_count: prescriptions?.length || 0,
       };
     } catch (error) {
       console.error('Error enhancing visit data:', error);
       return {
         ...visit,
-        doctor_name: visit.doctor ? `${visit.doctor.first_name} ${visit.doctor.last_name}` : 'Unknown',
+        doctor_name: visit.doctor
+          ? `${visit.doctor.first_name} ${visit.doctor.last_name}`
+          : 'Unknown',
         allergies: [],
         visit_diagnoses: [],
         prescriptions: [],
@@ -124,7 +134,7 @@ class VisitModel extends BaseModel {
         invoice_number: null,
         invoice_status: 'error',
         dispensed_medicine_count: 0,
-        prescribed_medicine_count: 0
+        prescribed_medicine_count: 0,
       };
     }
   }
@@ -136,7 +146,8 @@ class VisitModel extends BaseModel {
     try {
       const { data, error } = await this.supabase
         .from('patient_allergies')
-        .select(`
+        .select(
+          `
           id,
           allergy_name,
           allergen_type,
@@ -145,7 +156,8 @@ class VisitModel extends BaseModel {
           diagnosed_date,
           diagnosed_by,
           notes
-        `)
+        `
+        )
         .eq('visit_id', visitId);
 
       if (error) {
@@ -167,7 +179,8 @@ class VisitModel extends BaseModel {
     try {
       const { data, error } = await this.supabase
         .from('patient_diagnoses')
-        .select(`
+        .select(
+          `
           id,
           diagnosis_name,
           diagnosis_code,
@@ -176,7 +189,8 @@ class VisitModel extends BaseModel {
           severity,
           diagnosed_date,
           diagnosed_by
-        `)
+        `
+        )
         .eq('visit_id', visitId);
 
       if (error) {
@@ -198,7 +212,8 @@ class VisitModel extends BaseModel {
     try {
       const { data, error } = await this.supabase
         .from('prescriptions')
-        .select(`
+        .select(
+          `
           id,
           medication_name,
           dosage,
@@ -211,7 +226,8 @@ class VisitModel extends BaseModel {
           prescribed_date,
           start_date,
           end_date
-        `)
+        `
+        )
         .eq('visit_id', visitId)
         .order('prescribed_date', { ascending: false });
 
@@ -234,7 +250,8 @@ class VisitModel extends BaseModel {
     try {
       const { data, error } = await this.supabase
         .from('vitals')
-        .select(`
+        .select(
+          `
           id,
           temperature,
           temperature_unit,
@@ -250,13 +267,15 @@ class VisitModel extends BaseModel {
           bmi,
           pain_level,
           recorded_at
-        `)
+        `
+        )
         .eq('visit_id', visitId)
         .order('recorded_at', { ascending: false })
         .limit(1)
         .single();
 
-      if (error && error.code !== 'PGRST116') { // PGRST116 = no rows returned
+      if (error && error.code !== 'PGRST116') {
+        // PGRST116 = no rows returned
         console.error('Error fetching visit vitals:', error);
         return null;
       }
@@ -280,8 +299,8 @@ class VisitModel extends BaseModel {
         {
           service_name: 'Consultation',
           description: 'General medical consultation',
-          cost: 50.00
-        }
+          cost: 50.0,
+        },
       ];
     } catch (error) {
       console.error('Error in getVisitServices:', error);
@@ -294,16 +313,16 @@ class VisitModel extends BaseModel {
    */
   calculateConsultationFee(visit) {
     // Base consultation fee logic
-    const baseConsultationFee = 50.00;
-    
+    const baseConsultationFee = 50.0;
+
     if (visit.visit_type?.toLowerCase().includes('specialist')) {
       return baseConsultationFee * 1.5;
     }
-    
+
     if (visit.visit_type?.toLowerCase().includes('emergency')) {
       return baseConsultationFee * 2;
     }
-    
+
     return baseConsultationFee;
   }
 
@@ -312,7 +331,7 @@ class VisitModel extends BaseModel {
    */
   calculateServicesTotal(services) {
     if (!services || services.length === 0) return 0;
-    
+
     return services.reduce((total, service) => {
       return total + (parseFloat(service.cost) || 0);
     }, 0);
@@ -325,7 +344,8 @@ class VisitModel extends BaseModel {
     try {
       const { data: visit, error } = await this.supabase
         .from(this.tableName)
-        .select(`
+        .select(
+          `
           *,
           doctor:users!doctor_id (
             id,
@@ -344,7 +364,8 @@ class VisitModel extends BaseModel {
             appointment_type,
             reason_for_visit
           )
-        `)
+        `
+        )
         .eq('id', visitId)
         .single();
 
@@ -360,11 +381,31 @@ class VisitModel extends BaseModel {
 
   /**
    * Complete a visit and calculate final costs
+   *
+   * Idempotent: If visit is already completed, returns existing data.
+   * Only 'in_progress' visits can be completed.
+   *
+   * @param {string} visitId - The visit ID
+   * @param {Object} completionData - Additional completion data (payment_status, etc.)
+   * @returns {Promise<Object>} Completed visit data
    */
   async completeVisit(visitId, completionData = {}) {
     try {
       const visit = await this.getVisitWithDetails(visitId);
-      
+
+      // Idempotency check: if visit is already completed, return it
+      if (visit.status === 'completed') {
+        console.log(`[VISIT MODEL] Visit ${visitId} is already completed, returning existing data`);
+        return visit;
+      }
+
+      // Only allow completing visits that are in_progress
+      if (visit.status !== 'in_progress') {
+        throw new Error(
+          `Cannot complete visit with status '${visit.status}'. Only 'in_progress' visits can be completed.`
+        );
+      }
+
       const consultationFee = this.calculateConsultationFee(visit);
       const servicesTotal = this.calculateServicesTotal(visit.services);
       const totalCost = consultationFee + servicesTotal;
@@ -372,9 +413,9 @@ class VisitModel extends BaseModel {
       const updateData = {
         status: 'completed',
         total_cost: totalCost,
-        payment_status: completionData.payment_status || 'pending',
+        payment_status: completionData.payment_status || visit.payment_status || 'pending',
         ...completionData,
-        updated_at: new Date().toISOString()
+        updated_at: new Date().toISOString(),
       };
 
       const { data, error } = await this.supabase
@@ -401,14 +442,16 @@ class VisitModel extends BaseModel {
     try {
       const { data, error } = await this.supabase
         .from(this.tableName)
-        .select(`
+        .select(
+          `
           id,
           patient_id,
           doctor_id,
           visit_date,
           status,
           created_at
-        `)
+        `
+        )
         .eq('patient_id', patientId)
         .eq('status', 'in_progress')
         .gte('visit_date', startDate.toISOString())
@@ -432,7 +475,8 @@ class VisitModel extends BaseModel {
     try {
       const { data: invoice, error } = await this.supabase
         .from('invoices')
-        .select(`
+        .select(
+          `
           id,
           invoice_number,
           subtotal,
@@ -446,7 +490,8 @@ class VisitModel extends BaseModel {
           payment_notes,
           completed_at,
           created_at
-        `)
+        `
+        )
         .eq('visit_id', visitId)
         .order('created_at', { ascending: false })
         .limit(1)
@@ -471,11 +516,17 @@ class VisitModel extends BaseModel {
       }
 
       // Calculate totals by item type
-      const medicineItems = items?.filter(item => item.item_type === 'medicine') || [];
-      const serviceItems = items?.filter(item => item.item_type === 'service') || [];
-      
-      const medications_total = medicineItems.reduce((sum, item) => sum + parseFloat(item.total_price || 0), 0);
-      const services_total = serviceItems.reduce((sum, item) => sum + parseFloat(item.total_price || 0), 0);
+      const medicineItems = items?.filter((item) => item.item_type === 'medicine') || [];
+      const serviceItems = items?.filter((item) => item.item_type === 'service') || [];
+
+      const medications_total = medicineItems.reduce(
+        (sum, item) => sum + parseFloat(item.total_price || 0),
+        0
+      );
+      const services_total = serviceItems.reduce(
+        (sum, item) => sum + parseFloat(item.total_price || 0),
+        0
+      );
 
       return {
         ...invoice,
@@ -485,7 +536,7 @@ class VisitModel extends BaseModel {
         medications_total,
         services_total,
         medicine_count: medicineItems.length,
-        service_count: serviceItems.length
+        service_count: serviceItems.length,
       };
     } catch (error) {
       console.error('Error in getVisitInvoice:', error);
@@ -501,21 +552,24 @@ class VisitModel extends BaseModel {
     try {
       const { data, error } = await this.supabase
         .from(this.tableName)
-        .select(`
+        .select(
+          `
           id,
           patient_id,
           doctor_id,
           visit_date,
           status,
           created_at
-        `)
+        `
+        )
         .eq('patient_id', patientId)
         .eq('status', 'in_progress')
         .order('visit_date', { ascending: false })
         .limit(1)
         .single();
 
-      if (error && error.code !== 'PGRST116') { // PGRST116 = no rows returned
+      if (error && error.code !== 'PGRST116') {
+        // PGRST116 = no rows returned
         throw new Error(`Failed to fetch active visit: ${error.message}`);
       }
 

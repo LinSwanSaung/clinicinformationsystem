@@ -19,14 +19,42 @@ export const authenticate = asyncHandler(async (req, res, next) => {
   const token = authHeader.split(' ')[1];
 
   try {
-    // Verify JWT token
-    const decoded = jwt.verify(token, config.jwt.secret);
+    // Development convenience: accept a fake token to unblock local UI
+    if (
+      process.env.NODE_ENV !== 'production' &&
+      process.env.USE_DEV_TOKEN === 'true' &&
+      token === 'test-token'
+    ) {
+      const roleHeader = req.headers['x-dev-role'];
+      const role = roleHeader && isValidRole(roleHeader) ? roleHeader : ROLES.NURSE;
+      req.user = {
+        id: 'dev-user',
+        email: 'dev@example.com',
+        role,
+        first_name: 'Dev',
+        last_name: 'User',
+        is_active: true,
+        patient_id: null,
+      };
+      return next();
+    }
+
+    // Verify JWT token (support app-issued or Supabase-issued tokens)
+    let decoded;
+    try {
+      decoded = jwt.verify(token, config.jwt.secret);
+    } catch (primaryError) {
+      const supabaseSecret = process.env.SUPABASE_JWT_SECRET;
+      if (!supabaseSecret) throw primaryError;
+      decoded = jwt.verify(token, supabaseSecret);
+    }
 
     // Get user from database
+    const userId = decoded.userId || decoded.sub; // support our token payload or supabase subject
     const { data: user, error } = await supabase
       .from('users')
       .select('id, email, role, first_name, last_name, is_active, patient_id')
-      .eq('id', decoded.userId)
+      .eq('id', userId)
       .single();
 
     if (error || !user) {

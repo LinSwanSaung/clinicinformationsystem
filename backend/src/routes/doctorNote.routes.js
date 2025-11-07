@@ -13,7 +13,7 @@ const router = express.Router();
  */
 router.post(
   '/',
-  authorize(['doctor']),
+  authorize('doctor'),
   asyncHandler(async (req, res) => {
     const note = await DoctorNoteService.createNote(req.body);
     res
@@ -29,7 +29,7 @@ router.post(
  */
 router.get(
   '/visit/:visitId',
-  authorize(['doctor', 'nurse', 'receptionist']),
+  authorize('doctor', 'nurse', 'receptionist'),
   asyncHandler(async (req, res) => {
     const notes = await DoctorNoteService.getNotesByVisit(req.params.visitId);
     res.json({ success: true, data: notes, message: 'Notes retrieved successfully' });
@@ -43,7 +43,7 @@ router.get(
  */
 router.get(
   '/patient/:patientId',
-  authorize(['doctor', 'nurse', 'receptionist']),
+  authorize('doctor', 'nurse', 'receptionist'),
   asyncHandler(async (req, res) => {
     const notes = await DoctorNoteService.getNotesByPatient(req.params.patientId);
     res.json({ success: true, data: notes, message: 'Patient notes retrieved successfully' });
@@ -57,7 +57,7 @@ router.get(
  */
 router.put(
   '/:noteId',
-  authorize(['doctor']),
+  authorize('doctor'),
   asyncHandler(async (req, res) => {
     const updatedNote = await DoctorNoteService.updateNote(req.params.noteId, req.body);
     res.json({ success: true, data: updatedNote, message: 'Doctor note updated successfully' });
@@ -71,7 +71,7 @@ router.put(
  */
 router.delete(
   '/:noteId',
-  authorize(['doctor']),
+  authorize('doctor'),
   asyncHandler(async (req, res) => {
     await DoctorNoteService.deleteNote(req.params.noteId);
     res.json({ success: true, data: null, message: 'Doctor note deleted successfully' });

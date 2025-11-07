@@ -1,13 +1,11 @@
 import { useState, useEffect } from 'react';
 import { Card } from '@/components/ui/card';
-import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
-import { Search, Plus } from 'lucide-react';
-// centralized via React Query hooks
 import { usePatients } from '@/hooks/usePatients';
 import ReceptionistPatientCard from '@/components/ReceptionistPatientCard';
 import { useNavigate, Link } from 'react-router-dom';
 import PageLayout from '@/components/PageLayout';
+import { SearchBar, EmptyState, LoadingSpinner } from '@/components/library';
 
 export default function PatientListPage() {
   const [searchTerm, setSearchTerm] = useState('');
@@ -85,32 +83,21 @@ export default function PatientListPage() {
           </h2>
           <Link to="/receptionist/register-patient">
             <Button className="hover:bg-primary/90 flex w-full items-center gap-2 bg-primary px-4 py-3 text-sm text-primary-foreground sm:w-auto sm:gap-3 sm:px-6 sm:py-4 sm:text-base md:px-8 md:py-6 md:text-lg">
-              <Plus className="h-4 w-4 sm:h-5 sm:w-5 md:h-6 md:w-6" />
               New Patient
             </Button>
           </Link>
         </div>
 
-        <Card className="bg-card p-3 sm:p-4 md:p-6">
-          <div className="relative">
-            <Search className="absolute left-3 top-3 h-4 w-4 text-muted-foreground sm:left-4 sm:top-4 sm:h-5 sm:w-5 md:h-6 md:w-6" />
-            <Input
-              type="text"
-              placeholder="Search patients by name, ID, contact, or email..."
-              value={searchTerm}
-              onChange={handleSearch}
-              className="h-10 w-full bg-background pl-10 text-sm text-foreground placeholder:text-muted-foreground sm:h-12 sm:pl-12 sm:text-base md:h-14 md:pl-14 md:text-lg"
-            />
-          </div>
-        </Card>
+        <SearchBar
+          value={searchTerm}
+          onChange={handleSearch}
+          placeholder="Search patients by name, ID, contact, or email..."
+          ariaLabel="Search patients"
+        />
 
         <div className="grid gap-3 sm:gap-4 md:gap-6">
           {isLoading ? (
-            <Card className="bg-card p-6 text-center sm:p-8 md:p-12">
-              <p className="text-base text-muted-foreground sm:text-lg md:text-xl">
-                Loading patients...
-              </p>
-            </Card>
+            <LoadingSpinner label="Loading patients..." size="lg" />
           ) : normalizedError ? (
             <Card className="bg-card p-6 text-center sm:p-8 md:p-12">
               <p className="mb-3 text-base text-destructive sm:mb-4 sm:text-lg md:text-xl">
@@ -153,11 +140,10 @@ export default function PatientListPage() {
               />
             ))
           ) : (
-            <Card className="bg-card p-6 text-center sm:p-8 md:p-12">
-              <p className="text-base text-muted-foreground sm:text-lg md:text-xl">
-                No patients found matching your search criteria.
-              </p>
-            </Card>
+            <EmptyState
+              title="No patients found"
+              description="No patients found matching your search criteria."
+            />
           )}
         </div>
       </div>

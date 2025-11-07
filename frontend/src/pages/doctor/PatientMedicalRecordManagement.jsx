@@ -3,7 +3,7 @@ import { useLocation, useNavigate } from 'react-router-dom';
 import PageLayout from '../../components/PageLayout';
 import { Card } from '../../components/ui/card';
 import { Button } from '../../components/ui/button';
-import ModalComponent from '../../components/ui/ModalComponent';
+import { FormModal } from '@/components/library';
 import AllergyForm from '../../components/medical/forms/AllergyForm';
 import DiagnosisForm from '../../components/medical/forms/DiagnosisForm';
 import VisitHistoryCard from '../../components/medical/VisitHistoryCard';
@@ -22,6 +22,8 @@ import patientService from '../../services/patientService';
 import prescriptionService from '../../services/prescriptionService';
 import doctorNotesService from '../../services/doctorNotesService';
 import documentService from '../../services/documentService';
+import api from '../../services/api';
+import { PdfDownloadButton } from '@/components/library';
 import { 
   User,
   Activity,
@@ -69,7 +71,7 @@ const PatientMedicalRecordManagement = () => {
     severity: 'mild'
   });
 
-  // Tab configuration
+  // Tab configuration: show Doctor's Notes tab (view/add guarded by visit)
   const tabs = [
     { id: 'overview', label: 'Overview', icon: User },
     { id: 'history', label: 'Visit History', icon: Activity },
@@ -483,17 +485,9 @@ const PatientMedicalRecordManagement = () => {
 
   const handleDownloadFile = async (file) => {
     try {
-      // Use the document download endpoint with audit logging
-      const response = await fetch(`http://localhost:3001/api/documents/${file.id}/download`, {
-        method: 'GET',
-        headers: {
-          'Authorization': `Bearer ${localStorage.getItem('token')}`
-        }
+      const blob = await api.getBlob(`/documents/${file.id}/download`, {
+        headers: { Accept: 'application/octet-stream' },
       });
-
-      if (!response.ok) throw new Error('Download failed');
-
-      const blob = await response.blob();
       const url = window.URL.createObjectURL(blob);
       const a = document.createElement('a');
       a.href = url;
@@ -668,6 +662,15 @@ const PatientMedicalRecordManagement = () => {
                   onUploadFile={handleUploadFile}
                   onViewFile={handleViewFile}
                   onDownloadFile={handleDownloadFile}
+                  renderDownloadButton={(file) => (
+                    <PdfDownloadButton
+                      size="sm"
+                      variant="outline"
+                      endpoint={`/documents/${file.id}/download`}
+                      fileName={file.name || `document-${file.id}.pdf`}
+                      label="Download"
+                    />
+                  )}
                 />
               )}
             </div>
@@ -679,40 +682,40 @@ const PatientMedicalRecordManagement = () => {
       </div>
 
       {/* Allergy Modal - DOCTOR ACCESS ONLY */}
-      <ModalComponent
+      <FormModal
         isOpen={isAllergyModalOpen}
-        onClose={() => setIsAllergyModalOpen(false)}
+        onOpenChange={setIsAllergyModalOpen}
         title="Add New Allergy"
         size="md"
-        onSave={handleSaveAllergy}
-        saveText="Add Allergy"
+        onSubmit={handleSaveAllergy}
+        submitText="Add Allergy"
         isLoading={loading}
-        canSave={newAllergy.allergy_name.trim()}
+        submitDisabled={!newAllergy.allergy_name.trim()}
       >
         <AllergyForm 
           allergy={newAllergy}
           onChange={setNewAllergy}
           disabled={loading}
         />
-      </ModalComponent>
+      </FormModal>
 
       {/* Diagnosis Modal - DOCTOR ACCESS ONLY */}
-      <ModalComponent
+      <FormModal
         isOpen={isDiagnosisModalOpen}
-        onClose={() => setIsDiagnosisModalOpen(false)}
+        onOpenChange={setIsDiagnosisModalOpen}
         title="Add New Diagnosis"
         size="md"
-        onSave={handleSaveDiagnosis}
-        saveText="Add Diagnosis"
+        onSubmit={handleSaveDiagnosis}
+        submitText="Add Diagnosis"
         isLoading={loading}
-        canSave={newDiagnosis.diagnosis_name.trim()}
+        submitDisabled={!newDiagnosis.diagnosis_name.trim()}
       >
         <DiagnosisForm 
           diagnosis={newDiagnosis}
           onChange={setNewDiagnosis}
           disabled={loading}
         />
-      </ModalComponent>
+      </FormModal>
     </PageLayout>
   );
 };

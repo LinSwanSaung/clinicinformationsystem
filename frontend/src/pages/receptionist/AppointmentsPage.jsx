@@ -1,3 +1,4 @@
+import { LoadingSpinner, EmptyState } from '@/components/library';
 /* eslint-disable no-unused-vars, no-useless-catch, react-hooks/exhaustive-deps, no-constant-condition */
 import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
@@ -1413,23 +1414,16 @@ const AppointmentsPage = () => {
             </Card>
 
             {isLoading || isAppointmentsLoading ? (
-              <Card className="bg-card p-4 sm:p-6 md:p-8">
-                <div className="text-center">
-                  <div className="text-sm text-muted-foreground sm:text-base md:text-lg">
-                    Loading appointments...
-                  </div>
-                </div>
-              </Card>
+              <div className="py-8">
+                <LoadingSpinner label="Loading appointments..." />
+              </div>
             ) : filteredAppointments.length === 0 ? (
-              <Card className="bg-card p-4 sm:p-6 md:p-8">
-                <div className="text-center">
-                  <div className="text-sm text-muted-foreground sm:text-base md:text-lg">
-                    {searchTerm
-                      ? 'No appointments found matching your search.'
-                      : 'No appointments scheduled for this date.'}
-                  </div>
-                </div>
-              </Card>
+              <EmptyState
+                title={searchTerm ? 'No appointments found' : 'No appointments'}
+                description={searchTerm
+                  ? 'No appointments found matching your search.'
+                  : 'No appointments scheduled for this date.'}
+              />
             ) : (
               <div className="grid gap-3 sm:grid-cols-2 sm:gap-4 md:gap-6 lg:grid-cols-3">
                 {filteredAppointments

@@ -17,27 +17,9 @@ import {
   ThermometerSnowflake,
   User,
 } from 'lucide-react';
+import { FormModal } from '@/components/library';
 
-// Create the Dialog component for the modals
-const Dialog = ({ isOpen, onClose, title, children }) => {
-  if (!isOpen) return null;
-  
-  return (
-    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-      <div className="bg-white rounded-lg shadow-xl w-full max-w-lg max-h-[90vh] overflow-auto">
-        <div className="flex justify-between items-center p-4 border-b">
-          <h3 className="font-medium">{title}</h3>
-          <button onClick={onClose} className="text-gray-500 hover:text-gray-700">
-            <X size={18} />
-          </button>
-        </div>
-        <div className="p-4">
-          {children}
-        </div>
-      </div>
-    </div>
-  );
-};
+// Removed bespoke Dialog in favor of library FormModal (accessible)
 
 const PatientCard = ({ 
   patient, 
@@ -415,10 +397,24 @@ const PatientCard = ({
       {/* Nurse-only modals */}
       {userRole === 'nurse' && (
         <>
-          <Dialog
+          <FormModal
             isOpen={isVitalsModalOpen}
-            onClose={() => setIsVitalsModalOpen(false)}
+            onOpenChange={setIsVitalsModalOpen}
             title={`${patient.vitalsRecorded ? 'Edit' : 'Add'} Vitals & Notes for ${patient.name}`}
+            submitText="Save Vitals"
+            onSubmit={(e) => {
+              // Preserve existing save logic
+              const resolvedPatientId = patient?.patientId ?? patient?.patient_id ?? patient?.patient?.id ?? patient?.id;
+              if (!resolvedPatientId) {
+                // eslint-disable-next-line no-console
+                console.error('[PatientCard] Unable to resolve patient ID for vitals save:', patient);
+                alert('Could not determine patient ID. Please refresh and try again.');
+                return;
+              }
+              const visitId = patient?.visit_id ?? patient?.current_visit_id ?? patient?.latestVitals?.visit_id ?? null;
+              onSaveVitals(resolvedPatientId, vitalsForm, notes, visitId);
+              setIsVitalsModalOpen(false);
+            }}
           >
             {/* Vitals form content */}
             <div className="space-y-4">
@@ -509,47 +505,22 @@ const PatientCard = ({
                 />
               </div>
               
-              <div className="flex space-x-2 pt-4 border-t">
-                <Button variant="outline" onClick={() => setIsVitalsModalOpen(false)}>
-                  Cancel
-                </Button>
-                <Button onClick={() => {
-                  // The patient object from queue/token has a nested 'patient' object with the actual patient record
-                  // Priority: patient.id (nested patient record) > patient_id (FK) > id (token ID - wrong!)
-                  
-                  // The patient object from queue has patientId (camelCase) field, not patient_id or nested patient
-                  // Priority: patientId (camelCase) > patient_id (snake_case) > patient.id (nested) > id (WRONG!)
-                  const resolvedPatientId = patient?.patientId ?? patient?.patient_id ?? patient?.patient?.id ?? patient?.id;
-                  
-                  console.log('✅ [PatientCard] RESOLVED patient ID:', resolvedPatientId, 'from patientId:', patient?.patientId);
-                  
-                  if (!resolvedPatientId) {
-                    console.error('[PatientCard] Unable to resolve patient ID for vitals save:', patient);
-                    alert('Could not determine patient ID. Please refresh and try again.');
-                    return;
-                  }
-
-                  const visitId = patient?.visit_id ?? patient?.current_visit_id ?? patient?.latestVitals?.visit_id ?? null;
-                  console.log('[PatientCard] 🔍 Resolved visit_id for vitals save:', {
-                    visit_id: patient?.visit_id,
-                    current_visit_id: patient?.current_visit_id,
-                    latestVitals_visit_id: patient?.latestVitals?.visit_id,
-                    finalVisitId: visitId
-                  });
-
-                  onSaveVitals(resolvedPatientId, vitalsForm, notes, visitId);
-                  setIsVitalsModalOpen(false);
-                }}>
-                  Save Vitals
-                </Button>
-              </div>
             </div>
-          </Dialog>
+          </FormModal>
 
-          <Dialog
+          <FormModal
             isOpen={isDelayModalOpen}
-            onClose={() => setIsDelayModalOpen(false)}
+            onOpenChange={setIsDelayModalOpen}
             title={patient.status === 'delayed' ? 'Update Delay Reason' : 'Delay Patient'}
+            submitText={patient.status === 'delayed' ? 'Update Delay' : 'Confirm Delay'}
+            submitDisabled={!delayReason.trim()}
+            onSubmit={() => {
+              if (delayReason.trim()) {
+                onDelayPatient(patient.id, delayReason.trim());
+                setIsDelayModalOpen(false);
+                setDelayReason('');
+              }
+            }}
           >
             <div className="space-y-4">
               <div>
@@ -563,29 +534,8 @@ const PatientCard = ({
                   className="w-full p-3 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent min-h-[100px] resize-none"
                 />
               </div>
-              <div className="flex space-x-2 pt-4 border-t">
-                <Button variant="outline" onClick={() => {
-                  setIsDelayModalOpen(false);
-                  setDelayReason('');
-                }}>
-                  Cancel
-                </Button>
-                <Button 
-                  variant="destructive" 
-                  onClick={() => {
-                    if (delayReason.trim()) {
-                      onDelayPatient(patient.id, delayReason.trim());
-                      setIsDelayModalOpen(false);
-                      setDelayReason('');
-                    }
-                  }}
-                  disabled={!delayReason.trim()}
-                >
-                  {patient.status === 'delayed' ? 'Update Delay' : 'Confirm Delay'}
-                </Button>
-              </div>
             </div>
-          </Dialog>
+          </FormModal>
         </>
       )}
     </Card>

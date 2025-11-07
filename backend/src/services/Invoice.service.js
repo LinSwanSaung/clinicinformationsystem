@@ -4,6 +4,9 @@ import PaymentTransactionModel from '../models/PaymentTransaction.model.js';
 import VisitService from './Visit.service.js';
 import PrescriptionService from './Prescription.service.js';
 import NotificationService from './Notification.service.js';
+import { ApplicationError } from '../errors/ApplicationError.js';
+import { TransactionRunner } from './transactions/TransactionRunner.js';
+import { logAuditEvent } from '../utils/auditLogger.js';
 
 /**
  * Invoice Service - Business logic for invoices
@@ -38,13 +41,13 @@ class InvoiceService {
         patient_id: visit.patient_id,
         status: 'pending',
         created_by: createdBy,
-        subtotal: 0.00,
-        total_amount: 0.00,
-        balance: 0.00
+        subtotal: 0.0,
+        total_amount: 0.0,
+        balance: 0.0,
       };
 
       const invoice = await InvoiceModel.createInvoice(invoiceData);
-      
+
       return invoice;
     } catch (error) {
       console.error('[InvoiceService] Error in createInvoice:', error);
@@ -136,11 +139,11 @@ class InvoiceService {
         unit_price: parseFloat(unit_price),
         total_price: parseFloat(quantity) * parseFloat(unit_price),
         added_by: addedBy,
-        notes
+        notes,
       };
 
       const item = await InvoiceItemModel.createItem(itemData);
-      
+
       // Recalculate invoice totals
       await this.recalculateInvoiceTotal(invoiceId);
 
@@ -170,11 +173,11 @@ class InvoiceService {
         unit_price: parseFloat(unit_price),
         total_price: parseFloat(quantity) * parseFloat(unit_price),
         added_by: addedBy,
-        notes
+        notes,
       };
 
       const item = await InvoiceItemModel.createItem(itemData);
-      
+
       // Recalculate invoice totals
       await this.recalculateInvoiceTotal(invoiceId);
 
@@ -205,10 +208,10 @@ class InvoiceService {
           item_name: `${rx.medication_name} ${rx.dosage || ''}`,
           item_description: rx.instructions,
           quantity: parseFloat(rx.quantity) || 1,
-          unit_price: 0.00, // Cashier will set price
-          total_price: 0.00,
+          unit_price: 0.0, // Cashier will set price
+          total_price: 0.0,
           added_by: addedBy,
-          notes: `Prescribed: ${rx.frequency || ''} for ${rx.duration || ''}`
+          notes: `Prescribed: ${rx.frequency || ''} for ${rx.duration || ''}`,
         };
 
         const item = await InvoiceItemModel.createItem(itemData);
@@ -230,13 +233,17 @@ class InvoiceService {
       // Recalculate total_price if quantity or unit_price changed
       if (updates.quantity !== undefined || updates.unit_price !== undefined) {
         const item = await InvoiceItemModel.getItemById(itemId);
-        const quantity = updates.quantity !== undefined ? parseFloat(updates.quantity) : parseFloat(item.quantity);
-        const unitPrice = updates.unit_price !== undefined ? parseFloat(updates.unit_price) : parseFloat(item.unit_price);
+        const quantity =
+          updates.quantity !== undefined ? parseFloat(updates.quantity) : parseFloat(item.quantity);
+        const unitPrice =
+          updates.unit_price !== undefined
+            ? parseFloat(updates.unit_price)
+            : parseFloat(item.unit_price);
         updates.total_price = quantity * unitPrice;
       }
 
       const updatedItem = await InvoiceItemModel.updateItem(itemId, updates);
-      
+
       // Recalculate invoice totals
       await this.recalculateInvoiceTotal(updatedItem.invoice_id);
 
@@ -252,7 +259,7 @@ class InvoiceService {
   async removeInvoiceItem(itemId) {
     try {
       const item = await InvoiceItemModel.deleteItem(itemId);
-      
+
       // Recalculate invoice totals
       await this.recalculateInvoiceTotal(item.invoice_id);
 
@@ -269,17 +276,17 @@ class InvoiceService {
     try {
       // Get all items for this invoice
       const items = await InvoiceItemModel.getItemsByInvoice(invoiceId);
-      
+
       // Calculate subtotal
       const subtotal = items.reduce((sum, item) => sum + parseFloat(item.total_price || 0), 0);
-      
+
       // Get current invoice to preserve discount and tax
       const invoice = await InvoiceModel.getInvoiceById(invoiceId);
-      
+
       const discountAmount = parseFloat(invoice.discount_amount || 0);
       const taxAmount = parseFloat(invoice.tax_amount || 0);
       const totalAmount = subtotal - discountAmount + taxAmount;
-      
+
       // Get total paid
       const paidAmount = await PaymentTransactionModel.getTotalPaymentsByInvoice(invoiceId);
       const balance = totalAmount - paidAmount;
@@ -289,7 +296,7 @@ class InvoiceService {
         subtotal,
         total_amount: totalAmount,
         paid_amount: paidAmount,
-        balance
+        balance,
       });
 
       return { subtotal, total_amount: totalAmount, paid_amount: paidAmount, balance };
@@ -305,7 +312,7 @@ class InvoiceService {
     try {
       await InvoiceModel.updateInvoice(invoiceId, {
         discount_amount: parseFloat(discountAmount || 0),
-        discount_percentage: parseFloat(discountPercentage || 0)
+        discount_percentage: parseFloat(discountPercentage || 0),
       });
 
       await this.recalculateInvoiceTotal(invoiceId);
@@ -316,48 +323,155 @@ class InvoiceService {
   }
 
   /**
-   * Complete invoice (mark as paid)
+   * Complete invoice (mark as paid) and complete the associated visit
+   *
+   * Business rule: This is the ONLY place visits should be completed.
+   * Visits remain 'in_progress' after consultation ends until payment is received.
+   *
+   * Uses transaction pattern to ensure invoice and visit are updated atomically.
+   * Idempotent: if invoice is already paid, returns existing data without error.
+   *
+   * @param {string} invoiceId - The invoice ID
+   * @param {string} completedBy - User ID who completed the invoice
+   * @returns {Promise<Object>} Completed invoice data
+   * @throws {ApplicationError} If invoice not found, has no visit_id, or visit completion fails
    */
   async completeInvoice(invoiceId, completedBy) {
     try {
       // 1. Get the invoice details including visit_id
       const invoice = await InvoiceModel.getInvoiceById(invoiceId);
       if (!invoice) {
-        throw new Error('Invoice not found');
+        throw new ApplicationError('Invoice not found', 404, 'INVOICE_NOT_FOUND');
       }
 
-      // 2. Complete the invoice
-      const completedInvoice = await InvoiceModel.completeInvoice(invoiceId, completedBy);
-      
-      // 3. Mark the visit as completed
-      if (invoice.visit_id) {
-        await this.visitService.updateVisitStatus(invoice.visit_id, 'completed');
-        
-        // 4. Notify receptionists about visit completion
+      // 2. Idempotency check: if invoice is already paid, return existing data
+      if (invoice.status === 'paid') {
+        console.log('[InvoiceService] Invoice already paid, returning existing data');
+        return invoice;
+      }
+
+      // 3. Validate invoice has visit_id (required for visit completion)
+      if (!invoice.visit_id) {
+        throw new ApplicationError(
+          'Cannot complete invoice: Invoice has no associated visit. This indicates a data integrity issue.',
+          400,
+          'INVOICE_MISSING_VISIT',
+          { invoiceId, invoiceNumber: invoice.invoice_number }
+        );
+      }
+
+      // 4. Get visit details before update for audit logging
+      const oldVisit = await this.visitService.getVisitDetails(invoice.visit_id);
+      const oldVisitStatus = oldVisit?.data?.status || 'in_progress';
+
+      // 5. Use transaction pattern to ensure atomicity
+      const transaction = new TransactionRunner();
+      let completedInvoice = null;
+      let completedVisit = null;
+
+      try {
+        // Step 1: Complete the invoice (with rollback compensation)
+        completedInvoice = await transaction.add(
+          async () => {
+            return await InvoiceModel.completeInvoice(invoiceId, completedBy);
+          },
+          async () => {
+            // Compensation: revert invoice status if visit completion fails
+            console.log(`[InvoiceService] Rolling back invoice completion: ${invoiceId}`);
+            await InvoiceModel.updateById(invoiceId, {
+              status: invoice.status, // Revert to previous status
+              completed_by: null,
+              completed_at: null,
+            });
+          }
+        );
+
+        // Step 2: Complete the visit (this is the ONLY place visits should be completed)
+        // Business rule: Visits are completed when invoice is paid, not when consultation ends
+        completedVisit = await transaction.add(
+          async () => {
+            // Use completeVisit() to ensure costs are calculated correctly
+            // This method calculates total_cost from consultation fee + services
+            const visitResult = await this.visitService.completeVisit(invoice.visit_id, {
+              payment_status: 'paid',
+              // Status will be set to 'completed' by completeVisit()
+            });
+            return visitResult;
+          },
+          async () => {
+            // Compensation: if visit completion fails, we need to rollback invoice
+            // (This is handled by the transaction runner calling all compensations)
+            console.log(`[InvoiceService] Visit completion failed, invoice will be rolled back`);
+          }
+        );
+
+        console.log('[InvoiceService] ✅ Invoice and visit completed successfully');
+
+        // 6. Log visit status change for audit
+        try {
+          await logAuditEvent({
+            userId: completedBy,
+            role: 'cashier', // Typically completed by cashier
+            action: 'UPDATE',
+            entity: 'visits',
+            recordId: invoice.visit_id,
+            patientId: invoice.patient_id,
+            old_values: {
+              status: oldVisitStatus,
+              payment_status: oldVisit?.data?.payment_status || 'pending',
+            },
+            new_values: { status: 'completed', payment_status: 'paid' },
+            status: 'success',
+            reason: 'Invoice paid - visit completed',
+          });
+        } catch (logError) {
+          console.error('[AUDIT] Failed to log visit completion:', logError.message);
+          // Don't fail the operation if audit logging fails
+        }
+
+        // 7. Notify receptionists about visit completion (non-critical)
         try {
           const visitDetails = await this.visitService.getVisitDetails(invoice.visit_id);
           const patient = visitDetails?.data?.patient;
-          const patientName = patient 
-            ? `${patient.first_name} ${patient.last_name}`.trim() 
+          const patientName = patient
+            ? `${patient.first_name} ${patient.last_name}`.trim()
             : 'Patient';
-          
+
           await NotificationService.notifyReceptionists({
             title: 'Visit Completed',
             message: `${patientName} has completed their visit. Invoice #${invoice.invoice_number} has been paid.`,
             type: 'success',
             relatedEntityType: 'visit',
-            relatedEntityId: invoice.visit_id
+            relatedEntityId: invoice.visit_id,
           });
         } catch (notifError) {
           // Log error but don't fail the invoice completion
           console.error('[InvoiceService] Failed to send notification:', notifError);
         }
-      }
 
-      return completedInvoice;
+        return completedInvoice;
+      } catch (error) {
+        // Transaction runner will handle rollback automatically
+        if (error instanceof ApplicationError) {
+          throw error;
+        }
+        throw new ApplicationError(
+          `Failed to complete invoice: ${error.message}`,
+          500,
+          'INVOICE_COMPLETION_FAILED',
+          { invoiceId, visitId: invoice.visit_id }
+        );
+      }
     } catch (error) {
       console.error('[InvoiceService] Error completing invoice:', error);
-      throw new Error(`Failed to complete invoice: ${error.message}`);
+      if (error instanceof ApplicationError) {
+        throw error;
+      }
+      throw new ApplicationError(
+        `Failed to complete invoice: ${error.message}`,
+        500,
+        'INVOICE_COMPLETION_FAILED'
+      );
     }
   }
 
@@ -394,7 +508,7 @@ class InvoiceService {
       return {
         canCreate: count < 2,
         outstandingCount: count,
-        message: count >= 2 ? 'Patient has reached maximum outstanding invoices (2)' : 'OK'
+        message: count >= 2 ? 'Patient has reached maximum outstanding invoices (2)' : 'OK',
       };
     } catch (error) {
       throw new Error(`Failed to check invoice limit: ${error.message}`);
@@ -436,7 +550,7 @@ class InvoiceService {
             message: `Invoice #${invoice.invoice_number} has been fully paid.`,
             priority: 'normal',
             relatedEntity: 'invoice',
-            relatedEntityId: invoiceId
+            relatedEntityId: invoiceId,
           });
         } catch (notifError) {
           console.error('[InvoiceService] Failed to send notification:', notifError);
@@ -495,15 +609,15 @@ class InvoiceService {
       return {
         totalBalance,
         invoiceCount: invoices.length,
-        invoices: invoices.map(inv => ({
+        invoices: invoices.map((inv) => ({
           id: inv.id,
           invoice_number: inv.invoice_number,
           total_amount: inv.total_amount,
           amount_paid: inv.amount_paid,
           balance_due: inv.balance_due,
           on_hold: inv.on_hold,
-          created_at: inv.created_at
-        }))
+          created_at: inv.created_at,
+        })),
       };
     } catch (error) {
       throw new Error(`Failed to get outstanding balance: ${error.message}`);

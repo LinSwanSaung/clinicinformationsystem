@@ -310,7 +310,7 @@ CREATE TABLE IF NOT EXISTS queue_tokens (
     patient_id UUID NOT NULL REFERENCES patients(id) ON DELETE CASCADE,
     doctor_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
     appointment_id UUID REFERENCES appointments(id) ON DELETE SET NULL,
-    visit_id UUID REFERENCES visits(id) ON DELETE SET NULL,
+    visit_id UUID NOT NULL REFERENCES visits(id) ON DELETE RESTRICT,
     issued_date DATE DEFAULT CURRENT_DATE,
     issued_time TIMESTAMPTZ DEFAULT NOW(),
     -- Queue lifecycle
@@ -408,6 +408,11 @@ CREATE INDEX IF NOT EXISTS idx_appointments_status ON appointments(status);
 CREATE INDEX IF NOT EXISTS idx_visits_patient_id ON visits(patient_id);
 CREATE INDEX IF NOT EXISTS idx_visits_doctor_id ON visits(doctor_id);
 CREATE INDEX IF NOT EXISTS idx_visits_date ON visits(visit_date);
+
+-- Unique index: One active visit per patient (Stage 5 Phase B)
+CREATE UNIQUE INDEX IF NOT EXISTS visits_one_active_per_patient
+ON visits(patient_id)
+WHERE status = 'in_progress';
 
 -- Vitals indexes
 CREATE INDEX IF NOT EXISTS idx_vitals_visit_id ON vitals(visit_id);
@@ -1918,7 +1923,7 @@ CREATE TABLE IF NOT EXISTS services (
 CREATE TABLE IF NOT EXISTS invoices (
     id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
     invoice_number VARCHAR(50) UNIQUE NOT NULL,
-    visit_id UUID NOT NULL REFERENCES visits(id) ON DELETE CASCADE,
+    visit_id UUID NOT NULL REFERENCES visits(id) ON DELETE RESTRICT,
     patient_id UUID NOT NULL REFERENCES patients(id) ON DELETE CASCADE,
     
     -- Financial details
@@ -2010,6 +2015,7 @@ CREATE TABLE IF NOT EXISTS payment_transactions (
 -- INDEXES for Performance
 -- ===============================================
 CREATE INDEX idx_invoices_visit_id ON invoices(visit_id);
+CREATE INDEX idx_queue_tokens_visit_id ON queue_tokens(visit_id);
 CREATE INDEX idx_invoices_patient_id ON invoices(patient_id);
 CREATE INDEX idx_invoices_status ON invoices(status);
 CREATE INDEX idx_invoices_invoice_number ON invoices(invoice_number);

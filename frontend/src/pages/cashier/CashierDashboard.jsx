@@ -64,6 +64,8 @@ import PageLayout from '@/components/PageLayout';
 import useDebounce from '@/utils/useDebounce';
 import invoiceService from '../../services/invoiceService';
 import { useInvoices } from '@/hooks/useInvoices';
+import api from '../../services/api';
+import { PaymentDetailModal } from '@/components/library';
 
 // Animation variants
 const pageVariants = {
@@ -322,13 +324,6 @@ const CashierDashboard = () => {
   // Download receipt for invoice
   const handleDownloadReceipt = async (historyItem) => {
     try {
-      const token = localStorage.getItem('authToken');
-
-      if (!token) {
-        alert('Please login first');
-        return;
-      }
-
       // Get the first payment transaction for this invoice
       const paymentId = historyItem.rawData.payment_transactions?.[0]?.id;
 
@@ -337,23 +332,9 @@ const CashierDashboard = () => {
         return;
       }
 
-      // Use direct fetch with proper auth header format
-      const response = await fetch(`http://localhost:3001/api/payments/${paymentId}/receipt/pdf`, {
-        method: 'GET',
-        headers: {
-          Authorization: `Bearer ${token}`,
-          'Content-Type': 'application/json',
-        },
+      const blob = await api.getBlob(`/payments/${paymentId}/receipt/pdf`, {
+        headers: { Accept: 'application/pdf' },
       });
-
-      if (!response.ok) {
-        const errorText = await response.text();
-        console.error('Server error:', errorText);
-        throw new Error('Failed to download receipt');
-      }
-
-      // Create blob from response
-      const blob = await response.blob();
       const url = window.URL.createObjectURL(blob);
       const link = document.createElement('a');
       link.href = url;
@@ -1343,14 +1324,15 @@ const CashierDashboard = () => {
         </div>
 
         {/* Invoice Detail Modal */}
-        <Dialog open={showInvoiceDetail} onOpenChange={setShowInvoiceDetail}>
-          <DialogContent className="max-h-[90vh] max-w-6xl overflow-y-auto">
-            <DialogHeader>
-              <DialogTitle>Process Invoice - {selectedInvoice?.id}</DialogTitle>
-            </DialogHeader>
-
-            {selectedInvoice && (
-              <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
+        <PaymentDetailModal
+          open={showInvoiceDetail}
+          onOpenChange={setShowInvoiceDetail}
+          invoice={selectedInvoice}
+          onPay={() => handleProcessPayment()}
+          isProcessing={isProcessing}
+        >
+          {selectedInvoice && (
+            <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
                 {/* Main Content */}
                 <div className="space-y-6 lg:col-span-2">
                   {/* Patient Information */}
@@ -2139,8 +2121,7 @@ const CashierDashboard = () => {
                 </div>
               </div>
             )}
-          </DialogContent>
-        </Dialog>
+        </PaymentDetailModal>
 
         {/* Payment Confirmation Dialog */}
         <Dialog open={showPaymentDialog} onOpenChange={setShowPaymentDialog}>

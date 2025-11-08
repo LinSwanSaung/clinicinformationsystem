@@ -23,8 +23,8 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { employeeService } from '@/features/admin';
 import NotificationBell from './NotificationBell';
 import LanguageSwitcher from './LanguageSwitcher';
-import {
 import logger from '@/utils/logger';
+import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
@@ -189,13 +189,6 @@ const Navbar = () => {
           label: 'Dashboard',
           path: '/cashier/dashboard',
           isActive: location.pathname === '/cashier/dashboard' || location.pathname === '/cashier',
-        },
-        {
-          icon: FileText,
-          label: 'Invoices',
-          path: '/cashier',
-          isActive:
-            location.pathname === '/cashier' || location.pathname.includes('/cashier/invoice/'),
         },
       ];
     }

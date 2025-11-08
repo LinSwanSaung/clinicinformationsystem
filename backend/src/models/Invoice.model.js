@@ -17,8 +17,27 @@ class InvoiceModel extends BaseModel {
       .select(
         `
         *,
-        patient:patients(id, first_name, last_name, date_of_birth, phone),
-        visit:visits(id, visit_type, chief_complaint, status),
+        patient:patients(
+          id, 
+          first_name, 
+          last_name, 
+          patient_number,
+          date_of_birth, 
+          phone,
+          email
+        ),
+        visit:visits(
+          id, 
+          visit_type, 
+          visit_date,
+          chief_complaint, 
+          status,
+          doctor:users!visits_doctor_id_fkey(
+            id,
+            first_name,
+            last_name
+          )
+        ),
         invoice_items(*),
         payment_transactions(*),
         created_by_user:users!invoices_created_by_fkey(id, first_name, last_name, role),

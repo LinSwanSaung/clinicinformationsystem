@@ -8,6 +8,7 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
+import { X } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
 /**
@@ -97,19 +98,31 @@ export function FormModal({
     sm: 'max-w-md',
     default: 'max-w-lg',
     lg: 'max-w-2xl',
-    xl: 'max-w-4xl',
+    xl: 'max-w-6xl',
+    fullscreen: 'w-screen h-screen max-w-full max-h-full m-0 rounded-none',
   };
 
   return (
     <Dialog open={isOpen} onOpenChange={onOpenChange}>
-      <DialogContent className={cn(sizeClasses[size], className)}>
+      <DialogContent className={cn(sizeClasses[size], className, 'relative')}>
+        <Button
+          type="button"
+          variant="ghost"
+          size="icon"
+          className="absolute right-4 top-4 rounded-sm opacity-70 ring-offset-background transition-opacity hover:opacity-100 focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 disabled:pointer-events-none z-10"
+          onClick={() => onOpenChange?.(false)}
+          disabled={isLoading}
+        >
+          <X className="h-4 w-4" />
+          <span className="sr-only">Close</span>
+        </Button>
         <DialogHeader>
           <DialogTitle>{title}</DialogTitle>
           {description && <DialogDescription>{description}</DialogDescription>}
         </DialogHeader>
 
-        <form id={formId} onSubmit={handleSubmit} className="space-y-4" noValidate>
-          <div className="space-y-4 py-4">{children}</div>
+        <form id={formId} onSubmit={handleSubmit} className="space-y-4 flex flex-col h-full" noValidate>
+          <div className="flex-1 overflow-y-auto py-4">{children}</div>
 
           <DialogFooter>
             <Button
@@ -121,7 +134,15 @@ export function FormModal({
             >
               {cancelText}
             </Button>
-            <Button type="submit" disabled={submitDisabled || isLoading} ref={lastFocusableRef}>
+            <Button 
+              type="button"
+              onClick={(e) => {
+                e.preventDefault();
+                handleSubmit(e);
+              }}
+              disabled={submitDisabled || isLoading} 
+              ref={lastFocusableRef}
+            >
               {isLoading ? (confirmLoadingText || 'Submitting...') : submitText}
             </Button>
           </DialogFooter>

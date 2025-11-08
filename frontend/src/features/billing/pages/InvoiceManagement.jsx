@@ -157,10 +157,15 @@ const InvoiceManagement = () => {
   };
 
   const calculateTotals = () => {
-    const servicesTotal = invoice?.services.reduce((sum, service) => sum + service.price, 0) || 0;
+    const servicesTotal = (invoice?.services || []).reduce((sum, service) => sum + (parseFloat(service.price) || 0), 0);
     const medicationsTotal = medications
       .filter(med => med.action === 'dispense')
-      .reduce((sum, med) => sum + (med.price * med.dispensedQuantity / med.quantity), 0);
+      .reduce((sum, med) => {
+        const quantity = med.dispensedQuantity || 0;
+        const price = parseFloat(med.price) || 0;
+        const totalQuantity = med.quantity || 1;
+        return sum + (price * quantity / totalQuantity);
+      }, 0);
     
     const subtotal = servicesTotal + medicationsTotal;
     const discountAmountCalc = discountPercent > 0 
@@ -207,18 +212,19 @@ const InvoiceManagement = () => {
       }
       
       // Record payment in backend
-      await invoiceService.recordPayment(invoice.id, {
-        payment_method: paymentMethod,
-        amount: amountToRecord,
-        payment_notes: notes
-      });
-      
-      // If full payment, complete the invoice
+      // Use partial-payment endpoint for all payments (handles both full and partial)
       if (amountToRecord >= totals.total) {
-        await invoiceService.completeInvoice(invoice.id);
-        setInvoice(prev => ({ ...prev, status: 'completed' }));
+        // Full payment - complete the invoice (which also records payment)
+        const user = JSON.parse(localStorage.getItem('user') || '{}');
+        await invoiceService.completeInvoice(invoice.id, user.id);
+        setInvoice(prev => ({ ...prev, status: 'paid' }));
       } else {
-        // Partial payment - update status to 'partial'
+        // Partial payment - use partial-payment endpoint
+        await invoiceService.recordPartialPayment(invoice.id, {
+          amount: amountToRecord,
+          payment_method: paymentMethod,
+          notes: notes
+        });
         setInvoice(prev => ({ ...prev, status: 'partial' }));
       }
       
@@ -715,12 +721,15 @@ const InvoiceManagement = () => {
                     {/* Action Buttons */}
                     <div className="space-y-2 pt-4">
                       <Button
-                        onClick={() => setShowPaymentDialog(true)}
+                        onClick={() => {
+                          logger.debug('Process Payment button clicked', { totals, invoice: invoice?.id, servicesCount: invoice?.services?.length, medicationsCount: medications?.length });
+                          setShowPaymentDialog(true);
+                        }}
                         className="w-full gap-2"
-                        disabled={totals.total <= 0}
+                        disabled={totals.total <= 0 || isProcessing}
                       >
                         <CreditCard className="h-4 w-4" />
-                        Process Payment
+                        {isProcessing ? 'Processing...' : 'Process Payment'}
                       </Button>
                       <Button variant="outline" className="w-full gap-2">
                         <Save className="h-4 w-4" />

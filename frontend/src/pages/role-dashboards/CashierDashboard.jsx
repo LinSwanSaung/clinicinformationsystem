@@ -204,6 +204,7 @@ const CashierDashboard = () => {
   // Payment history invoice modal state
   const [invoiceModalOpen, setInvoiceModalOpen] = useState(false);
   const [selectedPayment, setSelectedPayment] = useState(null);
+  const [patientRemainingCredit, setPatientRemainingCredit] = useState(0);
 
   // Debounced search term for performance
   const debouncedSearchTerm = useDebounce(searchTerm, 300);
@@ -216,12 +217,12 @@ const CashierDashboard = () => {
     return () => clearInterval(interval);
   }, []);
 
-  // Load invoice history when switching to history tab (single useEffect)
+  // Load invoice history when switching to history tab or when completed invoices data changes
   useEffect(() => {
     if (activeTab === 'history') {
       loadInvoiceHistory();
     }
-  }, [activeTab]);
+  }, [activeTab, completedInvoicesData]);
 
   // Initialize medications and services when invoice is selected
   useEffect(() => {
@@ -257,47 +258,156 @@ const CashierDashboard = () => {
   }, [selectedInvoice]);
 
   // Load invoice history using hook data
-  const loadInvoiceHistory = async () => {
+  const loadInvoiceHistory = async (forceRefresh = false) => {
     try {
       setHistoryLoading(true);
       setHistoryError(null);
+      
+      // If force refresh, refetch from API first
+      if (forceRefresh) {
+        await refetchCompleted();
+      }
+      
       const response = Array.isArray(completedInvoicesData) ? completedInvoicesData : [];
-      // Transform the data to match the UI format
-      const formattedHistory = response.map((invoice) => ({
-        id: invoice.invoice_number,
-        patientName:
-          invoice.patients?.full_name ||
-          `${invoice.patients?.first_name || ''} ${invoice.patients?.last_name || ''}`.trim() ||
-          'Unknown Patient',
-        doctorName:
-          invoice.visits?.doctor?.full_name ||
-          `${invoice.visits?.doctor?.first_name || ''} ${invoice.visits?.doctor?.last_name || ''}`.trim() ||
-          'Unknown Doctor',
-        date: invoice.completed_at
-          ? new Date(invoice.completed_at).toLocaleDateString('en-US', {
-              year: 'numeric',
-              month: 'short',
-              day: 'numeric',
-            })
-          : 'N/A',
-        time: invoice.completed_at
-          ? new Date(invoice.completed_at).toLocaleTimeString('en-US', {
-              hour: 'numeric',
-              minute: '2-digit',
-              hour12: true,
-            })
-          : 'N/A',
-        totalAmount: parseFloat(invoice.total_amount || 0),
-        status: invoice.status,
-        paymentMethod: invoice.payment_transactions?.[0]?.payment_method || 'N/A',
-        processedBy:
-          invoice.completed_by_user?.full_name ||
-          `${invoice.completed_by_user?.first_name || ''} ${invoice.completed_by_user?.last_name || ''}`.trim() ||
-          'Unknown',
-        rawData: invoice, // Keep original data for details
-      }));
+      
+      // Group invoices by patient and date to consolidate credit payments
+      const invoiceGroups = new Map();
+      
+      response.forEach((invoice) => {
+        const patientId = invoice.patient_id;
+        const completedDate = invoice.completed_at 
+          ? new Date(invoice.completed_at).toDateString() 
+          : new Date(invoice.created_at).toDateString();
+        const key = `${patientId}-${completedDate}`;
+        
+        // Check if this invoice has credit payment (negative balance or notes mentioning credit)
+        const hasCreditPayment = invoice.payment_transactions?.some(
+          (payment) => 
+            parseFloat(payment.amount) < 0 || 
+            payment.notes?.toLowerCase().includes('credit') ||
+            payment.notes?.toLowerCase().includes('due credit')
+        ) || parseFloat(invoice.balance || 0) < 0;
+        
+        // Check if payment notes mention paying off previous invoices
+        const paysOffPrevious = invoice.payment_transactions?.some(
+          (payment) => 
+            payment.notes?.toLowerCase().includes('paid with current visit') ||
+            payment.notes?.toLowerCase().includes('previous invoice')
+        );
+        
+        if (!invoiceGroups.has(key)) {
+          invoiceGroups.set(key, []);
+        }
+        
+        invoiceGroups.get(key).push({
+          invoice,
+          hasCreditPayment,
+          paysOffPrevious,
+        });
+      });
+      
+      // Consolidate invoices in each group
+      const consolidatedInvoices = [];
+      
+      invoiceGroups.forEach((group) => {
+        // If group has only one invoice, add it as-is
+        if (group.length === 1) {
+          const { invoice } = group[0];
+          consolidatedInvoices.push({
+            id: invoice.invoice_number,
+            patientName:
+              invoice.patients?.full_name ||
+              `${invoice.patients?.first_name || ''} ${invoice.patients?.last_name || ''}`.trim() ||
+              'Unknown Patient',
+            doctorName:
+              invoice.visits?.doctor?.full_name ||
+              `${invoice.visits?.doctor?.first_name || ''} ${invoice.visits?.doctor?.last_name || ''}`.trim() ||
+              'Unknown Doctor',
+            date: invoice.completed_at
+              ? new Date(invoice.completed_at).toLocaleDateString('en-US', {
+                  year: 'numeric',
+                  month: 'short',
+                  day: 'numeric',
+                })
+              : 'N/A',
+            time: invoice.completed_at
+              ? new Date(invoice.completed_at).toLocaleTimeString('en-US', {
+                  hour: 'numeric',
+                  minute: '2-digit',
+                  hour12: true,
+                })
+              : 'N/A',
+            totalAmount: parseFloat(invoice.total_amount || 0),
+            status: invoice.status,
+            paymentMethod: invoice.payment_transactions?.[0]?.payment_method || 'N/A',
+            processedBy:
+              invoice.completed_by_user?.full_name ||
+              `${invoice.completed_by_user?.first_name || ''} ${invoice.completed_by_user?.last_name || ''}`.trim() ||
+              'Unknown',
+            hasCreditPayment: group[0].hasCreditPayment,
+            rawData: invoice,
+          });
+        } else {
+          // Multiple invoices on same day - consolidate if one pays off previous
+          const mainInvoice = group.find((g) => !g.paysOffPrevious) || group[0];
+          const creditInvoices = group.filter((g) => g.hasCreditPayment || g.paysOffPrevious);
+          
+          // Calculate total credit amount
+          const creditAmount = creditInvoices.reduce((sum, g) => {
+            const creditPayments = g.invoice.payment_transactions?.filter(
+              (p) => parseFloat(p.amount) < 0 || p.notes?.toLowerCase().includes('credit')
+            ) || [];
+            return sum + Math.abs(creditPayments.reduce((s, p) => s + parseFloat(p.amount || 0), 0));
+          }, 0);
+          
+          const { invoice } = mainInvoice;
+          consolidatedInvoices.push({
+            id: invoice.invoice_number,
+            patientName:
+              invoice.patients?.full_name ||
+              `${invoice.patients?.first_name || ''} ${invoice.patients?.last_name || ''}`.trim() ||
+              'Unknown Patient',
+            doctorName:
+              invoice.visits?.doctor?.full_name ||
+              `${invoice.visits?.doctor?.first_name || ''} ${invoice.visits?.doctor?.last_name || ''}`.trim() ||
+              'Unknown Doctor',
+            date: invoice.completed_at
+              ? new Date(invoice.completed_at).toLocaleDateString('en-US', {
+                  year: 'numeric',
+                  month: 'short',
+                  day: 'numeric',
+                })
+              : 'N/A',
+            time: invoice.completed_at
+              ? new Date(invoice.completed_at).toLocaleTimeString('en-US', {
+                  hour: 'numeric',
+                  minute: '2-digit',
+                  hour12: true,
+                })
+              : 'N/A',
+            totalAmount: parseFloat(invoice.total_amount || 0),
+            status: invoice.status,
+            paymentMethod: invoice.payment_transactions?.[0]?.payment_method || 'N/A',
+            processedBy:
+              invoice.completed_by_user?.full_name ||
+              `${invoice.completed_by_user?.first_name || ''} ${invoice.completed_by_user?.last_name || ''}`.trim() ||
+              'Unknown',
+            hasCreditPayment: creditAmount > 0,
+            creditAmount: creditAmount > 0 ? creditAmount : null,
+            rawData: invoice, // Main invoice data
+            consolidatedInvoices: creditInvoices.map((g) => g.invoice), // Store credit invoices for details
+          });
+        }
+      });
+      
+      // Sort by date (newest first)
+      consolidatedInvoices.sort((a, b) => {
+        const dateA = new Date(a.rawData?.completed_at || a.rawData?.created_at || 0);
+        const dateB = new Date(b.rawData?.completed_at || b.rawData?.created_at || 0);
+        return dateB - dateA;
+      });
 
-      setInvoiceHistory(formattedHistory);
+      setInvoiceHistory(consolidatedInvoices);
     } catch (error) {
       logger.error('Failed to load invoice history:', error);
       setHistoryError('Failed to load invoice history');
@@ -316,6 +426,18 @@ const CashierDashboard = () => {
         invoiceDetails: response,
       });
       setInvoiceModalOpen(true);
+      
+      // Fetch patient's total remaining credit
+      const patientId = response.patient?.id || historyItem.rawData.patient_id;
+      if (patientId) {
+        try {
+          const creditData = await invoiceService.getPatientRemainingCredit(patientId);
+          setPatientRemainingCredit(creditData?.totalCredit || 0);
+        } catch (creditError) {
+          logger.error('Failed to fetch patient remaining credit:', creditError);
+          setPatientRemainingCredit(0);
+        }
+      }
     } catch (error) {
       logger.error('Failed to fetch invoice:', error);
       alert('Failed to load invoice details');
@@ -445,8 +567,10 @@ const CashierDashboard = () => {
   };
 
   const handleViewInvoice = async (invoice) => {
+    logger.debug('handleViewInvoice called with invoice:', invoice?.id);
     setSelectedInvoice(invoice);
     setShowInvoiceDetail(true);
+    logger.debug('Modal state set to true');
     setDiscountPercent(0);
     setDiscountAmount(0);
     setPaymentMethod('cash');
@@ -455,6 +579,15 @@ const CashierDashboard = () => {
     // Check for outstanding balance and invoice limit
     if (invoice.patient_id) {
       try {
+        // Fetch patient's total remaining credit
+        try {
+          const creditData = await invoiceService.getPatientRemainingCredit(invoice.patient_id);
+          setPatientRemainingCredit(creditData?.totalCredit || 0);
+        } catch (creditError) {
+          logger.error('Failed to fetch patient remaining credit:', creditError);
+          setPatientRemainingCredit(0);
+        }
+
         const balanceData = await invoiceService.getPatientOutstandingBalance(invoice.patient_id);
 
         // Filter out the current invoice from outstanding invoices
@@ -726,12 +859,29 @@ const CashierDashboard = () => {
     try {
       setIsProcessing(true);
 
-      // Add prescriptions to invoice
+      // Add prescriptions to invoice (this will add new ones, not duplicate existing)
       await invoiceService.addPrescriptionsToInvoice(selectedInvoice.id, selectedInvoice.visit_id);
 
       // Reload the invoice to get updated items
       const updatedInvoice = await invoiceService.getInvoiceById(selectedInvoice.id);
       setSelectedInvoice(updatedInvoice);
+
+      // Extract medications from updated invoice
+      const meds = (updatedInvoice.invoice_items || [])
+        .filter((item) => item.item_type === 'medicine')
+        .map((item) => ({
+          id: item.id,
+          name: item.item_name,
+          quantity: item.quantity || 1,
+          price: parseFloat(item.unit_price || 0),
+          status: updatedInvoice.status,
+          dosage: item.notes || '',
+          instructions: item.notes || '',
+          inStock: 100, // Mock value - would come from inventory system
+          dispensedQuantity: 0,
+          action: 'pending', // pending, dispense, write-out
+        }));
+      setMedications(meds);
 
       // Reload the invoice list
       await refetchPending();
@@ -841,6 +991,16 @@ const CashierDashboard = () => {
 
       // Reload pending invoices
       await refetchPending();
+
+      // Reload completed invoices (invoice history) - always refresh when invoice is completed
+      await refetchCompleted();
+      // Update invoice history if currently viewing history tab
+      // Use setTimeout to ensure refetchCompleted has updated completedInvoicesData
+      if (activeTab === 'history') {
+        setTimeout(async () => {
+          await loadInvoiceHistory(true);
+        }, 100);
+      }
 
       // Clear success message after 5 seconds
       setTimeout(() => setSuccessMessage(null), 5000);
@@ -1207,7 +1367,14 @@ const CashierDashboard = () => {
                                   <Button
                                     onClick={(e) => {
                                       e.stopPropagation();
-                                      handleViewInvoice(invoice);
+                                      e.preventDefault();
+                                      logger.debug('Process button clicked for invoice:', invoice.id);
+                                      try {
+                                        handleViewInvoice(invoice);
+                                      } catch (error) {
+                                        logger.error('Error opening invoice detail:', error);
+                                        setError('Failed to open invoice details');
+                                      }
                                     }}
                                     size="sm"
                                     className="gap-2"
@@ -1267,15 +1434,29 @@ const CashierDashboard = () => {
                       {invoiceHistory.map((invoice) => (
                         <div
                           key={invoice.id}
-                          className="hover:bg-muted/50 flex items-center justify-between rounded-lg border p-4 transition-colors"
+                          className={`hover:bg-muted/50 flex items-center justify-between rounded-lg border p-4 transition-colors ${
+                            invoice.hasCreditPayment ? 'border-blue-200 bg-blue-50/50' : ''
+                          }`}
                         >
                           <div className="flex-1">
                             <div className="flex items-center gap-4">
                               <div>
-                                <p className="font-medium">{invoice.id}</p>
+                                <div className="flex items-center gap-2">
+                                  <p className="font-medium">{invoice.id}</p>
+                                  {invoice.hasCreditPayment && (
+                                    <Badge variant="outline" className="bg-blue-100 text-blue-800 border-blue-300 text-xs">
+                                      Credit Payment
+                                    </Badge>
+                                  )}
+                                </div>
                                 <p className="text-sm text-muted-foreground">
                                   {invoice.patientName}
                                 </p>
+                                {invoice.creditAmount && (
+                                  <p className="text-xs text-blue-700 mt-1 font-medium">
+                                    Includes ${invoice.creditAmount.toFixed(2)} credit from previous invoices
+                                  </p>
+                                )}
                               </div>
                               <div>
                                 <p className="text-sm">{invoice.doctorName}</p>
@@ -1329,7 +1510,10 @@ const CashierDashboard = () => {
           open={showInvoiceDetail}
           onOpenChange={setShowInvoiceDetail}
           invoice={selectedInvoice}
-          onPay={() => handleProcessPayment()}
+          onPay={() => {
+            // Open confirmation dialog instead of processing directly
+            setShowPaymentDialog(true);
+          }}
           isProcessing={isProcessing}
         >
           {selectedInvoice && (
@@ -1338,37 +1522,37 @@ const CashierDashboard = () => {
                 <div className="space-y-6 lg:col-span-2">
                   {/* Patient Information */}
                   <Card>
-                    <CardHeader>
-                      <CardTitle className="flex items-center gap-2">
-                        <User className="h-5 w-5" />
+                    <CardHeader className="pb-3">
+                      <CardTitle className="flex items-center gap-2 text-base">
+                        <User className="h-4 w-4" />
                         Patient Information
                       </CardTitle>
                     </CardHeader>
-                    <CardContent className="space-y-4">
-                      <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+                    <CardContent className="space-y-3 pt-0">
+                      <div className="grid grid-cols-2 gap-3 text-sm">
                         <div>
-                          <Label className="text-sm font-medium">Patient Name</Label>
-                          <p className="text-lg">
+                          <Label className="text-xs font-medium text-muted-foreground">Patient Name</Label>
+                          <p className="text-sm font-medium mt-0.5">
                             {selectedInvoice.patient?.first_name}{' '}
                             {selectedInvoice.patient?.last_name}
                           </p>
                         </div>
                         <div>
-                          <Label className="text-sm font-medium">Visit Type</Label>
-                          <p className="text-lg">{selectedInvoice.visit?.visit_type || 'N/A'}</p>
+                          <Label className="text-xs font-medium text-muted-foreground">Visit Type</Label>
+                          <p className="text-sm mt-0.5">{selectedInvoice.visit?.visit_type || 'N/A'}</p>
                         </div>
                         <div>
-                          <Label className="text-sm font-medium">Date & Time</Label>
-                          <p className="flex items-center gap-2">
-                            <Calendar className="h-4 w-4" />
+                          <Label className="text-xs font-medium text-muted-foreground">Date & Time</Label>
+                          <p className="flex items-center gap-1.5 text-sm mt-0.5">
+                            <Calendar className="h-3 w-3" />
                             {new Date(selectedInvoice.created_at).toLocaleDateString()} at{' '}
                             {new Date(selectedInvoice.created_at).toLocaleTimeString()}
                           </p>
                         </div>
                         <div>
-                          <Label className="text-sm font-medium">Contact</Label>
-                          <p className="text-sm">{selectedInvoice.patient?.phone || 'N/A'}</p>
-                          <p className="text-sm">{selectedInvoice.patient?.email || 'N/A'}</p>
+                          <Label className="text-xs font-medium text-muted-foreground">Contact</Label>
+                          <p className="text-xs mt-0.5">{selectedInvoice.patient?.phone || 'N/A'}</p>
+                          <p className="text-xs mt-0.5">{selectedInvoice.patient?.email || 'N/A'}</p>
                         </div>
                       </div>
                     </CardContent>
@@ -1498,7 +1682,7 @@ const CashierDashboard = () => {
                   )}
 
                   {/* Services and Medications */}
-                  <div className="grid grid-cols-1 gap-6 md:grid-cols-2">
+                  <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
                     {/* Services */}
                     <Card>
                       <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-3">
@@ -1655,11 +1839,11 @@ const CashierDashboard = () => {
                             size="sm"
                             variant="outline"
                             onClick={handleLoadPrescriptions}
-                            disabled={isProcessing || medications.length > 0}
+                            disabled={isProcessing}
                             className="gap-2"
                           >
                             <Pill className="h-4 w-4" />
-                            Load Prescriptions
+                            {medications.length > 0 ? 'Refresh Prescriptions' : 'Load Prescriptions'}
                           </Button>
                         </div>
                       </CardHeader>
@@ -1844,7 +2028,7 @@ const CashierDashboard = () => {
 
                 {/* Billing Summary Sidebar */}
                 <div className="space-y-6">
-                  <Card className="sticky top-4">
+                  <Card className="sticky top-0">
                     <CardHeader>
                       <CardTitle className="flex items-center gap-2">
                         <Calculator className="h-5 w-5" />
@@ -2301,100 +2485,393 @@ const CashierDashboard = () => {
 
         {/* Invoice Details Modal for Payment History */}
         <Dialog open={invoiceModalOpen} onOpenChange={setInvoiceModalOpen}>
-          <DialogContent className="max-h-[80vh] max-w-3xl overflow-y-auto">
+          <DialogContent className="max-h-[90vh] max-w-4xl overflow-y-auto">
             <DialogHeader>
-              <DialogTitle>Invoice Details</DialogTitle>
-              <DialogDescription>
-                Invoice #
-                {selectedPayment?.invoice?.invoice_number ||
-                  selectedPayment?.invoiceDetails?.invoice_number}
+              <DialogTitle className="text-2xl">Invoice Receipt</DialogTitle>
+              <DialogDescription className="text-base">
+                Invoice #{selectedPayment?.invoice?.invoice_number ||
+                  selectedPayment?.invoiceDetails?.invoice_number ||
+                  selectedPayment?.rawData?.invoice_number}
               </DialogDescription>
             </DialogHeader>
 
             {selectedPayment && (
-              <div className="space-y-4">
-                {/* Patient Info */}
-                <div className="border-b pb-4">
-                  <h4 className="mb-2 font-semibold">Patient Information</h4>
-                  <div className="grid grid-cols-2 gap-2 text-sm">
+              <div className="space-y-6">
+                {/* Header Section */}
+                <div className="border-b-2 pb-4">
+                  <div className="flex justify-between items-start">
                     <div>
-                      <span className="text-gray-600">Name:</span>
-                      <span className="ml-2 font-medium">
-                        {selectedPayment.invoice?.patient?.first_name}{' '}
-                        {selectedPayment.invoice?.patient?.last_name}
-                      </span>
+                      <h3 className="text-lg font-bold">RealCIS Healthcare System</h3>
+                      <p className="text-sm text-muted-foreground">Medical Invoice</p>
                     </div>
-                    <div>
-                      <span className="text-gray-600">Patient #:</span>
-                      <span className="ml-2 font-medium">
-                        {selectedPayment.invoice?.patient?.patient_number}
-                      </span>
+                    <div className="text-right">
+                      <p className="text-sm text-muted-foreground">Date:</p>
+                      <p className="font-medium">
+                        {selectedPayment.invoiceDetails?.created_at
+                          ? new Date(selectedPayment.invoiceDetails.created_at).toLocaleDateString('en-US', {
+                              year: 'numeric',
+                              month: 'long',
+                              day: 'numeric',
+                            })
+                          : selectedPayment.rawData?.created_at
+                            ? new Date(selectedPayment.rawData.created_at).toLocaleDateString('en-US', {
+                                year: 'numeric',
+                                month: 'long',
+                                day: 'numeric',
+                              })
+                            : 'N/A'}
+                      </p>
+                      <p className="text-sm text-muted-foreground mt-1">Time:</p>
+                      <p className="font-medium">
+                        {selectedPayment.invoiceDetails?.created_at
+                          ? new Date(selectedPayment.invoiceDetails.created_at).toLocaleTimeString('en-US', {
+                              hour: 'numeric',
+                              minute: '2-digit',
+                              hour12: true,
+                            })
+                          : selectedPayment.rawData?.created_at
+                            ? new Date(selectedPayment.rawData.created_at).toLocaleTimeString('en-US', {
+                                hour: 'numeric',
+                                minute: '2-digit',
+                                hour12: true,
+                              })
+                            : 'N/A'}
+                      </p>
                     </div>
                   </div>
                 </div>
 
-                {/* Invoice Summary */}
+                {/* Patient Information */}
                 <div className="border-b pb-4">
-                  <h4 className="mb-2 font-semibold">Invoice Summary</h4>
-                  <div className="space-y-2 text-sm">
-                    <div className="flex justify-between">
-                      <span className="text-gray-600">Total Amount:</span>
-                      <span className="font-medium">
-                        ${parseFloat(selectedPayment.invoiceDetails?.total_amount || 0).toFixed(2)}
-                      </span>
+                  <h4 className="mb-3 text-base font-semibold flex items-center gap-2">
+                    <User className="h-4 w-4" />
+                    Patient Information
+                  </h4>
+                  <div className="grid grid-cols-2 gap-4 text-sm">
+                    <div>
+                      <span className="text-muted-foreground">Name:</span>
+                      <p className="font-medium mt-0.5">
+                        {selectedPayment.invoiceDetails?.patient?.first_name || selectedPayment.invoice?.patient?.first_name || selectedPayment.rawData?.patients?.first_name}{' '}
+                        {selectedPayment.invoiceDetails?.patient?.last_name || selectedPayment.invoice?.patient?.last_name || selectedPayment.rawData?.patients?.last_name}
+                      </p>
                     </div>
-                    <div className="flex justify-between">
-                      <span className="text-gray-600">Paid Amount:</span>
-                      <span className="font-medium text-green-600">
-                        ${parseFloat(selectedPayment.invoiceDetails?.paid_amount || 0).toFixed(2)}
-                      </span>
+                    <div>
+                      <span className="text-muted-foreground">Patient #:</span>
+                      <p className="font-medium mt-0.5">
+                        {selectedPayment.invoiceDetails?.patient?.patient_number ||
+                          selectedPayment.invoice?.patient?.patient_number ||
+                          selectedPayment.rawData?.patients?.patient_number ||
+                          'N/A'}
+                      </p>
                     </div>
-                    <div className="flex justify-between">
-                      <span className="text-gray-600">Balance:</span>
-                      <span className="font-medium text-red-600">
-                        ${parseFloat(selectedPayment.invoiceDetails?.balance || 0).toFixed(2)}
-                      </span>
+                    <div>
+                      <span className="text-muted-foreground">Phone:</span>
+                      <p className="font-medium mt-0.5">
+                        {selectedPayment.invoiceDetails?.patient?.phone ||
+                          selectedPayment.invoice?.patient?.phone ||
+                          selectedPayment.rawData?.patients?.phone ||
+                          'N/A'}
+                      </p>
+                    </div>
+                    <div>
+                      <span className="text-muted-foreground">Email:</span>
+                      <p className="font-medium mt-0.5">
+                        {selectedPayment.invoiceDetails?.patient?.email ||
+                          selectedPayment.invoice?.patient?.email ||
+                          selectedPayment.rawData?.patients?.email ||
+                          'N/A'}
+                      </p>
+                    </div>
+                    <div>
+                      <span className="text-muted-foreground">Doctor:</span>
+                      <p className="font-medium mt-0.5">
+                        {selectedPayment.invoiceDetails?.visit?.doctor_name ||
+                          `${selectedPayment.invoiceDetails?.visit?.doctor?.first_name || ''} ${selectedPayment.invoiceDetails?.visit?.doctor?.last_name || ''}`.trim() ||
+                          selectedPayment.rawData?.visits?.doctor?.full_name ||
+                          `${selectedPayment.rawData?.visits?.doctor?.first_name || ''} ${selectedPayment.rawData?.visits?.doctor?.last_name || ''}`.trim() ||
+                          'N/A'}
+                      </p>
+                    </div>
+                    <div>
+                      <span className="text-muted-foreground">Visit Type:</span>
+                      <p className="font-medium mt-0.5 capitalize">
+                        {selectedPayment.invoiceDetails?.visit?.visit_type ||
+                          selectedPayment.rawData?.visits?.visit_type ||
+                          'N/A'}
+                      </p>
                     </div>
                   </div>
                 </div>
 
-                {/* Payment Transactions */}
-                {selectedPayment.invoiceDetails?.payment_transactions?.length > 0 && (
+                {/* Services Provided */}
+                {selectedPayment.invoiceDetails?.invoice_items || selectedPayment.rawData?.invoice_items ? (
                   <div className="border-b pb-4">
-                    <h4 className="mb-2 font-semibold">Payment History</h4>
+                    <h4 className="mb-3 text-base font-semibold flex items-center gap-2">
+                      <FileText className="h-4 w-4" />
+                      Services & Items
+                    </h4>
                     <div className="space-y-2">
-                      {selectedPayment.invoiceDetails.payment_transactions.map((payment, idx) => (
-                        <div
-                          key={idx}
-                          className="flex items-center justify-between rounded bg-green-50 p-3 text-sm"
-                        >
-                          <div>
-                            <p className="font-medium">${parseFloat(payment.amount).toFixed(2)}</p>
-                            <p className="text-xs capitalize text-gray-600">
-                              {payment.payment_method}
-                            </p>
+                      {/* Services */}
+                      {(selectedPayment.invoiceDetails?.invoice_items || selectedPayment.rawData?.invoice_items || [])
+                        .filter((item) => item.item_type === 'service')
+                        .map((item, idx) => (
+                          <div key={idx} className="flex justify-between items-start p-3 bg-muted/50 rounded-lg">
+                            <div className="flex-1">
+                              <p className="font-medium">{item.item_name}</p>
+                              {item.notes && (
+                                <p className="text-xs text-muted-foreground mt-1">{item.notes}</p>
+                              )}
+                              <p className="text-xs text-muted-foreground mt-1">
+                                Quantity: {item.quantity || 1}
+                              </p>
+                            </div>
+                            <div className="text-right">
+                              <p className="font-semibold">
+                                ${(parseFloat(item.unit_price || 0) * (item.quantity || 1)).toFixed(2)}
+                              </p>
+                              <p className="text-xs text-muted-foreground">
+                                ${parseFloat(item.unit_price || 0).toFixed(2)} each
+                              </p>
+                            </div>
                           </div>
-                          <div className="text-right">
-                            <p className="text-xs text-gray-600">
-                              {new Date(payment.payment_date).toLocaleDateString()}
-                            </p>
-                            <p className="text-xs text-gray-500">
-                              {payment.received_by_user
-                                ? `${payment.received_by_user.first_name} ${payment.received_by_user.last_name}`
-                                : 'Unknown'}
-                            </p>
+                        ))}
+
+                      {/* Medications */}
+                      {(selectedPayment.invoiceDetails?.invoice_items || selectedPayment.rawData?.invoice_items || [])
+                        .filter((item) => item.item_type === 'medicine')
+                        .map((item, idx) => (
+                          <div key={idx} className="flex justify-between items-start p-3 bg-blue-50 rounded-lg border border-blue-100">
+                            <div className="flex-1">
+                              <div className="flex items-center gap-2">
+                                <Pill className="h-4 w-4 text-blue-600" />
+                                <p className="font-medium">{item.item_name}</p>
+                              </div>
+                              {item.notes && (
+                                <p className="text-xs text-muted-foreground mt-1">{item.notes}</p>
+                              )}
+                              <p className="text-xs text-muted-foreground mt-1">
+                                Quantity: {item.quantity || 1}
+                              </p>
+                            </div>
+                            <div className="text-right">
+                              <p className="font-semibold">
+                                ${(parseFloat(item.unit_price || 0) * (item.quantity || 1)).toFixed(2)}
+                              </p>
+                              <p className="text-xs text-muted-foreground">
+                                ${parseFloat(item.unit_price || 0).toFixed(2)} each
+                              </p>
+                            </div>
                           </div>
-                        </div>
-                      ))}
+                        ))}
                     </div>
+                  </div>
+                ) : (
+                  <div className="border-b pb-4">
+                    <h4 className="mb-3 text-base font-semibold">Services & Items</h4>
+                    <p className="text-sm text-muted-foreground">No items found</p>
                   </div>
                 )}
 
+                {/* Invoice Summary */}
+                <div className="border-b pb-4">
+                  <h4 className="mb-3 text-base font-semibold">Invoice Summary</h4>
+                  <div className="space-y-2 text-sm">
+                    <div className="flex justify-between">
+                      <span className="text-muted-foreground">Subtotal:</span>
+                      <span className="font-medium">
+                        ${parseFloat(selectedPayment.invoiceDetails?.total_amount || selectedPayment.rawData?.total_amount || 0).toFixed(2)}
+                      </span>
+                    </div>
+                    {selectedPayment.invoiceDetails?.discount_amount > 0 && (
+                      <div className="flex justify-between text-green-600">
+                        <span>Discount:</span>
+                        <span className="font-medium">
+                          -${parseFloat(selectedPayment.invoiceDetails.discount_amount).toFixed(2)}
+                        </span>
+                      </div>
+                    )}
+                    <Separator />
+                    <div className="flex justify-between text-base font-bold">
+                      <span>Total Amount:</span>
+                      <span>
+                        ${parseFloat(selectedPayment.invoiceDetails?.total_amount || selectedPayment.rawData?.total_amount || 0).toFixed(2)}
+                      </span>
+                    </div>
+                    {(() => {
+                      // Calculate credit amount from payment transactions
+                      const paymentTransactions = selectedPayment.invoiceDetails?.payment_transactions || selectedPayment.rawData?.payment_transactions || [];
+                      const creditFromPrevious = paymentTransactions
+                        .filter((pt) => {
+                          const notes = (pt.payment_notes || '').toLowerCase();
+                          return (
+                            notes.includes('paid with current visit') ||
+                            notes.includes('previous invoice') ||
+                            notes.includes('outstanding balance') ||
+                            notes.includes('from previous invoices')
+                          );
+                        })
+                        .reduce((sum, pt) => sum + parseFloat(pt.amount || 0), 0);
+                      
+                      const total = parseFloat(selectedPayment.invoiceDetails?.total_amount || selectedPayment.rawData?.total_amount || 0);
+                      const paid = parseFloat(
+                        selectedPayment.invoiceDetails?.paid_amount ||
+                          paymentTransactions.reduce((sum, p) => sum + parseFloat(p.amount || 0), 0) ||
+                          0
+                      );
+                      const balance = total - paid;
+                      const creditFromOverpayment = balance < 0 ? Math.abs(balance) : 0;
+                      const totalCredit = creditFromPrevious + creditFromOverpayment;
+                      
+                      return (
+                        <>
+                          {totalCredit > 0 && (
+                            <div className="flex justify-between text-blue-600">
+                              <span className="font-semibold">Credit from Previous Invoices:</span>
+                              <span className="font-semibold">
+                                ${totalCredit.toFixed(2)}
+                              </span>
+                            </div>
+                          )}
+                          <div className="flex justify-between text-green-600">
+                            <span className="font-semibold">Paid Amount:</span>
+                            <span className="font-semibold">
+                              ${paid.toFixed(2)}
+                            </span>
+                          </div>
+                          {balance > 0 && (
+                            <div className="flex justify-between text-red-600">
+                              <span className="font-medium">Balance Due:</span>
+                              <span className="font-semibold">
+                                ${balance.toFixed(2)}
+                              </span>
+                            </div>
+                          )}
+                          {patientRemainingCredit > 0 && (
+                            <div className="flex justify-between text-blue-600">
+                              <span className="font-semibold">Credit Remaining:</span>
+                              <span className="font-semibold">
+                                ${patientRemainingCredit.toFixed(2)} (Credit)
+                              </span>
+                            </div>
+                          )}
+                        </>
+                      );
+                    })()}
+                  </div>
+                </div>
+
+                {/* Payment History */}
+                {selectedPayment.invoiceDetails?.payment_transactions?.length > 0 ||
+                selectedPayment.rawData?.payment_transactions?.length > 0 ? (
+                  <div className="border-b pb-4">
+                    <h4 className="mb-3 text-base font-semibold flex items-center gap-2">
+                      <CreditCard className="h-4 w-4" />
+                      Payment History
+                    </h4>
+                    <div className="space-y-2">
+                      {(selectedPayment.invoiceDetails?.payment_transactions ||
+                        selectedPayment.rawData?.payment_transactions ||
+                        [])
+                        .map((payment, idx) => {
+                          // Try multiple date fields with fallbacks
+                          const paymentDate = 
+                            payment.payment_date || 
+                            payment.created_at || 
+                            payment.received_at ||
+                            payment.paymentDate ||
+                            null;
+                          
+                          // Validate date
+                          let formattedDate = 'N/A';
+                          let formattedTime = 'N/A';
+                          if (paymentDate) {
+                            try {
+                              const dateObj = new Date(paymentDate);
+                              if (!isNaN(dateObj.getTime())) {
+                                formattedDate = dateObj.toLocaleDateString('en-US', {
+                                  year: 'numeric',
+                                  month: 'short',
+                                  day: 'numeric',
+                                });
+                                formattedTime = dateObj.toLocaleTimeString('en-US', {
+                                  hour: 'numeric',
+                                  minute: '2-digit',
+                                  hour12: true,
+                                });
+                              }
+                            } catch (e) {
+                              logger.debug('Date parsing error:', e);
+                            }
+                          }
+                          
+                          const isCreditPayment = 
+                            payment.payment_notes?.toLowerCase().includes('credit') ||
+                            payment.notes?.toLowerCase().includes('credit') ||
+                            payment.payment_notes?.toLowerCase().includes('due credit') ||
+                            payment.notes?.toLowerCase().includes('due credit') ||
+                            parseFloat(payment.amount || 0) < 0;
+                          
+                          // Get payment notes from either field
+                          const paymentNotes = payment.payment_notes || payment.notes || '';
+                          
+                          return (
+                            <div
+                              key={idx}
+                              className={`flex items-center justify-between rounded p-3 text-sm ${
+                                isCreditPayment
+                                  ? 'bg-blue-50 border border-blue-200'
+                                  : 'bg-green-50 border border-green-200'
+                              }`}
+                            >
+                              <div className="flex-1">
+                                <div className="flex items-center gap-2">
+                                  <p className="font-semibold">
+                                    ${Math.abs(parseFloat(payment.amount || 0)).toFixed(2)}
+                                  </p>
+                                  {isCreditPayment && (
+                                    <Badge variant="outline" className="bg-blue-100 text-blue-800 border-blue-300">
+                                      Credit Payment
+                                    </Badge>
+                                  )}
+                                </div>
+                                <p className="text-xs capitalize text-muted-foreground mt-1">
+                                  {payment.payment_method || 'N/A'}
+                                </p>
+                                {paymentNotes && (
+                                  <p className="text-xs text-muted-foreground mt-1">{paymentNotes}</p>
+                                )}
+                              </div>
+                              <div className="text-right">
+                                <p className="text-xs font-medium">
+                                  {formattedDate}
+                                </p>
+                                <p className="text-xs text-muted-foreground">
+                                  {formattedTime}
+                                </p>
+                                <p className="text-xs text-muted-foreground mt-1">
+                                  {payment.received_by_user
+                                    ? `${payment.received_by_user.first_name || ''} ${payment.received_by_user.last_name || ''}`.trim() || 
+                                      payment.received_by_user.full_name || 'Unknown'
+                                    : payment.processed_by_user
+                                      ? `${payment.processed_by_user.first_name || ''} ${payment.processed_by_user.last_name || ''}`.trim() ||
+                                        payment.processed_by_user.full_name || 'Unknown'
+                                      : payment.received_by
+                                        ? 'Processed'
+                                        : 'Unknown'}
+                                </p>
+                              </div>
+                            </div>
+                          );
+                        })}
+                    </div>
+                  </div>
+                ) : null}
+
                 {/* Actions */}
-                <div className="flex justify-end gap-2">
+                <div className="flex justify-end gap-2 pt-4 border-t">
                   <Button
                     variant="outline"
-                    onClick={() => handleDownloadReceipt({ rawData: selectedPayment.invoice })}
+                    onClick={() => handleDownloadReceipt({ rawData: selectedPayment.invoice || selectedPayment.rawData })}
                     className="gap-2"
                   >
                     <Download className="h-4 w-4" />

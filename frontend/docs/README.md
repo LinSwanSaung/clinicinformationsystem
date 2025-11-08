@@ -9,6 +9,7 @@ This directory contains production-ready documentation for the RealCIS frontend.
 - **[ARCHITECTURE.md](./ARCHITECTURE.md)** - Architecture, design patterns, component structure, and best practices
 - **[SETUP_AND_DEPLOYMENT.md](./SETUP_AND_DEPLOYMENT.md)** - Setup, configuration, build, and deployment guide
 - **[PRODUCTION_CHECKLIST.md](./PRODUCTION_CHECKLIST.md)** - Production deployment checklist and verification steps
+- **[ADDING_FEATURES.md](./ADDING_FEATURES.md)** - Guide for adding new features while maintaining clean structure
 
 ## 🔍 Quick Reference
 

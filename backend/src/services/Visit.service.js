@@ -5,6 +5,7 @@ import {
   getVisitStatistics as repoVisitStats,
   updateVisitStatus as repoUpdateVisitStatus,
 } from './repositories/VisitsRepo.js';
+import logger from '../config/logger.js';
 
 /**
  * Visit Service
@@ -107,7 +108,7 @@ class VisitService {
         message: 'Visit created successfully',
       };
     } catch (error) {
-      logger.error('[VISIT] Error creating visit:', error);
+      logger.error('Error creating visit:', error);
       throw error;
     }
   }
@@ -125,7 +126,7 @@ class VisitService {
       // eslint-disable-next-line no-unused-vars
       const { created_by, updated_by, ...cleanUpdateData } = updateData;
 
-      const visit = await this.visitModel.update(visitId, cleanUpdateData);
+      const visit = await this.visitModel.updateById(visitId, cleanUpdateData);
 
       return {
         success: true,

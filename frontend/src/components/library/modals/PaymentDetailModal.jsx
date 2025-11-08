@@ -23,21 +23,29 @@ export function PaymentDetailModal({
   onDownloadReceipt, // reserved for future use; behavior unchanged today
   children,
 }) {
-  const handleSubmit = async () => {
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    // Don't auto-submit - let the parent component handle the confirmation dialog
+    // The parent should open a confirmation dialog before calling onPay
     if (typeof onPay === 'function' && invoice?.id) {
-      await onPay(invoice.id);
+      // Call onPay which should open the confirmation dialog, not process directly
+      onPay();
     }
   };
 
   return (
     <FormModal
-      open={open}
+      isOpen={open}
       onOpenChange={onOpenChange}
       title={`Process Invoice - ${invoice?.id ?? ''}`}
       onSubmit={handleSubmit}
-      isSubmitting={!!isProcessing}
+      isLoading={!!isProcessing}
+      size="xl"
+      className="max-w-[95vw] max-h-[95vh] w-full h-full flex flex-col"
     >
-      {children}
+      <div className="overflow-y-auto flex-1">
+        {children}
+      </div>
     </FormModal>
   );
 }

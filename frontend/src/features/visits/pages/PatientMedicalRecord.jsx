@@ -264,6 +264,9 @@ const PatientMedicalRecord = () => {
                 }
 
                 return {
+                  id: note.id, // Store original note ID for updates
+                  visit_id: note.visit_id, // Store visit_id for prescription updates
+                  doctor_id: note.doctor_id, // Store doctor_id
                   date: new Date(note.created_at).toLocaleDateString(),
                   note: notesMatch ? notesMatch[1].trim() : content,
                   diagnosis: diagnosisMatch ? diagnosisMatch[1].trim() : 'N/A',
@@ -532,22 +535,124 @@ const PatientMedicalRecord = () => {
     setIsEditNoteModalOpen(true);
   };
 
-  const handleUpdateNote = () => {
-    if (noteFormData.note.trim() && noteFormData.diagnosis.trim() && editingNote) {
+  const handleUpdateNote = async () => {
+    if (!noteFormData.note.trim() || !noteFormData.diagnosis.trim() || !editingNote) {
+      alert('Diagnosis and clinical notes are required');
+      return;
+    }
+
+    if (!editingNote.id) {
+      alert('Cannot update note: Note ID is missing. Please refresh and try again.');
+      return;
+    }
+
+    try {
+      // Filter medications that have required fields
+      const validMedications = noteFormData.medications.filter(
+        (med) => med.name && med.dosage && med.frequency
+      );
+
+      // Step 1: Update the doctor note in the backend
+      const noteContent = `Diagnosis: ${noteFormData.diagnosis}\n\nClinical Notes: ${noteFormData.note}`;
+      await doctorNotesService.updateNote(editingNote.id, {
+        content: noteContent,
+      });
+
+      // Step 2: Update prescriptions if visit_id exists
+      if (editingNote.visit_id) {
+        // Get existing prescriptions for this visit
+        const existingPrescriptions = await prescriptionService.getPrescriptionsByVisit(
+          editingNote.visit_id
+        );
+
+        // Filter to prescriptions from this note (by doctor and time window)
+        const noteTime = new Date(editingNote.date).getTime();
+        const timeWindow = 5 * 60 * 1000; // 5 minutes window
+
+        const notePrescriptions = Array.isArray(existingPrescriptions)
+          ? existingPrescriptions.filter((p) => {
+              if (p.doctor_id !== editingNote.doctor_id) return false;
+              const prescriptionTime = new Date(p.created_at || p.prescribed_date).getTime();
+              const timeDiff = Math.abs(noteTime - prescriptionTime);
+              return timeDiff <= timeWindow;
+            })
+          : [];
+
+        // Cancel old prescriptions that are no longer in the updated medications
+        const updatedMedNames = validMedications.map((m) => m.name.toLowerCase().trim());
+        for (const oldPrescription of notePrescriptions) {
+          const oldMedName = oldPrescription.medication_name?.toLowerCase().trim();
+          if (!updatedMedNames.includes(oldMedName)) {
+            await prescriptionService.cancelPrescription(oldPrescription.id);
+          }
+        }
+
+        // Create new prescriptions for medications that don't exist
+        const existingMedNames = notePrescriptions.map((p) =>
+          p.medication_name?.toLowerCase().trim()
+        );
+        const currentUser = JSON.parse(localStorage.getItem('user') || '{}');
+
+        for (const med of validMedications) {
+          const medName = med.name.toLowerCase().trim();
+          if (!existingMedNames.includes(medName)) {
+            // Create new prescription
+            await prescriptionService.createPrescription({
+              patient_id: selectedPatient.id,
+              doctor_id: currentUser.id || editingNote.doctor_id,
+              visit_id: editingNote.visit_id,
+              medication_name: med.name,
+              dosage: med.dosage,
+              frequency: med.frequency,
+              duration: med.duration || null,
+              quantity: med.quantity || null,
+              refills: med.refills || 0,
+              instructions: med.instructions || null,
+              status: 'active',
+              prescribed_date: new Date().toISOString().split('T')[0],
+            });
+          }
+        }
+      }
+
+      // Step 3: Update local state
       const updatedNote = {
+        ...editingNote,
         date: editingNote.date,
         note: noteFormData.note,
         diagnosis: noteFormData.diagnosis,
-        prescribedMedications: noteFormData.medications.filter(
-          (med) => med.name && med.dosage && med.frequency
-        ),
+        prescribedMedications: validMedications,
       };
 
       setDoctorNotesList((prev) =>
         prev.map((note, index) => (index === editingNote.index ? updatedNote : note))
       );
 
+      // Step 4: Refresh patient data to update current medications
+      if (selectedPatient?.id) {
+        const visits = await visitService.getPatientVisitHistory(selectedPatient.id, {
+          includeCompleted: true,
+          includeInProgress: true,
+          limit: 50,
+        });
+        const mostRecentVisit = Array.isArray(visits) && visits.length > 0 ? visits[0] : null;
+        const recentPrescriptions = mostRecentVisit?.prescriptions || [];
+
+        setFullPatientData((prev) => ({
+          ...prev,
+          currentMedications: recentPrescriptions.map((p) => ({
+            name: p.medication_name,
+            dosage: p.dosage,
+            frequency: p.frequency,
+          })),
+        }));
+      }
+
+      alert('Note updated successfully! Prescriptions have been updated.');
       closeAllModals();
+    } catch (error) {
+      logger.error('Error updating note:', error);
+      alert('Failed to update note. Please try again.');
     }
   };
 

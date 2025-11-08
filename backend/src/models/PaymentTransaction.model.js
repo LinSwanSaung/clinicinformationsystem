@@ -12,17 +12,52 @@ class PaymentTransactionModel extends BaseModel {
    * Get payments by invoice ID
    */
   async getPaymentsByInvoice(invoiceId) {
+    // First get payment transactions without user relations to avoid ambiguous relationship
     const { data, error } = await this.supabase
       .from(this.tableName)
-      .select(`
-        *,
-        received_by_user:users(id, full_name, role)
-      `)
+      .select('*')
       .eq('invoice_id', invoiceId)
       .order('received_at', { ascending: false });
 
     if (error) throw error;
-    return data;
+    
+    // If no data, return empty array
+    if (!data || data.length === 0) {
+      return [];
+    }
+
+    // Get unique user IDs
+    const userIds = [
+      ...new Set(
+        data
+          .map((pt) => [pt.received_by, pt.processed_by])
+          .flat()
+          .filter(Boolean)
+      ),
+    ];
+
+    // Fetch users separately if we have any user IDs
+    let userMap = {};
+    if (userIds.length > 0) {
+      const { data: users, error: usersError } = await this.supabase
+        .from('users')
+        .select('id, first_name, last_name, role')
+        .in('id', userIds);
+
+      if (usersError) throw usersError;
+      
+      // Create a map for quick lookup
+      (users || []).forEach((user) => {
+        userMap[user.id] = user;
+      });
+    }
+
+    // Attach user info to payment transactions
+    return data.map((pt) => ({
+      ...pt,
+      received_by_user: pt.received_by ? userMap[pt.received_by] || null : null,
+      processed_by_user: pt.processed_by ? userMap[pt.processed_by] || null : null,
+    }));
   }
 
   /**

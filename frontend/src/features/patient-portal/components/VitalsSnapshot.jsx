@@ -1,4 +1,4 @@
-﻿import { useMemo } from 'react';
+﻿import { useMemo, memo } from 'react';
 import { useTranslation } from 'react-i18next';
 import { motion } from 'framer-motion';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
@@ -118,7 +118,7 @@ const CustomTooltip = ({ active, payload }) => {
   );
 };
 
-const VitalCard = React.memo(({ title, value, unit, delta, chartData, dataKey, color }) => {
+const VitalCard = memo(({ title, value, unit, delta, chartData, dataKey, color }) => {
   // Check if we have enough data points
   const validValues = useMemo(() => {
     if (!chartData || chartData.length < 1) return [];
@@ -255,7 +255,7 @@ const VitalCard = React.memo(({ title, value, unit, delta, chartData, dataKey, c
 
 VitalCard.displayName = 'VitalCard';
 
-const BloodPressureCard = React.memo(({ chartData, latest, previous }) => {
+const BloodPressureCard = memo(({ chartData, latest, previous }) => {
   const { t } = useTranslation();
   
   const sysValue = latest?.systolic !== null ? latest.systolic : null;

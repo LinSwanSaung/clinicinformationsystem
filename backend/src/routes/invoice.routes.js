@@ -406,6 +406,26 @@ router.get(
 );
 
 /**
+ * @route   GET /api/invoices/patient/:patientId/remaining-credit
+ * @desc    Get patient's total remaining credit
+ * @access  Private (Cashier, Admin)
+ */
+router.get(
+  '/patient/:patientId/remaining-credit',
+  authenticate,
+  authorize(ROLES.ADMIN, ROLES.CASHIER, 'receptionist'),
+  asyncHandler(async (req, res) => {
+    const { patientId } = req.params;
+    const credit = await InvoiceService.getPatientRemainingCredit(patientId);
+
+    res.status(200).json({
+      success: true,
+      data: credit,
+    });
+  })
+);
+
+/**
  * @route   GET /api/invoices/patient/:patientId/can-create
  * @desc    Check if patient can create more invoices (max 2 outstanding)
  * @access  Private (Cashier, Doctor, Admin)

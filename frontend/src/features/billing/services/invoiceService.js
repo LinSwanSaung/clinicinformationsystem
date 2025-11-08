@@ -86,9 +86,9 @@ const invoiceService = {
   recordPayment: async (invoiceId, paymentData) => {
     const response = await apiService.post('/payments', {
       invoice_id: invoiceId,
-      amount: paymentData.amount_paid,
+      amount: paymentData.amount || paymentData.amount_paid,
       payment_method: paymentData.payment_method,
-      payment_notes: paymentData.notes
+      payment_notes: paymentData.payment_notes || paymentData.notes
     });
     return response.data;
   },
@@ -108,6 +108,12 @@ const invoiceService = {
   // Get patient's total outstanding balance
   getPatientOutstandingBalance: async (patientId) => {
     const response = await apiService.get(`/invoices/patient/${patientId}/outstanding-balance`);
+    return response.data;
+  },
+
+  // Get patient's total remaining credit
+  getPatientRemainingCredit: async (patientId) => {
+    const response = await apiService.get(`/invoices/patient/${patientId}/remaining-credit`);
     return response.data;
   },
 

@@ -620,6 +620,22 @@ class InvoiceService {
       throw new Error(`Failed to get outstanding balance: ${error.message}`);
     }
   }
+
+  /**
+   * Get patient's total remaining credit (sum of negative balance_due from all invoices)
+   */
+  async getPatientRemainingCredit(patientId) {
+    try {
+      const { getPatientRemainingCredit: getCredit } = await import('./repositories/BillingRepo.js');
+      const totalCredit = await getCredit(patientId);
+      return {
+        totalCredit,
+        patientId,
+      };
+    } catch (error) {
+      throw new Error(`Failed to get patient remaining credit: ${error.message}`);
+    }
+  }
 }
 
 export default new InvoiceService();

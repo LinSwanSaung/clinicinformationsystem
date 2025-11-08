@@ -1,11 +1,16 @@
 import express from 'express';
 import cors from 'cors';
 import dotenv from 'dotenv';
+import helmet from 'helmet';
+import compression from 'compression';
 
 // Import middleware
 import { errorHandler } from './middleware/errorHandler.js';
 import { authenticate } from './middleware/auth.js';
 import { requestLogger } from './middleware/requestLogger.js';
+import { rateLimiter } from './middleware/rateLimiter.js';
+import config from './config/app.config.js';
+import logger from './config/logger.js';
 
 // Import routes
 import authRoutes from './routes/auth.routes.js';
@@ -41,7 +46,82 @@ dotenv.config();
 const app = express();
 const PORT = process.env.PORT || 3001;
 
-// Disable HTTP caching for API responses to prevent 304 Not Modified issues
+// ============================================================================
+// MIDDLEWARE ORDER (CRITICAL - Order matters!)
+// ============================================================================
+
+// 1. Trust proxy - Must be first if behind reverse proxy (nginx, load balancer)
+// This ensures rate limiting and IP detection work correctly
+app.set('trust proxy', process.env.TRUST_PROXY === 'true' ? true : 1);
+
+// 2. Security headers - Protect against common vulnerabilities
+app.use(
+  helmet({
+    contentSecurityPolicy: {
+      directives: {
+        defaultSrc: ["'self'"],
+        styleSrc: ["'self'", "'unsafe-inline'"],
+        scriptSrc: ["'self'"],
+        imgSrc: ["'self'", 'data:', 'https:'],
+      },
+    },
+    crossOriginEmbedderPolicy: false, // Allow embedding if needed
+  })
+);
+
+// 3. CORS - Configure properly based on environment
+const corsOptions = {
+  origin: (origin, callback) => {
+    // Allow requests with no origin (mobile apps, curl, etc.)
+    if (!origin) return callback(null, true);
+
+    const allowedOrigins = process.env.CLIENT_URL
+      ? process.env.CLIENT_URL.split(',')
+      : [config.cors.origin];
+
+    // In development, allow localhost on any port
+    if (process.env.NODE_ENV === 'development') {
+      if (
+        origin.startsWith('http://localhost') ||
+        origin.startsWith('http://127.0.0.1') ||
+        allowedOrigins.includes(origin)
+      ) {
+        return callback(null, true);
+      }
+    }
+
+    // In production, only allow configured origins
+    if (allowedOrigins.includes(origin)) {
+      callback(null, true);
+    } else {
+      callback(new Error('Not allowed by CORS'));
+    }
+  },
+  credentials: config.cors.credentials,
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
+  allowedHeaders: [
+    'Content-Type',
+    'Authorization',
+    'X-Requested-With',
+    'x-dev-role',
+    'Cache-Control',
+    'Pragma',
+  ],
+  exposedHeaders: ['RateLimit-Reset', 'RateLimit-Remaining', 'RateLimit-Limit'],
+};
+app.use(cors(corsOptions));
+
+// 4. Response compression - Compress responses to reduce bandwidth
+app.use(compression());
+
+// 5. Body parsers - Parse JSON and URL-encoded bodies
+app.use(express.json({ limit: '10mb' }));
+app.use(express.urlencoded({ extended: true, limit: '10mb' }));
+
+// 6. Request logger - Log all incoming requests
+app.use(requestLogger);
+
+// 7. Disable HTTP caching for API responses to prevent 304 Not Modified issues
 app.set('etag', false);
 app.use((req, res, next) => {
   res.set({
@@ -52,15 +132,16 @@ app.use((req, res, next) => {
   next();
 });
 
-// Simple CORS - Allow everything in development
-app.use(cors());
+// 8. Global rate limiter - Apply to all routes except health check
+// Health check should be exempt to allow monitoring systems to check status
+app.use((req, res, next) => {
+  if (req.path === '/health') {
+    return next(); // Skip rate limiting for health check
+  }
+  rateLimiter(req, res, next);
+});
 
-// Basic middleware
-app.use(express.json({ limit: '10mb' }));
-app.use(express.urlencoded({ extended: true, limit: '10mb' }));
-app.use(requestLogger);
-
-// Health check endpoint (includes DB connectivity)
+// Health check endpoint (includes DB connectivity) - Must be before routes
 app.get('/health', async (req, res) => {
   const dbConnected = await testConnection();
   res.status(200).json({
@@ -115,20 +196,20 @@ app.use(errorHandler);
 
 // Start server
 app.listen(PORT, () => {
-  console.log(`🚀 RealCIS API Server running on port ${PORT}`);
-  console.log(`📋 Environment: ${process.env.NODE_ENV}`);
-  console.log(`🏥 Health check: http://localhost:${PORT}/health`);
+  logger.info(`🚀 RealCIS API Server running on port ${PORT}`);
+  logger.info(`📋 Environment: ${process.env.NODE_ENV}`);
+  logger.info(`🏥 Health check: http://localhost:${PORT}/health`);
 
   // Start automatic token scheduler
-  console.log('\n⏰ Starting Token Scheduler...');
+  logger.info('⏰ Starting Token Scheduler...');
   tokenScheduler.start();
-  console.log('✓ Token Scheduler started - will check for missed tokens every 5 minutes');
+  logger.info('✓ Token Scheduler started - will check for missed tokens every 5 minutes');
 
   // Start automatic appointment auto-cancel job
-  console.log('\n⏰ Starting Appointment Auto-Cancel Job...');
+  logger.info('⏰ Starting Appointment Auto-Cancel Job...');
   appointmentAutoCancel.start();
-  console.log(
-    `✓ Appointment Auto-Cancel started - ${appointmentAutoCancel.getScheduleDescription()}\n`
+  logger.info(
+    `✓ Appointment Auto-Cancel started - ${appointmentAutoCancel.getScheduleDescription()}`
   );
 });
 

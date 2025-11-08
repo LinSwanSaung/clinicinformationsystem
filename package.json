@@ -41,5 +41,15 @@
     "husky": "^9.1.7",
     "lint-staged": "^15.2.11",
     "rimraf": "^5.0.5"
+  },
+  "lint-staged": {
+    "backend/src/**/*.js": [
+      "eslint --fix",
+      "prettier --write"
+    ],
+    "frontend/src/**/*.{js,jsx,ts,tsx}": [
+      "eslint --fix",
+      "prettier --write"
+    ]
   }
 }

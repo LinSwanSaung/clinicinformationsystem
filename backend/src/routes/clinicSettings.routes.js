@@ -89,7 +89,7 @@ router.get('/consultation-duration', authenticate, async (req, res) => {
       timestamp: new Date().toISOString(),
     });
   } catch (error) {
-    console.error('Error fetching consultation duration:', error);
+    logger.error('Error fetching consultation duration:', error);
     res.status(500).json({
       success: false,
       message: 'Failed to fetch consultation duration',
@@ -109,7 +109,7 @@ router.get('/late-threshold', authenticate, async (req, res) => {
       timestamp: new Date().toISOString(),
     });
   } catch (error) {
-    console.error('Error fetching late threshold:', error);
+    logger.error('Error fetching late threshold:', error);
     res.status(500).json({
       success: false,
       message: 'Failed to fetch late threshold',

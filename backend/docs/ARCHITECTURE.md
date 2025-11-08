@@ -98,7 +98,6 @@ The backend follows a layered architecture with clear separation of concerns:
 
 - `src/services/repositories/*.js`
 - `src/config/database.js` (client export)
-- `scripts/*.js` (utility scripts)
 
 **Forbidden everywhere else:**
 

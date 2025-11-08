@@ -1,4 +1,5 @@
 import { supabase } from '../config/database.js';
+import logger from '../config/logger.js';
 
 /**
  * Log an audit event with enhanced tracking
@@ -49,10 +50,10 @@ export async function logAuditEvent({
 
     const { error } = await supabase.from('audit_logs').insert(insert);
     if (error) {
-      console.error('[AUDIT] Failed to insert audit log:', error.message || error);
+      logger.error('[AUDIT] Failed to insert audit log:', error.message || error);
     }
   } catch (err) {
-    console.error('[AUDIT] Logging error:', err?.message || err);
+    logger.error('[AUDIT] Logging error:', err?.message || err);
   }
 }
 

@@ -50,6 +50,18 @@ export const errorHandler = (error, req, res, next) => {
     message = 'Unauthorized access';
   }
 
+  // Handle CORS errors
+  if (error.message.includes('CORS') || error.message.includes('Not allowed by CORS')) {
+    statusCode = 403;
+    message = 'CORS policy: Origin not allowed';
+  }
+
+  // Handle rate limit errors
+  if (error.statusCode === 429 || error.message.includes('Too many requests')) {
+    statusCode = 429;
+    message = error.message || 'Too many requests, please try again later';
+  }
+
   if (error.message.includes('not found') || error.message.includes('does not exist')) {
     statusCode = 404;
     message = 'Resource not found';

@@ -15,6 +15,7 @@ import cron from 'node-cron';
 import AppointmentModel from '../models/Appointment.model.js';
 import InvoiceModel from '../models/Invoice.model.js';
 import { logAuditEvent } from '../utils/auditLogger.js';
+import logger from '../config/logger.js';
 
 class AppointmentAutoCancelJob {
   constructor() {
@@ -31,33 +32,33 @@ class AppointmentAutoCancelJob {
    */
   start() {
     if (this.isRunning) {
-      console.log('[AppointmentAutoCancel] Already running');
+      logger.info('[AppointmentAutoCancel] Already running');
       return;
     }
 
     if (this.dryRun) {
-      console.log('[AppointmentAutoCancel] ⚠️  DRY RUN MODE - No appointments will be cancelled');
+      logger.warn('[AppointmentAutoCancel] ⚠️  DRY RUN MODE - No appointments will be cancelled');
     }
 
     this.scheduledTask = cron.schedule(
       this.cronSchedule,
       async () => {
         try {
-          console.log('[AppointmentAutoCancel] Running end-of-day auto-cancel check...');
+          logger.info('[AppointmentAutoCancel] Running end-of-day auto-cancel check...');
           const result = await this.processStaleAppointments();
 
-          console.log(`[AppointmentAutoCancel] ✓ Processed ${result.totalScanned} appointments`);
-          console.log(`[AppointmentAutoCancel]   - Cancelled: ${result.totalCancelled}`);
-          console.log(`[AppointmentAutoCancel]   - Skipped: ${result.totalSkipped}`);
+          logger.info(`[AppointmentAutoCancel] ✓ Processed ${result.totalScanned} appointments`);
+          logger.info(`[AppointmentAutoCancel]   - Cancelled: ${result.totalCancelled}`);
+          logger.info(`[AppointmentAutoCancel]   - Skipped: ${result.totalSkipped}`);
 
           if (result.cancelledAppointments.length > 0) {
-            console.log(
+            logger.info(
               '[AppointmentAutoCancel] Cancelled appointments:',
               result.cancelledAppointments.map((a) => `#${a.id.substring(0, 8)}`).join(', ')
             );
           }
         } catch (error) {
-          console.error('[AppointmentAutoCancel] Error during auto-cancel:', error);
+          logger.error('[AppointmentAutoCancel] Error during auto-cancel:', error);
         }
       },
       {
@@ -67,12 +68,12 @@ class AppointmentAutoCancelJob {
     );
 
     this.isRunning = true;
-    console.log(
+    logger.info(
       `[AppointmentAutoCancel] ✓ Started - Schedule: ${this.cronSchedule} (${this.getScheduleDescription()})`
     );
-    console.log(`[AppointmentAutoCancel] Lookback days: ${this.lookbackDays}`);
+    logger.info(`[AppointmentAutoCancel] Lookback days: ${this.lookbackDays}`);
     if (this.dryRun) {
-      console.log('[AppointmentAutoCancel] ⚠️  DRY RUN MODE ENABLED');
+      logger.warn('[AppointmentAutoCancel] ⚠️  DRY RUN MODE ENABLED');
     }
   }
 
@@ -83,7 +84,7 @@ class AppointmentAutoCancelJob {
     if (this.scheduledTask) {
       this.scheduledTask.stop();
       this.isRunning = false;
-      console.log('[AppointmentAutoCancel] Stopped');
+      logger.info('[AppointmentAutoCancel] Stopped');
     }
   }
 
@@ -121,7 +122,7 @@ class AppointmentAutoCancelJob {
 
     const cutoffDateStr = cutoffDate.toISOString().split('T')[0]; // YYYY-MM-DD
 
-    console.log(`[AppointmentAutoCancel] Scanning appointments before ${cutoffDateStr}...`);
+    logger.debug(`[AppointmentAutoCancel] Scanning appointments before ${cutoffDateStr}...`);
 
     // Query appointments that:
     // 1. Are from past days (before cutoff)
@@ -152,11 +153,11 @@ class AppointmentAutoCancelJob {
     };
 
     if (!staleAppointments || staleAppointments.length === 0) {
-      console.log('[AppointmentAutoCancel] No stale appointments found');
+      logger.info('[AppointmentAutoCancel] No stale appointments found');
       return result;
     }
 
-    console.log(
+    logger.info(
       `[AppointmentAutoCancel] Found ${staleAppointments.length} stale appointments to process`
     );
 
@@ -167,7 +168,7 @@ class AppointmentAutoCancelJob {
         const hasPaidInvoice = await this.checkHasPaidInvoice(appointment.id);
 
         if (hasPaidInvoice) {
-          console.log(
+          logger.debug(
             `[AppointmentAutoCancel] Skipping appointment ${appointment.id.substring(0, 8)} - has paid invoice`
           );
           result.totalSkipped++;
@@ -178,7 +179,7 @@ class AppointmentAutoCancelJob {
         if (!this.dryRun) {
           await this.cancelAppointment(appointment);
         } else {
-          console.log(
+          logger.debug(
             `[AppointmentAutoCancel] [DRY RUN] Would cancel appointment ${appointment.id.substring(0, 8)}`
           );
         }
@@ -195,7 +196,7 @@ class AppointmentAutoCancelJob {
             : 'Unknown',
         });
       } catch (error) {
-        console.error(
+        logger.error(
           `[AppointmentAutoCancel] Error processing appointment ${appointment.id}:`,
           error.message
         );
@@ -219,7 +220,7 @@ class AppointmentAutoCancelJob {
         .limit(1);
 
       if (visitError) {
-        console.warn(
+        logger.warn(
           `[AppointmentAutoCancel] Error checking visits for appointment ${appointmentId}:`,
           visitError.message
         );
@@ -240,7 +241,7 @@ class AppointmentAutoCancelJob {
         .limit(1);
 
       if (invoiceError) {
-        console.warn(
+        logger.warn(
           `[AppointmentAutoCancel] Error checking invoices for appointment ${appointmentId}:`,
           invoiceError.message
         );
@@ -249,7 +250,7 @@ class AppointmentAutoCancelJob {
 
       return invoices && invoices.length > 0;
     } catch (error) {
-      console.error(`[AppointmentAutoCancel] Error checking paid invoice:`, error);
+      logger.error(`[AppointmentAutoCancel] Error checking paid invoice:`, error);
       return false; // On error, assume no paid invoice (safer to cancel)
     }
   }
@@ -288,11 +289,11 @@ class AppointmentAutoCancelJob {
         reason: 'Auto-cancelled by end-of-day job - appointment from past day with no paid invoice',
       });
     } catch (logError) {
-      console.error('[AppointmentAutoCancel] Failed to log audit event:', logError.message);
+      logger.error('[AppointmentAutoCancel] Failed to log audit event:', logError.message);
       // Don't fail the operation if audit logging fails
     }
 
-    console.log(
+    logger.info(
       `[AppointmentAutoCancel] ✓ Cancelled appointment ${appointment.id.substring(0, 8)} (${appointment.appointment_date})`
     );
   }
@@ -302,15 +303,15 @@ class AppointmentAutoCancelJob {
    */
   async triggerManualCheck() {
     try {
-      console.log('[AppointmentAutoCancel] Manual check triggered...');
+      logger.info('[AppointmentAutoCancel] Manual check triggered...');
       const result = await this.processStaleAppointments();
-      console.log(`[AppointmentAutoCancel] Manual check complete:`);
-      console.log(`  - Scanned: ${result.totalScanned}`);
-      console.log(`  - Cancelled: ${result.totalCancelled}`);
-      console.log(`  - Skipped: ${result.totalSkipped}`);
+      logger.info(`[AppointmentAutoCancel] Manual check complete:`);
+      logger.info(`  - Scanned: ${result.totalScanned}`);
+      logger.info(`  - Cancelled: ${result.totalCancelled}`);
+      logger.info(`  - Skipped: ${result.totalSkipped}`);
       return result;
     } catch (error) {
-      console.error('[AppointmentAutoCancel] Error during manual check:', error);
+      logger.error('[AppointmentAutoCancel] Error during manual check:', error);
       throw error;
     }
   }

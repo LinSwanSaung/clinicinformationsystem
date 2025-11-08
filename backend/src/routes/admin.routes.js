@@ -289,7 +289,7 @@ router.post(
       .single();
 
     if (fetchError || !currentRecord) {
-      console.error('[ADMIN] Failed to fetch record:', fetchError);
+      logger.error('[ADMIN] Failed to fetch record:', fetchError);
       throw new AppError(`${entityType} record not found`, 404);
     }
 
@@ -307,7 +307,7 @@ router.post(
       .eq(idColumn, entityId);
 
     if (updateError) {
-      console.error('[ADMIN] Failed to update record:', updateError);
+      logger.error('[ADMIN] Failed to update record:', updateError);
       throw new AppError(`Failed to update ${entityType} record: ${updateError.message}`, 500);
     }
 
@@ -344,7 +344,7 @@ router.post(
                   updated_at: new Date().toISOString(),
                 })
                 .eq('id', fullRecord.appointment_id);
-              console.log(`[ADMIN] Updated appointment ${fullRecord.appointment_id}`);
+              logger.debug(`[ADMIN] Updated appointment ${fullRecord.appointment_id}`);
             }
           }
 
@@ -402,12 +402,12 @@ router.post(
                   updated_at: new Date().toISOString(),
                 })
                 .eq('id', fullRecord.appointment_id);
-              console.log(`[ADMIN] Updated appointment ${fullRecord.appointment_id}`);
+              logger.debug(`[ADMIN] Updated appointment ${fullRecord.appointment_id}`);
             }
           }
         }
       } catch (cascadeError) {
-        console.error('[ADMIN] Error cascading status update:', cascadeError);
+        logger.error('[ADMIN] Error cascading status update:', cascadeError);
         // Don't fail the main operation, just log the error
       }
     }

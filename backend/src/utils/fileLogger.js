@@ -1,6 +1,7 @@
 import fs from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
+import logger from '../config/logger.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -39,10 +40,10 @@ export const logToFile = (level, event, context = {}) => {
     // Append to today's log file
     fs.appendFileSync(getLogFilename(), logLine);
     
-    // Also log to console for development
-    console.log(`[${level}] ${event}`, context);
+    // Also log using main logger for consistency
+    logger.info(`[FILE_LOG ${level}] ${event}`, context);
   } catch (error) {
-    console.error('Failed to write log:', error);
+    logger.error('Failed to write log:', error);
   }
 };
 

@@ -2,6 +2,7 @@ import { createClient } from '@supabase/supabase-js';
 import dotenv from 'dotenv';
 import path from 'path';
 import { fileURLToPath } from 'url';
+import logger from './logger.js';
 
 // Get the directory name for ES modules
 const __filename = fileURLToPath(import.meta.url);
@@ -57,14 +58,14 @@ export const testConnection = async () => {
     const { data, error } = await supabase.from('users').select('count', { count: 'exact', head: true });
     
     if (error) {
-      console.error('❌ Database connection failed:', error.message);
+      logger.error('❌ Database connection failed:', error.message);
       return false;
     }
     
-    console.log('✅ Database connection successful');
+    logger.info('✅ Database connection successful');
     return true;
   } catch (error) {
-    console.error('❌ Database connection error:', error.message);
+    logger.error('❌ Database connection error:', error.message);
     return false;
   }
 };

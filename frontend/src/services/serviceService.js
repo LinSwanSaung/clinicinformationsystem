@@ -2,8 +2,12 @@ import apiService from './api.js';
 
 const serviceService = {
   // Get all active services
-  getActiveServices: async () => {
-    const response = await apiService.get('/services');
+  getActiveServices: async (options = {}) => {
+    const { status, category } = options;
+    const params = {};
+    if (status) params.status = status;
+    if (category) params.category = category;
+    const response = await apiService.get('/services', { params: Object.keys(params).length ? params : undefined });
     return response.data;
   },
 
@@ -14,9 +18,13 @@ const serviceService = {
   },
 
   // Search services
-  searchServices: async (searchTerm) => {
+  searchServices: async (searchTerm, options = {}) => {
+    const { status, category } = options;
+    const params = { q: searchTerm };
+    if (status) params.status = status;
+    if (category) params.category = category;
     const response = await apiService.get('/services/search', {
-      params: { q: searchTerm }
+      params
     });
     return response.data;
   },

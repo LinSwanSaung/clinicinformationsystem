@@ -5,6 +5,17 @@ import ServiceModel from '../models/Service.model.js';
  */
 class ServiceService {
   /**
+   * List services by status (admin)
+   */
+  async listServices({ status = 'active', category } = {}) {
+    try {
+      const normalized = ['active', 'inactive', 'all'].includes(status) ? status : 'active';
+      return await ServiceModel.listServicesFiltered({ status: normalized, category });
+    } catch (error) {
+      throw new Error(`Failed to list services: ${error.message}`);
+    }
+  }
+  /**
    * Get all active services
    */
   async getActiveServices() {
@@ -44,6 +55,18 @@ class ServiceService {
 
       const services = await ServiceModel.searchServices(searchTerm);
       return services;
+    } catch (error) {
+      throw new Error(`Failed to search services: ${error.message}`);
+    }
+  }
+
+  /**
+   * Advanced search including status (admin)
+   */
+  async searchServicesAdvanced(searchTerm, status = 'active', category) {
+    try {
+      const normalized = ['active', 'inactive', 'all'].includes(status) ? status : 'active';
+      return await ServiceModel.searchServicesWithFilters({ q: searchTerm || '', status: normalized, category });
     } catch (error) {
       throw new Error(`Failed to search services: ${error.message}`);
     }

@@ -51,6 +51,7 @@ import {
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Separator } from '@/components/ui/separator';
+import InvoiceDetails from '@/features/billing/components/InvoiceDetails.jsx';
 import { Textarea } from '@/components/ui/textarea';
 import {
   Dialog,
@@ -67,6 +68,7 @@ import { useInvoices } from '@/features/billing';
 import api from '@/services/api';
 import { PaymentDetailModal } from '@/components/library';
 import logger from '@/utils/logger';
+import DispenseHistoryTab from '@/features/dispenses/components/DispenseHistoryTab';
 
 // Animation variants
 const pageVariants = {
@@ -1168,7 +1170,7 @@ const CashierDashboard = () => {
           {/* Main Content with Tabs */}
           <Tabs value={activeTab} onValueChange={setActiveTab}>
             <div className="mb-6 flex items-center justify-between">
-              <TabsList className="grid w-auto grid-cols-2">
+              <TabsList className="grid w-auto grid-cols-3">
                 <TabsTrigger value="pending" className="gap-2">
                   <Clock className="h-4 w-4" />
                   Pending Invoices ({stats.pendingInvoices})
@@ -1176,6 +1178,10 @@ const CashierDashboard = () => {
                 <TabsTrigger value="history" className="gap-2">
                   <History className="h-4 w-4" />
                   Invoice History
+                </TabsTrigger>
+                <TabsTrigger value="dispenses" className="gap-2">
+                  <Package className="h-4 w-4" />
+                  Dispense History
                 </TabsTrigger>
               </TabsList>
 
@@ -1501,6 +1507,11 @@ const CashierDashboard = () => {
                   )}
                 </CardContent>
               </Card>
+            </TabsContent>
+
+            {/* Dispense History Tab */}
+            <TabsContent value="dispenses" className="space-y-6">
+              <DispenseHistoryTab />
             </TabsContent>
           </Tabs>
         </div>
@@ -2496,270 +2507,38 @@ const CashierDashboard = () => {
             </DialogHeader>
 
             {selectedPayment && (
-              <div className="space-y-6">
-                {/* Header Section */}
-                <div className="border-b-2 pb-4">
-                  <div className="flex justify-between items-start">
-                    <div>
-                      <h3 className="text-lg font-bold">RealCIS Healthcare System</h3>
-                      <p className="text-sm text-muted-foreground">Medical Invoice</p>
-                    </div>
-                    <div className="text-right">
-                      <p className="text-sm text-muted-foreground">Date:</p>
-                      <p className="font-medium">
-                        {selectedPayment.invoiceDetails?.created_at
-                          ? new Date(selectedPayment.invoiceDetails.created_at).toLocaleDateString('en-US', {
-                              year: 'numeric',
-                              month: 'long',
-                              day: 'numeric',
-                            })
-                          : selectedPayment.rawData?.created_at
-                            ? new Date(selectedPayment.rawData.created_at).toLocaleDateString('en-US', {
-                                year: 'numeric',
-                                month: 'long',
-                                day: 'numeric',
-                              })
-                            : 'N/A'}
-                      </p>
-                      <p className="text-sm text-muted-foreground mt-1">Time:</p>
-                      <p className="font-medium">
-                        {selectedPayment.invoiceDetails?.created_at
-                          ? new Date(selectedPayment.invoiceDetails.created_at).toLocaleTimeString('en-US', {
-                              hour: 'numeric',
-                              minute: '2-digit',
-                              hour12: true,
-                            })
-                          : selectedPayment.rawData?.created_at
-                            ? new Date(selectedPayment.rawData.created_at).toLocaleTimeString('en-US', {
-                                hour: 'numeric',
-                                minute: '2-digit',
-                                hour12: true,
-                              })
-                            : 'N/A'}
-                      </p>
-                    </div>
-                  </div>
-                </div>
-
-                {/* Patient Information */}
-                <div className="border-b pb-4">
-                  <h4 className="mb-3 text-base font-semibold flex items-center gap-2">
-                    <User className="h-4 w-4" />
-                    Patient Information
-                  </h4>
-                  <div className="grid grid-cols-2 gap-4 text-sm">
-                    <div>
-                      <span className="text-muted-foreground">Name:</span>
-                      <p className="font-medium mt-0.5">
-                        {selectedPayment.invoiceDetails?.patient?.first_name || selectedPayment.invoice?.patient?.first_name || selectedPayment.rawData?.patients?.first_name}{' '}
-                        {selectedPayment.invoiceDetails?.patient?.last_name || selectedPayment.invoice?.patient?.last_name || selectedPayment.rawData?.patients?.last_name}
-                      </p>
-                    </div>
-                    <div>
-                      <span className="text-muted-foreground">Patient #:</span>
-                      <p className="font-medium mt-0.5">
-                        {selectedPayment.invoiceDetails?.patient?.patient_number ||
-                          selectedPayment.invoice?.patient?.patient_number ||
-                          selectedPayment.rawData?.patients?.patient_number ||
-                          'N/A'}
-                      </p>
-                    </div>
-                    <div>
-                      <span className="text-muted-foreground">Phone:</span>
-                      <p className="font-medium mt-0.5">
-                        {selectedPayment.invoiceDetails?.patient?.phone ||
-                          selectedPayment.invoice?.patient?.phone ||
-                          selectedPayment.rawData?.patients?.phone ||
-                          'N/A'}
-                      </p>
-                    </div>
-                    <div>
-                      <span className="text-muted-foreground">Email:</span>
-                      <p className="font-medium mt-0.5">
-                        {selectedPayment.invoiceDetails?.patient?.email ||
-                          selectedPayment.invoice?.patient?.email ||
-                          selectedPayment.rawData?.patients?.email ||
-                          'N/A'}
-                      </p>
-                    </div>
-                    <div>
-                      <span className="text-muted-foreground">Doctor:</span>
-                      <p className="font-medium mt-0.5">
-                        {selectedPayment.invoiceDetails?.visit?.doctor_name ||
-                          `${selectedPayment.invoiceDetails?.visit?.doctor?.first_name || ''} ${selectedPayment.invoiceDetails?.visit?.doctor?.last_name || ''}`.trim() ||
-                          selectedPayment.rawData?.visits?.doctor?.full_name ||
-                          `${selectedPayment.rawData?.visits?.doctor?.first_name || ''} ${selectedPayment.rawData?.visits?.doctor?.last_name || ''}`.trim() ||
-                          'N/A'}
-                      </p>
-                    </div>
-                    <div>
-                      <span className="text-muted-foreground">Visit Type:</span>
-                      <p className="font-medium mt-0.5 capitalize">
-                        {selectedPayment.invoiceDetails?.visit?.visit_type ||
-                          selectedPayment.rawData?.visits?.visit_type ||
-                          'N/A'}
-                      </p>
-                    </div>
-                  </div>
-                </div>
-
-                {/* Services Provided */}
-                {selectedPayment.invoiceDetails?.invoice_items || selectedPayment.rawData?.invoice_items ? (
-                  <div className="border-b pb-4">
-                    <h4 className="mb-3 text-base font-semibold flex items-center gap-2">
-                      <FileText className="h-4 w-4" />
-                      Services & Items
-                    </h4>
-                    <div className="space-y-2">
-                      {/* Services */}
-                      {(selectedPayment.invoiceDetails?.invoice_items || selectedPayment.rawData?.invoice_items || [])
-                        .filter((item) => item.item_type === 'service')
-                        .map((item, idx) => (
-                          <div key={idx} className="flex justify-between items-start p-3 bg-muted/50 rounded-lg">
-                            <div className="flex-1">
-                              <p className="font-medium">{item.item_name}</p>
-                              {item.notes && (
-                                <p className="text-xs text-muted-foreground mt-1">{item.notes}</p>
-                              )}
-                              <p className="text-xs text-muted-foreground mt-1">
-                                Quantity: {item.quantity || 1}
-                              </p>
-                            </div>
-                            <div className="text-right">
-                              <p className="font-semibold">
-                                ${(parseFloat(item.unit_price || 0) * (item.quantity || 1)).toFixed(2)}
-                              </p>
-                              <p className="text-xs text-muted-foreground">
-                                ${parseFloat(item.unit_price || 0).toFixed(2)} each
-                              </p>
-                            </div>
-                          </div>
-                        ))}
-
-                      {/* Medications */}
-                      {(selectedPayment.invoiceDetails?.invoice_items || selectedPayment.rawData?.invoice_items || [])
-                        .filter((item) => item.item_type === 'medicine')
-                        .map((item, idx) => (
-                          <div key={idx} className="flex justify-between items-start p-3 bg-blue-50 rounded-lg border border-blue-100">
-                            <div className="flex-1">
-                              <div className="flex items-center gap-2">
-                                <Pill className="h-4 w-4 text-blue-600" />
-                                <p className="font-medium">{item.item_name}</p>
-                              </div>
-                              {item.notes && (
-                                <p className="text-xs text-muted-foreground mt-1">{item.notes}</p>
-                              )}
-                              <p className="text-xs text-muted-foreground mt-1">
-                                Quantity: {item.quantity || 1}
-                              </p>
-                            </div>
-                            <div className="text-right">
-                              <p className="font-semibold">
-                                ${(parseFloat(item.unit_price || 0) * (item.quantity || 1)).toFixed(2)}
-                              </p>
-                              <p className="text-xs text-muted-foreground">
-                                ${parseFloat(item.unit_price || 0).toFixed(2)} each
-                              </p>
-                            </div>
-                          </div>
-                        ))}
-                    </div>
-                  </div>
-                ) : (
-                  <div className="border-b pb-4">
-                    <h4 className="mb-3 text-base font-semibold">Services & Items</h4>
-                    <p className="text-sm text-muted-foreground">No items found</p>
-                  </div>
-                )}
-
-                {/* Invoice Summary */}
-                <div className="border-b pb-4">
-                  <h4 className="mb-3 text-base font-semibold">Invoice Summary</h4>
-                  <div className="space-y-2 text-sm">
-                    <div className="flex justify-between">
-                      <span className="text-muted-foreground">Subtotal:</span>
-                      <span className="font-medium">
-                        ${parseFloat(selectedPayment.invoiceDetails?.total_amount || selectedPayment.rawData?.total_amount || 0).toFixed(2)}
-                      </span>
-                    </div>
-                    {selectedPayment.invoiceDetails?.discount_amount > 0 && (
-                      <div className="flex justify-between text-green-600">
-                        <span>Discount:</span>
-                        <span className="font-medium">
-                          -${parseFloat(selectedPayment.invoiceDetails.discount_amount).toFixed(2)}
-                        </span>
-                      </div>
-                    )}
-                    <Separator />
-                    <div className="flex justify-between text-base font-bold">
-                      <span>Total Amount:</span>
-                      <span>
-                        ${parseFloat(selectedPayment.invoiceDetails?.total_amount || selectedPayment.rawData?.total_amount || 0).toFixed(2)}
-                      </span>
-                    </div>
-                    {(() => {
-                      // Calculate credit amount from payment transactions
-                      const paymentTransactions = selectedPayment.invoiceDetails?.payment_transactions || selectedPayment.rawData?.payment_transactions || [];
-                      const creditFromPrevious = paymentTransactions
-                        .filter((pt) => {
-                          const notes = (pt.payment_notes || '').toLowerCase();
-                          return (
-                            notes.includes('paid with current visit') ||
-                            notes.includes('previous invoice') ||
-                            notes.includes('outstanding balance') ||
-                            notes.includes('from previous invoices')
-                          );
-                        })
-                        .reduce((sum, pt) => sum + parseFloat(pt.amount || 0), 0);
-                      
-                      const total = parseFloat(selectedPayment.invoiceDetails?.total_amount || selectedPayment.rawData?.total_amount || 0);
-                      const paid = parseFloat(
-                        selectedPayment.invoiceDetails?.paid_amount ||
-                          paymentTransactions.reduce((sum, p) => sum + parseFloat(p.amount || 0), 0) ||
-                          0
-                      );
-                      const balance = total - paid;
-                      const creditFromOverpayment = balance < 0 ? Math.abs(balance) : 0;
-                      const totalCredit = creditFromPrevious + creditFromOverpayment;
-                      
-                      return (
-                        <>
-                          {totalCredit > 0 && (
-                            <div className="flex justify-between text-blue-600">
-                              <span className="font-semibold">Credit from Previous Invoices:</span>
-                              <span className="font-semibold">
-                                ${totalCredit.toFixed(2)}
-                              </span>
-                            </div>
-                          )}
-                          <div className="flex justify-between text-green-600">
-                            <span className="font-semibold">Paid Amount:</span>
-                            <span className="font-semibold">
-                              ${paid.toFixed(2)}
-                            </span>
-                          </div>
-                          {balance > 0 && (
-                            <div className="flex justify-between text-red-600">
-                              <span className="font-medium">Balance Due:</span>
-                              <span className="font-semibold">
-                                ${balance.toFixed(2)}
-                              </span>
-                            </div>
-                          )}
-                          {patientRemainingCredit > 0 && (
-                            <div className="flex justify-between text-blue-600">
-                              <span className="font-semibold">Credit Remaining:</span>
-                              <span className="font-semibold">
-                                ${patientRemainingCredit.toFixed(2)} (Credit)
-                              </span>
-                            </div>
-                          )}
-                        </>
-                      );
-                    })()}
-                  </div>
-                </div>
-
+              <>
+                <InvoiceDetails
+                  invoice={selectedPayment.invoiceDetails}
+                  fallback={selectedPayment.rawData || selectedPayment.invoice}
+                  payment={{
+                    // Prefer an explicit payment row if present; otherwise use latest transaction on the invoice
+                    amount:
+                      selectedPayment.amount ??
+                      (selectedPayment.invoiceDetails?.payment_transactions ||
+                        selectedPayment.rawData?.payment_transactions ||
+                        [])[0]?.amount,
+                    payment_method:
+                      selectedPayment.payment_method ??
+                      (selectedPayment.invoiceDetails?.payment_transactions ||
+                        selectedPayment.rawData?.payment_transactions ||
+                        [])[0]?.payment_method,
+                    payment_reference:
+                      selectedPayment.payment_reference ??
+                      (selectedPayment.invoiceDetails?.payment_transactions ||
+                        selectedPayment.rawData?.payment_transactions ||
+                        [])[0]?.payment_reference,
+                    payment_notes:
+                      selectedPayment.payment_notes ??
+                      (selectedPayment.invoiceDetails?.payment_transactions ||
+                        selectedPayment.rawData?.payment_transactions ||
+                        [])[0]?.payment_notes ??
+                      (selectedPayment.invoiceDetails?.payment_transactions ||
+                        selectedPayment.rawData?.payment_transactions ||
+                        [])[0]?.notes,
+                  }}
+                  showPaymentSection
+                />
                 {/* Payment History */}
                 {selectedPayment.invoiceDetails?.payment_transactions?.length > 0 ||
                 selectedPayment.rawData?.payment_transactions?.length > 0 ? (
@@ -2881,7 +2660,7 @@ const CashierDashboard = () => {
                     Close
                   </Button>
                 </div>
-              </div>
+              </>
             )}
           </DialogContent>
         </Dialog>

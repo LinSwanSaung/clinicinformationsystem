@@ -16,7 +16,14 @@ router.get(
   authenticate,
   authorize(ROLES.ADMIN, ROLES.DOCTOR, 'nurse', 'receptionist', 'cashier', 'pharmacist'),
   asyncHandler(async (req, res) => {
-    const services = await ServiceService.getActiveServices();
+    const { status, category } = req.query;
+    let services;
+    // Admin can request status=all|inactive|active; others always receive active
+    if (status && req.user.role === ROLES.ADMIN) {
+      services = await ServiceService.listServices({ status, category });
+    } else {
+      services = await ServiceService.listServices({ status: 'active', category });
+    }
 
     res.status(200).json({
       success: true,
@@ -55,8 +62,13 @@ router.get(
   authenticate,
   authorize(ROLES.ADMIN, ROLES.DOCTOR, 'nurse', 'receptionist', 'cashier', 'pharmacist'),
   asyncHandler(async (req, res) => {
-    const { q } = req.query;
-    const services = await ServiceService.searchServices(q || '');
+    const { q = '', status, category } = req.query;
+    let services;
+    if (status && req.user.role === ROLES.ADMIN) {
+      services = await ServiceService.searchServicesAdvanced(q, status, category);
+    } else {
+      services = await ServiceService.searchServices(q || '');
+    }
 
     res.status(200).json({
       success: true,

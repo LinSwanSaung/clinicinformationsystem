@@ -5,6 +5,7 @@ import { ROLES } from '../constants/roles.js';
 import { logAuditEvent } from '../utils/auditLogger.js';
 import { supabase } from '../config/database.js';
 import logger from '../config/logger.js';
+import EmailService from '../services/Email.service.js';
 
 const router = express.Router();
 
@@ -439,6 +440,47 @@ router.post(
         resolvedBy: req.user.id,
         reason,
       },
+    });
+  })
+);
+
+/**
+ * @route   GET /api/admin/debug/email
+ * @desc    Verify email (SMTP) configuration and connectivity
+ * @access  Private (Admin only)
+ */
+router.get(
+  '/debug/email',
+  authenticate,
+  authorize(ROLES.ADMIN),
+  asyncHandler(async (req, res) => {
+    const cfg = {
+      host: process.env.SMTP_HOST || null,
+      port: process.env.SMTP_PORT || null,
+      userPresent: Boolean(process.env.SMTP_USER),
+      passPresent: Boolean(process.env.SMTP_PASS),
+      from: process.env.EMAIL_FROM || null,
+    };
+
+    let verify = { ok: false, message: 'Transporter not initialized' };
+    try {
+      if (EmailService.transporter) {
+        await EmailService.transporter.verify();
+        verify = { ok: true, message: 'SMTP connection verified' };
+      }
+    } catch (e) {
+      verify = { ok: false, message: e?.message || String(e) };
+    }
+
+    res.json({
+      config: {
+        host: cfg.host,
+        port: cfg.port,
+        userPresent: cfg.userPresent,
+        passPresent: cfg.passPresent,
+        from: cfg.from,
+      },
+      verify,
     });
   })
 );

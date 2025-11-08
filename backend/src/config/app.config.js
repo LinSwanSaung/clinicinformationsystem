@@ -38,5 +38,19 @@ export default {
   security: {
     bcryptRounds: 12,
     passwordMinLength: 8
-  }
+  },
+
+  // Email / SMTP
+  email: {
+    smtp: {
+      host: process.env.SMTP_HOST || null,
+      port: parseInt(process.env.SMTP_PORT, 10) || 587,
+      user: process.env.SMTP_USER || null,
+      pass: process.env.SMTP_PASS || null
+    },
+    from: process.env.EMAIL_FROM || 'no-reply@realcis.local'
+  },
+
+  // Portal URL for CTAs in emails
+  portalUrl: process.env.PORTAL_URL || process.env.APP_BASE_URL || 'https://portal.example.com'
 };

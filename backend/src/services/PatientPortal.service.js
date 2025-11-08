@@ -7,6 +7,7 @@ import VitalsModel from '../models/Vitals.model.js';
 import PrescriptionModel from '../models/Prescription.model.js';
 import AppointmentModel from '../models/Appointment.model.js';
 import logger from '../config/logger.js';
+import InvoiceService from './Invoice.service.js';
 
 class PatientPortalService {
   constructor() {
@@ -125,6 +126,13 @@ class PatientPortalService {
   async getUpcomingAppointments(userId, options = {}) {
     const { patient } = await this.getLinkedPatient(userId);
     return this.appointmentModel.getUpcomingByPatientId(patient.id, options);
+  }
+
+  async getRemainingCredit(userId) {
+    const { patient } = await this.getLinkedPatient(userId);
+    // Reuse existing invoice logic
+    const credit = await InvoiceService.getPatientRemainingCredit(patient.id);
+    return credit;
   }
 }
 

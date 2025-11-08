@@ -5,6 +5,7 @@ import { ROLES } from '../constants/roles.js';
 import AppointmentService from '../services/Appointment.service.js';
 import { logAuditEvent } from '../utils/auditLogger.js';
 import logger from '../config/logger.js';
+import NotificationService from '../services/Notification.service.js';
 
 const router = express.Router();
 const appointmentService = new AppointmentService();
@@ -108,6 +109,19 @@ router.post(
       message: 'Appointment created successfully',
       data: newAppointment,
     });
+
+    // Notify patient (if they have a portal account) - fire and forget
+    try {
+      await NotificationService.notifyPatientByPatientId(newAppointment.patient_id, {
+        title: 'Appointment Scheduled',
+        message: `Your appointment is scheduled on ${newAppointment.appointment_date} at ${newAppointment.appointment_time}.`,
+        type: 'info',
+        relatedEntityType: 'appointment',
+        relatedEntityId: newAppointment.id,
+      });
+    } catch (nerr) {
+      logger.warn('[APPOINTMENTS] Failed to notify patient about new appointment:', nerr.message);
+    }
   })
 );
 

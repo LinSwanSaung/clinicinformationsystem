@@ -17,6 +17,21 @@ class PatientAccountService {
     const response = await api.delete(`/auth/patient-accounts/${userId}/bind`);
     return response;
   }
+
+  async deactivate(userId) {
+    const response = await api.put(`/auth/patient-accounts/${userId}/deactivate`);
+    return response;
+  }
+
+  async activate(userId) {
+    const response = await api.put(`/auth/patient-accounts/${userId}/activate`);
+    return response;
+  }
+
+  async softDelete(userId) {
+    const response = await api.delete(`/auth/patient-accounts/${userId}`);
+    return response;
+  }
 }
 
 const patientAccountService = new PatientAccountService();

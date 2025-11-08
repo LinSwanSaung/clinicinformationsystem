@@ -36,9 +36,11 @@ import patientPortalRoutes from './routes/patientPortal.routes.js';
 import auditLogRoutes from './routes/auditLog.routes.js';
 import adminRoutes from './routes/admin.routes.js';
 import aiRoutes from './routes/ai.routes.js';
+import dispenseRoutes from './routes/dispense.routes.js';
 import { testConnection } from './config/database.js';
 import tokenScheduler from './services/TokenScheduler.service.js';
 import appointmentAutoCancel from './jobs/autoCancelAppointments.js';
+import { startAppointmentReminders } from './jobs/appointmentReminders.js';
 
 // Load environment variables
 dotenv.config();
@@ -176,6 +178,7 @@ app.use('/api/doctor-notes', authenticate, doctorNoteRoutes);
 app.use('/api/services', serviceRoutes);
 app.use('/api/invoices', invoiceRoutes);
 app.use('/api/payments', paymentRoutes);
+app.use('/api/dispenses', dispenseRoutes);
 app.use('/api/notifications', notificationRoutes);
 app.use('/api/me', patientPortalRoutes);
 app.use('/api/audit-logs', auditLogRoutes);
@@ -211,6 +214,9 @@ app.listen(PORT, () => {
   logger.info(
     `✓ Appointment Auto-Cancel started - ${appointmentAutoCancel.getScheduleDescription()}`
   );
+
+  // Start appointment reminder job (runs every 5 minutes)
+  startAppointmentReminders();
 });
 
 export default app;

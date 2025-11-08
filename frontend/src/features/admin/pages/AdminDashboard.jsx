@@ -3,7 +3,7 @@ import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Users, Calendar, Settings, Stethoscope, AlertTriangle, DollarSign } from 'lucide-react';
+import { Users, Calendar, Settings, Stethoscope, AlertTriangle, DollarSign, ClipboardList } from 'lucide-react';
 import PageLayout from '@/components/layout/PageLayout';
 import api from '@/services/api';
 import { userService } from '@/features/admin';
@@ -228,6 +228,12 @@ const AdminDashboard = () => {
       description: 'View all payment transactions',
       icon: DollarSign,
       action: () => navigate('/admin/payment-transactions'),
+    },
+    {
+      title: 'Manage Services',
+      description: 'Create, edit and organize billable services',
+      icon: ClipboardList,
+      action: () => navigate('/admin/services'),
     },
     {
       title: 'System Audit Logs',

@@ -7,6 +7,9 @@ import { LatestVisitSummary } from '@/features/visits';
 import { patientPortalService } from '@/features/patients';
 import { Separator } from '@/components/ui/separator';
 import logger from '@/utils/logger';
+import { StatCard } from '@/components/library/dashboard/StatCard';
+import { Wallet } from 'lucide-react';
+import invoiceService from '@/features/billing/services/invoiceService';
 
 const PatientPortalDashboard = () => {
   const navigate = useNavigate();
@@ -14,6 +17,7 @@ const PatientPortalDashboard = () => {
   const [profileState, setProfileState] = useState({ data: null, loading: true, error: null });
   const [visitsState, setVisitsState] = useState({ data: [], loading: true, error: null });
   const [appointmentsState, setAppointmentsState] = useState({ data: [], loading: true, error: null });
+  const [creditState, setCreditState] = useState({ value: 0, loading: false, error: null });
   const isMounted = useRef(false);
 
   useEffect(() => {
@@ -117,6 +121,24 @@ const PatientPortalDashboard = () => {
   logger.debug('[PatientPortalDashboard] profileState:', profileState);
   logger.debug('[PatientPortalDashboard] profileData:', profileData);
 
+  // Load patient remaining credit once profile is ready (via patient portal endpoint)
+  useEffect(() => {
+    let mounted = true;
+    (async () => {
+      try {
+        setCreditState((s) => ({ ...s, loading: true, error: null }));
+        const res = await patientPortalService.getRemainingCredit();
+        const value = Number(res?.data?.totalCredit ?? res?.totalCredit ?? 0);
+        if (mounted) setCreditState({ value, loading: false, error: null });
+      } catch (e) {
+        if (mounted) setCreditState({ value: 0, loading: false, error: e.message || 'Failed to load credit' });
+      }
+    })();
+    return () => {
+      mounted = false;
+    };
+  }, []);
+
   return (
     <PageLayout
       title={t('patient.dashboard.title')}
@@ -133,6 +155,21 @@ const PatientPortalDashboard = () => {
             error={profileState.error}
             onRetry={loadProfile}
           />
+          {/* Credit Remaining */}
+          <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
+            <StatCard
+              title={t('patient.dashboard.creditRemaining')}
+              value={`$${Number(creditState.value || 0).toFixed(2)}`}
+              icon={Wallet}
+              helperText={
+                creditState.loading
+                  ? t('common.loading')
+                  : creditState.error
+                    ? creditState.error
+                    : t('patient.dashboard.creditRemainingHelper')
+              }
+            />
+          </div>
           <div className="grid gap-6 xl:grid-cols-[2fr,3fr]">
             <UpcomingAppointments
               appointments={appointmentsState.data}

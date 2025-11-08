@@ -444,11 +444,42 @@ class QueueService {
       // Update token status to 'called'
       const calledToken = await this.queueTokenModel.updateStatus(nextToken.id, 'called');
 
+      // Notify the patient that they have been called
+      try {
+        const { default: NotificationService } = await import('./Notification.service.js');
+        await NotificationService.notifyPatientByPatientId(calledToken.patient_id, {
+          title: 'You are called',
+          message: `Please proceed to the consultation room (Token #${calledToken.token_number}).`,
+          type: 'info',
+          relatedEntityType: 'queue_token',
+          relatedEntityId: calledToken.id,
+        });
+      } catch (nerr) {
+        logger.warn('[QUEUE] Failed to notify patient (called):', nerr.message);
+      }
+
       // Update appointment status if linked
       if (nextToken.appointment_id) {
         await this.appointmentModel.update(nextToken.appointment_id, {
           status: 'ready_for_doctor',
         });
+      }
+
+      // After calling, identify who is next and notify them they are next in line
+      try {
+        const nextInQueue = await this.queueTokenModel.getNextToken(doctorId);
+        if (nextInQueue && nextInQueue.status === 'waiting') {
+          const { default: NotificationService } = await import('./Notification.service.js');
+          await NotificationService.notifyPatientByPatientId(nextInQueue.patient_id, {
+            title: 'You are next',
+            message: 'You are next in line. Please be ready to proceed.',
+            type: 'info',
+            relatedEntityType: 'queue_token',
+            relatedEntityId: nextInQueue.id,
+          });
+        }
+      } catch (nerr2) {
+        logger.warn('[QUEUE] Failed to notify next-in-line patient:', nerr2.message);
       }
 
       return {
@@ -591,6 +622,23 @@ class QueueService {
       }
 
       const updatedToken = await this.queueTokenModel.updateStatus(tokenId, 'serving');
+
+      // When consultation starts, notify next waiting patient that they are next
+      try {
+        const nextInQueue = await this.queueTokenModel.getNextToken(currentToken.doctor_id);
+        if (nextInQueue && nextInQueue.status === 'waiting') {
+          const { default: NotificationService } = await import('./Notification.service.js');
+          await NotificationService.notifyPatientByPatientId(nextInQueue.patient_id, {
+            title: 'You are next',
+            message: 'You are next in line. Please be ready to proceed.',
+            type: 'info',
+            relatedEntityType: 'queue_token',
+            relatedEntityId: nextInQueue.id,
+          });
+        }
+      } catch (nerr) {
+        logger.warn('[QUEUE] Failed to notify next-in-line on startConsultation:', nerr.message);
+      }
       
 
       // Check if a visit already exists for this patient today

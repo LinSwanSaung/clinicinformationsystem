@@ -110,4 +110,20 @@ router.get(
   })
 );
 
+/**
+ * @route   GET /api/me/billing/remaining-credit
+ * @desc    Get patient's total remaining credit (Patient portal)
+ * @access  Private (Patient)
+ */
+router.get(
+  '/billing/remaining-credit',
+  asyncHandler(async (req, res) => {
+    const data = await PatientPortalService.getRemainingCredit(req.user.id);
+    res.status(200).json({
+      success: true,
+      data,
+    });
+  })
+);
+
 export default router;

@@ -4,11 +4,49 @@ import {
   getReceptionistIds,
 } from './repositories/NotificationsRepo.js';
 import logger from '../config/logger.js';
+import { supabase } from '../config/database.js';
+import EmailService from './Email.service.js';
+import { renderNotificationEmail } from '../utils/emailTemplates.js';
 
 /**
  * Notification Service
  */
 class NotificationService {
+  /**
+   * Resolve portal user ID from a patient ID, if linked.
+   */
+  async getPortalUserIdByPatientId(patientId) {
+    try {
+      const { data, error } = await supabase
+        .from('users')
+        .select('id')
+        .eq('patient_id', patientId)
+        .eq('is_active', true)
+        .limit(1)
+        .maybeSingle();
+      if (error) throw error;
+      return data?.id || null;
+    } catch (err) {
+      logger.warn('[NotificationService] Failed to resolve user by patient_id:', err.message);
+      return null;
+    }
+  }
+
+  /**
+   * Convenience: notify a patient portal user by patientId (no-op if no account).
+   */
+  async notifyPatientByPatientId(patientId, { title, message, type = 'info', relatedEntityType, relatedEntityId }) {
+    const userId = await this.getPortalUserIdByPatientId(patientId);
+    if (!userId) return null;
+    return this.createNotification({
+      userId,
+      title,
+      message,
+      type,
+      relatedEntityType,
+      relatedEntityId,
+    });
+  }
   /**
    * Create notification for user(s)
    */
@@ -25,6 +63,21 @@ class NotificationService {
       const notifications = [];
       const targetUsers = userIds || [userId];
 
+      // Prepare batch email lookup if multiple recipients
+      let emailLookup = null;
+      const targetIds = (targetUsers || []).filter(Boolean);
+      if (targetIds.length > 1) {
+        try {
+          const { data: users } = await supabase
+            .from('users')
+            .select('id, email, first_name, last_name')
+            .in('id', targetIds);
+          emailLookup = new Map((users || []).map((u) => [u.id, u]));
+        } catch (e) {
+          logger.warn('[NotificationService] Failed batch user email lookup:', e.message);
+        }
+      }
+
       for (const uid of targetUsers) {
         const notificationData = {
           user_id: uid,
@@ -37,6 +90,31 @@ class NotificationService {
 
         const notification = await repoCreateNotification(notificationData);
         notifications.push(notification);
+
+        // Also email the user if SMTP configured
+        try {
+          let user = emailLookup ? emailLookup.get(uid) : null;
+          if (!user) {
+            const resp = await supabase
+              .from('users')
+              .select('email, first_name, last_name')
+              .eq('id', uid)
+              .maybeSingle();
+            user = resp?.data;
+          }
+          if (user?.email) {
+            const subject = title || 'Notification';
+            const textBody =
+              `${message}\n\n` +
+              (relatedEntityType && relatedEntityId
+                ? `Ref: ${relatedEntityType} #${relatedEntityId}`
+                : '');
+            const { html } = renderNotificationEmail({ title: subject, message });
+            await EmailService.send({ to: user.email, subject, text: textBody, html });
+          }
+        } catch (e) {
+          logger.warn('[NotificationService] Failed to send email notification:', e.message);
+        }
       }
 
       return notifications;

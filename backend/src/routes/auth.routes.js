@@ -282,4 +282,97 @@ router.delete(
   })
 );
 
+/**
+ * @route   PUT /api/auth/patient-accounts/:userId/deactivate
+ * @desc    Admin deactivate a patient account
+ * @access  Private (Admin)
+ */
+router.put(
+  '/patient-accounts/:userId/deactivate',
+  authenticate,
+  authorize(ROLES.ADMIN),
+  asyncHandler(async (req, res) => {
+    const account = await AuthService.adminSetPatientAccountActive(req.params.userId, false);
+
+    try {
+      logAuditEvent({
+        actor_id: req.user.id,
+        actor_role: req.user.role,
+        action: 'PATIENT_ACCOUNT_DEACTIVATE',
+        entity_type: 'user',
+        entity_id: req.params.userId,
+        new_values: { is_active: false },
+      });
+    } catch (e) {}
+
+    res.status(200).json({
+      success: true,
+      message: 'Patient account deactivated',
+      data: account,
+    });
+  })
+);
+
+/**
+ * @route   PUT /api/auth/patient-accounts/:userId/activate
+ * @desc    Admin activate a patient account
+ * @access  Private (Admin)
+ */
+router.put(
+  '/patient-accounts/:userId/activate',
+  authenticate,
+  authorize(ROLES.ADMIN),
+  asyncHandler(async (req, res) => {
+    const account = await AuthService.adminSetPatientAccountActive(req.params.userId, true);
+
+    try {
+      logAuditEvent({
+        actor_id: req.user.id,
+        actor_role: req.user.role,
+        action: 'PATIENT_ACCOUNT_ACTIVATE',
+        entity_type: 'user',
+        entity_id: req.params.userId,
+        new_values: { is_active: true },
+      });
+    } catch (e) {}
+
+    res.status(200).json({
+      success: true,
+      message: 'Patient account activated',
+      data: account,
+    });
+  })
+);
+
+/**
+ * @route   DELETE /api/auth/patient-accounts/:userId
+ * @desc    Admin delete a patient account (soft delete)
+ * @access  Private (Admin)
+ */
+router.delete(
+  '/patient-accounts/:userId',
+  authenticate,
+  authorize(ROLES.ADMIN),
+  asyncHandler(async (req, res) => {
+    const result = await AuthService.adminDeletePatientAccount(req.params.userId);
+
+    try {
+      logAuditEvent({
+        actor_id: req.user.id,
+        actor_role: req.user.role,
+        action: 'PATIENT_ACCOUNT_DELETE',
+        entity_type: 'user',
+        entity_id: req.params.userId,
+        new_values: { is_active: false },
+      });
+    } catch (e) {}
+
+    res.status(200).json({
+      success: true,
+      message: 'Patient account deleted (soft)',
+      data: result,
+    });
+  })
+);
+
 export default router;

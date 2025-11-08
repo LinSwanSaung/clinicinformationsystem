@@ -3,6 +3,29 @@ import { getAbortSignal, handleUnauthorized } from '@/features/auth';
 // API Base Configuration
 const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:3001/api';
 
+function toFriendlyMessage(message = '', { endpoint, status, data } = {}) {
+  const lower = String(message || '').toLowerCase();
+  if (data?.code === '23505' || lower.includes('duplicate key value')) {
+    if (lower.includes('services_service_code_key') || lower.includes('service_code')) {
+      return 'Service code already exists. Please use a different code.';
+    }
+    return 'A record with the same value already exists.';
+  }
+  if (lower.includes('missing required fields')) {
+    return message.replace(/failed to create service:\s*/i, '').trim();
+  }
+  if (lower.includes('violates foreign key constraint')) {
+    return 'Operation blocked because this record is referenced by other data.';
+  }
+  if (status === 404 || lower.includes('not found')) {
+    return 'Resource not found.';
+  }
+  if (lower.includes('validation')) {
+    return 'Some inputs are invalid. Please check and try again.';
+  }
+  return message || 'Something went wrong';
+}
+
 class ApiService {
   constructor() {
     this.baseURL = API_BASE_URL;
@@ -103,14 +126,35 @@ class ApiService {
         await handleUnauthorized();
         throw new Error('Unauthorized');
       } else {
-        // Login failed - extract error message from response
-        const errorMessage = data.message || data.error || 'Invalid credentials. Please check your email and password.';
+        // Login failed - extract error message from response (friendly)
+        const raw = data.message || data.error || 'Invalid credentials. Please check your email and password.';
+        const errorMessage = toFriendlyMessage(raw, { endpoint, status: response.status, data });
+        // Also surface via global error in case login pages want to show modal
+        window.dispatchEvent(
+          new CustomEvent('global-error', {
+            detail: { message: errorMessage, code: data.code },
+          })
+        );
         throw new Error(errorMessage);
       }
     }
 
     if (!response.ok) {
-      throw new Error(data.message || `HTTP error! status: ${response.status}`);
+      const raw = data.message || `HTTP error! status: ${response.status}`;
+      const message = toFriendlyMessage(raw, { endpoint, status: response.status, data });
+      // Dispatch global error for non-401 failures
+      if (response.status !== 401) {
+        window.dispatchEvent(
+          new CustomEvent('global-error', {
+            detail: {
+              message,
+              code: data.code,
+              details: data.errors || undefined,
+            },
+          })
+        );
+      }
+      throw new Error(message);
     }
 
     return data;

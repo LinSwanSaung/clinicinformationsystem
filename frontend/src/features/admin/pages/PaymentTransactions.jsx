@@ -11,6 +11,7 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog';
 import { DollarSign, Eye, Filter } from 'lucide-react';
+import InvoiceDetails from '@/features/billing/components/InvoiceDetails.jsx';
 import api from '@/services/api';
 import { DataTable, PdfDownloadButton } from '@/components/library';
 import logger from '@/utils/logger';
@@ -74,11 +75,21 @@ const PaymentTransactions = () => {
 
   const handleViewInvoice = async (payment) => {
     try {
-      const response = await api.get(`/invoices/${payment.invoice.id}`);
-      setSelectedPayment({ ...payment, invoiceDetails: response.data.data });
+      const invoiceId =
+        payment?.invoice?.id || payment?.invoice_id || payment?.invoice?.invoice_id || null;
+
+      let invoiceDetails = null;
+      if (invoiceId) {
+        const response = await api.get(`/invoices/${invoiceId}`);
+        invoiceDetails = response?.data?.data || response?.data || null;
+      }
+
+      setSelectedPayment({ ...payment, invoiceDetails });
       setInvoiceModalOpen(true);
     } catch (error) {
       logger.error('Failed to fetch invoice:', error);
+      setSelectedPayment({ ...payment, invoiceDetails: null });
+      setInvoiceModalOpen(true);
     }
   };
 
@@ -299,83 +310,17 @@ const PaymentTransactions = () => {
             </DialogHeader>
 
             {selectedPayment && (
-              <div className="space-y-4">
-                {/* Patient Info */}
-                <div className="border-b pb-4">
-                  <h4 className="mb-2 font-semibold">Patient Information</h4>
-                  <div className="grid grid-cols-2 gap-2 text-sm">
-                    <div>
-                      <span className="text-gray-600">Name:</span>
-                      <span className="ml-2 font-medium">
-                        {selectedPayment.invoice?.patient?.first_name}{' '}
-                        {selectedPayment.invoice?.patient?.last_name}
-                      </span>
-                    </div>
-                    <div>
-                      <span className="text-gray-600">Patient #:</span>
-                      <span className="ml-2 font-medium">
-                        {selectedPayment.invoice?.patient?.patient_number}
-                      </span>
-                    </div>
-                  </div>
-                </div>
-
-                {/* Invoice Summary */}
-                <div className="border-b pb-4">
-                  <h4 className="mb-2 font-semibold">Invoice Summary</h4>
-                  <div className="space-y-2 text-sm">
-                    <div className="flex justify-between">
-                      <span className="text-gray-600">Total Amount:</span>
-                      <span className="font-medium">
-                        ${parseFloat(selectedPayment.invoiceDetails?.total_amount || 0).toFixed(2)}
-                      </span>
-                    </div>
-                    <div className="flex justify-between">
-                      <span className="text-gray-600">Paid Amount:</span>
-                      <span className="font-medium text-green-600">
-                        ${parseFloat(selectedPayment.invoiceDetails?.paid_amount || 0).toFixed(2)}
-                      </span>
-                    </div>
-                    <div className="flex justify-between">
-                      <span className="text-gray-600">Balance:</span>
-                      <span className="font-medium text-red-600">
-                        ${parseFloat(selectedPayment.invoiceDetails?.balance || 0).toFixed(2)}
-                      </span>
-                    </div>
-                  </div>
-                </div>
-
-                {/* This Payment */}
-                <div className="rounded-lg bg-green-50 p-4">
-                  <h4 className="mb-2 font-semibold">This Payment</h4>
-                  <div className="space-y-2 text-sm">
-                    <div className="flex justify-between">
-                      <span className="text-gray-600">Amount:</span>
-                      <span className="font-bold text-green-700">
-                        ${parseFloat(selectedPayment.amount).toFixed(2)}
-                      </span>
-                    </div>
-                    <div className="flex justify-between">
-                      <span className="text-gray-600">Method:</span>
-                      <span className="font-medium capitalize">
-                        {selectedPayment.payment_method.replace('_', ' ')}
-                      </span>
-                    </div>
-                    <div className="flex justify-between">
-                      <span className="text-gray-600">Reference:</span>
-                      <span className="font-medium">
-                        {selectedPayment.payment_reference || '—'}
-                      </span>
-                    </div>
-                    {selectedPayment.payment_notes && (
-                      <div>
-                        <span className="text-gray-600">Notes:</span>
-                        <p className="mt-1 text-gray-700">{selectedPayment.payment_notes}</p>
-                      </div>
-                    )}
-                  </div>
-                </div>
-              </div>
+              <InvoiceDetails
+                invoice={selectedPayment.invoiceDetails}
+                fallback={selectedPayment.invoice || selectedPayment.rawData}
+                payment={{
+                  amount: selectedPayment.amount,
+                  payment_method: selectedPayment.payment_method,
+                  payment_reference: selectedPayment.payment_reference,
+                  payment_notes: selectedPayment.payment_notes,
+                }}
+                showPaymentSection
+              />
             )}
           </DialogContent>
         </Dialog>

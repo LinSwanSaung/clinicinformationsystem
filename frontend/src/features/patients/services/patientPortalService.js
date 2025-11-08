@@ -30,6 +30,10 @@ class PatientPortalService {
       params: { limit }
     });
   }
+
+  async getRemainingCredit() {
+    return api.get('/me/billing/remaining-credit');
+  }
 }
 
 export default new PatientPortalService();

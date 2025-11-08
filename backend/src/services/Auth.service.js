@@ -86,6 +86,28 @@ class AuthService {
     // Remove sensitive data
     const { password_hash, ...userWithoutPassword } = newUser;
 
+    // Send welcome email for patient accounts
+    try {
+      if (newUser.role === 'patient' && newUser.email) {
+        const { default: EmailService } = await import('./Email.service.js');
+        const { renderWelcomeEmail } = await import('../utils/emailTemplates.js');
+        const { subject, html } = renderWelcomeEmail({
+          firstName: newUser.first_name || '',
+        });
+        await EmailService.send({
+          to: newUser.email,
+          subject,
+          text:
+            `Welcome to the Patient Portal.\n\n` +
+            `Your account has been created. You can access the portal to view appointments and notifications.\n\n` +
+            `If you did not request this, please contact the clinic.`,
+          html,
+        });
+      }
+    } catch (e) {
+      // Non-blocking
+    }
+
     return userWithoutPassword;
   }
 
@@ -238,6 +260,35 @@ class AuthService {
     return UserModel.getPatientAccountById(user.id);
   }
 
+  /**
+   * Admin activate/deactivate a patient account
+   */
+  async adminSetPatientAccountActive(userId, isActive) {
+    const user = await UserModel.findById(userId);
+    if (!user) {
+      throw new AppError('User not found', 404);
+    }
+    if (user.role !== 'patient') {
+      throw new AppError('Only patient accounts can be modified via this endpoint', 403);
+    }
+    await UserModel.toggleActive(userId, !!isActive);
+    return UserModel.getPatientAccountById(userId);
+  }
+
+  /**
+   * Admin delete patient account (soft delete by deactivating)
+   */
+  async adminDeletePatientAccount(userId) {
+    const user = await UserModel.findById(userId);
+    if (!user) {
+      throw new AppError('User not found', 404);
+    }
+    if (user.role !== 'patient') {
+      throw new AppError('Only patient accounts can be deleted via this endpoint', 403);
+    }
+    await UserModel.softDelete(userId);
+    return { id: userId, is_active: false };
+  }
   /**
    * Get current user
    */

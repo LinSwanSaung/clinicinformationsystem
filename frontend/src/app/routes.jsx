@@ -11,6 +11,7 @@ import {
   PendingItems,
   PaymentTransactions,
 } from '../features/admin';
+import ServiceCatalog from '../features/services/pages/ServiceCatalog.jsx';
 import { AppointmentsPage } from '../features/appointments';
 import { PatientListPage, PatientDetailPage, RegisterPatientPage } from '../features/patients';
 import { LiveQueuePage, DoctorQueueDetailPage, NursePatientQueuePage } from '../features/queue';
@@ -135,6 +136,14 @@ export function AppRoutes() {
         element={
           <ProtectedRoute allowedRoles={['admin']}>
             <PendingItems />
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/admin/services"
+        element={
+          <ProtectedRoute allowedRoles={['admin']}>
+            <ServiceCatalog />
           </ProtectedRoute>
         }
       />

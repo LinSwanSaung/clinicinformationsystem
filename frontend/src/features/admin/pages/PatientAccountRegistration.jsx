@@ -21,6 +21,8 @@ import {
   Users,
   Plus,
   Edit,
+  Ban,
+  Check as CheckIcon,
 } from 'lucide-react';
 import { patientAccountService } from '@/features/patients';
 import api from '@/services/api';
@@ -81,6 +83,7 @@ const PatientAccountRegistration = () => {
   const [patientLoading, setPatientLoading] = useState(false);
   const [patientError, setPatientError] = useState('');
   const [binding, setBinding] = useState(false);
+  const [rowActionLoading, setRowActionLoading] = useState(null);
 
   const loadAccounts = async (search = '') => {
     try {
@@ -496,6 +499,49 @@ const PatientAccountRegistration = () => {
     }
   };
 
+  const handleDeactivate = async (account) => {
+    if (!account) return;
+    try {
+      setRowActionLoading(account.id);
+      const response = await patientAccountService.deactivate(account.id);
+      const updated = response?.data;
+      if (updated) {
+        setAccounts((prev) => prev.map((item) => (item.id === updated.id ? updated : item)));
+      } else {
+        // fallback update
+        setAccounts((prev) =>
+          prev.map((item) => (item.id === account.id ? { ...item, is_active: false } : item))
+        );
+      }
+    } catch (err) {
+      logger.error('Failed to deactivate account:', err);
+      setError(err.message || 'Failed to deactivate account.');
+    } finally {
+      setRowActionLoading(null);
+    }
+  };
+
+  const handleActivate = async (account) => {
+    if (!account) return;
+    try {
+      setRowActionLoading(account.id);
+      const response = await patientAccountService.activate(account.id);
+      const updated = response?.data;
+      if (updated) {
+        setAccounts((prev) => prev.map((item) => (item.id === updated.id ? updated : item)));
+      } else {
+        setAccounts((prev) =>
+          prev.map((item) => (item.id === account.id ? { ...item, is_active: true } : item))
+        );
+      }
+    } catch (err) {
+      logger.error('Failed to activate account:', err);
+      setError(err.message || 'Failed to activate account.');
+    } finally {
+      setRowActionLoading(null);
+    }
+  };
+
   return (
     <PageLayout
       title="Patient Account Management"
@@ -596,7 +642,7 @@ const PatientAccountRegistration = () => {
                 {
                   key: 'actions',
                   label: 'Actions',
-                  className: 'w-[210px]',
+                  className: 'w-[420px]',
                   render: (_, row) => (
                     <div className="flex gap-2">
                       <Button size="sm" variant="outline" onClick={() => openEditDialog(row)}>
@@ -611,6 +657,27 @@ const PatientAccountRegistration = () => {
                         <Button size="sm" variant="ghost" onClick={() => handleUnbindAccount(row)}>
                           <Unlink className="mr-2 h-4 w-4" />
                           Unbind
+                        </Button>
+                      )}
+                      {row.is_active ? (
+                        <Button
+                          size="sm"
+                          variant="destructive"
+                          disabled={rowActionLoading === row.id}
+                          onClick={() => handleDeactivate(row)}
+                        >
+                          <Ban className="mr-2 h-4 w-4" />
+                          {rowActionLoading === row.id ? 'Deactivating...' : 'Deactivate'}
+                        </Button>
+                      ) : (
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          disabled={rowActionLoading === row.id}
+                          onClick={() => handleActivate(row)}
+                        >
+                          <CheckIcon className="mr-2 h-4 w-4" />
+                          {rowActionLoading === row.id ? 'Activating...' : 'Activate'}
                         </Button>
                       )}
                     </div>

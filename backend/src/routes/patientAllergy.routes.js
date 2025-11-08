@@ -1,6 +1,7 @@
 import express from 'express';
 import { authenticate, authorize } from '../middleware/auth.js';
 import { requireActiveVisit } from '../middleware/activeVisitCheck.js';
+import { ROLES } from '../constants/roles.js';
 import patientAllergyService from '../services/PatientAllergy.service.js';
 
 const router = express.Router();
@@ -160,7 +161,7 @@ router.delete('/:id', authenticate, authorize('doctor', 'nurse'), async (req, re
 router.get(
   '/active/all',
   authenticate,
-  authorize('doctor', 'nurse', 'receptionist'),
+  authorize(ROLES.DOCTOR, ROLES.NURSE, ROLES.RECEPTIONIST),
   async (req, res) => {
     try {
       const allergies = await patientAllergyService.getAllActiveAllergies();

@@ -2,7 +2,7 @@ import express from 'express';
 import PrescriptionService from '../services/Prescription.service.js';
 import { asyncHandler } from '../middleware/errorHandler.js';
 import { ROLES } from '../constants/roles.js';
-import { authorize } from '../middleware/auth.js';
+import { authenticate, authorize } from '../middleware/auth.js';
 import { requireActiveVisit } from '../middleware/activeVisitCheck.js';
 import { logAuditEvent } from '../utils/auditLogger.js';
 
@@ -16,6 +16,7 @@ const router = express.Router();
  */
 router.post(
   '/',
+  authenticate,
   authorize('doctor'),
   requireActiveVisit,
   asyncHandler(async (req, res) => {
@@ -43,6 +44,7 @@ router.post(
  */
 router.get(
   '/patient/:patientId',
+  authenticate,
   authorize('doctor', 'nurse', 'receptionist'),
   asyncHandler(async (req, res) => {
     const { patientId } = req.params;
@@ -62,6 +64,7 @@ router.get(
  */
 router.get(
   '/visit/:visitId',
+  authenticate,
   authorize('doctor', 'nurse', 'receptionist'),
   asyncHandler(async (req, res) => {
     const { visitId } = req.params;
@@ -77,6 +80,7 @@ router.get(
  */
 router.patch(
   '/:prescriptionId/status',
+  authenticate,
   authorize('doctor'),
   asyncHandler(async (req, res) => {
     const { prescriptionId } = req.params;
@@ -105,6 +109,7 @@ router.patch(
  */
 router.delete(
   '/:prescriptionId',
+  authenticate,
   authorize('doctor'),
   asyncHandler(async (req, res) => {
     const { prescriptionId } = req.params;

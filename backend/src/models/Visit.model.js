@@ -1,4 +1,5 @@
 import { BaseModel } from './BaseModel.js';
+import logger from '../config/logger.js';
 
 /**
  * Visit Model with comprehensive data relationships
@@ -55,7 +56,7 @@ class VisitModel extends BaseModel {
         .range(offset, offset + limit - 1);
 
       if (error) {
-        console.error(`[VISIT MODEL] ❌ Error fetching visits:`, error);
+        logger.error(`[VISIT MODEL] ❌ Error fetching visits:`, error);
         throw new Error(`Failed to fetch patient visit history: ${error.message}`);
       }
 
@@ -114,7 +115,7 @@ class VisitModel extends BaseModel {
         prescribed_medicine_count: prescriptions?.length || 0,
       };
     } catch (error) {
-      console.error('Error enhancing visit data:', error);
+      logger.error('Error enhancing visit data:', error);
       return {
         ...visit,
         doctor_name: visit.doctor
@@ -161,13 +162,13 @@ class VisitModel extends BaseModel {
         .eq('visit_id', visitId);
 
       if (error) {
-        console.error('Error fetching visit allergies:', error);
+        logger.error('Error fetching visit allergies:', error);
         return [];
       }
 
       return data || [];
     } catch (error) {
-      console.error('Error in getVisitAllergies:', error);
+      logger.error('Error in getVisitAllergies:', error);
       return [];
     }
   }
@@ -194,13 +195,13 @@ class VisitModel extends BaseModel {
         .eq('visit_id', visitId);
 
       if (error) {
-        console.error('Error fetching visit diagnoses:', error);
+        logger.error('Error fetching visit diagnoses:', error);
         return [];
       }
 
       return data || [];
     } catch (error) {
-      console.error('Error in getVisitDiagnoses:', error);
+      logger.error('Error in getVisitDiagnoses:', error);
       return [];
     }
   }
@@ -232,13 +233,13 @@ class VisitModel extends BaseModel {
         .order('prescribed_date', { ascending: false });
 
       if (error) {
-        console.error('Error fetching visit prescriptions:', error);
+        logger.error('Error fetching visit prescriptions:', error);
         return [];
       }
 
       return data || [];
     } catch (error) {
-      console.error('Error in getVisitPrescriptions:', error);
+      logger.error('Error in getVisitPrescriptions:', error);
       return [];
     }
   }
@@ -276,13 +277,13 @@ class VisitModel extends BaseModel {
 
       if (error && error.code !== 'PGRST116') {
         // PGRST116 = no rows returned
-        console.error('Error fetching visit vitals:', error);
+        logger.error('Error fetching visit vitals:', error);
         return null;
       }
 
       return data;
     } catch (error) {
-      console.error('Error in getVisitVitals:', error);
+      logger.error('Error in getVisitVitals:', error);
       return null;
     }
   }
@@ -303,7 +304,7 @@ class VisitModel extends BaseModel {
         },
       ];
     } catch (error) {
-      console.error('Error in getVisitServices:', error);
+      logger.error('Error in getVisitServices:', error);
       return [];
     }
   }
@@ -395,7 +396,7 @@ class VisitModel extends BaseModel {
 
       // Idempotency check: if visit is already completed, return it
       if (visit.status === 'completed') {
-        console.log(`[VISIT MODEL] Visit ${visitId} is already completed, returning existing data`);
+        logger.debug(`[VISIT MODEL] Visit ${visitId} is already completed, returning existing data`);
         return visit;
       }
 
@@ -512,7 +513,7 @@ class VisitModel extends BaseModel {
         .eq('invoice_id', invoice.id);
 
       if (itemsError) {
-        console.error('Error fetching invoice items:', itemsError);
+        logger.error('Error fetching invoice items:', itemsError);
       }
 
       // Calculate totals by item type
@@ -539,7 +540,7 @@ class VisitModel extends BaseModel {
         service_count: serviceItems.length,
       };
     } catch (error) {
-      console.error('Error in getVisitInvoice:', error);
+      logger.error('Error in getVisitInvoice:', error);
       return null;
     }
   }

@@ -22,3 +22,7 @@ dist-ssr
 *.njsproj
 *.sln
 *.sw?
+
+# Audit local files (do not commit)
+scripts/audit-local/
+docs/audit-local/

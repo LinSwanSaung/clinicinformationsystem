@@ -1,4 +1,5 @@
 import { BaseModel } from './BaseModel.js';
+import logger from '../config/logger.js';
 
 /**
  * Invoice Model - Main billing records
@@ -55,7 +56,7 @@ class InvoiceModel extends BaseModel {
    * Get invoice by visit ID
    */
   async getInvoiceByVisit(visitId) {
-    console.log('[InvoiceModel] Querying invoice for visit_id:', visitId);
+    logger.debug('[InvoiceModel] Querying invoice for visit_id:', visitId);
 
     const { data, error } = await this.supabase
       .from(this.tableName)
@@ -73,11 +74,11 @@ class InvoiceModel extends BaseModel {
       .limit(1)
       .maybeSingle(); // Use maybeSingle instead of single
 
-    console.log('[InvoiceModel] Query result - Error:', error?.message || 'none');
-    console.log('[InvoiceModel] Query result - Data:', data ? `Found invoice ${data.id}` : 'null');
+    logger.debug('[InvoiceModel] Query result - Error:', error?.message || 'none');
+    logger.debug('[InvoiceModel] Query result - Data:', data ? `Found invoice ${data.id}` : 'null');
 
     if (error) {
-      console.error('[InvoiceModel] Database error:', error);
+      logger.error('[InvoiceModel] Database error:', error);
       throw error;
     }
 

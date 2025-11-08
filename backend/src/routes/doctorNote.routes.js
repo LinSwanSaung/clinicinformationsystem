@@ -2,7 +2,7 @@ import express from 'express';
 import DoctorNoteService from '../services/DoctorNote.service.js';
 import { asyncHandler } from '../middleware/errorHandler.js';
 import { ROLES } from '../constants/roles.js';
-import { authorize } from '../middleware/auth.js';
+import { authenticate, authorize } from '../middleware/auth.js';
 
 const router = express.Router();
 
@@ -13,6 +13,7 @@ const router = express.Router();
  */
 router.post(
   '/',
+  authenticate,
   authorize('doctor'),
   asyncHandler(async (req, res) => {
     const note = await DoctorNoteService.createNote(req.body);
@@ -29,6 +30,7 @@ router.post(
  */
 router.get(
   '/visit/:visitId',
+  authenticate,
   authorize('doctor', 'nurse', 'receptionist'),
   asyncHandler(async (req, res) => {
     const notes = await DoctorNoteService.getNotesByVisit(req.params.visitId);
@@ -43,6 +45,7 @@ router.get(
  */
 router.get(
   '/patient/:patientId',
+  authenticate,
   authorize('doctor', 'nurse', 'receptionist'),
   asyncHandler(async (req, res) => {
     const notes = await DoctorNoteService.getNotesByPatient(req.params.patientId);
@@ -57,6 +60,7 @@ router.get(
  */
 router.put(
   '/:noteId',
+  authenticate,
   authorize('doctor'),
   asyncHandler(async (req, res) => {
     const updatedNote = await DoctorNoteService.updateNote(req.params.noteId, req.body);
@@ -71,6 +75,7 @@ router.put(
  */
 router.delete(
   '/:noteId',
+  authenticate,
   authorize('doctor'),
   asyncHandler(async (req, res) => {
     await DoctorNoteService.deleteNote(req.params.noteId);

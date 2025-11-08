@@ -1,5 +1,6 @@
 import PatientModel from '../models/Patient.model.js';
 import { AppError } from '../middleware/errorHandler.js';
+import logger from '../config/logger.js';
 
 /**
  * Patient Service
@@ -46,7 +47,7 @@ class PatientService {
       const existingPatient = await PatientModel.findOne({ phone: patientData.phone });
       
       if (existingPatient) {
-        console.warn('Patient with this phone number already exists:', patientData.phone);
+        logger.warn('Patient with this phone number already exists:', patientData.phone);
         // Don't throw error, allow duplicate phone numbers for now
       }
     }

@@ -1,4 +1,5 @@
 import { BaseModel } from '../models/BaseModel.js';
+import logger from '../config/logger.js';
 
 class ClinicSettingsService {
   constructor() {
@@ -25,7 +26,7 @@ class ClinicSettingsService {
       
       return settings;
     } catch (error) {
-      console.error('Error in ClinicSettingsService.getSettings:', error);
+      logger.error('Error in ClinicSettingsService.getSettings:', error);
       throw error;
     }
   }
@@ -52,7 +53,7 @@ class ClinicSettingsService {
         return created;
       }
     } catch (error) {
-      console.error('Error in ClinicSettingsService.updateSettings:', error);
+      logger.error('Error in ClinicSettingsService.updateSettings:', error);
       throw error;
     }
   }
@@ -62,7 +63,7 @@ class ClinicSettingsService {
       const settings = await this.getSettings();
       return settings.consult_expected_minutes || 15;
     } catch (error) {
-      console.error('Error in ClinicSettingsService.getConsultationDuration:', error);
+      logger.error('Error in ClinicSettingsService.getConsultationDuration:', error);
       return 15; // Default fallback
     }
   }
@@ -72,7 +73,7 @@ class ClinicSettingsService {
       const settings = await this.getSettings();
       return settings.late_threshold_minutes || 7;
     } catch (error) {
-      console.error('Error in ClinicSettingsService.getLateThreshold:', error);
+      logger.error('Error in ClinicSettingsService.getLateThreshold:', error);
       return 7; // Default fallback
     }
   }

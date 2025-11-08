@@ -1,4 +1,5 @@
 import VisitModel from '../models/Visit.model.js';
+import logger from '../config/logger.js';
 
 /**
  * Middleware to check if a patient has an active visit before allowing data modifications
@@ -46,7 +47,7 @@ export const requireActiveVisit = async (req, res, next) => {
     // Continue to next middleware/route handler
     next();
   } catch (error) {
-    console.error('Error checking active visit:', error);
+    logger.error('Error checking active visit:', error);
     return res.status(500).json({
       success: false,
       message: 'Failed to verify active visit status',
@@ -73,7 +74,7 @@ export const checkActiveVisit = async (req, res, next) => {
 
     next();
   } catch (error) {
-    console.error('Error checking active visit (non-blocking):', error);
+    logger.error('Error checking active visit (non-blocking):', error);
     // Don't block request on error, just continue
     next();
   }

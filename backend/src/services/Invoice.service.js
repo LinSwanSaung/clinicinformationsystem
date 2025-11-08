@@ -422,7 +422,7 @@ class InvoiceService {
             reason: 'Invoice paid - visit completed',
           });
         } catch (logError) {
-          console.error('[AUDIT] Failed to log visit completion:', logError.message);
+          logger.error('[AUDIT] Failed to log visit completion:', logError.message);
           // Don't fail the operation if audit logging fails
         }
 

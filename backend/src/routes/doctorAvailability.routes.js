@@ -15,7 +15,7 @@ const doctorAvailabilityService = new DoctorAvailabilityService();
 router.get(
   '/',
   authenticate,
-  authorize(ROLES.ADMIN, ROLES.RECEPTIONIST, ROLES.RECEPTION, ROLES.DOCTOR, ROLES.NURSE),
+  authorize(ROLES.ADMIN, ROLES.RECEPTIONIST, ROLES.DOCTOR, ROLES.NURSE),
   asyncHandler(async (req, res) => {
     const { doctor_id } = req.query;
 
@@ -39,7 +39,7 @@ router.get(
 router.get(
   '/doctor/:doctorId',
   authenticate,
-  authorize(ROLES.ADMIN, ROLES.RECEPTIONIST, ROLES.RECEPTION, ROLES.DOCTOR, ROLES.NURSE),
+  authorize(ROLES.ADMIN, ROLES.RECEPTIONIST, ROLES.DOCTOR, ROLES.NURSE),
   asyncHandler(async (req, res) => {
     const { doctorId } = req.params;
 
@@ -61,7 +61,7 @@ router.get(
 router.get(
   '/available-doctors',
   authenticate,
-  authorize(ROLES.ADMIN, ROLES.RECEPTIONIST, ROLES.RECEPTION),
+  authorize(ROLES.ADMIN, ROLES.RECEPTIONIST),
   asyncHandler(async (req, res) => {
     const { day_of_week, time } = req.query;
 
@@ -90,7 +90,7 @@ router.get(
 router.get(
   '/check-availability',
   authenticate,
-  authorize(ROLES.ADMIN, ROLES.RECEPTIONIST, ROLES.RECEPTION),
+  authorize(ROLES.ADMIN, ROLES.RECEPTIONIST),
   asyncHandler(async (req, res) => {
     const { doctor_id, day_of_week, time } = req.query;
 
@@ -123,7 +123,7 @@ router.get(
 router.get(
   '/:doctorId/check-slot',
   authenticate,
-  authorize(ROLES.ADMIN, ROLES.RECEPTIONIST, ROLES.RECEPTION),
+  authorize(ROLES.ADMIN, ROLES.RECEPTIONIST),
   asyncHandler(async (req, res) => {
     const { doctorId } = req.params;
     const { date, time } = req.query;
@@ -153,7 +153,7 @@ router.get(
 router.get(
   '/:doctorId/available-slots',
   authenticate,
-  authorize(ROLES.ADMIN, ROLES.RECEPTIONIST, ROLES.RECEPTION),
+  authorize(ROLES.ADMIN, ROLES.RECEPTIONIST),
   asyncHandler(async (req, res) => {
     const { doctorId } = req.params;
     const { date } = req.query;
@@ -250,7 +250,7 @@ router.delete(
 router.post(
   '/check-missed-tokens',
   authenticate,
-  authorize(ROLES.ADMIN, ROLES.RECEPTIONIST, ROLES.RECEPTION),
+  authorize(ROLES.ADMIN, ROLES.RECEPTIONIST),
   asyncHandler(async (req, res) => {
     const result = await doctorAvailabilityService.checkAndMarkMissedTokens();
 
@@ -273,7 +273,7 @@ router.post(
 router.post(
   '/check-missed-tokens/:doctorId',
   authenticate,
-  authorize(ROLES.ADMIN, ROLES.RECEPTIONIST, ROLES.RECEPTION),
+  authorize(ROLES.ADMIN, ROLES.RECEPTIONIST),
   asyncHandler(async (req, res) => {
     const { doctorId } = req.params;
 
@@ -298,7 +298,7 @@ router.post(
 router.post(
   '/cancel-remaining-tokens/:doctorId',
   authenticate,
-  authorize(ROLES.ADMIN, ROLES.RECEPTIONIST, ROLES.RECEPTION),
+  authorize(ROLES.ADMIN, ROLES.RECEPTIONIST),
   asyncHandler(async (req, res) => {
     const { doctorId } = req.params;
     const { reason } = req.body;
@@ -328,7 +328,7 @@ router.post(
 router.get(
   '/status/:doctorId',
   authenticate,
-  authorize('admin', ROLES.RECEPTION, ROLES.DOCTOR, ROLES.NURSE),
+  authorize('admin', ROLES.RECEPTIONIST, ROLES.DOCTOR, ROLES.NURSE),
   asyncHandler(async (req, res) => {
     const { doctorId } = req.params;
 
@@ -350,7 +350,7 @@ router.get(
 router.get(
   '/status-all',
   authenticate,
-  authorize(ROLES.ADMIN, ROLES.RECEPTIONIST, ROLES.RECEPTION),
+  authorize(ROLES.ADMIN, ROLES.RECEPTIONIST),
   asyncHandler(async (req, res) => {
     const result = await doctorAvailabilityService.getAllDoctorsAvailabilityStatus();
 

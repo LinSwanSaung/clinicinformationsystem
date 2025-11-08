@@ -1,4 +1,5 @@
 import { supabase } from '../config/database.js';
+import logger from '../config/logger.js';
 
 /**
  * Base Model class with common database operations
@@ -102,13 +103,13 @@ export class BaseModel {
         .maybeSingle();
 
       if (error) {
-        console.error(`Error creating ${this.tableName}:`, error);
+        logger.error(`Error creating ${this.tableName}:`, error);
         throw error;
       }
 
       return result;
     } catch (error) {
-      console.error(`Exception creating ${this.tableName}:`, error);
+      logger.error(`Exception creating ${this.tableName}:`, error);
       throw error;
     }
   }
@@ -131,7 +132,7 @@ export class BaseModel {
         .maybeSingle();
 
       if (error) {
-        console.error(`Error updating ${this.tableName}:`, error);
+        logger.error(`Error updating ${this.tableName}:`, error);
         throw error;
       }
 
@@ -142,7 +143,7 @@ export class BaseModel {
 
       return result;
     } catch (error) {
-      console.error(`Exception updating ${this.tableName}:`, error);
+      logger.error(`Exception updating ${this.tableName}:`, error);
       throw error;
     }
   }

@@ -263,7 +263,7 @@ class QueueService {
             : 'Walk-in visit created by receptionist',
         });
       } catch (logError) {
-        console.error('[AUDIT] Failed to log visit creation:', logError.message);
+        logger.error('[AUDIT] Failed to log visit creation:', logError.message);
         // Don't fail the operation if audit logging fails
       }
 
@@ -353,7 +353,7 @@ class QueueService {
         message: `Consultation started with ${patientName} (Token #${updatedToken.token_number})`,
       };
     } catch (error) {
-      console.error('[QUEUE] ❌ Error in callNextAndStart:', error);
+      logger.error('[QUEUE] ❌ Error in callNextAndStart:', error);
       throw new Error(`Failed to call next patient and start consultation: ${error.message}`);
     }
   }
@@ -640,7 +640,7 @@ class QueueService {
                 note: 'Doctor started consultation with patient',
               });
             } catch (logError) {
-              console.error('[AUDIT] Failed to log consultation start:', logError.message);
+              logger.error('[AUDIT] Failed to log consultation start:', logError.message);
             }
           } catch (updateError) {
             
@@ -746,12 +746,12 @@ class QueueService {
             reason: 'Consultation ended - visit_end_time set',
           });
         } catch (logError) {
-          console.error('[AUDIT] Failed to log visit update:', logError.message);
+          logger.error('[AUDIT] Failed to log visit update:', logError.message);
         }
 
         
       } catch (visitError) {
-        console.error('[QUEUE] ❌ Failed to update visit end time:', visitError.message);
+        logger.error('[QUEUE] ❌ Failed to update visit end time:', visitError.message);
         // Don't fail the entire operation if visit update fails, but log it
         throw new ApplicationError(
           `Consultation completed but failed to update visit end time: ${visitError.message}`,
@@ -778,7 +778,7 @@ class QueueService {
         message: 'Consultation completed',
       };
     } catch (error) {
-      console.error('[QUEUE] ❌ Error completing consultation:', error.message);
+      logger.error('[QUEUE] ❌ Error completing consultation:', error.message);
       if (error instanceof ApplicationError) {
         throw error;
       }
@@ -832,12 +832,12 @@ class QueueService {
               reason: 'Patient marked as missed/no-show',
             });
           } catch (logError) {
-            console.error('[AUDIT] Failed to log visit cancellation:', logError.message);
+            logger.error('[AUDIT] Failed to log visit cancellation:', logError.message);
           }
 
           
         } catch (visitError) {
-          console.error(
+          logger.error(
             `[QUEUE] ⚠️ Failed to cancel visit ${updatedToken.visit_id}:`,
             visitError.message
           );
@@ -900,7 +900,7 @@ class QueueService {
           });
           
         } catch (visitError) {
-          console.error(`⚠️ Failed to cancel visit ${updatedToken.visit_id}:`, visitError.message);
+          logger.error(`⚠️ Failed to cancel visit ${updatedToken.visit_id}:`, visitError.message);
           // Don't fail the token cancellation if visit cancellation fails
         }
       }

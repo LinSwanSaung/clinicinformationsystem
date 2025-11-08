@@ -6,6 +6,7 @@ import VisitModel from '../models/Visit.model.js';
 import VitalsModel from '../models/Vitals.model.js';
 import PrescriptionModel from '../models/Prescription.model.js';
 import AppointmentModel from '../models/Appointment.model.js';
+import logger from '../config/logger.js';
 
 class PatientPortalService {
   constructor() {
@@ -86,7 +87,7 @@ class PatientPortalService {
           estimatedWait = token.status === 'serving' ? 0 : ahead * consultMinutes;
         }
       } catch (error) {
-        console.warn('[PatientPortal] Failed to compute queue position:', error.message);
+        logger.warn('[PatientPortal] Failed to compute queue position:', error.message);
       }
     }
 

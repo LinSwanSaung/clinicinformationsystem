@@ -3,6 +3,7 @@ import { authenticate, authorize } from '../middleware/auth.js';
 import { asyncHandler } from '../middleware/errorHandler.js';
 import { ROLES } from '../constants/roles.js';
 import PatientService from '../services/Patient.service.js';
+import logger from '../config/logger.js';
 import { validatePatient, validatePatientUpdate } from '../validators/patient.validator.js';
 
 const router = express.Router();
@@ -15,7 +16,7 @@ const router = express.Router();
 router.get(
   '/',
   authenticate,
-  authorize(ROLES.ADMIN, ROLES.RECEPTIONIST, 'reception', 'doctor', 'nurse'),
+  authorize(ROLES.ADMIN, ROLES.RECEPTIONIST, 'doctor', 'nurse'),
   asyncHandler(async (req, res) => {
     const { page = 1, limit = 100, search } = req.query;
 
@@ -49,7 +50,7 @@ router.get(
         },
       });
     } catch (error) {
-      console.error('Error in GET /patients:', error);
+      logger.error('Error in GET /patients:', error);
       res.status(error.status || 500).json({
         success: false,
         message: error.message || 'Failed to fetch patients',
@@ -88,7 +89,7 @@ router.get(
         total: Array.isArray(patients) ? patients.length : 0,
       });
     } catch (error) {
-      console.error('Error in GET /patients/doctor:', error);
+      logger.error('Error in GET /patients/doctor:', error);
       res.status(500).json({
         success: false,
         message: 'Failed to fetch doctor patients',
@@ -126,7 +127,7 @@ router.get(
 router.post(
   '/',
   authenticate,
-  authorize(ROLES.ADMIN, ROLES.RECEPTIONIST, ROLES.RECEPTION),
+  authorize(ROLES.ADMIN, ROLES.RECEPTIONIST),
   validatePatient,
   asyncHandler(async (req, res) => {
     const patient = await PatientService.createPatient(req.body, req.user.id);
@@ -147,7 +148,7 @@ router.post(
 router.put(
   '/:id',
   authenticate,
-  authorize(ROLES.ADMIN, ROLES.RECEPTIONIST, ROLES.RECEPTION),
+  authorize(ROLES.ADMIN, ROLES.RECEPTIONIST),
   validatePatientUpdate,
   asyncHandler(async (req, res) => {
     const patient = await PatientService.updatePatient(req.params.id, req.body, req.user.id);

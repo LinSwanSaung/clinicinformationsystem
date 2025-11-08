@@ -4,6 +4,7 @@ import { AppError, asyncHandler } from '../middleware/errorHandler.js';
 import { ROLES } from '../constants/roles.js';
 import AppointmentService from '../services/Appointment.service.js';
 import { logAuditEvent } from '../utils/auditLogger.js';
+import logger from '../config/logger.js';
 
 const router = express.Router();
 const appointmentService = new AppointmentService();
@@ -77,7 +78,7 @@ router.get(
 router.post(
   '/',
   authenticate,
-  authorize(ROLES.ADMIN, ROLES.RECEPTIONIST, ROLES.RECEPTION),
+  authorize(ROLES.ADMIN, ROLES.RECEPTIONIST),
   asyncHandler(async (req, res) => {
     const appointmentData = {
       ...req.body,
@@ -99,7 +100,7 @@ router.post(
         ip: req.ip,
       });
     } catch (e) {
-      console.error('Audit log error:', e);
+      logger.error('Audit log error:', e);
     }
 
     res.status(201).json({
@@ -118,7 +119,7 @@ router.post(
 router.put(
   '/:id',
   authenticate,
-  authorize(ROLES.ADMIN, ROLES.RECEPTIONIST, ROLES.RECEPTION),
+  authorize(ROLES.ADMIN, ROLES.RECEPTIONIST),
   asyncHandler(async (req, res) => {
     const { id } = req.params;
     const updateData = req.body;
@@ -139,7 +140,7 @@ router.put(
         ip: req.ip,
       });
     } catch (e) {
-      console.error('Audit log error:', e);
+      logger.error('Audit log error:', e);
     }
 
     res.status(200).json({
@@ -158,7 +159,7 @@ router.put(
 router.delete(
   '/:id',
   authenticate,
-  authorize(ROLES.ADMIN, ROLES.RECEPTIONIST, ROLES.RECEPTION),
+  authorize(ROLES.ADMIN, ROLES.RECEPTIONIST),
   asyncHandler(async (req, res) => {
     const { id } = req.params;
 
@@ -176,7 +177,7 @@ router.delete(
         ip: req.ip,
       });
     } catch (e) {
-      console.error('Audit log error:', e);
+      logger.error('Audit log error:', e);
     }
 
     res.status(200).json({
@@ -194,7 +195,7 @@ router.delete(
 router.put(
   '/:id/status',
   authenticate,
-  authorize('doctor', 'nurse', 'receptionist', ROLES.RECEPTION),
+  authorize('doctor', 'nurse', 'receptionist'),
   asyncHandler(async (req, res) => {
     const { id } = req.params;
     const { status } = req.body;
@@ -222,7 +223,7 @@ router.put(
         ip: req.ip,
       });
     } catch (e) {
-      console.error('Audit log error:', e);
+      logger.error('Audit log error:', e);
     }
 
     res.status(200).json({
@@ -241,7 +242,7 @@ router.put(
 router.get(
   '/doctor/:doctorId/slots',
   authenticate,
-  authorize(ROLES.ADMIN, ROLES.RECEPTIONIST, ROLES.RECEPTION),
+  authorize(ROLES.ADMIN, ROLES.RECEPTIONIST),
   asyncHandler(async (req, res) => {
     const { doctorId } = req.params;
     const { date } = req.query;

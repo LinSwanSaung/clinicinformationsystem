@@ -8,6 +8,7 @@ import config from '../config/app.config.js';
 import { supabase } from '../config/database.js';
 import crypto from 'crypto';
 import { logAuditEvent } from '../utils/auditLogger.js';
+import logger from '../config/logger.js';
 
 const router = express.Router();
 
@@ -75,7 +76,7 @@ router.post(
         });
 
       if (uploadError) {
-        console.error('Supabase upload error:', uploadError);
+        logger.error('Supabase upload error:', uploadError);
         throw new Error(`Failed to upload file: ${uploadError.message}`);
       }
 
@@ -100,7 +101,7 @@ router.post(
         .single();
 
       if (dbError) {
-        console.error('Database insert error:', dbError);
+        logger.error('Database insert error:', dbError);
         // Try to delete the uploaded file
         await supabase.storage.from('medical-documents').remove([uniqueFileName]);
         throw new Error(`Failed to save document metadata: ${dbError.message}`);
@@ -127,7 +128,7 @@ router.post(
         data: docData,
       });
     } catch (error) {
-      console.error('Document upload error:', error);
+      logger.error('Document upload error:', error);
       res.status(500).json({
         success: false,
         message: error.message || 'Failed to upload document',
@@ -247,7 +248,7 @@ router.delete(
       .remove([doc.file_path]);
 
     if (storageError) {
-      console.error('Storage deletion error:', storageError);
+      logger.error('Storage deletion error:', storageError);
     }
 
     // Delete from database

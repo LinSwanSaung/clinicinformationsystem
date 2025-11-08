@@ -1,4 +1,5 @@
 import { BaseModel } from './BaseModel.js';
+import logger from '../config/logger.js';
 
 class QueueTokenModel extends BaseModel {
   constructor() {
@@ -419,7 +420,7 @@ class QueueTokenModel extends BaseModel {
 
       return data || null;
     } catch (error) {
-      console.error('Error finding serving token by doctor:', error);
+      logger.error('Error finding serving token by doctor:', error);
       throw new Error(`Failed to find serving token: ${error.message}`);
     }
   }

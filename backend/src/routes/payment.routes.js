@@ -65,7 +65,7 @@ router.post(
 router.get(
   '/:id',
   authenticate,
-  authorize(ROLES.ADMIN, ROLES.CASHIER, 'pharmacist', 'doctor', ROLES.RECEPTION),
+  authorize(ROLES.ADMIN, ROLES.CASHIER, 'pharmacist', 'doctor', ROLES.RECEPTIONIST),
   asyncHandler(async (req, res) => {
     const { id } = req.params;
     const payment = await PaymentService.getPaymentById(id);
@@ -85,7 +85,7 @@ router.get(
 router.get(
   '/invoice/:invoiceId',
   authenticate,
-  authorize(ROLES.ADMIN, ROLES.CASHIER, 'pharmacist', 'doctor', ROLES.RECEPTION),
+  authorize(ROLES.ADMIN, ROLES.CASHIER, 'pharmacist', 'doctor', ROLES.RECEPTIONIST),
   asyncHandler(async (req, res) => {
     const { invoiceId } = req.params;
     const payments = await PaymentService.getPaymentsByInvoice(invoiceId);

@@ -2,6 +2,7 @@ import express from 'express';
 import QueueService from '../services/Queue.service.js';
 import { authenticate } from '../middleware/auth.js';
 import { validateQueueToken } from '../validators/queue.validator.js';
+import logger from '../config/logger.js';
 
 const router = express.Router();
 const queueService = new QueueService();
@@ -71,7 +72,7 @@ router.get('/doctor/:doctorId/status', authenticate, async (req, res) => {
       data: status,
     });
   } catch (error) {
-    console.error('Error getting doctor queue status:', error);
+    logger.error('Error getting doctor queue status:', error);
     res.status(500).json({
       success: false,
       message: error.message,
@@ -136,7 +137,7 @@ router.post('/call-next-and-start/:doctorId', authenticate, async (req, res) => 
     const result = await queueService.callNextAndStart(doctorId);
     res.json(result);
   } catch (error) {
-    console.error('[ROUTE] Call next and start error:', error);
+    logger.error('[ROUTE] Call next and start error:', error);
     res.status(400).json({
       success: false,
       message: error.message || 'Failed to call next patient and start consultation',
@@ -161,7 +162,7 @@ router.post('/force-end-consultation/:doctorId', authenticate, async (req, res) 
     const result = await queueService.forceEndActiveConsultation(doctorId);
     res.json(result);
   } catch (error) {
-    console.error('[ROUTE] Force end consultation error:', error);
+    logger.error('[ROUTE] Force end consultation error:', error);
     res.status(400).json({
       success: false,
       message: error.message || 'Failed to end consultation',
@@ -190,7 +191,7 @@ router.put('/token/:tokenId/mark-ready', authenticate, async (req, res) => {
       message: result.message,
     });
   } catch (error) {
-    console.error('Mark ready error:', error);
+    logger.error('Mark ready error:', error);
     res.status(400).json({
       success: false,
       message: error.message,
@@ -214,7 +215,7 @@ router.put('/token/:tokenId/mark-waiting', authenticate, async (req, res) => {
       message: result.message,
     });
   } catch (error) {
-    console.error('Mark waiting error:', error);
+    logger.error('Mark waiting error:', error);
     res.status(400).json({
       success: false,
       message: error.message,
@@ -252,7 +253,7 @@ router.put('/token/:tokenId/start-consultation', authenticate, async (req, res) 
       message: result.message,
     });
   } catch (error) {
-    console.error('Failed to start consultation:', error);
+    logger.error('Failed to start consultation:', error);
     res.status(400).json({
       success: false,
       message: error.message,
@@ -711,7 +712,7 @@ router.post('/doctor/:doctorId/force-complete-active', authenticate, async (req,
       message: result.message,
     });
   } catch (error) {
-    console.error('Force complete error:', error);
+    logger.error('Force complete error:', error);
     res.status(400).json({
       success: false,
       message: error.message,

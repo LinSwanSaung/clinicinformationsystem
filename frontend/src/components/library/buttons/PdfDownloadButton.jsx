@@ -3,6 +3,7 @@ import { Button } from '@/components/ui/button';
 import { Download } from 'lucide-react';
 import api from '@/services/api';
 import logger from '@/utils/logger';
+import { useFeedback } from '@/contexts/FeedbackContext';
 
 /**
  * PdfDownloadButton
@@ -28,6 +29,7 @@ export function PdfDownloadButton({
   icon: Icon = Download,
 }) {
   const [downloading, setDownloading] = useState(false);
+  const { showError } = useFeedback();
 
   const handleClick = async () => {
     if (!endpoint || !fileName) return;
@@ -48,7 +50,7 @@ export function PdfDownloadButton({
     } catch (error) {
       // eslint-disable-next-line no-console
       logger.error('Failed to download PDF:', error);
-      alert('Failed to download file. Please try again.');
+      showError('Failed to download file. Please try again.');
     } finally {
       setDownloading(false);
     }

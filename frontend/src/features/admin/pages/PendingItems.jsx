@@ -360,6 +360,26 @@ const PendingItems = () => {
                   ),
                 },
                 {
+                  key: 'issue',
+                  label: 'Issue',
+                  render: (_, row) => (
+                    <div className="max-w-md">
+                      {row.issue ? (
+                        <div className="flex items-start gap-2">
+                          {row.issue.includes('Data inconsistency') ? (
+                            <AlertTriangle className="h-4 w-4 text-amber-500 mt-0.5 flex-shrink-0" />
+                          ) : (
+                            <AlertCircle className="h-4 w-4 text-blue-500 mt-0.5 flex-shrink-0" />
+                          )}
+                          <span className="text-sm text-muted-foreground">{row.issue}</span>
+                        </div>
+                      ) : (
+                        <span className="text-sm text-muted-foreground">-</span>
+                      )}
+                    </div>
+                  ),
+                },
+                {
                   key: 'lastUpdated',
                   label: 'Last Updated',
                   render: (_, row) => (

@@ -26,6 +26,7 @@ import doctorService from '@/services/doctorService';
 import { queueService } from '@/features/queue';
 import { useQuery } from '@tanstack/react-query';
 import { useAuth } from '@/contexts/AuthContext';
+import { useFeedback } from '@/contexts/FeedbackContext';
 import { ROLES } from '@/constants/roles';
 import { POLLING_INTERVALS } from '@/constants/polling';
 import logger from '@/utils/logger';
@@ -83,6 +84,9 @@ const NurseDashboard = () => {
   const [selectedStatus, setSelectedStatus] = useState('all'); // New status filter state
   const [lastRefresh, setLastRefresh] = useState(new Date());
   const [isUserActive, setIsUserActive] = useState(false); // Track user activity
+  
+  // Use feedback system for notifications
+  const { showSuccess, showError, showWarning, showInfo } = useFeedback();
   const [queueStats, setQueueStats] = useState({
     totalDoctors: 0,
     activeDoctors: 0,
@@ -671,7 +675,7 @@ const NurseDashboard = () => {
                           try {
                             if (!patientId || typeof patientId !== 'string') {
                               logger.error('[NURSE] Invalid patient ID provided when saving vitals:', patientId);
-                              alert('Unable to determine the patient record. Please refresh and try again.');
+                              showError('Unable to determine the patient record. Please refresh and try again.');
                               return;
                             }
 
@@ -707,7 +711,7 @@ const NurseDashboard = () => {
                             
                             // If there's a blood pressure validation error, show it
                             if (bpError) {
-                              alert(`Invalid blood pressure: ${bpError}`);
+                              showError(`Invalid blood pressure: ${bpError}`);
                               return;
                             }
                             
@@ -739,7 +743,7 @@ const NurseDashboard = () => {
                             
                             // If there's a temperature validation error, show it
                             if (tempError) {
-                              alert(`Invalid temperature: ${tempError}`);
+                              showError(`Invalid temperature: ${tempError}`);
                               return;
                             }
                             
@@ -771,15 +775,15 @@ const NurseDashboard = () => {
                               logger.debug('✅ [NURSE] Patient list refreshed');
                             }
                             
-                            alert('Vitals saved successfully!');
+                            showSuccess('Vitals saved successfully!');
                           } catch (error) {
                             logger.error('Failed to save vitals:', error);
                             
                             // Check for specific error from backend
                             if (error.response?.data?.code === 'NO_ACTIVE_VISIT') {
-                              alert('⚠️ Security Check Failed\n\nCannot record vitals: Patient does not have an active visit.\n\nPlease ensure the patient has an active consultation session before recording vitals.');
+                              showWarning('Security Check Failed: Cannot record vitals. Patient does not have an active visit. Please ensure the patient has an active consultation session before recording vitals.');
                             } else {
-                              alert(`Failed to save vitals: ${error.response?.data?.message || error.message}`);
+                              showError(`Failed to save vitals: ${error.response?.data?.message || error.message}`);
                             }
                           }
                         }}
@@ -799,11 +803,11 @@ const NurseDashboard = () => {
                               }
                             } else {
                               logger.error('No active token found for patient:', patientId);
-                              alert('Could not find active token for this patient.');
+                              showError('Could not find active token for this patient.');
                             }
                           } catch (error) {
                             logger.error('Failed to mark patient ready:', error);
-                            alert('Failed to mark patient ready. Please try again.');
+                            showError('Failed to mark patient ready. Please try again.');
                           }
                         }}
                         onUnmarkReady={async (patientId) => {
@@ -824,7 +828,7 @@ const NurseDashboard = () => {
                             }
                           } catch (error) {
                             logger.error('Failed to unmark patient ready:', error);
-                            alert('Failed to unmark patient ready. Please try again.');
+                            showError('Failed to unmark patient ready. Please try again.');
                           }
                         }}
                         onDelayPatient={async (tokenOrQueueId, reason) => {
@@ -837,7 +841,7 @@ const NurseDashboard = () => {
                             if (!patient) {
                               logger.error('❌ Patient not found. TokenOrQueueId:', tokenOrQueueId);
                               logger.error('   Available IDs in patients array:', patients.map(p => p.id));
-                              alert('Patient not found in current list. Please refresh the page and try again.');
+                              showError('Patient not found in current list. Please refresh the page and try again.');
                               return;
                             }
                             
@@ -858,7 +862,7 @@ const NurseDashboard = () => {
                             // Delay the token
                             await queueService.delayToken(patient.id, reason);
                             logger.debug('✅ Token queue patient delayed');
-                            alert('✅ Patient has been marked as delayed');
+                            showSuccess('Patient has been marked as delayed');
                             
                             // Refresh the patient data
                             if (selectedDoctor) {
@@ -866,7 +870,7 @@ const NurseDashboard = () => {
                             }
                           } catch (error) {
                             logger.error('❌ Failed to delay patient:', error);
-                            alert('❌ Failed to delay patient: ' + (error.message || 'Please try again.'));
+                            showError('Failed to delay patient: ' + (error.message || 'Please try again.'));
                           }
                         }}
                         onRemoveDelay={async (tokenOrQueueId) => {
@@ -883,7 +887,7 @@ const NurseDashboard = () => {
                               // Undelay the token
                               const result = await queueService.undelayToken(patient.id);
                               logger.debug('✅ Token queue patient undelayed. New token:', result.newTokenNumber);
-                              alert(`Patient has been added back to the queue with token #${result.newTokenNumber}`);
+                              showSuccess(`Patient has been added back to the queue with token #${result.newTokenNumber}`);
                               
                               // Refresh the patient data
                               if (selectedDoctor) {
@@ -892,7 +896,7 @@ const NurseDashboard = () => {
                             }
                           } catch (error) {
                             logger.error('Failed to remove delay:', error);
-                            alert('Failed to remove delay: ' + (error.message || 'Please try again.'));
+                            showError('Failed to remove delay: ' + (error.message || 'Please try again.'));
                           }
                         }}
                         readOnly={false}

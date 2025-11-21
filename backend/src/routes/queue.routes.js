@@ -253,10 +253,31 @@ router.put('/token/:tokenId/start-consultation', authenticate, async (req, res) 
       message: result.message,
     });
   } catch (error) {
-    logger.error('Failed to start consultation:', error);
+    // Better error logging to capture all error details
+    logger.error('Failed to start consultation:', {
+      message: error?.message || 'Unknown error',
+      stack: error?.stack,
+      name: error?.name,
+      tokenId: req.params.tokenId,
+      error: error
+    });
+    
+    // Check for network/database connectivity issues
+    const errMsg = error?.message?.toLowerCase() || '';
+    if (errMsg.includes('fetch failed') || 
+        errMsg.includes('network') || 
+        errMsg.includes('timeout') ||
+        errMsg.includes('econnrefused') ||
+        errMsg.includes('enotfound')) {
+      return res.status(503).json({
+        success: false,
+        message: 'Database connection failed. Please check your network connection or try disabling VPN.',
+      });
+    }
+    
     res.status(400).json({
       success: false,
-      message: error.message,
+      message: error?.message || 'Failed to start consultation',
     });
   }
 });
@@ -669,6 +690,33 @@ router.get('/doctor/:doctorId/active-consultation', authenticate, async (req, re
     res.status(500).json({
       success: false,
       message: error.message,
+    });
+  }
+});
+
+/**
+ * @route   GET /api/queue/debug/patient/:patientId/tokens
+ * @desc    Debug helper: get today's tokens for a patient (optionally filter by doctorId)
+ * @access  Private
+ */
+router.get('/debug/patient/:patientId/tokens', authenticate, async (req, res) => {
+  try {
+    const { patientId } = req.params;
+    const { doctorId } = req.query;
+
+    // Use model directly to keep response simple for the debug UI
+    const { default: QueueTokenModel } = await import('../models/QueueToken.model.js');
+    const model = new QueueTokenModel();
+    const tokens = await model.getPatientTokensToday(patientId, doctorId);
+
+    res.json({
+      success: true,
+      data: { tokens },
+    });
+  } catch (error) {
+    res.status(500).json({
+      success: false,
+      message: error.message || 'Failed to fetch patient tokens',
     });
   }
 });

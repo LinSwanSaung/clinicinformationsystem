@@ -2,6 +2,7 @@
 import { useState, useEffect, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
+import { useFeedback } from '@/contexts/FeedbackContext';
 import {
   Search,
   Filter,
@@ -145,8 +146,8 @@ const searchVariants = {
 const CashierDashboard = () => {
   const navigate = useNavigate();
 
-  const [error, setError] = useState(null);
-  const [successMessage, setSuccessMessage] = useState(null);
+  // Use feedback system instead of inline state
+  const { showSuccess, showError } = useFeedback();
 
   // Invoices via React Query hooks
   const {
@@ -442,7 +443,7 @@ const CashierDashboard = () => {
       }
     } catch (error) {
       logger.error('Failed to fetch invoice:', error);
-      alert('Failed to load invoice details');
+      showError('Failed to load invoice details');
     }
   };
 
@@ -453,7 +454,7 @@ const CashierDashboard = () => {
       const paymentId = historyItem.rawData.payment_transactions?.[0]?.id;
 
       if (!paymentId) {
-        alert('No payment found for this invoice');
+        showWarning('No payment found for this invoice');
         return;
       }
 
@@ -470,7 +471,7 @@ const CashierDashboard = () => {
       window.URL.revokeObjectURL(url);
     } catch (error) {
       logger.error('Failed to download receipt:', error);
-      alert('Failed to download receipt. Please try again.');
+      showError('Failed to download receipt. Please try again.');
     }
   };
 
@@ -490,7 +491,7 @@ const CashierDashboard = () => {
       setLastRefreshTime(new Date());
     } catch (error) {
       logger.error('Manual refresh error:', error);
-      setError('Failed to refresh invoice data');
+      showError('Failed to refresh invoice data');
     } finally {
       setIsRefreshing(false);
     }
@@ -700,7 +701,7 @@ const CashierDashboard = () => {
       setSelectedInvoice(updatedInvoice);
     } catch (error) {
       logger.error('Error removing service:', error);
-      setError('Failed to remove service');
+      showError('Failed to remove service');
     } finally {
       setIsProcessing(false);
     }
@@ -708,7 +709,7 @@ const CashierDashboard = () => {
 
   const handleAddService = async () => {
     if (!selectedInvoice || !newService.name || !newService.price) {
-      setError('Service name and price are required');
+      showError('Service name and price are required');
       return;
     }
 
@@ -730,7 +731,7 @@ const CashierDashboard = () => {
       setShowAddServiceDialog(false);
     } catch (error) {
       logger.error('Error adding service:', error);
-      setError('Failed to add service');
+      showError('Failed to add service');
     } finally {
       setIsProcessing(false);
     }
@@ -763,7 +764,7 @@ const CashierDashboard = () => {
       setSelectedInvoice(updatedInvoice);
     } catch (error) {
       logger.error('Error updating service:', error);
-      setError('Failed to update service');
+      showError('Failed to update service');
     } finally {
       setIsProcessing(false);
     }
@@ -834,14 +835,14 @@ const CashierDashboard = () => {
         const limitCheck = await invoiceService.canPatientCreateInvoice(selectedInvoice.patient_id);
 
         if (!limitCheck.canCreate) {
-          setError(
+          showError(
             `Cannot process partial payment: ${limitCheck.message}. Patient must pay outstanding invoices first.`
           );
           return;
         }
       } catch (error) {
         logger.error('Error checking invoice limit:', error);
-        setError('Failed to verify patient invoice limit');
+        showError('Failed to verify patient invoice limit');
         return;
       }
     }
@@ -889,7 +890,7 @@ const CashierDashboard = () => {
       await refetchPending();
     } catch (error) {
       logger.error('Error loading prescriptions:', error);
-      setError('Failed to load prescriptions');
+      showError('Failed to load prescriptions');
     } finally {
       setIsProcessing(false);
     }
@@ -969,23 +970,31 @@ const CashierDashboard = () => {
         if (addOutstandingToInvoice && outstandingBalance) {
           successMsg += ` (including $${outstandingBalance.totalBalance.toFixed(2)} from previous invoices)`;
         }
-        setSuccessMessage(successMsg);
+        showSuccess(successMsg);
       } else {
-        // Process full payment
+        // Process full payment (or $0 invoice completion)
+        if (totals.total > 0) {
+          // Record payment for non-zero invoices
         await invoiceService.recordPayment(selectedInvoice.id, {
           payment_method: paymentMethod,
           amount_paid: totals.total,
           notes: notes || 'Payment processed',
         });
+        }
+        // For $0 invoices, skip payment recording (backend doesn't allow $0 payments)
+        // The invoice completion will handle marking it as paid
 
         // Complete the invoice (this will also complete the visit)
+        // For $0 invoices, this will mark them as paid without requiring a payment transaction
         await invoiceService.completeInvoice(selectedInvoice.id, currentUser?.id);
 
-        let successMsg = `Invoice ${selectedInvoice.invoice_number || selectedInvoice.id} completed successfully! Visit has been marked as completed.`;
+        let successMsg = totals.total === 0
+          ? `Visit completed successfully (no charge). Invoice ${selectedInvoice.invoice_number || selectedInvoice.id} has been marked as paid.`
+          : `Invoice ${selectedInvoice.invoice_number || selectedInvoice.id} completed successfully! Visit has been marked as completed.`;
         if (addOutstandingToInvoice && outstandingBalance) {
           successMsg += ` Also paid off ${outstandingBalance.invoiceCount} previous invoice(s) totaling $${outstandingBalance.totalBalance.toFixed(2)}.`;
         }
-        setSuccessMessage(successMsg);
+        showSuccess(successMsg);
       }
 
       setShowPaymentDialog(false);
@@ -1004,12 +1013,6 @@ const CashierDashboard = () => {
         }, 100);
       }
 
-      // Clear success message after 5 seconds
-      setTimeout(() => setSuccessMessage(null), 5000);
-
-      // Clear error
-      setError(null);
-
       // Reset partial payment state
       setIsPartialPayment(false);
       setPartialAmount('');
@@ -1017,7 +1020,7 @@ const CashierDashboard = () => {
       setPaymentDueDate('');
     } catch (error) {
       logger.error('Payment processing error:', error);
-      setError('Failed to process payment: ' + error.message);
+      showError('Failed to process payment: ' + error.message);
     } finally {
       setIsProcessing(false);
     }
@@ -1082,34 +1085,7 @@ const CashierDashboard = () => {
         fullWidth
       >
         <div className="space-y-6 p-4 md:p-6">
-          {/* Success Message */}
-          {successMessage && (
-            <motion.div
-              initial={{ opacity: 0, y: -20 }}
-              animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, y: -20 }}
-              className="flex items-center gap-3 rounded-lg border border-green-200 bg-green-50 p-4"
-            >
-              <CheckCircle className="h-5 w-5 text-green-600" />
-              <p className="font-medium text-green-800">{successMessage}</p>
-            </motion.div>
-          )}
-
-          {/* Error Message */}
-          {error && (
-            <motion.div
-              initial={{ opacity: 0, y: -20 }}
-              animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, y: -20 }}
-              className="flex items-center gap-3 rounded-lg border border-red-200 bg-red-50 p-4"
-            >
-              <AlertCircle className="h-5 w-5 text-red-600" />
-              <p className="font-medium text-red-800">{error}</p>
-              <Button variant="ghost" size="sm" onClick={() => setError(null)} className="ml-auto">
-                <X className="h-4 w-4" />
-              </Button>
-            </motion.div>
-          )}
+          {/* Success and error messages now handled by Toast system (top-right corner) */}
 
           {/* Statistics Cards */}
           <motion.div
@@ -1379,7 +1355,7 @@ const CashierDashboard = () => {
                                         handleViewInvoice(invoice);
                                       } catch (error) {
                                         logger.error('Error opening invoice detail:', error);
-                                        setError('Failed to open invoice details');
+                                        showError('Failed to open invoice details');
                                       }
                                     }}
                                     size="sm"
@@ -2166,17 +2142,27 @@ const CashierDashboard = () => {
                         <Label className="text-sm font-medium">Quick Discounts</Label>
                         <div className="grid grid-cols-2 gap-2">
                           <Button
+                            type="button"
                             variant="outline"
                             size="sm"
-                            onClick={() => handleDiscountPercentChange(10)}
+                            onClick={(e) => {
+                              e.preventDefault();
+                              e.stopPropagation();
+                              handleDiscountPercentChange(10);
+                            }}
                           >
                             <Tag className="mr-1 h-4 w-4" />
                             10% Senior
                           </Button>
                           <Button
+                            type="button"
                             variant="outline"
                             size="sm"
-                            onClick={() => handleDiscountPercentChange(20)}
+                            onClick={(e) => {
+                              e.preventDefault();
+                              e.stopPropagation();
+                              handleDiscountPercentChange(20);
+                            }}
                           >
                             <Tag className="mr-1 h-4 w-4" />
                             20% Staff
@@ -2292,14 +2278,16 @@ const CashierDashboard = () => {
                           onClick={handleApproveInvoice}
                           className="w-full gap-2"
                           disabled={
-                            totals.total <= 0 ||
+                            totals.total < 0 || // Only disable if negative (invalid state)
                             (isPartialPayment &&
                               (!partialAmount || parseFloat(partialAmount) <= 0 || !holdReason)) ||
                             (invoiceLimitReached && isPartialPayment) // Disable partial payment when limit reached
                           }
                         >
                           <Check className="h-4 w-4" />
-                          {isPartialPayment
+                          {totals.total === 0
+                            ? 'Complete Visit (No Charge)'
+                            : isPartialPayment
                             ? 'Process Partial Payment'
                             : 'Approve & Process Full Payment'}
                         </Button>

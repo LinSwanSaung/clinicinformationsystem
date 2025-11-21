@@ -50,15 +50,23 @@ router.get(
   asyncHandler(async (req, res) => {
     const pendingItems = [];
 
-    // Get pending visits (in_progress or active visits older than 5 minutes - for testing)
-    const fiveMinutesAgo = new Date(Date.now() - 5 * 60 * 1000).toISOString();
+    // Get pending visits that need admin attention:
+    // 1. Visits with consultation ended (visit_end_time set) but still in_progress
+    // 2. Visits with active queue tokens (serving status)
+    // 3. Visits in_progress for more than 1 hour without invoice or with unpaid invoice
+    
+    const oneHourAgo = new Date(Date.now() - 60 * 60 * 1000).toISOString();
+    const oneDayAgo = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
 
-    const { data: visitsData, error: visitsError } = await supabase
+    // Query 1: Visits with visit_end_time set but still in_progress (consultation ended, visit not completed)
+    // Exclude visits already resolved by admin
+    const { data: endedConsultationVisits, error: endedError } = await supabase
       .from('visits')
       .select(
         `
         id,
         status,
+        visit_end_time,
         updated_at,
         resolved_by_admin,
         resolved_reason,
@@ -73,31 +81,229 @@ router.get(
         )
       `
       )
-      .in('status', ['in_progress', 'active', 'consulting'])
-      .lt('updated_at', fiveMinutesAgo)
-      .order('updated_at', { ascending: true });
+      .eq('status', 'in_progress')
+      .not('visit_end_time', 'is', null) // Consultation has ended
+      .eq('resolved_by_admin', false) // Exclude already resolved
+      .order('visit_end_time', { ascending: true });
 
-    if (visitsError) {
-      logger.error('[ADMIN] Visits query error:', visitsError);
+    // Query 2: Visits with active serving queue tokens
+    // Exclude visits already resolved by admin (filter in code after fetching)
+    const { data: servingTokens, error: servingError } = await supabase
+      .from('queue_tokens')
+      .select(
+        `
+        visit_id,
+        status,
+        updated_at,
+        visits!inner (
+          id,
+          status,
+          visit_end_time,
+          updated_at,
+          resolved_by_admin,
+          resolved_reason,
+          patients!inner (
+            first_name,
+            last_name,
+            patient_number
+          ),
+          users (
+            first_name,
+            last_name
+          )
+        )
+      `
+      )
+      .eq('status', 'serving')
+      .not('visit_id', 'is', null);
+
+    // Query 3: Long-running in_progress visits (older than 1 hour) without invoice or with unpaid invoice
+    // Get all in_progress visits first, then filter in code
+    // Exclude visits already resolved by admin
+    const { data: allInProgressVisits, error: longRunningError } = await supabase
+      .from('visits')
+      .select(
+        `
+        id,
+        status,
+        visit_start_time,
+        visit_end_time,
+        updated_at,
+        resolved_by_admin,
+        resolved_reason,
+        patients!inner (
+          first_name,
+          last_name,
+          patient_number
+        ),
+        users (
+          first_name,
+          last_name
+        )
+      `
+      )
+      .eq('status', 'in_progress')
+      .eq('resolved_by_admin', false) // Exclude already resolved
+      .order('updated_at', { ascending: true });
+    
+    // Filter in code: visits that started more than 1 hour ago OR updated more than 1 hour ago
+    const longRunningVisits = allInProgressVisits?.filter((visit) => {
+      const startTime = visit.visit_start_time ? new Date(visit.visit_start_time) : null;
+      const updatedTime = visit.updated_at ? new Date(visit.updated_at) : null;
+      const oneHourAgoDate = new Date(oneHourAgo);
+      
+      return (
+        (startTime && startTime < oneHourAgoDate) ||
+        (updatedTime && updatedTime < oneHourAgoDate)
+      );
+    }) || [];
+
+    if (endedError) {
+      logger.error('[ADMIN] Ended consultation visits query error:', endedError);
+    }
+    if (servingError) {
+      logger.error('[ADMIN] Serving tokens query error:', servingError);
+    }
+    if (longRunningError) {
+      logger.error('[ADMIN] Long-running visits query error:', longRunningError);
     }
 
-    if (!visitsError && visitsData) {
-      pendingItems.push(
-        ...visitsData.map((visit) => ({
-          entityType: 'visit',
-          entityId: visit.id,
-          currentStatus: visit.status,
-          lastUpdated: visit.updated_at,
-          patientName: `${visit.patients.first_name} ${visit.patients.last_name}`,
-          patientNumber: visit.patients.patient_number,
-          doctorName: visit.users ? `${visit.users.first_name} ${visit.users.last_name}` : null,
-          resolvedByAdmin: visit.resolved_by_admin,
-          resolvedReason: visit.resolved_reason,
-        }))
-      );
+    // Process ended consultation visits
+    if (!endedError && endedConsultationVisits) {
+      // Check if they have paid invoices - if not, they need attention
+      for (const visit of endedConsultationVisits) {
+        // Double-check: skip if already resolved (defensive check)
+        if (visit.resolved_by_admin) {
+          continue;
+        }
+
+        const { data: invoices } = await supabase
+          .from('invoices')
+          .select('id, status')
+          .eq('visit_id', visit.id)
+          .eq('status', 'paid')
+          .limit(1);
+
+        // If no paid invoice, it needs admin attention
+        if (!invoices || invoices.length === 0) {
+          pendingItems.push({
+            entityType: 'visit',
+            entityId: visit.id,
+            currentStatus: visit.status,
+            lastUpdated: visit.visit_end_time || visit.updated_at,
+            patientName: `${visit.patients.first_name} ${visit.patients.last_name}`,
+            patientNumber: visit.patients.patient_number,
+            doctorName: visit.users ? `${visit.users.first_name} ${visit.users.last_name}` : null,
+            resolvedByAdmin: visit.resolved_by_admin,
+            resolvedReason: visit.resolved_reason,
+            issue: 'Consultation ended but visit not completed (no paid invoice)',
+          });
+        }
+      }
+    }
+
+    // Process visits with active serving tokens
+    if (!servingError && servingTokens) {
+      const visitIds = new Set();
+      servingTokens.forEach((token) => {
+        if (token.visits && !visitIds.has(token.visits.id)) {
+          // Skip if already resolved by admin (defensive check)
+          if (token.visits.resolved_by_admin) {
+            return;
+          }
+          
+          visitIds.add(token.visits.id);
+          
+          // Check if visit_end_time is set but token still serving (data inconsistency)
+          const issue = token.visits.visit_end_time
+            ? 'Data inconsistency: Consultation ended but token still serving'
+            : 'Active consultation in progress';
+          
+          pendingItems.push({
+            entityType: 'visit',
+            entityId: token.visits.id,
+            currentStatus: token.visits.status,
+            lastUpdated: token.updated_at || token.visits.updated_at,
+            patientName: `${token.visits.patients.first_name} ${token.visits.patients.last_name}`,
+            patientNumber: token.visits.patients.patient_number,
+            doctorName: token.visits.users
+              ? `${token.visits.users.first_name} ${token.visits.users.last_name}`
+              : null,
+            resolvedByAdmin: token.visits.resolved_by_admin,
+            resolvedReason: token.visits.resolved_reason,
+            issue,
+          });
+        }
+      });
+    }
+
+    // Process long-running visits
+    if (!longRunningError && longRunningVisits && longRunningVisits.length > 0) {
+      for (const visit of longRunningVisits) {
+        // Skip if already added from other queries
+        if (pendingItems.some((item) => item.entityId === visit.id && item.entityType === 'visit')) {
+          continue;
+        }
+
+        // Skip if already resolved by admin (defensive check)
+        if (visit.resolved_by_admin) {
+          continue;
+        }
+
+        // Check if it has an invoice
+        const { data: invoices } = await supabase
+          .from('invoices')
+          .select('id, status')
+          .eq('visit_id', visit.id)
+          .limit(1);
+
+        const hasUnpaidInvoice =
+          invoices && invoices.length > 0 && invoices[0].status !== 'paid';
+        const hasPartialInvoice =
+          invoices && invoices.length > 0 && invoices[0].status === 'partial';
+
+        // Include if: no invoice, unpaid invoice, or partial invoice
+        if (!invoices || invoices.length === 0 || hasUnpaidInvoice || hasPartialInvoice) {
+          let issue = 'Long-running visit without completion';
+          if (visit.visit_end_time) {
+            issue = 'Consultation ended but visit not completed';
+          } else if (hasPartialInvoice) {
+            issue = 'Long-running visit with partial payment';
+          } else if (hasUnpaidInvoice) {
+            issue = 'Long-running visit with unpaid invoice';
+          } else if (!invoices || invoices.length === 0) {
+            issue = 'Long-running visit without invoice';
+          }
+
+          pendingItems.push({
+            entityType: 'visit',
+            entityId: visit.id,
+            currentStatus: visit.status,
+            lastUpdated: visit.updated_at,
+            patientName: `${visit.patients.first_name} ${visit.patients.last_name}`,
+            patientNumber: visit.patients.patient_number,
+            doctorName: visit.users ? `${visit.users.first_name} ${visit.users.last_name}` : null,
+            resolvedByAdmin: visit.resolved_by_admin,
+            resolvedReason: visit.resolved_reason,
+            issue,
+          });
+        }
+      }
+    }
+
+    // Remove duplicates (in case same visit appears in multiple queries)
+    const uniquePendingItems = [];
+    const seenIds = new Set();
+    for (const item of pendingItems) {
+      const key = `${item.entityType}-${item.entityId}`;
+      if (!seenIds.has(key)) {
+        seenIds.add(key);
+        uniquePendingItems.push(item);
+      }
     }
 
     // Get pending appointments (scheduled but not completed/cancelled, older than 1 hour past scheduled time)
+    // Exclude appointments already resolved by admin
     const { data: appointmentsData, error: appointmentsError } = await supabase
       .from('appointments')
       .select(
@@ -121,6 +327,7 @@ router.get(
       `
       )
       .eq('status', 'scheduled')
+      .eq('resolved_by_admin', false) // Exclude already resolved
       .order('appointment_date', { ascending: true });
 
     if (!appointmentsError && appointmentsData) {
@@ -151,6 +358,7 @@ router.get(
     }
 
     // Get pending queue tokens (active tokens older than 4 hours)
+    // Exclude tokens already resolved by admin
     const { data: queueData, error: queueError } = await supabase
       .from('queue_tokens')
       .select(
@@ -172,6 +380,7 @@ router.get(
       `
       )
       .in('status', ['waiting', 'called', 'serving', 'delayed'])
+      .eq('resolved_by_admin', false) // Exclude already resolved
       .lt('created_at', new Date(Date.now() - 4 * 60 * 60 * 1000).toISOString())
       .order('created_at', { ascending: true });
 
@@ -192,6 +401,7 @@ router.get(
     }
 
     // Get pending invoices (unpaid invoices older than 7 days)
+    // Exclude invoices already resolved by admin
     const { data: invoicesData, error: invoicesError } = await supabase
       .from('invoices')
       .select(
@@ -209,6 +419,7 @@ router.get(
       `
       )
       .eq('status', 'pending')
+      .eq('resolved_by_admin', false) // Exclude already resolved
       .lt('created_at', new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString())
       .order('created_at', { ascending: true });
 
@@ -229,7 +440,7 @@ router.get(
     }
 
 
-    res.json(pendingItems);
+    res.json(uniquePendingItems);
   })
 );
 
@@ -326,12 +537,26 @@ router.post(
         if (fullRecord) {
           // If cancelling/completing a VISIT, also cancel/complete its queue token and appointment
           if (entityType === 'visit') {
-            // Update queue token
+            const now = new Date().toISOString();
+            
+            // Update visit with visit_end_time if completing and not already set
+            if (newStatus === 'completed' && !fullRecord.visit_end_time) {
+              await supabase
+                .from('visits')
+                .update({ visit_end_time: now })
+                .eq('id', fullRecord.id);
+            }
+            
+            // Update queue token(s) linked to this visit
             if (fullRecord.id) {
               await supabase
                 .from('queue_tokens')
-                .update({ status: newStatus, updated_at: new Date().toISOString() })
+                .update({ 
+                  status: newStatus === 'completed' ? 'completed' : newStatus,
+                  updated_at: now 
+                })
                 .eq('visit_id', fullRecord.id);
+              logger.debug(`[ADMIN] Updated queue token(s) for visit ${fullRecord.id}`);
             }
 
             // Update appointment if linked
@@ -342,7 +567,7 @@ router.post(
                   status: newStatus,
                   resolved_by_admin: true,
                   resolved_reason: reason,
-                  updated_at: new Date().toISOString(),
+                  updated_at: now,
                 })
                 .eq('id', fullRecord.appointment_id);
               logger.debug(`[ADMIN] Updated appointment ${fullRecord.appointment_id}`);

@@ -26,10 +26,12 @@ import { allergyService, diagnosisService } from '@/features/medical';
 import PageLayout from '@/components/layout/PageLayout';
 import { FormModal } from '@/components/library';
 import logger from '@/utils/logger';
+import { useFeedback } from '@/contexts/FeedbackContext';
 
 const PatientDetailPage = () => {
   const { id } = useParams();
   const navigate = useNavigate();
+  const { showSuccess, showError } = useFeedback();
   const [patient, setPatient] = useState(null);
   const [allergies, setAllergies] = useState([]);
   const [diagnoses, setDiagnoses] = useState([]);
@@ -92,7 +94,7 @@ const PatientDetailPage = () => {
     try {
       // Validate required fields
       if (!editFormData.first_name || !editFormData.last_name) {
-        alert('Please fill in all required fields (First Name, Last Name)');
+      showError('Please fill in all required fields (First Name, Last Name)');
         return;
       }
 
@@ -102,13 +104,13 @@ const PatientDetailPage = () => {
       if (response.success) {
         setPatient(response.data);
         setIsEditModalOpen(false);
-        alert('Patient information updated successfully!');
+      showSuccess('Patient information updated successfully!');
       } else {
-        alert('Failed to update patient information');
+      showError('Failed to update patient information');
       }
     } catch (error) {
       logger.error('Error updating patient:', error);
-      alert('Error updating patient information');
+      showError('Error updating patient information');
     } finally {
       setIsSaving(false);
     }

@@ -747,15 +747,40 @@ const InvoiceManagement = () => {
                     <CardTitle className="text-sm">Quick Actions</CardTitle>
                   </CardHeader>
                   <CardContent className="space-y-2">
-                    <Button variant="outline" size="sm" className="w-full justify-start gap-2">
+                    <Button 
+                      type="button"
+                      variant="outline" 
+                      size="sm" 
+                      className="w-full justify-start gap-2"
+                      onClick={(e) => {
+                        e.preventDefault();
+                        e.stopPropagation();
+                        handleDiscountPercentChange(10);
+                      }}
+                    >
                       <Tag className="h-4 w-4" />
                       Apply Senior Discount (10%)
                     </Button>
-                    <Button variant="outline" size="sm" className="w-full justify-start gap-2">
+                    <Button 
+                      type="button"
+                      variant="outline" 
+                      size="sm" 
+                      className="w-full justify-start gap-2"
+                      onClick={(e) => {
+                        e.preventDefault();
+                        e.stopPropagation();
+                        handleDiscountPercentChange(20);
+                      }}
+                    >
                       <Tag className="h-4 w-4" />
                       Apply Staff Discount (20%)
                     </Button>
-                    <Button variant="outline" size="sm" className="w-full justify-start gap-2">
+                    <Button 
+                      type="button"
+                      variant="outline" 
+                      size="sm" 
+                      className="w-full justify-start gap-2"
+                    >
                       <FileText className="h-4 w-4" />
                       Generate Insurance Form
                     </Button>

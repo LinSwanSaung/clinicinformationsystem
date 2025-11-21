@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
+import { useFeedback } from '@/contexts/FeedbackContext';
 import { ArrowLeft, AlertCircle } from 'lucide-react';
 import PageLayout from '@/components/layout/PageLayout';
 import { Button } from '../../components/ui/button';
@@ -18,6 +19,7 @@ import logger from '@/utils/logger';
 const PatientMedicalRecords = () => {
   const navigate = useNavigate();
   const { t, i18n } = useTranslation();
+  const { showError } = useFeedback();
   
   // Basic state
   const [profileData, setProfileData] = useState(null);
@@ -112,7 +114,7 @@ const PatientMedicalRecords = () => {
       document.body.removeChild(a);
     } catch (err) {
       logger.error('Failed to download visit PDF:', err);
-      alert('Failed to download visit summary. Please try again.');
+      showError('Failed to download visit summary. Please try again.');
     }
   };
 

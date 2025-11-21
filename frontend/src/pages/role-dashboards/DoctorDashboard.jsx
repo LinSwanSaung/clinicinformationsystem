@@ -1,6 +1,7 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../../contexts/AuthContext';
+import { useFeedback } from '@/contexts/FeedbackContext';
 import PageLayout from '@/components/layout/PageLayout';
 import { Card } from '../../components/ui/card';
 import { Input } from '../../components/ui/input';
@@ -21,6 +22,7 @@ import { PatientCard, PatientStats } from '@/features/patients';
 import { patientService } from '@/features/patients';
 import { queueService } from '@/features/queue';
 import { vitalsService } from '@/features/medical';
+import { POLLING_INTERVALS } from '@/constants/polling';
 import logger from '@/utils/logger';
 
 /**
@@ -133,22 +135,102 @@ const DoctorDashboard = () => {
   const [queueData, setQueueData] = useState([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
-  const [notification, setNotification] = useState(null); // { type: 'success'|'error', message: string }
+  const [autoRefresh, setAutoRefresh] = useState(true); // Auto-refresh enabled by default
+  const refreshIntervalRef = useRef(null);
   
   // Get current doctor ID from authenticated user
   const currentDoctorId = user?.id;
 
-  // Show notification function
+  // Use feedback system for notifications
+  const { showSuccess, showError, showInfo } = useFeedback();
+
+  // Helper function to show notifications (for backward compatibility)
   const showNotification = (type, message) => {
-    setNotification({ type, message });
-    // Auto-hide notification after 4 seconds
-    setTimeout(() => setNotification(null), 4000);
+    if (type === 'success') {
+      showSuccess(message);
+    } else if (type === 'error') {
+      showError(message);
+    } else if (type === 'info') {
+      showInfo(message);
+    }
   };
 
   // Load patients and queue data on component mount
   useEffect(() => {
     loadDoctorData();
   }, []);
+
+  // Create a stable refresh function for auto-refresh
+  // Uses a ref to access the current selectedTab value without causing re-renders
+  const selectedTabRef = useRef(selectedTab);
+  
+  // Update ref when selectedTab changes
+  useEffect(() => {
+    selectedTabRef.current = selectedTab;
+  }, [selectedTab]);
+
+  const silentRefreshQueue = useCallback(async () => {
+    try {
+      const queueResponse = await queueService.getDoctorQueueStatus(currentDoctorId);
+      
+      if (queueResponse.success && queueResponse.data) {
+        const newTokens = queueResponse.data.tokens || [];
+        const activeTokens = newTokens.filter(token => token.status !== 'cancelled');
+        
+        // Check if there's an active consultation
+        const hasActiveConsultation = activeTokens.some(token => token.status === 'serving');
+        
+        // Fetch vitals for each patient in the queue
+        const tokensWithVitals = await Promise.all(
+          activeTokens.map(async (token) => {
+            const vitals = await fetchTokenVitals(token);
+            if (vitals) {
+              token.patient.vitals = vitals;
+            }
+            return token;
+          })
+        );
+        
+        setQueueData(tokensWithVitals);
+        
+        // Auto-switch to consulting tab if there's an active consultation
+        // but only if user is on ready tab (not on completed tab)
+        if (hasActiveConsultation && selectedTabRef.current === 'ready') {
+          setSelectedTab('consulting');
+        }
+      }
+    } catch (error) {
+      logger.error('Auto-refresh failed:', error);
+    }
+  }, [currentDoctorId]);
+
+  // Auto-refresh queue data at regular intervals
+  useEffect(() => {
+    if (autoRefresh && currentDoctorId) {
+      // Clear any existing interval
+      if (refreshIntervalRef.current) {
+        clearInterval(refreshIntervalRef.current);
+      }
+
+      // Set up new interval for auto-refresh
+      refreshIntervalRef.current = setInterval(() => {
+        silentRefreshQueue(); // Silent refresh (no notification, no tab switching)
+      }, POLLING_INTERVALS.QUEUE);
+
+      // Cleanup on unmount or when autoRefresh changes
+      return () => {
+        if (refreshIntervalRef.current) {
+          clearInterval(refreshIntervalRef.current);
+        }
+      };
+    } else {
+      // Clear interval if auto-refresh is disabled
+      if (refreshIntervalRef.current) {
+        clearInterval(refreshIntervalRef.current);
+        refreshIntervalRef.current = null;
+      }
+    }
+  }, [autoRefresh, currentDoctorId, silentRefreshQueue]);
 
   const loadDoctorData = async () => {
     try {
@@ -210,7 +292,7 @@ const DoctorDashboard = () => {
   };
 
   // Refresh queue data
-  const refreshQueue = async () => {
+  const refreshQueue = async (silent = false) => {
     try {
       setRefreshing(true);
       const queueResponse = await queueService.getDoctorQueueStatus(currentDoctorId);
@@ -221,6 +303,9 @@ const DoctorDashboard = () => {
         // Filter out cancelled appointments
         const activeTokens = newTokens.filter(token => token.status !== 'cancelled');
         logger.debug(`📋 [DOCTOR REFRESH] Filtered to ${activeTokens.length} active tokens (excluded ${newTokens.length - activeTokens.length} cancelled)`);
+        
+        // Check if there's an active consultation (status === 'serving')
+        const hasActiveConsultation = activeTokens.some(token => token.status === 'serving');
         
         // Fetch vitals for each patient in the queue
         const tokensWithVitals = await Promise.all(
@@ -234,12 +319,25 @@ const DoctorDashboard = () => {
         );
         
         setQueueData(tokensWithVitals);
-        showNotification('success', 'Queue data refreshed successfully');
+        
+        // Automatically switch to consulting tab if there's an active consultation
+        // and user is not already viewing completed tab
+        if (hasActiveConsultation && selectedTab !== 'completed') {
+          setSelectedTab('consulting');
+        }
+        
+        if (!silent) {
+          showNotification('success', 'Queue data refreshed successfully');
+        }
       } else {
-        showNotification('error', 'Failed to refresh queue data');
+        if (!silent) {
+          showNotification('error', 'Failed to refresh queue data');
+        }
       }
     } catch (error) {
-      showNotification('error', `Failed to refresh: ${error.message}`);
+      if (!silent) {
+        showNotification('error', `Failed to refresh: ${error.message}`);
+      }
     } finally {
       setRefreshing(false);
     }
@@ -406,7 +504,9 @@ const DoctorDashboard = () => {
           logger.debug('[UI] Retrying call next and start...');
           const retryResponse = await queueService.callNextAndStart(currentDoctorId);
           if (retryResponse && retryResponse.success) {
-            await refreshQueue();
+            // Immediately switch to consulting tab and refresh
+            setSelectedTab('consulting');
+            await refreshQueue(false);
             showNotification('success', retryResponse.message);
           } else if (retryResponse) {
             showNotification('info', retryResponse.message);
@@ -414,7 +514,9 @@ const DoctorDashboard = () => {
         }
       } else if (response.success) {
         logger.debug('[UI] ✅ Consultation started successfully');
-        await refreshQueue();
+        // Immediately switch to consulting tab and refresh
+        setSelectedTab('consulting');
+        await refreshQueue(false);
         showNotification('success', response.message);
       } else {
         logger.debug('[UI] ℹ️ Response not successful:', response.message);
@@ -464,22 +566,13 @@ const DoctorDashboard = () => {
       setRefreshing(true);
       const response = await queueService.startConsultation(tokenId);
       if (response.success) {
-        // Update queue data immediately and force re-render
-        const updatedQueueData = queueData.map(token => 
-          token.id === tokenId 
-            ? { ...token, status: 'serving' }
-            : token
-        );
-        
-        // Use React's batch update to update both state and tab together
-        setQueueData([...updatedQueueData]); // Spread to create new array reference
+        // Immediately switch to consulting tab
         setSelectedTab('consulting');
-        showNotification('success', 'Consultation started successfully!');
         
-        // Background refresh for server sync
-        setTimeout(async () => {
-          await refreshQueue();
-        }, 500);
+        // Refresh queue data to get latest status from server
+        await refreshQueue(false);
+        
+        showNotification('success', 'Consultation started successfully!');
       }
     } catch (error) {
       // Handle different error types
@@ -489,8 +582,9 @@ const DoctorDashboard = () => {
           `${message}\n\nClick "OK" to go to "In Consultation" tab to see active consultations.`
         );
         if (confirmAction) {
-          // Switch to the "In Consultation" tab
+          // Switch to the "In Consultation" tab and refresh
           setSelectedTab('consulting');
+          await refreshQueue(false);
         }
       } else if (error.message && error.message.includes("should be 'called'")) {
         const confirmAction = window.confirm(
@@ -518,39 +612,7 @@ const DoctorDashboard = () => {
       subtitle="Manage patient consultations and medical records"
       fullWidth
     >
-      {/* Notification Component */}
-      {notification && (
-        <div className={`fixed top-4 right-4 z-50 p-4 rounded-lg shadow-lg border transition-all duration-300 ${
-          notification.type === 'success' 
-            ? 'bg-green-50 border-green-200 text-green-800' 
-            : 'bg-red-50 border-red-200 text-red-800'
-        }`}>
-          <div className="flex items-center space-x-3">
-            <div className={`flex-shrink-0 ${
-              notification.type === 'success' ? 'text-green-600' : 'text-red-600'
-            }`}>
-              {notification.type === 'success' ? (
-                <CheckCircle size={20} />
-              ) : (
-                <X size={20} />
-              )}
-            </div>
-            <div className="flex-1">
-              <p className="font-medium">{notification.message}</p>
-            </div>
-            <button
-              onClick={() => setNotification(null)}
-              className={`flex-shrink-0 rounded-full p-1 hover:bg-opacity-20 ${
-                notification.type === 'success' 
-                  ? 'hover:bg-green-600' 
-                  : 'hover:bg-red-600'
-              }`}
-            >
-              <X size={14} />
-            </button>
-          </div>
-        </div>
-      )}
+      {/* Notifications now handled by Toast system (top-right corner) */}
       
       <div className="space-y-8 p-8">
         {/* Loading state */}
@@ -611,6 +673,15 @@ const DoctorDashboard = () => {
               >
                 <RefreshCw className={`${refreshing ? 'animate-spin' : ''}`} size={18} />
                 Refresh
+              </Button>
+              <Button 
+                onClick={() => setAutoRefresh(!autoRefresh)}
+                variant={autoRefresh ? 'default' : 'outline'}
+                className={`h-12 px-4 ${autoRefresh ? 'bg-green-600 hover:bg-green-700 text-white' : ''}`}
+                title={autoRefresh ? 'Auto-refresh is ON - Click to disable' : 'Auto-refresh is OFF - Click to enable'}
+              >
+                <RefreshCw className={`mr-2 ${autoRefresh ? 'animate-pulse' : ''}`} size={18} />
+                {autoRefresh ? 'Auto-refresh ON' : 'Auto-refresh OFF'}
               </Button>
             </div>
 

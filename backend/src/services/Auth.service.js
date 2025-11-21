@@ -3,6 +3,7 @@ import config from '../config/app.config.js';
 import UserModel from '../models/User.model.js';
 import PatientModel from '../models/Patient.model.js';
 import { AppError } from '../middleware/errorHandler.js';
+import { executeWithRetry } from '../config/database.js';
 
 /**
  * Authentication Service
@@ -14,8 +15,12 @@ class AuthService {
    */
   async login(email, password) {
     try {
-      // Find user by email
-      const user = await UserModel.findByEmail(email);
+      // Find user by email with retry logic for network resilience
+      const user = await executeWithRetry(
+        async () => await UserModel.findByEmail(email),
+        2, // 2 retries
+        'User lookup'
+      );
 
       if (!user) {
         throw new AppError('Invalid credentials', 401);
@@ -26,7 +31,7 @@ class AuthService {
         throw new AppError('Account is deactivated', 401);
       }
 
-      // Verify password
+      // Verify password (this is local, no network call needed)
       const isValidPassword = await UserModel.verifyPassword(password, user.password_hash);
 
       if (!isValidPassword) {
@@ -50,8 +55,15 @@ class AuthService {
         { expiresIn: config.jwt.expiresIn }
       );
 
-      // Update last login timestamp
-      await UserModel.updateLastLogin(user.id);
+      // Update last login timestamp with retry logic
+      await executeWithRetry(
+        async () => await UserModel.updateLastLogin(user.id),
+        1, // 1 retry for non-critical operation
+        'Update last login'
+      ).catch(err => {
+        // Non-critical, log but don't fail login
+        console.warn('Failed to update last login timestamp:', err.message);
+      });
 
       // Remove sensitive data
       const { password_hash, ...userWithoutPassword } = user;
@@ -62,8 +74,17 @@ class AuthService {
       };
     } catch (err) {
       // Surface connectivity issues distinctly
-      if (typeof err.message === 'string' && err.message.toLowerCase().includes('fetch failed')) {
-        throw new AppError('Authentication service unavailable', 503);
+      const errMsg = err?.message?.toLowerCase() || '';
+      if (errMsg.includes('fetch failed') || 
+          errMsg.includes('network') || 
+          errMsg.includes('timeout') ||
+          errMsg.includes('econnrefused') ||
+          errMsg.includes('enotfound') ||
+          errMsg.includes('abort')) {
+        throw new AppError(
+          'Authentication service unavailable. Please check your network connection or try disabling VPN.',
+          503
+        );
       }
       throw err;
     }

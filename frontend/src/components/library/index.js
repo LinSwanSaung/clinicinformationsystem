@@ -4,6 +4,7 @@ export { EmptyState } from './feedback/EmptyState';
 export { ErrorState } from './feedback/ErrorState';
 export { ConfirmDialog } from './feedback/ConfirmDialog';
 export { AlertModal } from './feedback/AlertModal';
+export { Toast, ToastContainer } from './feedback/Toast';
 
 // Status components
 export { StatusBadge } from './status/StatusBadge';

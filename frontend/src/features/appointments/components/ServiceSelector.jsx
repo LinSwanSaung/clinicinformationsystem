@@ -3,8 +3,10 @@ import { Plus, X, Search, DollarSign, Package, Check } from 'lucide-react';
 import serviceService from '@/services/serviceService';
 import invoiceService from '@/features/billing/services/invoiceService';
 import logger from '@/utils/logger';
+import { useFeedback } from '@/contexts/FeedbackContext';
 
 const ServiceSelector = ({ visitId, onServicesAdded }) => {
+  const { showSuccess, showError, showWarning } = useFeedback();
   const [services, setServices] = useState([]);
   const [selectedServices, setSelectedServices] = useState([]);
   const [addedServices, setAddedServices] = useState([]); // Services already in invoice
@@ -152,12 +154,12 @@ const ServiceSelector = ({ visitId, onServicesAdded }) => {
 
   const handleSave = async () => {
     if (!invoice) {
-      alert('No invoice found. Please try again.');
+      showError('No invoice found. Please try again.');
       return;
     }
 
     if (selectedServices.length === 0) {
-      alert('Please add at least one service.');
+      showWarning('Please add at least one service.');
       return;
     }
 
@@ -184,11 +186,11 @@ const ServiceSelector = ({ visitId, onServicesAdded }) => {
         onServicesAdded();
       }
 
-      alert('Services added to invoice successfully!');
+      showSuccess('Services added to invoice successfully!');
       setSelectedServices([]);
     } catch (error) {
       logger.error('Error saving services:', error);
-      alert('Failed to save services. Please try again.');
+      showError('Failed to save services. Please try again.');
     } finally {
       setSaving(false);
     }

@@ -128,11 +128,50 @@ const PatientLiveQueue = () => {
     }
   };
 
-  const getStatusLabel = (status) => {
+  // Helper to check if a specific queue token is the next one to be served
+  const isTokenNextInLine = (queueToken, allTokens) => {
+    if (!queueToken || !allTokens || !Array.isArray(allTokens) || allTokens.length === 0) return false;
+    if (queueToken.status === 'serving') return true;
+    
+    const activeStatuses = ['waiting', 'called', 'serving'];
+    const statusOrder = { serving: 0, called: 1, waiting: 2 };
+    
+    const activeTokens = allTokens
+      .filter(t => t && activeStatuses.includes(t.status))
+      .sort((a, b) => {
+        const statusDiff = statusOrder[a.status] - statusOrder[b.status];
+        if (statusDiff !== 0) return statusDiff;
+        const priorityDiff = (b.priority || 1) - (a.priority || 1);
+        if (priorityDiff !== 0) return priorityDiff;
+        return (a.token_number || 0) - (b.token_number || 0);
+      });
+    
+    if (activeTokens.length === 0) return false;
+    
+    const servingTokens = activeTokens.filter(t => t.status === 'serving');
+    const nextToken = servingTokens.length > 0 
+      ? activeTokens[servingTokens.length]
+      : activeTokens[0];
+    
+    if (!nextToken) return false;
+    
+    return nextToken.id === queueToken.id || 
+      (nextToken.token_number === queueToken.token_number && 
+       nextToken.doctor_id === queueToken.doctor_id);
+  };
+
+  const getStatusLabel = (status, queueToken = null, allTokens = null) => {
+    // For 'called' status, check if this token is actually next in line
+    if (status === 'called' && queueToken && allTokens) {
+      const isNext = isTokenNextInLine(queueToken, allTokens);
+      return isNext ? t('patient.liveQueue.readyProceed') : t('patient.liveQueue.waitingInQueue');
+    }
+    
     switch (status) {
       case 'waiting':
         return t('patient.liveQueue.waitingInQueue');
       case 'called':
+        // Fallback: show ready if we can't determine
         return t('patient.liveQueue.readyProceed');
       case 'serving':
         return t('patient.liveQueue.inConsultation');
@@ -178,11 +217,27 @@ const PatientLiveQueue = () => {
   const position = queueStatus?.position;
   const isInQueue = Boolean(token);
 
+  // Verify if patient is actually next in line by checking the queue
+  const isActuallyNextInLine = () => {
+    if (!token) return false;
+    
+    // If doctorQueue is loaded, use the helper function
+    if (doctorQueue?.tokens && Array.isArray(doctorQueue.tokens)) {
+      return isTokenNextInLine(token, doctorQueue.tokens);
+    }
+    
+    // Fallback to position if doctorQueue is not loaded yet
+    // Only trust position if it's explicitly 1 (not just truthy)
+    return position === 1 && token.status === 'called';
+  };
+
+  const actuallyNext = isActuallyNextInLine();
+
   // Calculate estimated wait based on clinic settings and queue position
   const calculateEstimatedWait = () => {
     if (!position || position <= 0) return 0;
     // If currently being served, wait time is 0
-    if (token?.status === 'serving' || token?.status === 'called') return 0;
+    if (token?.status === 'serving') return 0;
     // Calculate: consultation time * (people ahead in queue)
     return consultationDuration * (position - 1);
   };
@@ -323,7 +378,7 @@ const PatientLiveQueue = () => {
                 <div className="flex items-center justify-between">
                   <CardTitle className="text-2xl">{t('patient.liveQueue.yourQueueStatus')}</CardTitle>
                   <Badge className={`${getStatusColor(token.status)} text-white px-4 py-1 text-sm`}>
-                    {getStatusLabel(token.status)}
+                    {getStatusLabel(token.status, token, doctorQueue?.tokens)}
                   </Badge>
                 </div>
               </CardHeader>
@@ -363,7 +418,7 @@ const PatientLiveQueue = () => {
                       <Timer className="h-4 w-4" />
                       <span className="text-sm font-medium">{t('patient.liveQueue.estimatedWait')}</span>
                     </div>
-                    {position === 1 || estimatedWait === 0 ? (
+                    {actuallyNext ? (
                       <div className="text-2xl font-bold text-green-600">
                         {t('patient.liveQueue.youreUpNext')}
                       </div>
@@ -391,7 +446,7 @@ const PatientLiveQueue = () => {
                 )}
 
                 {/* Status-specific messages */}
-                {token.status === 'called' && (
+                {token.status === 'called' && actuallyNext && (
                   <Alert className="mt-6 border-yellow-500 bg-yellow-50">
                     <AlertCircle className="h-4 w-4 text-yellow-600" />
                     <AlertDescription className="text-yellow-800">
@@ -503,7 +558,7 @@ const PatientLiveQueue = () => {
                                   className={`${getStatusColor(queueToken.status)} text-white`}
                                   variant="secondary"
                                 >
-                                  {getStatusLabel(queueToken.status)}
+                                  {getStatusLabel(queueToken.status, queueToken, doctorQueue.tokens)}
                                 </Badge>
                                 {isYourToken && (
                                   <Badge variant="outline" className="border-primary text-primary">

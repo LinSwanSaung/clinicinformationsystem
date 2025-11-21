@@ -86,6 +86,7 @@ class QueueTokenModel extends BaseModel {
 
   /**
    * Get next token in queue for a doctor
+   * Looks for tokens that are waiting, ready, or called (not yet being served)
    */
   async getNextToken(doctorId, date = null) {
     const queueDate = date || new Date().toISOString().split('T')[0];
@@ -107,7 +108,7 @@ class QueueTokenModel extends BaseModel {
       `)
       .eq('doctor_id', doctorId)
       .eq('issued_date', queueDate)
-      .eq('status', 'waiting')
+      .in('status', ['waiting', 'ready', 'called']) // Include all statuses that mean "ready to be seen"
       .order('priority', { ascending: false })
       .order('token_number')
       .limit(1)
@@ -330,12 +331,39 @@ class QueueTokenModel extends BaseModel {
   }
 
   /**
+   * Get all tokens for a patient today (optionally filter by doctor)
+   */
+  async getPatientTokensToday(patientId, doctorId = null, statuses = ['waiting', 'called', 'serving']) {
+    const today = new Date().toISOString().split('T')[0];
+
+    let query = this.supabase
+      .from(this.tableName)
+      .select('*')
+      .eq('patient_id', patientId)
+      .eq('issued_date', today);
+
+    if (Array.isArray(statuses) && statuses.length > 0) {
+      query = query.in('status', statuses);
+    }
+
+    if (doctorId) {
+      query = query.eq('doctor_id', doctorId);
+    }
+
+    const { data, error } = await query.order('created_at', { ascending: false });
+
+    if (error) {
+      throw new Error(`Failed to fetch patient tokens: ${error.message}`);
+    }
+
+    return data || [];
+  }
+
+  /**
    * Check if doctor has any active consultation TODAY
    */
-  async getActiveConsultation(doctorId) {
-    const today = new Date().toISOString().split('T')[0];
-    
-    const { data, error } = await this.supabase
+  async getActiveConsultation(doctorId, includeAllDates = false) {
+    let query = this.supabase
       .from(this.tableName)
       .select(`
         *,
@@ -351,15 +379,53 @@ class QueueTokenModel extends BaseModel {
         )
       `)
       .eq('doctor_id', doctorId)
-      .eq('issued_date', today)  // Only check today's tokens
-      .eq('status', 'serving')
-      .single();
+      .eq('status', 'serving');
+    
+    // Only filter by today's date if not including all dates (for cleanup/debugging)
+    if (!includeAllDates) {
+      const today = new Date().toISOString().split('T')[0];
+      query = query.eq('issued_date', today);
+    }
+    
+    // Order by most recent first, then get first result
+    query = query.order('served_at', { ascending: false, nullsFirst: false })
+                 .limit(1);
+    
+    const { data, error } = await query;
 
-    if (error && error.code !== 'PGRST116') {
+    if (error) {
       throw new Error(`Failed to fetch active consultation: ${error.message}`);
     }
 
-    return data;
+    // Return first result or null
+    return data && data.length > 0 ? data[0] : null;
+  }
+
+  /**
+   * Find ALL serving tokens for a doctor (for debugging/cleanup)
+   * This bypasses date filtering to find stuck tokens
+   */
+  async getAllServingTokens(doctorId) {
+    const { data, error } = await this.supabase
+      .from(this.tableName)
+      .select(`
+        *,
+        patient:patients!patient_id (
+          id,
+          patient_number,
+          first_name,
+          last_name
+        )
+      `)
+      .eq('doctor_id', doctorId)
+      .eq('status', 'serving')
+      .order('served_at', { ascending: false });
+
+    if (error) {
+      throw new Error(`Failed to fetch serving tokens: ${error.message}`);
+    }
+
+    return data || [];
   }
 
   /**

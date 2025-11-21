@@ -19,6 +19,7 @@ import {
 } from 'lucide-react';
 import { FormModal } from '@/components/library';
 import logger from '@/utils/logger';
+import { useFeedback } from '@/contexts/FeedbackContext';
 
 // Removed bespoke Dialog in favor of library FormModal (accessible)
 
@@ -37,6 +38,7 @@ const PatientCard = ({
   onViewFullPatientData
 }) => {
   const navigate = useNavigate();
+  const { showError } = useFeedback();
   // Form states for nurse role
   const [vitalsForm, setVitalsForm] = useState({
     bp: patient.vitals?.bp || '',
@@ -409,7 +411,7 @@ const PatientCard = ({
               if (!resolvedPatientId) {
                 // eslint-disable-next-line no-console
                 logger.error('[PatientCard] Unable to resolve patient ID for vitals save:', patient);
-                alert('Could not determine patient ID. Please refresh and try again.');
+                showError('Could not determine patient ID. Please refresh and try again.');
                 return;
               }
               const visitId = patient?.visit_id ?? patient?.current_visit_id ?? patient?.latestVitals?.visit_id ?? null;

@@ -13,6 +13,7 @@ import { logAuditEvent } from '../utils/auditLogger.js';
 import { ApplicationError } from '../errors/ApplicationError.js';
 import { TransactionRunner } from './transactions/TransactionRunner.js';
 import logger from '../config/logger.js';
+import { executeWithRetry } from '../config/database.js';
 
 class QueueService {
   constructor() {
@@ -344,13 +345,18 @@ class QueueService {
         }
       }
 
-      // Get updated token with patient details
+      // Get updated token with patient details (use nextToken.patient which already has the data)
       const updatedToken = await this.queueTokenModel.findById(nextToken.id);
+      
+      // Get patient name from nextToken (which already includes patient data from getNextToken)
+      const patientName = nextToken.patient
+        ? `${nextToken.patient.first_name || ''} ${nextToken.patient.last_name || ''}`.trim() || 'Unknown Patient'
+        : 'Unknown Patient';
 
       return {
         success: true,
-        token: updatedToken,
-        message: `Consultation started with ${patientName} (Token #${updatedToken.token_number})`,
+        token: updatedToken || nextToken, // Use updatedToken if available, otherwise use nextToken
+        message: `Consultation started with ${patientName} (Token #${nextToken.token_number})`,
       };
     } catch (error) {
       logger.error('[QUEUE] ❌ Error in callNextAndStart:', error);
@@ -364,11 +370,28 @@ class QueueService {
    */
   async forceEndActiveConsultation(doctorId) {
     try {
+      // First check today's consultations
+      let activeConsultation = await this.queueTokenModel.getActiveConsultation(doctorId, false);
       
-
-      const activeConsultation = await this.queueTokenModel.getActiveConsultation(doctorId);
+      // If not found, check ALL dates for stuck tokens
       if (!activeConsultation) {
+        logger.warn('[QUEUE] No active consultation found for today, checking all dates for stuck tokens...', { doctorId });
+        activeConsultation = await this.queueTokenModel.getActiveConsultation(doctorId, true); // includeAllDates = true
         
+        if (activeConsultation) {
+          const tokenDate = activeConsultation.issued_date;
+          const today = new Date().toISOString().split('T')[0];
+          if (tokenDate !== today) {
+            logger.warn('[QUEUE] Found stuck consultation from different date:', {
+              tokenId: activeConsultation.id,
+              tokenDate,
+              today
+            });
+          }
+        }
+      }
+      
+      if (!activeConsultation) {
         return {
           success: false,
           message: 'No active consultation found. The doctor is not currently seeing any patient.',
@@ -594,8 +617,12 @@ class QueueService {
    */
   async startConsultation(tokenId) {
     try {
-      // First, get the current token to check its status
-      const currentToken = await this.queueTokenModel.findById(tokenId);
+      // First, get the current token to check its status (with retry for network resilience)
+      const currentToken = await executeWithRetry(
+        async () => await this.queueTokenModel.findById(tokenId),
+        2,
+        'Find queue token'
+      );
 
       if (!currentToken) {
         throw new Error('Token not found');
@@ -607,9 +634,11 @@ class QueueService {
         );
       }
 
-      // Check if doctor already has a patient in consultation
-      const existingServingToken = await this.queueTokenModel.getActiveConsultation(
-        currentToken.doctor_id
+      // Check if doctor already has a patient in consultation (with retry)
+      const existingServingToken = await executeWithRetry(
+        async () => await this.queueTokenModel.getActiveConsultation(currentToken.doctor_id),
+        2,
+        'Check active consultation'
       );
       if (existingServingToken) {
         // Get patient details for the existing serving token
@@ -621,7 +650,90 @@ class QueueService {
         );
       }
 
-      const updatedToken = await this.queueTokenModel.updateStatus(tokenId, 'serving');
+      // Update token status (with retry and constraint violation handling)
+      let updatedToken;
+      try {
+        updatedToken = await executeWithRetry(
+          async () => await this.queueTokenModel.updateStatus(tokenId, 'serving'),
+          2,
+          'Update token status to serving'
+        );
+      } catch (updateError) {
+        // Handle unique constraint violation (race condition)
+        const errorMsg = updateError?.message?.toLowerCase() || '';
+        if (errorMsg.includes('uq_queue_one_serving_per_doctor') || 
+            errorMsg.includes('duplicate key') ||
+            errorMsg.includes('unique constraint')) {
+          // Re-check for active consultation - check ALL dates to find stuck tokens
+          const existingServingToken = await executeWithRetry(
+            async () => await this.queueTokenModel.getActiveConsultation(currentToken.doctor_id, true), // includeAllDates = true
+            1,
+            'Re-check active consultation after constraint violation (all dates)'
+          );
+          
+          if (existingServingToken) {
+            const patientInfo = existingServingToken.patient
+              ? `${existingServingToken.patient.first_name} ${existingServingToken.patient.last_name} (Token #${existingServingToken.token_number})`
+              : `Token #${existingServingToken.token_number}`;
+            
+            // If it's from a different date, it's a stuck token - offer to fix it
+            const tokenDate = existingServingToken.issued_date;
+            const today = new Date().toISOString().split('T')[0];
+            if (tokenDate !== today) {
+              throw new Error(
+                `Found a stuck consultation from ${tokenDate}: ${patientInfo}. Please use "End Consultation" to clear it first.`
+              );
+            }
+            
+            throw new Error(
+              `You already have a patient in consultation: ${patientInfo}. Please complete the current consultation first.`
+            );
+          } else {
+            // Constraint violation but no active consultation found - try to find and fix stuck token
+            logger.warn('[QUEUE] Constraint violation but no active consultation found. Searching for stuck tokens...', {
+              doctorId: currentToken.doctor_id,
+              tokenId: tokenId
+            });
+            
+            // Try to find ALL serving tokens (bypassing date filter)
+            try {
+              const allServingTokens = await this.queueTokenModel.getAllServingTokens(currentToken.doctor_id);
+              if (allServingTokens && allServingTokens.length > 0) {
+                // Found stuck token(s) - automatically fix the first one
+                logger.warn('[QUEUE] Found stuck serving token(s), attempting to fix...', {
+                  count: allServingTokens.length,
+                  tokens: allServingTokens.map(t => ({ id: t.id, token_number: t.token_number, issued_date: t.issued_date }))
+                });
+                
+                // Auto-fix: Complete the stuck token
+                const stuckToken = allServingTokens[0];
+                await this.queueTokenModel.updateStatus(stuckToken.id, 'completed');
+                logger.info('[QUEUE] Auto-fixed stuck token:', stuckToken.id);
+                
+                // Now retry the original operation
+                updatedToken = await executeWithRetry(
+                  async () => await this.queueTokenModel.updateStatus(tokenId, 'serving'),
+                  1,
+                  'Retry update token status after fixing stuck token'
+                );
+              } else {
+                // No serving tokens found but constraint violation - database inconsistency
+                throw new Error(
+                  'Database inconsistency detected. Please refresh and try again, or contact support if the issue persists.'
+                );
+              }
+            } catch (fixError) {
+              logger.error('[QUEUE] Failed to fix stuck token:', fixError);
+              throw new Error(
+                'Unable to start consultation due to a stuck consultation. Please use "End Consultation" button to clear it, or contact support.'
+              );
+            }
+          }
+        } else {
+          // Re-throw if it's not a constraint violation
+          throw updateError;
+        }
+      }
 
       // When consultation starts, notify next waiting patient that they are next
       try {
@@ -691,7 +803,11 @@ class QueueService {
               logger.error('[AUDIT] Failed to log consultation start:', logError.message);
             }
           } catch (updateError) {
-            
+            logger.warn('[QUEUE] Failed to update visit start time:', {
+              visitId: visitRecord.id,
+              error: updateError?.message || String(updateError)
+            });
+            // Continue - visit update failure shouldn't block consultation start
           }
         } else {
           // No visit found, create one (fallback for legacy tokens)
@@ -708,7 +824,11 @@ class QueueService {
           visitRecord = visitResponse.data;
         }
       } catch (visitError) {
-        
+        logger.warn('[QUEUE] Failed to handle visit record during consultation start:', {
+          tokenId: tokenId,
+          patientId: updatedToken.patient_id,
+          error: visitError?.message || String(visitError)
+        });
         // Don't fail the consultation start if visit handling fails
         // This ensures backward compatibility
       }
@@ -728,7 +848,21 @@ class QueueService {
         message: 'Consultation started',
       };
     } catch (error) {
-      logger.error('Queue Service Error:', error);
+      // Better error logging with full details
+      logger.error('Queue Service Error in startConsultation:', {
+        message: error?.message || 'Unknown error',
+        stack: error?.stack,
+        name: error?.name,
+        tokenId: tokenId,
+        error: error
+      });
+      
+      // Re-throw with better error message if it's missing
+      if (!error.message) {
+        const errMsg = String(error) || 'Unknown error occurred';
+        throw new Error(`Failed to start consultation: ${errMsg}`);
+      }
+      
       throw error;
     }
   }
@@ -818,6 +952,27 @@ class QueueService {
           
           // Don't fail the operation
         }
+      }
+
+      // Auto-create invoice if it doesn't exist (ensures every visit has an invoice)
+      // This allows cashier to add services even if doctor forgot to add them
+      try {
+        const { default: InvoiceService } = await import('./Invoice.service.js');
+        const invoiceService = new InvoiceService();
+        
+        // Check if invoice already exists
+        const existingInvoice = await invoiceService.getInvoiceByVisit(token.visit_id);
+        
+        if (!existingInvoice) {
+          // Auto-create invoice (even if $0, cashier can add services later)
+          logger.debug(`[QUEUE] Auto-creating invoice for visit ${token.visit_id}`);
+          await invoiceService.createInvoice(token.visit_id, token.doctor_id || null);
+          logger.info(`[QUEUE] ✅ Auto-created invoice for visit ${token.visit_id}`);
+        }
+      } catch (invoiceError) {
+        // Log error but don't fail consultation completion
+        // Invoice can be created manually later if auto-creation fails
+        logger.warn(`[QUEUE] ⚠️ Failed to auto-create invoice for visit ${token.visit_id}:`, invoiceError.message);
       }
 
       return {

@@ -140,6 +140,20 @@ export const MedicationForm = ({
   canAdd = true,
   canRemove = true
 }) => {
+  const customInputRefs = useRef({});
+  
+  // Focus custom input when it becomes visible
+  useEffect(() => {
+    medications.forEach((med, index) => {
+      if (med.customName && customInputRefs.current[index]) {
+        // Small delay to ensure DOM is updated
+        setTimeout(() => {
+          customInputRefs.current[index]?.focus();
+        }, 0);
+      }
+    });
+  }, [medications]);
+  
   const handleAddMedication = () => {
     if (canAdd) {
       onChange([...medications, { 
@@ -259,21 +273,42 @@ export const MedicationForm = ({
                 {medication.customName ? (
                   <div className="flex gap-2">
                     <Input
+                      ref={(el) => {
+                        if (el) customInputRefs.current[index] = el;
+                      }}
                       placeholder="Enter custom medication name..."
                       value={medication.name || ''}
-                      onChange={(e) => handleMedicationChange(index, 'name', e.target.value)}
+                      onChange={(e) => {
+                        // Update name as user types (keep original value, trim on blur)
+                        handleMedicationChange(index, 'name', e.target.value);
+                      }}
+                      onBlur={(e) => {
+                        // Trim whitespace when user finishes typing
+                        const trimmedName = e.target.value.trim();
+                        if (trimmedName !== e.target.value) {
+                          handleMedicationChange(index, 'name', trimmedName);
+                        }
+                      }}
                       className="h-9 text-sm flex-1"
+                      required
                     />
                     <Button
                       type="button"
-                      variant="ghost"
+                      variant="outline"
                       size="sm"
-                      onClick={() => {
-                        const updated = [...medications];
-                        updated[index] = { ...updated[index], customName: false, name: '' };
+                      onClick={(e) => {
+                        e.preventDefault();
+                        e.stopPropagation();
+                        // Switch back to dropdown list view
+                        const updated = medications.map((med, i) => {
+                          if (i === index) {
+                            return { ...med, customName: false, name: '' };
+                          }
+                          return med;
+                        });
                         onChange(updated);
                       }}
-                      className="h-9 px-2 text-xs"
+                      className="h-9 px-3 text-xs border-gray-300 hover:bg-gray-50"
                     >
                       List
                     </Button>
@@ -281,14 +316,15 @@ export const MedicationForm = ({
                 ) : (
                   <select
                     className="w-full h-9 px-3 text-sm border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                    value={medication.name || ''}
+                    value={medication.customName ? '' : (medication.name || '')}
                     onChange={(e) => {
                       const value = e.target.value;
                       if (value === 'CUSTOM') {
-                        const updated = [...medications];
-                        updated[index] = { ...updated[index], customName: true, name: '' };
-                        onChange(updated);
-                      } else {
+                        handleMedicationChange(index, 'customName', true);
+                        // Don't clear name immediately - let user type in custom input
+                        // This ensures the medication isn't filtered out during validation
+                      } else if (value !== '') {
+                        handleMedicationChange(index, 'customName', false);
                         handleMedicationChange(index, 'name', value);
                       }
                     }}

@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
+import { useFeedback } from '@/contexts/FeedbackContext';
 import PageLayout from '@/components/layout/PageLayout';
 import { Card } from '@/components/ui/card';
 import {
@@ -22,6 +23,7 @@ import logger from '@/utils/logger';
 const PatientMedicalRecord = () => {
   const location = useLocation();
   const navigate = useNavigate();
+  const { showSuccess, showError, showWarning } = useFeedback();
 
   // Basic state
   const [selectedPatient] = useState(location.state?.patient || null);
@@ -398,8 +400,8 @@ const PatientMedicalRecord = () => {
   const handleAddNote = () => {
     // Check for active visit first
     if (!activeVisitId) {
-      alert(
-        "⚠️ No Visit Today\n\nCannot add clinical notes: Patient does not have a visit from today.\n\nMedical data can only be added for today's visits."
+      showWarning(
+        "Cannot add clinical notes: Patient does not have a visit today. Medical data can only be added for today's visits."
       );
       return;
     }
@@ -410,20 +412,26 @@ const PatientMedicalRecord = () => {
 
   const handleSaveNote = async () => {
     if (!noteFormData.note.trim() || !noteFormData.diagnosis.trim()) {
-      alert('Diagnosis and clinical notes are required');
+      showError('Diagnosis and clinical notes are required');
       return;
     }
 
     if (!activeVisitId) {
-      alert('No active visit found. Please ensure the patient has an active consultation.');
+      showError('No active visit found. Please ensure the patient has an active consultation.');
       return;
     }
 
     try {
       // Filter medications that have required fields
-      const validMedications = noteFormData.medications.filter(
-        (med) => med.name && med.dosage && med.frequency
-      );
+      // Trim medication names to handle custom medicines properly
+      const validMedications = noteFormData.medications
+        .map((med) => ({
+          ...med,
+          name: med.name ? med.name.trim() : '', // Trim whitespace from custom names
+        }))
+        .filter(
+          (med) => med.name && med.name.length > 0 && med.dosage && med.frequency
+        );
 
       // Step 1: Mark previous active prescriptions as completed
       // This ensures old medications don't remain "active" when new ones are prescribed
@@ -486,8 +494,8 @@ const PatientMedicalRecord = () => {
 
           // Check for specific error from backend
           if (error.response?.data?.code === 'NO_ACTIVE_VISIT') {
-            alert(
-              '⚠️ Security Check Failed\n\nCannot add prescription: Patient does not have an active visit.\n\nPlease ensure the patient has an active consultation session before prescribing medications.'
+            showWarning(
+              'Security Check Failed: Cannot add prescription because patient has no active visit.'
             );
             throw error; // Stop processing
           }
@@ -495,7 +503,7 @@ const PatientMedicalRecord = () => {
       }
 
       // Show success message
-      alert(`Note saved successfully! ${savedPrescriptions.length} prescription(s) added.`);
+      showSuccess(`Note saved successfully! ${savedPrescriptions.length} prescription(s) added.`);
 
       // Close modal
       closeAllModals();
@@ -504,7 +512,7 @@ const PatientMedicalRecord = () => {
       window.location.reload();
     } catch (error) {
       logger.error('Error saving note:', error);
-      alert('Failed to save note: ' + (error.message || 'Unknown error'));
+      showError('Failed to save note: ' + (error.message || 'Unknown error'));
     }
   };
 
@@ -537,20 +545,26 @@ const PatientMedicalRecord = () => {
 
   const handleUpdateNote = async () => {
     if (!noteFormData.note.trim() || !noteFormData.diagnosis.trim() || !editingNote) {
-      alert('Diagnosis and clinical notes are required');
+      showError('Diagnosis and clinical notes are required');
       return;
     }
 
     if (!editingNote.id) {
-      alert('Cannot update note: Note ID is missing. Please refresh and try again.');
+      showError('Cannot update note: Note ID is missing. Please refresh and try again.');
       return;
     }
 
     try {
       // Filter medications that have required fields
-      const validMedications = noteFormData.medications.filter(
-        (med) => med.name && med.dosage && med.frequency
-      );
+      // Trim medication names to handle custom medicines properly
+      const validMedications = noteFormData.medications
+        .map((med) => ({
+          ...med,
+          name: med.name ? med.name.trim() : '', // Trim whitespace from custom names
+        }))
+        .filter(
+          (med) => med.name && med.name.length > 0 && med.dosage && med.frequency
+        );
 
       // Step 1: Update the doctor note in the backend
       const noteContent = `Diagnosis: ${noteFormData.diagnosis}\n\nClinical Notes: ${noteFormData.note}`;
@@ -648,11 +662,11 @@ const PatientMedicalRecord = () => {
         }));
       }
 
-      alert('Note updated successfully! Prescriptions have been updated.');
+      showSuccess('Note updated successfully! Prescriptions have been updated.');
       closeAllModals();
     } catch (error) {
       logger.error('Error updating note:', error);
-      alert('Failed to update note. Please try again.');
+      showError('Failed to update note. Please try again.');
     }
   };
 
@@ -660,9 +674,7 @@ const PatientMedicalRecord = () => {
   const handleAddDiagnosis = () => {
     // Require active visit to add diagnosis
     if (!activeVisitId) {
-      alert(
-        '⚠️ No Visit Today\n\nCannot add diagnosis: Patient does not have an active consultation.'
-      );
+      showWarning('Cannot add diagnosis: Patient does not have an active consultation.');
       return;
     }
 
@@ -682,12 +694,12 @@ const PatientMedicalRecord = () => {
     try {
       // Validate required fields
       if (!diagnosisFormData.diagnosis_name.trim()) {
-        alert('Diagnosis name is required');
+        showError('Diagnosis name is required');
         return;
       }
 
       if (!activeVisitId) {
-        alert('No active visit found. Please ensure the patient has an active consultation.');
+        showError('No active visit found. Please ensure the patient has an active consultation.');
         return;
       }
 
@@ -718,7 +730,7 @@ const PatientMedicalRecord = () => {
       });
 
       // Show success message
-      alert('Diagnosis added successfully!');
+      showSuccess('Diagnosis added successfully!');
 
       // Refresh the page to show new diagnosis
       window.location.reload();
@@ -727,11 +739,9 @@ const PatientMedicalRecord = () => {
 
       // Check for specific error from backend
       if (error.response?.data?.code === 'NO_ACTIVE_VISIT') {
-        alert(
-          '⚠️ Security Check Failed\n\nCannot add diagnosis: Patient does not have an active visit.'
-        );
+        showWarning('Security Check Failed: Cannot add diagnosis because patient has no active visit.');
       } else {
-        alert(
+        showError(
           'Failed to add diagnosis: ' +
             (error.response?.data?.message || error.message || 'Unknown error')
         );
@@ -743,9 +753,7 @@ const PatientMedicalRecord = () => {
   const handleAddAllergy = () => {
     // Require active visit to add allergy
     if (!activeVisitId) {
-      alert(
-        '⚠️ No Visit Today\n\nCannot add allergy: Patient does not have an active consultation.'
-      );
+      showWarning('Cannot add allergy: Patient does not have an active consultation.');
       return;
     }
 
@@ -764,12 +772,12 @@ const PatientMedicalRecord = () => {
     try {
       // Validate required fields
       if (!allergyFormData.allergy_name.trim()) {
-        alert('Allergy name is required');
+        showError('Allergy name is required');
         return;
       }
 
       if (!activeVisitId) {
-        alert('No active visit found. Please ensure the patient has an active consultation.');
+        showError('No active visit found. Please ensure the patient has an active consultation.');
         return;
       }
 
@@ -790,7 +798,7 @@ const PatientMedicalRecord = () => {
       });
 
       // Show success message
-      alert('Allergy added successfully!');
+      showSuccess('Allergy added successfully!');
 
       // Refresh the page to show new allergy
       window.location.reload();
@@ -799,11 +807,9 @@ const PatientMedicalRecord = () => {
 
       // Check for specific error from backend
       if (error.response?.data?.code === 'NO_ACTIVE_VISIT') {
-        alert(
-          '⚠️ Security Check Failed\n\nCannot add allergy: Patient does not have an active visit.'
-        );
+        showWarning('Security Check Failed: Cannot add allergy. Patient does not have an active visit.');
       } else {
-        alert(
+        showError(
           'Failed to add allergy: ' +
             (error.response?.data?.message || error.message || 'Unknown error')
         );
@@ -814,7 +820,7 @@ const PatientMedicalRecord = () => {
   // File handlers
   const handleUploadFile = () => {
     if (!selectedPatient?.id) {
-      alert('No patient selected');
+      showError('No patient selected');
       return;
     }
 
@@ -836,14 +842,14 @@ const PatientMedicalRecord = () => {
         const result = await documentService.uploadMultipleDocuments(patientId, files);
 
         if (result.success) {
-          alert(`Successfully uploaded ${files.length} file(s)!`);
+          showSuccess(`Successfully uploaded ${files.length} file(s)!`);
           // Reload documents
           const documents = await documentService.getPatientDocuments(patientId);
           setPatientFiles(Array.isArray(documents) ? documents : []);
         }
       } catch (error) {
         logger.error('Error uploading files:', error);
-        alert(`Failed to upload files: ${error.message || 'Please try again.'}`);
+        showError(`Failed to upload files: ${error.message || 'Please try again.'}`);
       } finally {
         setUploadingFiles(false);
       }
@@ -856,7 +862,7 @@ const PatientMedicalRecord = () => {
     if (file.file_url) {
       window.open(file.file_url, '_blank');
     } else {
-      alert('File URL not available');
+      showError('File URL not available');
     }
   };
 
@@ -864,7 +870,7 @@ const PatientMedicalRecord = () => {
     if (file.file_url) {
       window.open(file.file_url, '_blank');
     } else {
-      alert('File URL not available');
+      showError('File URL not available');
     }
   };
 

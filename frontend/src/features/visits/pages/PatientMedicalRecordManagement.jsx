@@ -20,10 +20,12 @@ import {
   ArrowLeft,
   AlertCircle
 } from 'lucide-react';
+import { useFeedback } from '@/contexts/FeedbackContext';
 
 const PatientMedicalRecordManagement = () => {
   const location = useLocation();
   const navigate = useNavigate();
+  const { showSuccess, showError, showWarning, showInfo } = useFeedback();
   
   // State management
   const [selectedPatient, setSelectedPatient] = useState(location.state?.patient || null);
@@ -279,17 +281,17 @@ const PatientMedicalRecordManagement = () => {
   // Medical action handlers - DOCTOR CAN ADD DIAGNOSIS AND ALLERGY
   const handleAddVitals = () => {
     logger.debug('Vitals are managed by nurses');
-    alert('Vitals are managed by nursing staff. Please ask a nurse to record vitals.');
+    showInfo('Vitals are managed by nursing staff. Please ask a nurse to record vitals.');
   };
 
   const handleEditVitals = () => {
     logger.debug('Vitals are managed by nurses');
-    alert('Vitals are managed by nursing staff. Please ask a nurse to update vitals.');
+    showInfo('Vitals are managed by nursing staff. Please ask a nurse to update vitals.');
   };
 
   const handleAddAllergy = () => {
     if (!hasActiveVisit) {
-      alert('⚠️ No Active Visit\n\nCannot add allergy: Patient does not have an active visit.\n\nPlease start a consultation first.');
+      showWarning('Cannot add allergy: Patient does not have an active visit. Please start a consultation first.');
       return;
     }
     
@@ -304,7 +306,7 @@ const PatientMedicalRecordManagement = () => {
 
   const handleSaveAllergy = async () => {
     if (!newAllergy.allergy_name.trim()) {
-      alert('Please enter an allergy name');
+      showError('Please enter an allergy name');
       return;
     }
 
@@ -332,15 +334,15 @@ const PatientMedicalRecordManagement = () => {
         reaction: ''
       });
       setIsAllergyModalOpen(false);
-      alert('Allergy added successfully!');
+      showSuccess('Allergy added successfully!');
     } catch (error) {
       logger.error('Error saving allergy:', error);
       
       // Check for specific error from backend
       if (error.response?.data?.code === 'NO_ACTIVE_VISIT') {
-        alert('⚠️ Security Check Failed\n\nCannot add allergy: Patient does not have an active visit.\n\nPlease ensure the patient has an active consultation session before adding medical data.');
+        showWarning('Security Check Failed: Cannot add allergy because patient has no active visit.');
       } else {
-        alert('Failed to save allergy: ' + (error.response?.data?.message || error.message || 'Please try again.'));
+        showError('Failed to save allergy: ' + (error.response?.data?.message || error.message || 'Please try again.'));
       }
     } finally {
       setLoading(false);
@@ -349,7 +351,7 @@ const PatientMedicalRecordManagement = () => {
 
   const handleAddDiagnosis = () => {
     if (!hasActiveVisit) {
-      alert('⚠️ No Active Visit\n\nCannot add diagnosis: Patient does not have an active visit.\n\nPlease start a consultation first.');
+      showWarning('Cannot add diagnosis: Patient does not have an active visit. Please start a consultation first.');
       return;
     }
     
@@ -364,7 +366,7 @@ const PatientMedicalRecordManagement = () => {
 
   const handleSaveDiagnosis = async () => {
     if (!newDiagnosis.diagnosis_name.trim()) {
-      alert('Please enter a diagnosis');
+      showError('Please enter a diagnosis');
       return;
     }
 
@@ -392,15 +394,15 @@ const PatientMedicalRecordManagement = () => {
         severity: 'mild'
       });
       setIsDiagnosisModalOpen(false);
-      alert('Diagnosis added successfully!');
+      showSuccess('Diagnosis added successfully!');
     } catch (error) {
       logger.error('Error saving diagnosis:', error);
       
       // Check for specific error from backend
       if (error.response?.data?.code === 'NO_ACTIVE_VISIT') {
-        alert('⚠️ Security Check Failed\n\nCannot add diagnosis: Patient does not have an active visit.\n\nPlease ensure the patient has an active consultation session before adding medical data.');
+        showWarning('Security Check Failed: Cannot add diagnosis because patient has no active visit.');
       } else {
-        alert('Failed to save diagnosis: ' + (error.response?.data?.message || error.message || 'Please try again.'));
+        showError('Failed to save diagnosis: ' + (error.response?.data?.message || error.message || 'Please try again.'));
       }
     } finally {
       setLoading(false);
@@ -424,7 +426,7 @@ const PatientMedicalRecordManagement = () => {
 
   const handleUploadFile = () => {
     if (!selectedPatient?.id) {
-      alert('No patient selected');
+      showError('No patient selected');
       return;
     }
 
@@ -445,14 +447,14 @@ const PatientMedicalRecordManagement = () => {
         const result = await documentService.uploadMultipleDocuments(patientId, files);
         
         if (result.success) {
-          alert(`Successfully uploaded ${files.length} file(s)!`);
+          showSuccess(`Successfully uploaded ${files.length} file(s)!`);
           // Reload patient documents
           await loadPatientMedicalData();
         }
         
       } catch (error) {
         logger.error('Error uploading files:', error);
-        alert(`Failed to upload files: ${error.message || 'Please try again.'}`);
+        showError(`Failed to upload files: ${error.message || 'Please try again.'}`);
       } finally {
         setUploadingFiles(false);
       }
@@ -467,7 +469,7 @@ const PatientMedicalRecordManagement = () => {
     if (fileUrl) {
       window.open(fileUrl, '_blank');
     } else {
-      alert('File URL not available');
+      showError('File URL not available');
     }
   };
 
@@ -486,7 +488,7 @@ const PatientMedicalRecordManagement = () => {
       document.body.removeChild(a);
     } catch (error) {
       logger.error('Download error:', error);
-      alert('Failed to download file: ' + error.message);
+      showError('Failed to download file: ' + error.message);
     }
   };
 

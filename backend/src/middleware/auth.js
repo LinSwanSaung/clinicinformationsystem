@@ -1,6 +1,6 @@
 import jwt from 'jsonwebtoken';
 import config from '../config/app.config.js';
-import { supabase } from '../config/database.js';
+import { supabase, executeWithRetry } from '../config/database.js';
 import { AppError, asyncHandler } from './errorHandler.js';
 import { ROLES, isValidRole } from '../constants/roles.js';
 
@@ -49,13 +49,39 @@ export const authenticate = asyncHandler(async (req, res, next) => {
       decoded = jwt.verify(token, supabaseSecret);
     }
 
-    // Get user from database
+    // Get user from database with retry logic for network resilience
     const userId = decoded.userId || decoded.sub; // support our token payload or supabase subject
-    const { data: user, error } = await supabase
-      .from('users')
-      .select('id, email, role, first_name, last_name, is_active, patient_id')
-      .eq('id', userId)
-      .single();
+    let user, error;
+    try {
+      const result = await executeWithRetry(
+        async () => {
+          return await supabase
+            .from('users')
+            .select('id, email, role, first_name, last_name, is_active, patient_id')
+            .eq('id', userId)
+            .single();
+        },
+        2, // 2 retries
+        'User authentication lookup'
+      );
+      user = result.data;
+      error = result.error;
+    } catch (networkError) {
+      // Handle network connectivity issues (e.g., VPN blocking Supabase)
+      const errMsg = networkError?.message?.toLowerCase() || '';
+      if (errMsg.includes('fetch failed') || 
+          errMsg.includes('network') || 
+          errMsg.includes('timeout') ||
+          errMsg.includes('econnrefused') ||
+          errMsg.includes('enotfound') ||
+          errMsg.includes('abort')) {
+        throw new AppError(
+          'Database connection failed. Please check your network connection or try disabling VPN.',
+          503
+        );
+      }
+      throw networkError;
+    }
 
     if (error || !user) {
       throw new AppError('Invalid token', 401);

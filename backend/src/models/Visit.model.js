@@ -98,15 +98,15 @@ class VisitModel extends BaseModel {
         vitals,
         services,
         invoice,
-        // Use invoice data if available, otherwise calculate from visit data
+        // Only show consultation fee and costs when an invoice exists (actual charges)
+        // Don't show placeholder/estimated costs - only real charges from invoices
         consultation_fee:
           invoice?.service_items?.find((s) => s.item_name?.toLowerCase().includes('consultation'))
-            ?.total_price || this.calculateConsultationFee(visit),
-        services_total: invoice?.services_total || this.calculateServicesTotal(services),
-        medications_total: invoice?.medications_total || 0,
-        total_cost:
-          invoice?.total_amount ||
-          this.calculateConsultationFee(visit) + this.calculateServicesTotal(services),
+            ?.total_price || null,
+        services_total: invoice?.services_total || null,
+        medications_total: invoice?.medications_total || null,
+        // Only show total_cost if invoice exists (actual charge)
+        total_cost: invoice?.total_amount || null,
         payment_status: invoice ? (invoice.status === 'paid' ? 'paid' : 'pending') : 'no_invoice',
         invoice_number: invoice?.invoice_number,
         invoice_status: invoice?.status || 'no_invoice',

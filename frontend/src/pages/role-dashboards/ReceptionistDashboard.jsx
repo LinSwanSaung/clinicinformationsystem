@@ -2,6 +2,7 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
+import { useFeedback } from '@/contexts/FeedbackContext';
 import {
   Calendar,
   Users,
@@ -61,6 +62,7 @@ const ReceptionistDashboard = () => {
   const navigate = useNavigate();
   const { logout } = useAuth();
   const { t } = useTranslation();
+  const { showSuccess, showError } = useFeedback();
   const [isLoading, setIsLoading] = useState(true);
   const [todayAppointments, setTodayAppointments] = useState([]);
   const [filteredAppointments, setFilteredAppointments] = useState([]);
@@ -279,7 +281,7 @@ const ReceptionistDashboard = () => {
       }
     } catch (error) {
       logger.error('[ReceptionistDashboard] Error marking appointment as ready:', error);
-      alert(`Failed to mark as ready: ${error.message}`);
+      showError(`Failed to mark as ready: ${error.message}`);
     } finally {
       // Remove from processing set
       setProcessingAppointments((prev) => {
@@ -317,7 +319,7 @@ const ReceptionistDashboard = () => {
       }
     } catch (error) {
       logger.error('[ReceptionistDashboard] Error marking appointment as late:', error);
-      alert(`Failed to mark as late: ${error.message}`);
+      showError(`Failed to mark as late: ${error.message}`);
     } finally {
       setProcessingAppointments((prev) => {
         const newSet = new Set(prev);
@@ -352,7 +354,7 @@ const ReceptionistDashboard = () => {
       }
     } catch (error) {
       logger.error('[ReceptionistDashboard] Error marking appointment as no-show:', error);
-      alert(`Failed to mark as no-show: ${error.message}`);
+      showError(`Failed to mark as no-show: ${error.message}`);
     } finally {
       setProcessingAppointments((prev) => {
         const newSet = new Set(prev);

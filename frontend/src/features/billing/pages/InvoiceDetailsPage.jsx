@@ -12,10 +12,12 @@ import {
 } from 'lucide-react';
 import { invoiceService } from '@/features/billing';
 import logger from '@/utils/logger';
+import { useFeedback } from '@/contexts/FeedbackContext';
 
 const InvoiceDetailsPage = () => {
   const { id } = useParams();
   const navigate = useNavigate();
+  const { showSuccess, showError, showWarning } = useFeedback();
   
   const [invoice, setInvoice] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -63,7 +65,7 @@ const InvoiceDetailsPage = () => {
 
   const handleAddMedicine = async () => {
     if (!newMedicine.medicine_name || newMedicine.unit_price <= 0) {
-      alert('Please enter medicine name and price');
+      showError('Please enter medicine name and price');
       return;
     }
 
@@ -84,10 +86,10 @@ const InvoiceDetailsPage = () => {
       
       // Reload invoice
       await loadInvoice();
-      alert('Medicine added successfully!');
+      showSuccess('Medicine added successfully!');
     } catch (error) {
       logger.error('Error adding medicine:', error);
-      alert('Failed to add medicine. Please try again.');
+      showError('Failed to add medicine. Please try again.');
     } finally {
       setSaving(false);
     }
@@ -95,19 +97,19 @@ const InvoiceDetailsPage = () => {
 
   const handleProcessPayment = async () => {
     if (payment.amount <= 0) {
-      alert('Please enter a valid payment amount');
+      showError('Please enter a valid payment amount');
       return;
     }
 
     try {
       setSaving(true);
       await invoiceService.recordPayment(invoice.id, payment);
-      alert('Payment recorded successfully!');
+      showSuccess('Payment recorded successfully!');
       await loadInvoice();
       setShowPaymentForm(false);
     } catch (error) {
       logger.error('Error processing payment:', error);
-      alert('Failed to process payment. Please try again.');
+      showError('Failed to process payment. Please try again.');
     } finally {
       setSaving(false);
     }
@@ -123,11 +125,11 @@ const InvoiceDetailsPage = () => {
     try {
       setSaving(true);
       await invoiceService.completeInvoice(invoice.id);
-      alert('Invoice completed successfully!');
+      showSuccess('Invoice completed successfully!');
       navigate('/cashier/dashboard');
     } catch (error) {
       logger.error('Error completing invoice:', error);
-      alert('Failed to complete invoice. Please try again.');
+      showError('Failed to complete invoice. Please try again.');
     } finally {
       setSaving(false);
     }

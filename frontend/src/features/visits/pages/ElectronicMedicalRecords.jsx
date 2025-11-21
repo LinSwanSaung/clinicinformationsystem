@@ -10,10 +10,12 @@ import { NavigationTabs } from '@/components/library';
 import { PatientVitalsDisplay, MedicalInformationPanel, ClinicalNotesDisplay, PatientDocumentManager, allergyService, diagnosisService, prescriptionService, doctorNotesService } from '@/features/medical';
 import { User, Activity, Calendar, FileText, ArrowLeft, AlertCircle } from 'lucide-react';
 import logger from '@/utils/logger';
+import { useFeedback } from '@/contexts/FeedbackContext';
 
 const ElectronicMedicalRecords = () => {
   const location = useLocation();
   const navigate = useNavigate();
+  const { showSuccess, showError, showWarning, showInfo } = useFeedback();
 
   // State management
   const [selectedPatient, setSelectedPatient] = useState(location.state?.patient || null);
@@ -315,12 +317,12 @@ const ElectronicMedicalRecords = () => {
         setLoading(true);
 
         // TODO: Implement actual file upload to backend
-        alert(
+        showSuccess(
           `Successfully selected ${files.length} file(s) for upload:\n${files.map((f) => f.name).join('\n')}\n\nFile upload API integration pending.`
         );
       } catch (error) {
         logger.error('Error uploading files:', error);
-        alert('Failed to upload files. Please try again.');
+        showError('Failed to upload files. Please try again.');
       } finally {
         setLoading(false);
       }
@@ -331,14 +333,14 @@ const ElectronicMedicalRecords = () => {
 
   const handleViewFile = (file) => {
     logger.debug('View file:', file);
-    alert(
+    showInfo(
       `File viewing functionality will open: ${file.name}\n\nThis requires backend integration.`
     );
   };
 
   const handleDownloadFile = (file) => {
     logger.debug('Download file:', file);
-    alert(`File download functionality for: ${file.name}\n\nThis requires backend integration.`);
+    showInfo(`File download functionality for: ${file.name}\n\nThis requires backend integration.`);
   };
 
   // Render visit history tab content

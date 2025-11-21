@@ -77,13 +77,31 @@ class PatientPortalService {
         const doctorQueue = await this.queueTokenModel.getByDoctorAndDate(token.doctor_id, queueDate);
 
         const activeStatuses = ['waiting', 'called', 'serving'];
-        const sortedQueue = doctorQueue.filter(t => activeStatuses.includes(t.status));
+        let sortedQueue = doctorQueue.filter(t => activeStatuses.includes(t.status));
+
+        // Sort queue properly: serving first, then called, then waiting
+        // Within each status group, sort by priority (desc) then token_number (asc)
+        const statusOrder = { serving: 0, called: 1, waiting: 2 };
+        sortedQueue = sortedQueue.sort((a, b) => {
+          // First, sort by status priority
+          const statusDiff = statusOrder[a.status] - statusOrder[b.status];
+          if (statusDiff !== 0) return statusDiff;
+
+          // Then by priority (higher priority first)
+          const priorityDiff = (b.priority || 1) - (a.priority || 1);
+          if (priorityDiff !== 0) return priorityDiff;
+
+          // Finally by token_number (lower number first)
+          return a.token_number - b.token_number;
+        });
 
         const index = sortedQueue.findIndex(t => t.id === token.id);
         if (index !== -1) {
           position = index + 1;
 
-          const ahead = Math.max(index, 0);
+          // Count tokens ahead that are not yet serving
+          // Only count tokens that come before this one in the sorted queue
+          const ahead = sortedQueue.slice(0, index).filter(t => t.status !== 'serving').length;
           const consultMinutes = token.consult_expected_minutes || 15;
           estimatedWait = token.status === 'serving' ? 0 : ahead * consultMinutes;
         }

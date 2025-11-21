@@ -29,8 +29,10 @@ import appointmentService from '../services/appointmentService';
 import { queueService } from '@/features/queue';
 import apiService from '@/services/api';
 import logger from '@/utils/logger';
+import { useFeedback } from '@/contexts/FeedbackContext';
 
 const WalkInModal = ({ isOpen, onClose, onSubmit }) => {
+  const { showError, showSuccess, showWarning } = useFeedback();
   const [step, setStep] = useState(1); // 1: Select Patient, 2: Select Doctor
   const [selectedPatient, setSelectedPatient] = useState(null);
   const [selectedDoctor, setSelectedDoctor] = useState(null);
@@ -140,9 +142,9 @@ const WalkInModal = ({ isOpen, onClose, onSubmit }) => {
 
       // Show user-friendly error message if needed
       if (error.response?.status === 401) {
-        alert('Authentication required. Please log in again.');
+        showError('Authentication required. Please log in again.');
       } else if (error.response?.status >= 500) {
-        alert('Server error. Please try again later.');
+        showError('Server error. Please try again later.');
       }
     } finally {
       setIsLoadingPatients(false);
@@ -378,8 +380,8 @@ const WalkInModal = ({ isOpen, onClose, onSubmit }) => {
 
     // Check capacity before proceeding
     if (doctorCapacity && !doctorCapacity.canAccept) {
-      alert(
-        `Cannot create walk-in appointment:\n\n${doctorCapacity.reason}\n\nPlease choose a different doctor or schedule an appointment for later.`
+      showWarning(
+        `Cannot create walk-in appointment.\n\n${doctorCapacity.reason}\nPlease choose a different doctor or schedule for later.`
       );
       return;
     }
@@ -399,7 +401,7 @@ const WalkInModal = ({ isOpen, onClose, onSubmit }) => {
           `• Issued Time: ${new Date(token.issued_time).toLocaleTimeString()}\n` +
           `• Estimated Wait: ${token.estimated_wait_time || 'N/A'} minutes`;
 
-        alert(
+        showWarning(
           `This patient already has an active queue token for this doctor today.${tokenDetails}\n\nPlease:\n1. Check the current queue status, or\n2. Complete/cancel the existing token first, or\n3. Choose a different doctor`
         );
         return;
@@ -442,11 +444,11 @@ const WalkInModal = ({ isOpen, onClose, onSubmit }) => {
           // Ignore parsing errors
         }
 
-        alert(
+        showWarning(
           `This patient already has an active queue token for this doctor today.${tokenDetails}\n\nPlease:\n1. Check the current queue status, or\n2. Complete/cancel the existing token first, or\n3. Choose a different doctor`
         );
       } else {
-        alert(error.message || 'Failed to create walk-in appointment. Please try again.');
+        showError(error.message || 'Failed to create walk-in appointment. Please try again.');
       }
     } finally {
       setIsSubmitting(false);

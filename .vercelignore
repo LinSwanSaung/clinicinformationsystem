@@ -27,3 +27,7 @@ dist/
 build/
 *.tsbuildinfo
 
+# Root package.json (Vercel should only use frontend/package.json)
+package.json
+package-lock.json
+

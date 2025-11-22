@@ -15,7 +15,7 @@
     "format:backend": "cd backend && npm run format",
     "install-all": "cd frontend && npm install && cd ../backend && npm install",
     "clean": "rimraf node_modules **/*/node_modules",
-    "prepare": "husky",
+    "prepare": "husky || true",
     "start:frontend": "cd frontend && npm run dev",
     "start:backend": "cd backend && npm run dev",
     "build:frontend": "cd frontend && npm run build",

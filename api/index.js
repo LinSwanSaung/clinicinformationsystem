@@ -3,6 +3,35 @@
 
 import app from '../backend/src/app.js';
 
-// Export the Express app as the default handler
-// Vercel will automatically handle routing to this function
-export default app;
+// Wrapper to ensure CORS headers are set for all requests, including OPTIONS
+export default async function handler(req, res) {
+  // Extract origin from request headers
+  const origin = req.headers.origin;
+  
+  // Set CORS headers for all requests (including OPTIONS preflight)
+  // Always set headers to allow Vercel preview URLs
+  if (origin && origin.includes('.vercel.app')) {
+    // For Vercel preview URLs, echo back the exact origin
+    res.setHeader('Access-Control-Allow-Origin', origin);
+    res.setHeader('Access-Control-Allow-Credentials', 'true');
+  } else if (origin) {
+    // For other origins, echo back the origin (Express CORS will validate)
+    res.setHeader('Access-Control-Allow-Origin', origin);
+    res.setHeader('Access-Control-Allow-Credentials', 'true');
+  } else {
+    // No origin header (e.g., same-origin request or mobile app)
+    res.setHeader('Access-Control-Allow-Origin', '*');
+  }
+  
+  res.setHeader('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, PATCH, OPTIONS');
+  res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization, X-Requested-With, x-dev-role, Cache-Control, Pragma');
+  res.setHeader('Access-Control-Max-Age', '86400'); // 24 hours
+
+  // Handle OPTIONS preflight requests immediately
+  if (req.method === 'OPTIONS') {
+    return res.status(204).end();
+  }
+
+  // Pass all other requests to Express app (which will also set CORS headers via middleware)
+  return app(req, res);
+}

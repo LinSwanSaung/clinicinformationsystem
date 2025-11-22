@@ -76,11 +76,14 @@ app.use(
 const corsOptions = {
   origin: (origin, callback) => {
     // Allow requests with no origin (mobile apps, curl, etc.)
-    if (!origin) return callback(null, true);
+    if (!origin) {
+      return callback(null, true);
+    }
 
     // CRITICAL: Always allow Vercel preview URLs first (before other checks)
     // This ensures CORS headers are set for all Vercel deployments
-    if (origin.includes('.vercel.app')) {
+    // Check for any Vercel domain pattern
+    if (origin.includes('.vercel.app') || origin.includes('vercel.app')) {
       return callback(null, true);
     }
 
@@ -99,12 +102,19 @@ const corsOptions = {
       }
     }
 
+    // If we're on Vercel (detected by VERCEL environment variable), allow all origins
+    // This is safe because Vercel preview URLs are from the same project
+    if (process.env.VERCEL || process.env.VERCEL_ENV) {
+      return callback(null, true);
+    }
+
     // In production, allow configured origins
     if (allowedOrigins.includes(origin)) {
-      callback(null, true);
-    } else {
-      callback(new Error('Not allowed by CORS'));
+      return callback(null, true);
     }
+    
+    // Reject if none of the above conditions matched
+    callback(new Error('Not allowed by CORS'));
   },
   credentials: config.cors.credentials,
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],

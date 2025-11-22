@@ -72,10 +72,17 @@ app.use(
 );
 
 // 3. CORS - Configure properly based on environment
+// For Vercel deployments, we need to be more permissive with CORS
 const corsOptions = {
   origin: (origin, callback) => {
     // Allow requests with no origin (mobile apps, curl, etc.)
     if (!origin) return callback(null, true);
+
+    // CRITICAL: Always allow Vercel preview URLs first (before other checks)
+    // This ensures CORS headers are set for all Vercel deployments
+    if (origin.includes('.vercel.app')) {
+      return callback(null, true);
+    }
 
     const allowedOrigins = process.env.CLIENT_URL
       ? process.env.CLIENT_URL.split(',')
@@ -90,13 +97,6 @@ const corsOptions = {
       ) {
         return callback(null, true);
       }
-    }
-
-    // Allow all Vercel preview URLs (for deployments on same project)
-    // This handles cases where frontend and backend are on different preview URLs
-    // All .vercel.app domains are from the same Vercel project, so this is safe
-    if (origin.includes('.vercel.app')) {
-      return callback(null, true);
     }
 
     // In production, allow configured origins
@@ -117,7 +117,14 @@ const corsOptions = {
     'Pragma',
   ],
   exposedHeaders: ['RateLimit-Reset', 'RateLimit-Remaining', 'RateLimit-Limit'],
+  preflightContinue: false,
+  optionsSuccessStatus: 204,
 };
+
+// Explicit OPTIONS handler for preflight requests (needed for Vercel serverless functions)
+// This ensures OPTIONS requests are handled before other middleware
+app.options('*', cors(corsOptions));
+
 app.use(cors(corsOptions));
 
 // 4. Response compression - Compress responses to reduce bandwidth

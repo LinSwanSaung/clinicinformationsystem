@@ -99,7 +99,7 @@ class InvoiceModel extends BaseModel {
         invoice_items(*)
       `
       )
-      .in('status', ['pending', 'partial'])
+      .in('status', ['pending', 'draft'])
       .order('created_at', { ascending: false });
 
     if (error) throw error;
@@ -123,8 +123,8 @@ class InvoiceModel extends BaseModel {
         payment_transactions(*)
       `
       )
-      .eq('status', 'paid')
-      .order('completed_at', { ascending: false })
+      .in('status', ['paid', 'partial_paid'])
+      .order('completed_at', { ascending: false, nullsFirst: false })
       .range(offset, offset + limit - 1);
 
     if (error) throw error;
@@ -285,71 +285,6 @@ class InvoiceModel extends BaseModel {
     return count || 0;
   }
 
-  /**
-   * Record partial payment
-   */
-  async recordPartialPayment(invoiceId, paymentData) {
-    // 1. Get current invoice
-    const { data: invoice, error: invoiceError } = await this.supabase
-      .from(this.tableName)
-      .select('*')
-      .eq('id', invoiceId)
-      .single();
-
-    if (invoiceError) throw invoiceError;
-
-    const amountPaid = parseFloat(paymentData.amount);
-    const newTotalPaid = parseFloat(invoice.amount_paid || 0) + amountPaid;
-    const newBalance = parseFloat(invoice.total_amount) - newTotalPaid;
-
-    // 2. Create payment transaction
-    const { data: transaction, error: transactionError } = await this.supabase
-      .from('payment_transactions')
-      .insert({
-        invoice_id: invoiceId,
-        amount: amountPaid,
-        payment_method: paymentData.payment_method,
-        payment_notes: paymentData.notes,
-        received_by: paymentData.processed_by, // Use 'received_by' to match schema column name
-      })
-      .select()
-      .single();
-
-    if (transactionError) throw transactionError;
-
-    // 3. Update invoice
-    const updateData = {
-      amount_paid: newTotalPaid,
-      balance_due: newBalance,
-      status: newBalance <= 0 ? 'paid' : 'partial_paid',
-      on_hold: newBalance > 0,
-      hold_reason: paymentData.hold_reason || 'Partial payment - balance due',
-      hold_date: new Date().toISOString(),
-      payment_due_date: paymentData.payment_due_date,
-      updated_at: new Date().toISOString(),
-    };
-
-    // If fully paid, mark as completed
-    if (newBalance <= 0) {
-      updateData.on_hold = false;
-      updateData.completed_at = new Date().toISOString();
-      updateData.completed_by = paymentData.processed_by;
-    }
-
-    const { data: updatedInvoice, error: updateError } = await this.supabase
-      .from(this.tableName)
-      .update(updateData)
-      .eq('id', invoiceId)
-      .select()
-      .single();
-
-    if (updateError) throw updateError;
-
-    return {
-      invoice: updatedInvoice,
-      transaction,
-    };
-  }
 
   /**
    * Get payment history for an invoice

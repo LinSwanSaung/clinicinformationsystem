@@ -126,4 +126,20 @@ router.get(
   })
 );
 
+/**
+ * @route   GET /api/me/billing/outstanding-balance
+ * @desc    Get patient's total outstanding balance (what they owe)
+ * @access  Private (Patient)
+ */
+router.get(
+  '/billing/outstanding-balance',
+  asyncHandler(async (req, res) => {
+    const data = await PatientPortalService.getOutstandingBalance(req.user.id);
+    res.status(200).json({
+      success: true,
+      data,
+    });
+  })
+);
+
 export default router;

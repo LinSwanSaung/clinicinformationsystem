@@ -1,15 +1,15 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Card } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
+import { formatCurrencySync, refreshCurrencyCache } from '@/utils/currency';
 import { 
   ChevronDown, 
   ChevronRight, 
   Calendar, 
   Pill, 
   DollarSign,
-  FileText,
   AlertTriangle,
   Activity,
   Heart,
@@ -24,11 +24,15 @@ const VisitHistoryCard = ({
   visit, 
   isExpanded = false, 
   onToggleExpand,
-  showDetailsButton = true,
   onDownloadPDF = null 
 }) => {
   const { t } = useTranslation();
   const [localExpanded, setLocalExpanded] = useState(isExpanded);
+
+  // Refresh currency cache on mount
+  useEffect(() => {
+    refreshCurrencyCache();
+  }, []);
 
   const handleToggle = () => {
     const newExpanded = !localExpanded;
@@ -95,10 +99,7 @@ const VisitHistoryCard = ({
 
   const formatCurrency = (amount) => {
     if (!amount) return 'N/A';
-    return new Intl.NumberFormat('en-US', {
-      style: 'currency',
-      currency: 'USD'
-    }).format(amount);
+    return formatCurrencySync(amount);
   };
 
   return (
@@ -425,22 +426,6 @@ const VisitHistoryCard = ({
                     </div>
                   )}
                 </div>
-              </div>
-            </div>
-          )}
-
-          {/* Additional Actions */}
-          {showDetailsButton && (
-            <div className="pt-4 border-t border-gray-200">
-              <div className="flex space-x-3">
-                <Button variant="outline" size="sm">
-                  <FileText size={16} className="mr-2" />
-                  View Full Record
-                </Button>
-                <Button variant="outline" size="sm">
-                  <Pill size={16} className="mr-2" />
-                  View Prescriptions
-                </Button>
               </div>
             </div>
           )}

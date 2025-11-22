@@ -23,10 +23,13 @@ const notificationService = {
   async getUnreadCount() {
     try {
       const response = await apiService.get('/notifications/unread-count');
-      return response.data;
+      // Backend returns: { success: true, data: { count: number } }
+      // Return the nested data object with count for easier access
+      return response.data?.data || response.data || { count: 0 };
     } catch (error) {
       logger.error('Error fetching unread count:', error);
-      throw error.response?.data || error;
+      // Return default structure on error
+      return { count: 0 };
     }
   },
 

@@ -361,7 +361,6 @@ const ElectronicMedicalRecords = () => {
               visit={visit}
               isExpanded={expandedVisit === index}
               onToggleExpand={(expanded) => setExpandedVisit(expanded ? index : null)}
-              showDetailsButton={true}
             />
           ))}
         </div>

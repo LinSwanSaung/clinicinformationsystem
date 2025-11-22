@@ -377,6 +377,27 @@ router.delete(
       });
     }
 
+    // Get user to check role
+    const user = await userModel.findById(id);
+    if (!user) {
+      return res.status(404).json({ success: false, message: 'User not found' });
+    }
+
+    // If user is a doctor, check for active visits
+    if (user.role === 'doctor') {
+      const VisitModel = (await import('../models/Visit.model.js')).default;
+      const visitModel = new VisitModel();
+      const activeVisits = await visitModel.getDoctorActiveVisits(id);
+
+      if (activeVisits && activeVisits.length > 0) {
+        return res.status(409).json({
+          success: false,
+          message: `Cannot delete doctor. Doctor has ${activeVisits.length} active visit(s). Please complete or cancel the visits first.`,
+          activeVisits: activeVisits.map(v => ({ id: v.id, patient_id: v.patient_id })),
+        });
+      }
+    }
+
     // Mark tombstone: cannot be edited/activated again
     const updated = await userModel.updateById(id, {
       is_active: false,

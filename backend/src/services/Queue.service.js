@@ -2,6 +2,7 @@ import QueueTokenModel from '../models/QueueToken.model.js';
 import AppointmentModel from '../models/Appointment.model.js';
 import patientModel from '../models/Patient.model.js';
 import VisitService from './Visit.service.js';
+import clinicSettingsService from './ClinicSettings.service.js';
 import {
   getDoctorAvailabilityForDay,
   getQueueTokensByDoctorAndDate as repoGetQueueTokensByDoctorAndDate,
@@ -33,7 +34,8 @@ class QueueService {
    */
   async canAcceptWalkIn(doctorId) {
     try {
-      const AVERAGE_CONSULTATION_TIME = 15; // minutes per patient
+      // Get consultation duration from clinic settings
+      const AVERAGE_CONSULTATION_TIME = await clinicSettingsService.getConsultationDuration();
       const now = new Date();
       const currentDay = now.toLocaleDateString('en-US', { weekday: 'long' });
       const currentTime = now.toTimeString().slice(0, 5); // HH:MM format
@@ -148,8 +150,11 @@ class QueueService {
     }
 
     // Check if patient already has an active visit (in_progress)
+    // Note: Visits with paid/partial_paid invoices are excluded from active visits
+    // (they won't block new visits, but will show in admin pending items for manual completion)
     const activeVisit = await this.visitService.getPatientActiveVisit(patient_id);
     if (activeVisit) {
+      // This is a truly active visit (no paid/partial_paid invoice) - block new visit
       throw new ApplicationError(
         `Patient already has an active visit. Please complete or cancel the current visit before creating a new one.`,
         409,
@@ -365,6 +370,97 @@ class QueueService {
   }
 
   /**
+   * Detect and auto-fix stuck consultations
+   * Finds consultations that have been serving for too long (from previous days)
+   * and automatically completes them
+   */
+  async detectAndFixStuckConsultations(maxAgeHours = 24) {
+    try {
+      logger.info('[QUEUE] Starting stuck consultation detection and cleanup...');
+      
+      // Detect all stuck consultations
+      const stuckTokens = await this.queueTokenModel.detectStuckConsultations(null, maxAgeHours);
+      
+      if (!stuckTokens || stuckTokens.length === 0) {
+        logger.info('[QUEUE] No stuck consultations found.');
+        return {
+          success: true,
+          fixed: 0,
+          message: 'No stuck consultations found.',
+        };
+      }
+      
+      logger.warn(`[QUEUE] Found ${stuckTokens.length} stuck consultation(s) to fix.`);
+      
+      const fixedTokens = [];
+      const errors = [];
+      
+      // Auto-fix each stuck token
+      for (const token of stuckTokens) {
+        try {
+          const patientName = token.patient
+            ? `${token.patient.first_name} ${token.patient.last_name}`
+            : 'Unknown Patient';
+          
+          logger.warn(`[QUEUE] Auto-fixing stuck consultation: Token #${token.token_number} for ${patientName} (from ${token.issued_date})`);
+          
+          // Complete the token
+          await this.queueTokenModel.updateStatus(token.id, 'completed');
+          
+          // Mark consultation end time if visit exists
+          if (token.visit_id) {
+            try {
+              await this.visitService.updateVisit(token.visit_id, {
+                visit_end_time: new Date().toISOString(),
+              });
+            } catch (visitError) {
+              logger.error(`[QUEUE] Failed to update visit end time for visit ${token.visit_id}:`, visitError);
+            }
+          }
+          
+          // Complete appointment if linked
+          if (token.appointment_id) {
+            try {
+              await this.appointmentModel.update(token.appointment_id, {
+                status: 'completed',
+              });
+            } catch (aptError) {
+              logger.error(`[QUEUE] Failed to update appointment ${token.appointment_id}:`, aptError);
+            }
+          }
+          
+          fixedTokens.push({
+            tokenId: token.id,
+            tokenNumber: token.token_number,
+            patientName,
+            issuedDate: token.issued_date,
+          });
+        } catch (error) {
+          logger.error(`[QUEUE] Failed to fix stuck token ${token.id}:`, error);
+          errors.push({
+            tokenId: token.id,
+            error: error.message,
+          });
+        }
+      }
+      
+      logger.info(`[QUEUE] Stuck consultation cleanup completed: ${fixedTokens.length} fixed, ${errors.length} errors.`);
+      
+      return {
+        success: true,
+        fixed: fixedTokens.length,
+        errors: errors.length,
+        fixedTokens,
+        errors: errors.length > 0 ? errors : undefined,
+        message: `Successfully fixed ${fixedTokens.length} stuck consultation(s).`,
+      };
+    } catch (error) {
+      logger.error('[QUEUE] Error in detectAndFixStuckConsultations:', error);
+      throw new Error(`Failed to detect and fix stuck consultations: ${error.message}`);
+    }
+  }
+
+  /**
    * Force end any active consultation for a doctor
    * Used to fix stuck consultations
    */
@@ -411,18 +507,33 @@ class QueueService {
 
       // Complete the token
       
-      await this.queueTokenModel.updateStatus(activeConsultation.id, 'completed');
+      // Force end consultation (bypass validation)
+      await this.queueTokenModel.updateStatus(activeConsultation.id, 'completed', {}, true);
 
-      // Mark consultation end time (visit stays in_progress until invoice is paid)
-      // Business rule: Visits are only completed when invoice is paid
+      // Complete visit when consultation ends (allows new visits even with outstanding balance)
       if (activeConsultation.visit_id) {
         try {
-          await this.visitService.updateVisit(activeConsultation.visit_id, {
-            visit_end_time: new Date().toISOString(),
-            // Note: Visit status remains 'in_progress' until invoice is paid
-          });
+          const visitDetails = await this.visitService.getVisitDetails(activeConsultation.visit_id);
+          if (visitDetails?.data?.status !== 'completed') {
+            // Complete the visit with payment_status based on invoice status
+            const invoice = visitDetails?.data?.invoice;
+            const paymentStatus = invoice?.status === 'paid' ? 'paid' : 'pending';
+            
+            await this.visitService.completeVisit(activeConsultation.visit_id, {
+              payment_status: paymentStatus,
+            });
+            logger.info(`[QUEUE] Completed visit ${activeConsultation.visit_id} after force ending consultation`);
+          }
         } catch (visitError) {
-          logger.error('Failed to update visit end time:', visitError);
+          logger.error('Failed to complete visit:', visitError);
+          // Fallback: just set end time
+          try {
+            await this.visitService.updateVisit(activeConsultation.visit_id, {
+              visit_end_time: new Date().toISOString(),
+            });
+          } catch (updateError) {
+            logger.error('Failed to update visit end time:', updateError);
+          }
         }
       }
 
@@ -431,6 +542,28 @@ class QueueService {
         await this.appointmentModel.update(activeConsultation.appointment_id, {
           status: 'completed',
         });
+      }
+
+      // Auto-create invoice if it doesn't exist (non-critical, no rollback needed)
+      // This allows cashier to add services even if doctor forgot to add them
+      if (activeConsultation.visit_id) {
+        try {
+          const { default: invoiceService } = await import('./Invoice.service.js');
+          
+          // Check if invoice already exists
+          const existingInvoice = await invoiceService.getInvoiceByVisit(activeConsultation.visit_id);
+          
+          if (!existingInvoice) {
+            // Auto-create invoice (even if $0, cashier can add services later)
+            logger.debug(`[QUEUE] Auto-creating invoice for visit ${activeConsultation.visit_id} (force end)`);
+            await invoiceService.createInvoice(activeConsultation.visit_id, activeConsultation.doctor_id || null);
+            logger.info(`[QUEUE] ✅ Auto-created invoice for visit ${activeConsultation.visit_id} (force end)`);
+          }
+        } catch (invoiceError) {
+          // Log error but don't fail consultation completion
+          // Invoice can be created manually later if auto-creation fails
+          logger.warn(`[QUEUE] ⚠️ Failed to auto-create invoice for visit ${activeConsultation.visit_id} (force end):`, invoiceError.message);
+        }
       }
 
       return {
@@ -550,6 +683,7 @@ class QueueService {
       // No need to boost priority here - it was already determined when token was issued
 
       // Update token status to called (indicating ready for doctor)
+      // Note: 'called' status means the patient is ready and waiting for doctor to start consultation
       const updatedToken = await this.queueTokenModel.updateStatus(
         tokenId,
         'called',
@@ -562,6 +696,27 @@ class QueueService {
         token.issued_date
       );
       const fullToken = tokensWithDetails.find((t) => t.id === tokenId);
+
+      // Notify doctor that patient is ready
+      try {
+        const { default: NotificationService } = await import('./Notification.service.js');
+        // Get patient details from the full token
+        const patient = fullToken?.patient || fullToken?.patients;
+        const patientName = patient
+          ? `${patient.first_name || ''} ${patient.last_name || ''}`.trim()
+          : 'Patient';
+        
+        await NotificationService.notifyDoctor(token.doctor_id, {
+          title: 'Patient Ready',
+          message: `${patientName} (Token #${token.token_number}) is ready for consultation.`,
+          type: 'info',
+          relatedEntityType: 'queue_token',
+          relatedEntityId: tokenId,
+        });
+      } catch (notifError) {
+        // Log error but don't fail the operation
+        logger.warn('[QUEUE] Failed to notify doctor when patient marked ready:', notifError.message);
+      }
 
       return {
         success: true,
@@ -628,111 +783,62 @@ class QueueService {
         throw new Error('Token not found');
       }
 
+      // Quick validation before atomic operation (fast-fail optimization)
       if (currentToken.status !== 'called') {
         throw new Error(
           `Cannot start consultation. Token status is '${currentToken.status}' but should be 'called'`
         );
       }
 
-      // Check if doctor already has a patient in consultation (with retry)
-      const existingServingToken = await executeWithRetry(
-        async () => await this.queueTokenModel.getActiveConsultation(currentToken.doctor_id),
-        2,
-        'Check active consultation'
-      );
-      if (existingServingToken) {
-        // Get patient details for the existing serving token
-        const patientInfo = existingServingToken.patient
-          ? `${existingServingToken.patient.first_name} ${existingServingToken.patient.last_name} (Token #${existingServingToken.token_number})`
-          : `Token #${existingServingToken.token_number}`;
-        throw new Error(
-          `You already have a patient in consultation: ${patientInfo}. Please complete the current consultation first.`
-        );
-      }
-
-      // Update token status (with retry and constraint violation handling)
+      // Use atomic function with advisory locks to prevent race conditions
+      // This function handles all checks and updates atomically, preventing race conditions
+      // This ensures only one consultation can be started per doctor at a time
       let updatedToken;
       try {
-        updatedToken = await executeWithRetry(
-          async () => await this.queueTokenModel.updateStatus(tokenId, 'serving'),
+        const atomicResult = await executeWithRetry(
+          async () => await this.queueTokenModel.startConsultationAtomic(tokenId, currentToken.doctor_id),
           2,
-          'Update token status to serving'
+          'Start consultation atomically'
         );
-      } catch (updateError) {
-        // Handle unique constraint violation (race condition)
-        const errorMsg = updateError?.message?.toLowerCase() || '';
-        if (errorMsg.includes('uq_queue_one_serving_per_doctor') || 
-            errorMsg.includes('duplicate key') ||
-            errorMsg.includes('unique constraint')) {
-          // Re-check for active consultation - check ALL dates to find stuck tokens
-          const existingServingToken = await executeWithRetry(
-            async () => await this.queueTokenModel.getActiveConsultation(currentToken.doctor_id, true), // includeAllDates = true
-            1,
-            'Re-check active consultation after constraint violation (all dates)'
-          );
-          
-          if (existingServingToken) {
-            const patientInfo = existingServingToken.patient
-              ? `${existingServingToken.patient.first_name} ${existingServingToken.patient.last_name} (Token #${existingServingToken.token_number})`
-              : `Token #${existingServingToken.token_number}`;
-            
-            // If it's from a different date, it's a stuck token - offer to fix it
-            const tokenDate = existingServingToken.issued_date;
-            const today = new Date().toISOString().split('T')[0];
-            if (tokenDate !== today) {
-              throw new Error(
-                `Found a stuck consultation from ${tokenDate}: ${patientInfo}. Please use "End Consultation" to clear it first.`
-              );
-            }
-            
-            throw new Error(
-              `You already have a patient in consultation: ${patientInfo}. Please complete the current consultation first.`
-            );
-          } else {
-            // Constraint violation but no active consultation found - try to find and fix stuck token
-            logger.warn('[QUEUE] Constraint violation but no active consultation found. Searching for stuck tokens...', {
-              doctorId: currentToken.doctor_id,
-              tokenId: tokenId
-            });
-            
-            // Try to find ALL serving tokens (bypassing date filter)
-            try {
-              const allServingTokens = await this.queueTokenModel.getAllServingTokens(currentToken.doctor_id);
-              if (allServingTokens && allServingTokens.length > 0) {
-                // Found stuck token(s) - automatically fix the first one
-                logger.warn('[QUEUE] Found stuck serving token(s), attempting to fix...', {
-                  count: allServingTokens.length,
-                  tokens: allServingTokens.map(t => ({ id: t.id, token_number: t.token_number, issued_date: t.issued_date }))
-                });
-                
-                // Auto-fix: Complete the stuck token
-                const stuckToken = allServingTokens[0];
-                await this.queueTokenModel.updateStatus(stuckToken.id, 'completed');
-                logger.info('[QUEUE] Auto-fixed stuck token:', stuckToken.id);
-                
-                // Now retry the original operation
-                updatedToken = await executeWithRetry(
-                  async () => await this.queueTokenModel.updateStatus(tokenId, 'serving'),
-                  1,
-                  'Retry update token status after fixing stuck token'
-                );
-              } else {
-                // No serving tokens found but constraint violation - database inconsistency
-                throw new Error(
-                  'Database inconsistency detected. Please refresh and try again, or contact support if the issue persists.'
-                );
-              }
-            } catch (fixError) {
-              logger.error('[QUEUE] Failed to fix stuck token:', fixError);
-              throw new Error(
-                'Unable to start consultation due to a stuck consultation. Please use "End Consultation" button to clear it, or contact support.'
-              );
-            }
-          }
-        } else {
-          // Re-throw if it's not a constraint violation
-          throw updateError;
+        
+        if (!atomicResult.success) {
+          throw new Error(atomicResult.message || 'Failed to start consultation');
         }
+        
+        updatedToken = atomicResult.token;
+      } catch (atomicError) {
+        // If atomic function fails, check for stuck tokens from previous days
+        const errorMsg = atomicError?.message?.toLowerCase() || '';
+        
+        // Check for stuck consultations from previous days
+        const existingServingToken = await executeWithRetry(
+          async () => await this.queueTokenModel.getActiveConsultation(currentToken.doctor_id, true), // includeAllDates = true
+          1,
+          'Check for stuck consultations (all dates)'
+        );
+        
+        if (existingServingToken) {
+          const patientInfo = existingServingToken.patient
+            ? `${existingServingToken.patient.first_name} ${existingServingToken.patient.last_name} (Token #${existingServingToken.token_number})`
+            : `Token #${existingServingToken.token_number}`;
+          
+          // If it's from a different date, it's a stuck token
+          const tokenDate = existingServingToken.issued_date;
+          const today = new Date().toISOString().split('T')[0];
+          if (tokenDate !== today) {
+            throw new Error(
+              `Found a stuck consultation from ${tokenDate}: ${patientInfo}. Please use "End Consultation" to clear it first.`
+            );
+          }
+          
+          // Same day - doctor already has active consultation
+          throw new Error(
+            `You already have a patient in consultation: ${patientInfo}. Please complete the current consultation first.`
+          );
+        }
+        
+        // Re-throw the original error if no stuck token found
+        throw atomicError;
       }
 
       // When consultation starts, notify next waiting patient that they are next
@@ -889,31 +995,119 @@ class QueueService {
       // CRITICAL: Token must have visit_id - error if missing
       if (!token.visit_id) {
         throw new ApplicationError(
-          'Cannot complete consultation: Token has no associated visit. This indicates a data integrity issue.',
+          `Cannot complete consultation: Token #${token.token_number} is missing visit information. ` +
+          `Please contact support to resolve this data integrity issue. The consultation cannot be completed until this is fixed.`,
           400,
           'ORPHAN_TOKEN',
-          { tokenId, tokenNumber: token.token_number }
+          { 
+            tokenId, 
+            tokenNumber: token.token_number,
+            patientId: token.patient_id,
+            message: 'Token missing visit association - data integrity issue'
+          }
         );
       }
 
-
       // Get visit before update for audit logging
       const oldVisit = await this.visitService.getVisitDetails(token.visit_id);
+      const oldTokenStatus = token.status;
 
-      // Update token status
-      const updatedToken = await this.queueTokenModel.updateStatus(tokenId, 'completed');
+      // Use transaction pattern to ensure atomicity
+      const transaction = new TransactionRunner();
+      let updatedToken = null;
+      let updatedVisit = null;
+      let updatedAppointment = null;
 
-      // Mark consultation end time (visit stays in_progress until invoice is paid)
-      // Business rule: Visits are only completed when invoice is paid, not when consultation ends
       try {
-        
-        await this.visitService.updateVisit(token.visit_id, {
-          visit_end_time: new Date().toISOString(),
-          // Note: Visit status remains 'in_progress' until invoice is paid
-          // This ensures proper billing workflow and prevents premature completion
-        });
+        // Step 1: Update token status (with rollback compensation)
+        updatedToken = await transaction.add(
+          async () => {
+            return await this.queueTokenModel.updateStatus(tokenId, 'completed');
+          },
+          async () => {
+            // Compensation: revert token status if later steps fail
+            await this.queueTokenModel.updateStatus(tokenId, oldTokenStatus);
+          }
+        );
 
-        // Log visit update for audit
+        // Step 2: Complete visit when consultation ends (with rollback compensation)
+        updatedVisit = await transaction.add(
+          async () => {
+            // Business rule: Complete visit when consultation ends to allow new visits
+            // Invoice can remain partial_paid, but visit should be completed
+            // This allows patients to have new visits even with outstanding balance
+            try {
+              const visitDetails = await this.visitService.getVisitDetails(token.visit_id);
+              if (visitDetails?.data?.status !== 'completed') {
+                // Complete the visit with payment_status based on invoice status
+                const invoice = visitDetails?.data?.invoice;
+                const paymentStatus = invoice?.status === 'paid' ? 'paid' : 'pending';
+                
+                await this.visitService.completeVisit(token.visit_id, {
+                  payment_status: paymentStatus,
+                });
+                logger.info(`[QueueService] Completed visit ${token.visit_id} after consultation ended`);
+              }
+              return { id: token.visit_id, status: 'completed' };
+            } catch (visitError) {
+              // If visit completion fails, just set end time as fallback
+              logger.warn(`[QueueService] Failed to complete visit ${token.visit_id}, setting end time only:`, visitError);
+              return await this.visitService.updateVisit(token.visit_id, {
+                visit_end_time: new Date().toISOString(),
+              });
+            }
+          },
+          async () => {
+            // Compensation: if visit completion fails, token status will be rolled back
+            // Visit completion doesn't need explicit rollback as it's a final state
+          }
+        );
+
+        // Step 3: Update appointment status if linked (with rollback compensation)
+        if (token.appointment_id) {
+          updatedAppointment = await transaction.add(
+            async () => {
+              return await this.appointmentModel.update(token.appointment_id, {
+                status: 'completed',
+              });
+            },
+            async () => {
+              // Compensation: revert appointment status if needed
+              // Get original status before update
+              const originalAppointment = await this.appointmentModel.findById(token.appointment_id);
+              if (originalAppointment) {
+                await this.appointmentModel.update(token.appointment_id, {
+                  status: originalAppointment.status,
+                });
+              }
+            }
+          );
+        }
+
+        // Step 4: Auto-create invoice if it doesn't exist (non-critical, no rollback needed)
+        // This allows cashier to add services even if doctor forgot to add them
+        try {
+          const { default: invoiceService } = await import('./Invoice.service.js');
+          
+          // Check if invoice already exists
+          const existingInvoice = await invoiceService.getInvoiceByVisit(token.visit_id);
+          
+          if (!existingInvoice) {
+            // Auto-create invoice (even if $0, cashier can add services later)
+            logger.debug(`[QUEUE] Auto-creating invoice for visit ${token.visit_id}`);
+            await invoiceService.createInvoice(token.visit_id, token.doctor_id || null);
+            logger.info(`[QUEUE] ✅ Auto-created invoice for visit ${token.visit_id}`);
+          }
+        } catch (invoiceError) {
+          // Log error but don't fail consultation completion
+          // Invoice can be created manually later if auto-creation fails
+          logger.warn(`[QUEUE] ⚠️ Failed to auto-create invoice for visit ${token.visit_id}:`, invoiceError.message);
+        }
+
+        // All steps succeeded - transaction is complete
+        // (TransactionRunner executes operations immediately in add(), no explicit commit needed)
+
+        // Log visit update for audit (after successful commit)
         try {
           await logAuditEvent({
             userId: null, // System action
@@ -931,55 +1125,65 @@ class QueueService {
           logger.error('[AUDIT] Failed to log visit update:', logError.message);
         }
 
-        
-      } catch (visitError) {
-        logger.error('[QUEUE] ❌ Failed to update visit end time:', visitError.message);
-        // Don't fail the entire operation if visit update fails, but log it
-        throw new ApplicationError(
-          `Consultation completed but failed to update visit end time: ${visitError.message}`,
-          500,
-          'VISIT_UPDATE_FAILED'
-        );
-      }
-
-      // Update appointment status if linked
-      if (updatedToken.appointment_id) {
+        // Notify cashiers that consultation is finished and patient will come for payment
         try {
-          await this.appointmentModel.update(updatedToken.appointment_id, {
-            status: 'completed',
-          });
-        } catch (apptError) {
+          const { default: NotificationService } = await import('./Notification.service.js');
+          const visitDetails = await this.visitService.getVisitDetails(token.visit_id);
+          const patient = visitDetails?.data?.patient;
+          const patientName = patient
+            ? `${patient.first_name} ${patient.last_name}`.trim()
+            : 'Patient';
           
-          // Don't fail the operation
+          await NotificationService.notifyCashiers({
+            title: 'Consultation Completed',
+            message: `${patientName} has completed their consultation and will proceed to payment. Invoice is ready for processing.`,
+            type: 'info',
+            relatedEntityType: 'visit',
+            relatedEntityId: token.visit_id,
+          });
+        } catch (notifError) {
+          // Log error but don't fail consultation completion
+          logger.warn('[QUEUE] Failed to notify cashiers after consultation completion:', notifError.message);
         }
-      }
 
-      // Auto-create invoice if it doesn't exist (ensures every visit has an invoice)
-      // This allows cashier to add services even if doctor forgot to add them
-      try {
-        const { default: InvoiceService } = await import('./Invoice.service.js');
-        const invoiceService = new InvoiceService();
-        
-        // Check if invoice already exists
-        const existingInvoice = await invoiceService.getInvoiceByVisit(token.visit_id);
-        
-        if (!existingInvoice) {
-          // Auto-create invoice (even if $0, cashier can add services later)
-          logger.debug(`[QUEUE] Auto-creating invoice for visit ${token.visit_id}`);
-          await invoiceService.createInvoice(token.visit_id, token.doctor_id || null);
-          logger.info(`[QUEUE] ✅ Auto-created invoice for visit ${token.visit_id}`);
+        return {
+          success: true,
+          token: updatedToken,
+          message: 'Consultation completed',
+        };
+      } catch (error) {
+        // Rollback all changes if any step fails
+        try {
+          await transaction.rollback();
+          logger.info('[QUEUE] Successfully rolled back consultation completion due to error');
+        } catch (rollbackError) {
+          // If rollback fails, log error but don't mask original error
+          logger.error('[QUEUE] ❌ CRITICAL: Rollback failed after consultation completion error:', rollbackError);
+          logger.error('[QUEUE] Original error:', error);
+          
+          // Attempt recovery: Check current state and log for admin review
+          try {
+            const currentToken = await this.queueTokenModel.findById(tokenId, '*');
+            const currentVisit = await this.visitService.getVisitDetails(token.visit_id);
+            
+            logger.error('[QUEUE] Recovery check - Current state:', {
+              tokenStatus: currentToken?.status,
+              visitStatus: currentVisit?.data?.status,
+              visitEndTime: currentVisit?.data?.visit_end_time,
+              error: error.message,
+              rollbackError: rollbackError.message,
+            });
+            
+            // If token is completed but visit is not updated, this is a partial state
+            if (currentToken?.status === 'completed' && !currentVisit?.data?.visit_end_time) {
+              logger.error('[QUEUE] ⚠️ PARTIAL STATE DETECTED: Token completed but visit not updated. Manual intervention required.');
+            }
+          } catch (recoveryError) {
+            logger.error('[QUEUE] Failed to check recovery state:', recoveryError);
+          }
         }
-      } catch (invoiceError) {
-        // Log error but don't fail consultation completion
-        // Invoice can be created manually later if auto-creation fails
-        logger.warn(`[QUEUE] ⚠️ Failed to auto-create invoice for visit ${token.visit_id}:`, invoiceError.message);
+        throw error;
       }
-
-      return {
-        success: true,
-        token: updatedToken,
-        message: 'Consultation completed',
-      };
     } catch (error) {
       logger.error('[QUEUE] ❌ Error completing consultation:', error.message);
       if (error instanceof ApplicationError) {
@@ -1277,8 +1481,9 @@ class QueueService {
           (token) => token.status === 'waiting' && token.token_number < currentToken.token_number
         ).length + 1;
 
-      // Estimate wait time (average 15 minutes per consultation)
-      const estimatedWaitMinutes = (position - 1) * 15;
+      // Estimate wait time using clinic settings for consultation duration
+      const consultationDuration = await clinicSettingsService.getConsultationDuration();
+      const estimatedWaitMinutes = (position - 1) * consultationDuration;
 
       return {
         hasToken: true,
@@ -1513,45 +1718,11 @@ class QueueService {
   }
 
   /**
-   * Force complete any active consultation for the doctor
-   */
-  async forceCompleteActiveConsultation(doctorId) {
-    try {
-      const activeToken = await this.queueTokenModel.getActiveConsultation(doctorId);
-
-      if (!activeToken) {
-        return {
-          success: false,
-          message: 'No active consultation found',
-        };
-      }
-
-      // Complete the consultation
-      const updatedToken = await this.queueTokenModel.updateStatus(activeToken.id, 'completed');
-
-      // Update appointment status if linked
-      if (updatedToken.appointment_id) {
-        await this.appointmentModel.update(updatedToken.appointment_id, {
-          status: 'completed',
-        });
-      }
-
-      return {
-        success: true,
-        completedToken: updatedToken,
-        message: `Consultation with ${activeToken.patient?.first_name} ${activeToken.patient?.last_name} has been force completed`,
-      };
-    } catch (error) {
-      throw new Error(`Failed to force complete consultation: ${error.message}`);
-    }
-  }
-  /**
    * Force complete any active consultation for a doctor
+   * Bypasses normal validation to allow admin/doctor to force end consultations
    */
   async forceCompleteActiveConsultation(doctorId) {
     try {
-      
-
       // Find any token with status 'serving' for this doctor using existing method
       const activeToken = await this.queueTokenModel.getActiveConsultation(doctorId);
 
@@ -1569,8 +1740,8 @@ class QueueService {
         activeToken.patient_id
       );
 
-      // Force complete this consultation
-      const updatedToken = await this.queueTokenModel.updateStatus(activeToken.id, 'completed');
+      // Force complete this consultation (bypass validation for force complete)
+      const updatedToken = await this.queueTokenModel.updateStatus(activeToken.id, 'completed', {}, true);
 
       // Update appointment status if linked
       if (updatedToken.appointment_id) {

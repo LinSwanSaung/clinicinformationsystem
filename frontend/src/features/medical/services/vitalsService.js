@@ -64,9 +64,21 @@ class VitalsService {
    */
   async getVisitVitals(visitId) {
     try {
+      // Check if user is authenticated before making request
+      // This prevents errors when components make requests after logout
+      const token = localStorage.getItem('authToken');
+      if (!token) {
+        // User is logged out, silently return empty result
+        return { success: true, data: [] };
+      }
+      
       const response = await apiService.get(`/vitals/visit/${visitId}`);
       return response;
     } catch (error) {
+      // Silently handle "Unauthorized - user logged out" errors
+      if (error.message?.includes('Unauthorized - user logged out')) {
+        return { success: true, data: [] };
+      }
       throw new Error(error.message || 'Failed to fetch visit vitals');
     }
   }

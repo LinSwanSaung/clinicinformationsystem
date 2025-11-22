@@ -34,6 +34,10 @@ class PatientPortalService {
   async getRemainingCredit() {
     return api.get('/me/billing/remaining-credit');
   }
+
+  async getOutstandingBalance() {
+    return api.get('/me/billing/outstanding-balance');
+  }
 }
 
 export default new PatientPortalService();

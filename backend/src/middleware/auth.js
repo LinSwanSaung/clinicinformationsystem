@@ -56,10 +56,10 @@ export const authenticate = asyncHandler(async (req, res, next) => {
       const result = await executeWithRetry(
         async () => {
           return await supabase
-            .from('users')
-            .select('id, email, role, first_name, last_name, is_active, patient_id')
-            .eq('id', userId)
-            .single();
+      .from('users')
+      .select('id, email, role, first_name, last_name, is_active, patient_id')
+      .eq('id', userId)
+      .single();
         },
         2, // 2 retries
         'User authentication lookup'

@@ -5,8 +5,7 @@ import { uploadRateLimiter } from '../middleware/rateLimiter.js';
 import { asyncHandler } from '../middleware/errorHandler.js';
 import { ROLES } from '../constants/roles.js';
 import config from '../config/app.config.js';
-import { supabase } from '../config/database.js';
-import crypto from 'crypto';
+import documentService from '../services/Document.service.js';
 import { logAuditEvent } from '../utils/auditLogger.js';
 import logger from '../config/logger.js';
 
@@ -63,49 +62,14 @@ router.post(
     }
 
     try {
-      // Generate unique file name
-      const fileExtension = file.originalname.split('.').pop();
-      const uniqueFileName = `${patient_id}/${crypto.randomUUID()}.${fileExtension}`;
-
-      // Upload to Supabase Storage
-      const { data: uploadData, error: uploadError } = await supabase.storage
-        .from('medical-documents')
-        .upload(uniqueFileName, file.buffer, {
-          contentType: file.mimetype,
-          upsert: false,
-        });
-
-      if (uploadError) {
-        logger.error('Supabase upload error:', uploadError);
-        throw new Error(`Failed to upload file: ${uploadError.message}`);
-      }
-
-      // Get public URL
-      const {
-        data: { publicUrl },
-      } = supabase.storage.from('medical-documents').getPublicUrl(uniqueFileName);
-
-      // Store document metadata in database
-      const { data: docData, error: dbError } = await supabase
-        .from('medical_documents')
-        .insert({
-          patient_id,
-          document_type: document_type || 'other',
-          document_name: file_name || file.originalname,
-          file_path: uniqueFileName,
-          file_size: file.size,
-          mime_type: file.mimetype,
-          uploaded_by: req.user.id,
-        })
-        .select()
-        .single();
-
-      if (dbError) {
-        logger.error('Database insert error:', dbError);
-        // Try to delete the uploaded file
-        await supabase.storage.from('medical-documents').remove([uniqueFileName]);
-        throw new Error(`Failed to save document metadata: ${dbError.message}`);
-      }
+      const docData = await documentService.uploadDocument(
+        file.buffer,
+        file_name || file.originalname,
+        file.mimetype,
+        patient_id,
+        document_type,
+        req.user.id
+      );
 
       // Log upload
       try {
@@ -148,37 +112,36 @@ router.get(
   asyncHandler(async (req, res) => {
     const { id } = req.params;
 
-    const { data: doc, error: fetchError } = await supabase
-      .from('medical_documents')
-      .select('id, file_path, patient_id')
-      .eq('id', id)
-      .single();
+    try {
+      const doc = await documentService.getDocumentById(id);
 
-    if (fetchError || !doc) {
+      if (!doc) {
+        return res.status(404).json({ success: false, message: 'Document not found' });
+      }
+
+      // Obtain public URL
+      const publicUrl = documentService.getDocumentPublicUrl(doc.file_path);
+
+      // Log download
+      try {
+        logAuditEvent({
+          userId: req.user?.id || null,
+          role: req.user?.role || null,
+          action: 'DOWNLOAD',
+          entity: 'medical_documents',
+          recordId: id,
+          patientId: doc.patient_id || null,
+          result: 'success',
+          ip: req.ip,
+        });
+      } catch (e) {}
+
+      // Redirect to public URL
+      return res.redirect(publicUrl);
+    } catch (error) {
+      logger.error('Error downloading document:', error);
       return res.status(404).json({ success: false, message: 'Document not found' });
     }
-
-    // Obtain public URL
-    const {
-      data: { publicUrl },
-    } = supabase.storage.from('medical-documents').getPublicUrl(doc.file_path);
-
-    // Log download
-    try {
-      logAuditEvent({
-        userId: req.user?.id || null,
-        role: req.user?.role || null,
-        action: 'DOWNLOAD',
-        entity: 'medical_documents',
-        recordId: id,
-        patientId: doc.patient_id || null,
-        result: 'success',
-        ip: req.ip,
-      });
-    } catch (e) {}
-
-    // Redirect to public URL
-    return res.redirect(publicUrl);
   })
 );
 
@@ -193,26 +156,16 @@ router.get(
   asyncHandler(async (req, res) => {
     const { patientId } = req.params;
 
-    const { data, error } = await supabase
-      .from('medical_documents')
-      .select(
-        `
-        *,
-        uploader:uploaded_by (
-          first_name,
-          last_name,
-          role
-        )
-      `
-      )
-      .eq('patient_id', patientId)
-      .order('created_at', { ascending: false });
-
-    if (error) {
-      throw new Error(`Failed to fetch documents: ${error.message}`);
+    try {
+      const documents = await documentService.getPatientDocuments(patientId);
+      res.status(200).json(documents);
+    } catch (error) {
+      logger.error('Error fetching patient documents:', error);
+      res.status(500).json({
+        success: false,
+        message: error.message || 'Failed to fetch documents',
+      });
     }
-
-    res.status(200).json(data || []);
   })
 );
 
@@ -228,40 +181,26 @@ router.delete(
   asyncHandler(async (req, res) => {
     const { id } = req.params;
 
-    // Get document info first
-    const { data: doc, error: fetchError } = await supabase
-      .from('medical_documents')
-      .select('file_path')
-      .eq('id', id)
-      .single();
+    try {
+      await documentService.deleteDocument(id);
 
-    if (fetchError || !doc) {
-      return res.status(404).json({
+      res.status(200).json({
+        success: true,
+        message: 'Document deleted successfully',
+      });
+    } catch (error) {
+      logger.error('Error deleting document:', error);
+      if (error.message === 'Document not found') {
+        return res.status(404).json({
+          success: false,
+          message: 'Document not found',
+        });
+      }
+      res.status(500).json({
         success: false,
-        message: 'Document not found',
+        message: error.message || 'Failed to delete document',
       });
     }
-
-    // Delete from storage
-    const { error: storageError } = await supabase.storage
-      .from('medical-documents')
-      .remove([doc.file_path]);
-
-    if (storageError) {
-      logger.error('Storage deletion error:', storageError);
-    }
-
-    // Delete from database
-    const { error: dbError } = await supabase.from('medical_documents').delete().eq('id', id);
-
-    if (dbError) {
-      throw new Error(`Failed to delete document: ${dbError.message}`);
-    }
-
-    res.status(200).json({
-      success: true,
-      message: 'Document deleted successfully',
-    });
   })
 );
 

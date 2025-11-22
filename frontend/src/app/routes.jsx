@@ -10,6 +10,7 @@ import {
   AuditLogs,
   PendingItems,
   PaymentTransactions,
+  ClinicSettings,
 } from '../features/admin';
 import ServiceCatalog from '../features/services/pages/ServiceCatalog.jsx';
 import { AppointmentsPage } from '../features/appointments';
@@ -152,6 +153,14 @@ export function AppRoutes() {
         element={
           <ProtectedRoute allowedRoles={['admin']}>
             <PaymentTransactions />
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/admin/settings"
+        element={
+          <ProtectedRoute allowedRoles={['admin']}>
+            <ClinicSettings />
           </ProtectedRoute>
         }
       />

@@ -227,15 +227,15 @@ router.put(
 /**
  * @route   DELETE /api/invoices/:id/items/:itemId
  * @desc    Remove invoice item
- * @access  Private (Cashier, Pharmacist, Admin)
+ * @access  Private (Doctor during active consultation, Cashier, Pharmacist, Admin)
  */
 router.delete(
   '/:id/items/:itemId',
   authenticate,
-  authorize(ROLES.ADMIN, ROLES.CASHIER, 'pharmacist'),
+  authorize(ROLES.ADMIN, ROLES.DOCTOR, ROLES.CASHIER, 'pharmacist'),
   asyncHandler(async (req, res) => {
     const { itemId } = req.params;
-    const item = await InvoiceService.removeInvoiceItem(itemId);
+    const item = await InvoiceService.removeInvoiceItem(itemId, req.user);
 
     res.status(200).json({
       success: true,

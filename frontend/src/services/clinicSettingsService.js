@@ -61,6 +61,46 @@ class ClinicSettingsService {
       return 7; // Default fallback
     }
   }
+
+  // Upload clinic logo
+  async uploadLogo(file) {
+    try {
+      const formData = new FormData();
+      formData.append('logo', file);
+      
+      const response = await api.post('/clinic-settings/upload-logo', formData);
+      return {
+        success: true,
+        data: response.data
+      };
+    } catch (error) {
+      logger.error('Error uploading logo:', error);
+      return {
+        success: false,
+        error: error.response?.data?.message || 'Failed to upload logo'
+      };
+    }
+  }
+
+  // Upload payment QR code
+  async uploadQRCode(file) {
+    try {
+      const formData = new FormData();
+      formData.append('qr_code', file);
+      
+      const response = await api.post('/clinic-settings/upload-qr-code', formData);
+      return {
+        success: true,
+        data: response.data
+      };
+    } catch (error) {
+      logger.error('Error uploading QR code:', error);
+      return {
+        success: false,
+        error: error.response?.data?.message || 'Failed to upload QR code'
+      };
+    }
+  }
 }
 
 export default new ClinicSettingsService();

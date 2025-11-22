@@ -23,6 +23,8 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { employeeService } from '@/features/admin';
 import NotificationBell from './NotificationBell';
 import LanguageSwitcher from './LanguageSwitcher';
+import clinicSettingsService from '@/services/clinicSettingsService';
+import { APP_CONFIG } from '@/constants/app';
 import logger from '@/utils/logger';
 import {
   DropdownMenu,
@@ -39,6 +41,10 @@ const Navbar = () => {
   const location = useLocation();
   // const [showNotifications, setShowNotifications] = useState(false); // TODO: Implement notifications
   const [userDetails, setUserDetails] = useState(null);
+  const [clinicSettings, setClinicSettings] = useState({
+    clinic_name: null,
+    clinic_logo_url: null,
+  });
 
   useEffect(() => {
     const loadUserDetails = async () => {
@@ -74,6 +80,32 @@ const Navbar = () => {
 
     loadUserDetails();
   }, [user]);
+
+  useEffect(() => {
+    const loadClinicSettings = async () => {
+      try {
+        const result = await clinicSettingsService.getSettings();
+        if (result.success && result.data) {
+          const data = result.data.data || result.data;
+          logger.debug('Loaded clinic settings:', { 
+            clinic_name: data.clinic_name, 
+            clinic_logo_url: data.clinic_logo_url 
+          });
+          setClinicSettings({
+            clinic_name: data.clinic_name || null,
+            clinic_logo_url: data.clinic_logo_url || null,
+          });
+        } else {
+          logger.warn('Failed to load clinic settings:', result.error);
+        }
+      } catch (error) {
+        logger.error('Error loading clinic settings:', error);
+        // Use defaults if error
+      }
+    };
+
+    loadClinicSettings();
+  }, []);
 
   const handleLogout = () => {
     logout();
@@ -247,17 +279,59 @@ const Navbar = () => {
           whileTap={{ scale: 0.95 }}
         >
           <motion.div
-            className="shrink-0 rounded-lg bg-primary p-2 transition-all hover:shadow-lg sm:rounded-xl sm:p-3"
+            className="shrink-0 rounded-lg bg-primary p-2 transition-all hover:shadow-lg sm:rounded-xl sm:p-3 flex items-center justify-center"
             whileHover={{ rotate: 5, scale: 1.1 }}
             transition={{ type: 'spring', stiffness: 400, damping: 10 }}
           >
-            <Heart className="h-5 w-5 text-primary-foreground sm:h-6 sm:w-6 md:h-7 md:w-7" />
+            {clinicSettings.clinic_logo_url ? (
+              <img
+                src={clinicSettings.clinic_logo_url}
+                alt="Clinic Logo"
+                className="h-5 w-5 object-contain sm:h-6 sm:w-6 md:h-7 md:w-7 max-w-full max-h-full"
+                style={{ display: 'block' }}
+                onError={(e) => {
+                  // Log error for debugging
+                  logger.error('Failed to load clinic logo:', clinicSettings.clinic_logo_url);
+                  // Hide image on error and show Heart icon as fallback
+                  e.target.style.display = 'none';
+                  const heartIcon = e.target.nextElementSibling;
+                  if (heartIcon) {
+                    heartIcon.classList.remove('hidden');
+                  }
+                }}
+                onLoad={() => {
+                  logger.debug('Clinic logo loaded successfully:', clinicSettings.clinic_logo_url);
+                }}
+              />
+            ) : null}
+            <Heart
+              className={`h-5 w-5 text-primary-foreground sm:h-6 sm:w-6 md:h-7 md:w-7 ${
+                clinicSettings.clinic_logo_url ? 'hidden' : ''
+              }`}
+            />
           </motion.div>
           <div className="hidden sm:block">
-            <h1 className="text-lg font-bold tracking-tight text-foreground sm:text-xl md:text-2xl">
-              RealCIS
-            </h1>
-            <p className="text-xs text-muted-foreground sm:text-sm">Healthcare System</p>
+            {clinicSettings.clinic_name ? (
+              <>
+                <h1 className="text-lg font-bold tracking-tight text-foreground sm:text-xl md:text-2xl">
+                  {clinicSettings.clinic_name}
+                </h1>
+                {APP_CONFIG.SHOW_SYSTEM_NAME_IN_NAVBAR && (
+                  <p className="text-xs text-muted-foreground sm:text-sm">
+                    {APP_CONFIG.SYSTEM_NAME} {APP_CONFIG.SYSTEM_DESCRIPTION}
+                  </p>
+                )}
+              </>
+            ) : (
+              <>
+                <h1 className="text-lg font-bold tracking-tight text-foreground sm:text-xl md:text-2xl">
+                  {APP_CONFIG.SYSTEM_NAME}
+                </h1>
+                <p className="text-xs text-muted-foreground sm:text-sm">
+                  {APP_CONFIG.SYSTEM_DESCRIPTION}
+                </p>
+              </>
+            )}
           </div>
         </motion.div>
 

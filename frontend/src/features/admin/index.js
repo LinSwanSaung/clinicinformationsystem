@@ -6,6 +6,7 @@ export { default as PatientAccountRegistration } from './pages/PatientAccountReg
 export { default as AuditLogs } from './pages/AuditLogs';
 export { default as PendingItems } from './pages/PendingItems';
 export { default as PaymentTransactions } from './pages/PaymentTransactions';
+export { default as ClinicSettings } from './pages/ClinicSettings';
 
 // Components
 export { default as EmployeeCard } from './components/EmployeeCard';

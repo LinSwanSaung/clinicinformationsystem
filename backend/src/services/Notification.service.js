@@ -2,9 +2,12 @@ import NotificationModel from '../models/Notification.model.js';
 import {
   createNotification as repoCreateNotification,
   getReceptionistIds,
+  getCashierIds,
+  getDoctorId,
+  getPortalUserIdByPatientId as repoGetPortalUserIdByPatientId,
+  getUserDetailsForEmail,
 } from './repositories/NotificationsRepo.js';
 import logger from '../config/logger.js';
-import { supabase } from '../config/database.js';
 import EmailService from './Email.service.js';
 import { renderNotificationEmail } from '../utils/emailTemplates.js';
 
@@ -17,15 +20,7 @@ class NotificationService {
    */
   async getPortalUserIdByPatientId(patientId) {
     try {
-      const { data, error } = await supabase
-        .from('users')
-        .select('id')
-        .eq('patient_id', patientId)
-        .eq('is_active', true)
-        .limit(1)
-        .maybeSingle();
-      if (error) throw error;
-      return data?.id || null;
+      return await repoGetPortalUserIdByPatientId(patientId);
     } catch (err) {
       logger.warn('[NotificationService] Failed to resolve user by patient_id:', err.message);
       return null;
@@ -68,11 +63,8 @@ class NotificationService {
       const targetIds = (targetUsers || []).filter(Boolean);
       if (targetIds.length > 1) {
         try {
-          const { data: users } = await supabase
-            .from('users')
-            .select('id, email, first_name, last_name')
-            .in('id', targetIds);
-          emailLookup = new Map((users || []).map((u) => [u.id, u]));
+          const users = await getUserDetailsForEmail(targetIds);
+          emailLookup = new Map(users.map((u) => [u.id, u]));
         } catch (e) {
           logger.warn('[NotificationService] Failed batch user email lookup:', e.message);
         }
@@ -95,12 +87,8 @@ class NotificationService {
         try {
           let user = emailLookup ? emailLookup.get(uid) : null;
           if (!user) {
-            const resp = await supabase
-              .from('users')
-              .select('email, first_name, last_name')
-              .eq('id', uid)
-              .maybeSingle();
-            user = resp?.data;
+            const users = await getUserDetailsForEmail(uid);
+            user = users[0] || null;
           }
           if (user?.email) {
             const subject = title || 'Notification';
@@ -146,6 +134,57 @@ class NotificationService {
     } catch (error) {
       logger.error('[NotificationService] Error notifying receptionists:', error);
       throw new Error(`Failed to notify receptionists: ${error.message}`);
+    }
+  }
+
+  /**
+   * Notify all cashiers
+   */
+  async notifyCashiers({ title, message, type = 'info', relatedEntityType, relatedEntityId }) {
+    try {
+      const cashierIds = await getCashierIds();
+
+      if (cashierIds.length === 0) {
+        return [];
+      }
+
+      return await this.createNotification({
+        userIds: cashierIds,
+        title,
+        message,
+        type,
+        relatedEntityType,
+        relatedEntityId,
+      });
+    } catch (error) {
+      logger.error('[NotificationService] Error notifying cashiers:', error);
+      throw new Error(`Failed to notify cashiers: ${error.message}`);
+    }
+  }
+
+  /**
+   * Notify a specific doctor
+   */
+  async notifyDoctor(doctorId, { title, message, type = 'info', relatedEntityType, relatedEntityId }) {
+    try {
+      const doctorUserId = await getDoctorId(doctorId);
+      
+      if (!doctorUserId) {
+        logger.warn(`[NotificationService] Doctor ${doctorId} not found or inactive`);
+        return null;
+      }
+
+      return await this.createNotification({
+        userId: doctorUserId,
+        title,
+        message,
+        type,
+        relatedEntityType,
+        relatedEntityId,
+      });
+    } catch (error) {
+      logger.error('[NotificationService] Error notifying doctor:', error);
+      throw new Error(`Failed to notify doctor: ${error.message}`);
     }
   }
 

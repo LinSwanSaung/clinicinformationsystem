@@ -1,6 +1,7 @@
 import cron from 'node-cron';
 import AppointmentModel from '../models/Appointment.model.js';
 import NotificationService from '../services/Notification.service.js';
+import clinicSettingsService from '../services/ClinicSettings.service.js';
 import logger from '../config/logger.js';
 
 /**
@@ -23,6 +24,8 @@ export function startAppointmentReminders() {
       });
 
       const now = new Date();
+      // Get late threshold from clinic settings for arrival time recommendation
+      const lateThreshold = await clinicSettingsService.getLateThreshold();
       for (const appt of appointments) {
         if (!appt.appointment_time) continue;
         const [h, m] = appt.appointment_time.split(':').map((n) => parseInt(n, 10));
@@ -33,7 +36,7 @@ export function startAppointmentReminders() {
           try {
             await NotificationService.notifyPatientByPatientId(appt.patient_id, {
               title: 'Appointment Reminder',
-              message: `Reminder: Your appointment is in 1 hour (at ${appt.appointment_time}). Please arrive 15 minutes early.`,
+              message: `Reminder: Your appointment is in 1 hour (at ${appt.appointment_time}). Please arrive ${lateThreshold} minutes early.`,
               type: 'info',
               relatedEntityType: 'appointment',
               relatedEntityId: appt.id,

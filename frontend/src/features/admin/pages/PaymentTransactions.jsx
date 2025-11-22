@@ -14,6 +14,7 @@ import { DollarSign, Eye, Filter } from 'lucide-react';
 import InvoiceDetails from '@/features/billing/components/InvoiceDetails.jsx';
 import api from '@/services/api';
 import { DataTable, PdfDownloadButton } from '@/components/library';
+import { formatCurrencySync } from '@/utils/currency';
 import logger from '@/utils/logger';
 
 const PaymentTransactions = () => {
@@ -234,7 +235,7 @@ const PaymentTransactions = () => {
                 label: 'Amount',
                 render: (_, row) => (
                   <span className="font-semibold text-gray-900">
-                    ${parseFloat(row.amount).toFixed(2)}
+                    {formatCurrencySync(parseFloat(row.amount))}
                   </span>
                 ),
               },

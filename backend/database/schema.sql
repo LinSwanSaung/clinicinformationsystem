@@ -390,6 +390,14 @@ CREATE TABLE IF NOT EXISTS clinic_settings (
     key TEXT PRIMARY KEY,
     late_threshold_minutes INTEGER NOT NULL DEFAULT 7,     -- minutes before marking late/no-show
     consult_expected_minutes INTEGER NOT NULL DEFAULT 15,  -- target consult length in minutes
+    clinic_name TEXT,                                      -- clinic name
+    clinic_logo_url TEXT,                                  -- URL to clinic logo (Supabase Storage public URL)
+    clinic_phone TEXT,                                     -- clinic phone number
+    clinic_email TEXT,                                     -- clinic email address
+    clinic_address TEXT,                                   -- clinic physical address
+    currency_code TEXT DEFAULT 'USD',                      -- ISO currency code (USD, MMK, etc.)
+    currency_symbol TEXT DEFAULT '$',                      -- currency symbol ($, K, etc.)
+    payment_qr_code_url TEXT,                              -- URL to payment QR code image (Supabase Storage public URL)
     updated_at TIMESTAMPTZ DEFAULT NOW()
 );
 
@@ -525,6 +533,111 @@ END;
 $$ language 'plpgsql';
 
 -- Auto-generate queue token numbers
+-- ===============================================
+-- Atomic function to start consultation with advisory lock
+-- Prevents race conditions when multiple requests try to start consultations
+-- for the same doctor simultaneously
+-- ===============================================
+CREATE OR REPLACE FUNCTION start_consultation_atomic(
+  p_token_id UUID,
+  p_doctor_id UUID
+)
+RETURNS TABLE (
+  success BOOLEAN,
+  message TEXT,
+  token_data JSONB
+) 
+LANGUAGE plpgsql
+AS $$
+DECLARE
+  v_token_record RECORD;
+  v_existing_serving_token RECORD;
+  v_updated_token RECORD;
+  v_lock_key BIGINT;
+BEGIN
+  -- Generate a unique lock key based on doctor_id
+  -- Using pg_advisory_lock with doctor_id hash to ensure only one consultation
+  -- can be started per doctor at a time
+  -- Use hashtext to convert UUID to bigint for advisory lock
+  v_lock_key := abs(hashtext(p_doctor_id::TEXT))::bigint;
+  
+  -- Acquire advisory lock (blocks until lock is available)
+  PERFORM pg_advisory_xact_lock(v_lock_key);
+  
+  -- Now we have exclusive access to this doctor's consultation state
+  -- Check if token exists and is in 'called' status
+  SELECT * INTO v_token_record
+  FROM queue_tokens
+  WHERE id = p_token_id;
+  
+  IF NOT FOUND THEN
+    RETURN QUERY SELECT FALSE, 'Token not found'::TEXT, NULL::JSONB;
+    RETURN;
+  END IF;
+  
+  IF v_token_record.status != 'called' THEN
+    RETURN QUERY SELECT 
+      FALSE, 
+      format('Token status is ''%s'' but should be ''called''', v_token_record.status)::TEXT,
+      NULL::JSONB;
+    RETURN;
+  END IF;
+  
+  -- Check if doctor already has a serving token (with date filter for today)
+  SELECT * INTO v_existing_serving_token
+  FROM queue_tokens
+  WHERE doctor_id = p_doctor_id
+    AND status = 'serving'
+    AND issued_date = CURRENT_DATE
+  LIMIT 1;
+  
+  IF FOUND THEN
+    RETURN QUERY SELECT 
+      FALSE,
+      format('Doctor already has a patient in consultation (Token #%s)', v_existing_serving_token.token_number)::TEXT,
+      NULL::JSONB;
+    RETURN;
+  END IF;
+  
+  -- Update token status to 'serving' atomically
+  UPDATE queue_tokens
+  SET 
+    status = 'serving',
+    served_at = NOW(),
+    in_consult_at = NOW(),
+    updated_at = NOW()
+  WHERE id = p_token_id
+    AND status = 'called'  -- Double-check status hasn't changed
+  RETURNING * INTO v_updated_token;
+  
+  IF NOT FOUND THEN
+    -- Token status changed between check and update (shouldn't happen with lock, but safety check)
+    RETURN QUERY SELECT FALSE, 'Token status changed during update'::TEXT, NULL::JSONB;
+    RETURN;
+  END IF;
+  
+  -- Success - return updated token data
+  RETURN QUERY SELECT 
+    TRUE,
+    format('Consultation started successfully (Token #%s)', v_updated_token.token_number)::TEXT,
+    to_jsonb(v_updated_token);
+    
+  -- Lock is automatically released when transaction ends
+END;
+$$;
+
+-- Grant execute permission
+GRANT EXECUTE ON FUNCTION start_consultation_atomic(UUID, UUID) TO authenticated;
+GRANT EXECUTE ON FUNCTION start_consultation_atomic(UUID, UUID) TO service_role;
+
+-- Add comment
+COMMENT ON FUNCTION start_consultation_atomic IS 
+  'Atomically starts a consultation using advisory locks to prevent race conditions. 
+   Ensures only one consultation can be started per doctor at a time.';
+
+-- ===============================================
+-- Generate token number for queue
+-- ===============================================
 CREATE OR REPLACE FUNCTION generate_token_number()
 RETURNS TRIGGER AS $$
 DECLARE
@@ -542,8 +655,146 @@ BEGIN
 END;
 $$ LANGUAGE plpgsql;
 
--- Auto-calculate queue position
-CREATE OR REPLACE FUNCTION calculate_queue_position()
+-- ===============================================
+-- Atomic function to record payment with advisory lock
+-- Prevents race conditions when multiple payments are recorded simultaneously
+-- for the same invoice
+-- ===============================================
+CREATE OR REPLACE FUNCTION record_payment_atomic(
+  p_invoice_id UUID,
+  p_amount DECIMAL(10,2),
+  p_payment_method VARCHAR(50),
+  p_payment_reference TEXT,
+  p_payment_notes TEXT,
+  p_received_by UUID
+)
+RETURNS TABLE (
+  success BOOLEAN,
+  message TEXT,
+  payment_data JSONB,
+  invoice_data JSONB
+) 
+LANGUAGE plpgsql
+AS $$
+DECLARE
+  v_invoice_record RECORD;
+  v_payment_record RECORD;
+  v_lock_key BIGINT;
+  v_total_paid DECIMAL(10,2);
+  v_new_balance DECIMAL(10,2);
+  v_subtotal DECIMAL(10,2);
+  v_discount DECIMAL(10,2);
+  v_tax DECIMAL(10,2);
+  v_total_amount DECIMAL(10,2);
+BEGIN
+  -- Generate a unique lock key based on invoice_id
+  -- Using pg_advisory_lock to ensure only one payment can be recorded
+  -- per invoice at a time
+  v_lock_key := abs(hashtext(p_invoice_id::TEXT))::bigint;
+  
+  -- Acquire advisory lock (blocks until lock is available)
+  PERFORM pg_advisory_xact_lock(v_lock_key);
+  
+  -- Now we have exclusive access to this invoice
+  -- Get current invoice state
+  SELECT * INTO v_invoice_record
+  FROM invoices
+  WHERE id = p_invoice_id;
+  
+  IF NOT FOUND THEN
+    RETURN QUERY SELECT FALSE, 'Invoice not found'::TEXT, NULL::JSONB, NULL::JSONB;
+    RETURN;
+  END IF;
+  
+  -- Validate amount
+  IF p_amount <= 0 THEN
+    RETURN QUERY SELECT FALSE, 'Payment amount must be greater than 0'::TEXT, NULL::JSONB, NULL::JSONB;
+    RETURN;
+  END IF;
+  
+  -- Calculate invoice totals from items (atomic calculation)
+  SELECT COALESCE(SUM(total_price), 0) INTO v_subtotal
+  FROM invoice_items
+  WHERE invoice_id = p_invoice_id;
+  
+  v_discount := COALESCE(v_invoice_record.discount_amount, 0);
+  v_tax := COALESCE(v_invoice_record.tax_amount, 0);
+  v_total_amount := v_subtotal - v_discount + v_tax;
+  
+  -- Get current total paid (sum of all payment transactions)
+  SELECT COALESCE(SUM(amount), 0) INTO v_total_paid
+  FROM payment_transactions
+  WHERE invoice_id = p_invoice_id;
+  
+  -- Create payment transaction
+  INSERT INTO payment_transactions (
+    invoice_id,
+    amount,
+    payment_method,
+    payment_reference,
+    payment_notes,
+    received_by
+  )
+  VALUES (
+    p_invoice_id,
+    p_amount,
+    p_payment_method,
+    p_payment_reference,
+    p_payment_notes,
+    p_received_by
+  )
+  RETURNING * INTO v_payment_record;
+  
+  -- Recalculate total paid (including new payment)
+  v_total_paid := v_total_paid + p_amount;
+  v_new_balance := v_total_amount - v_total_paid;
+  
+  -- Update invoice with new totals and status
+  UPDATE invoices
+  SET 
+    subtotal = v_subtotal,
+    total_amount = v_total_amount,
+    amount_paid = v_total_paid,
+    balance_due = v_new_balance,
+    status = CASE 
+      WHEN v_new_balance <= 0 THEN 'paid'
+      WHEN v_total_paid > 0 THEN 'partial_paid'
+      ELSE 'pending'
+    END,
+    -- Set completed_at and completed_by when invoice becomes fully paid
+    -- This ensures invoice history shows correct dates instead of "N/A at N/A"
+    completed_at = CASE 
+      WHEN v_new_balance <= 0 AND completed_at IS NULL THEN NOW()
+      ELSE completed_at
+    END,
+    completed_by = CASE 
+      WHEN v_new_balance <= 0 AND completed_by IS NULL THEN p_received_by
+      ELSE completed_by
+    END,
+    updated_at = NOW()
+  WHERE id = p_invoice_id
+  RETURNING * INTO v_invoice_record;
+  
+  -- Success - return payment and updated invoice data
+  RETURN QUERY SELECT 
+    TRUE,
+    format('Payment of %s recorded successfully', p_amount)::TEXT,
+    to_jsonb(v_payment_record),
+    to_jsonb(v_invoice_record);
+    
+  -- Lock is automatically released when transaction ends
+END;
+$$;
+
+-- Grant execute permission
+GRANT EXECUTE ON FUNCTION record_payment_atomic(UUID, DECIMAL, VARCHAR, TEXT, TEXT, UUID) TO authenticated;
+GRANT EXECUTE ON FUNCTION record_payment_atomic(UUID, DECIMAL, VARCHAR, TEXT, TEXT, UUID) TO service_role;
+
+-- Add comment
+COMMENT ON FUNCTION record_payment_atomic IS 
+  'Atomically records a payment and recalculates invoice totals using advisory locks. 
+   Prevents race conditions when multiple payments are recorded simultaneously.';
+
 -- Function to check doctor availability
 CREATE OR REPLACE FUNCTION is_doctor_available(
     p_doctor_id UUID,
@@ -1879,7 +2130,7 @@ CREATE TABLE IF NOT EXISTS services (
 CREATE TABLE IF NOT EXISTS invoices (
     id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
     invoice_number VARCHAR(50) UNIQUE NOT NULL,
-    visit_id UUID NOT NULL REFERENCES visits(id) ON DELETE RESTRICT,
+    visit_id UUID NOT NULL UNIQUE REFERENCES visits(id) ON DELETE RESTRICT,
     patient_id UUID NOT NULL REFERENCES patients(id) ON DELETE CASCADE,
     
     -- Financial details
@@ -1917,7 +2168,7 @@ CREATE TABLE IF NOT EXISTS invoices (
     resolved_reason TEXT,
     
     CONSTRAINT valid_invoice_status CHECK (status IN ('draft', 'pending', 'partial_paid', 'paid', 'cancelled', 'refunded')),
-    CONSTRAINT valid_payment_method CHECK (payment_method IN ('cash', 'card', 'insurance', 'mobile_payment', 'mixed'))
+    CONSTRAINT valid_payment_method CHECK (payment_method IN ('cash', 'online_payment', 'mixed'))
 );
 
 -- ===============================================
@@ -1970,7 +2221,7 @@ CREATE TABLE IF NOT EXISTS payment_transactions (
     created_at TIMESTAMPTZ DEFAULT NOW(),
     updated_at TIMESTAMPTZ DEFAULT NOW(),
     
-    CONSTRAINT valid_payment_method_tx CHECK (payment_method IN ('cash', 'card', 'insurance', 'mobile_payment'))
+    CONSTRAINT valid_payment_method_tx CHECK (payment_method IN ('cash', 'online_payment'))
 );
 
 -- ===============================================
@@ -1982,7 +2233,8 @@ CREATE TABLE IF NOT EXISTS payment_transactions (
 -- ===============================================
 -- INDEXES for Performance
 -- ===============================================
-CREATE INDEX idx_invoices_visit_id ON invoices(visit_id);
+-- Unique index: One invoice per visit (prevents duplicate invoices)
+CREATE UNIQUE INDEX IF NOT EXISTS uq_invoices_one_per_visit ON invoices(visit_id);
 CREATE INDEX idx_queue_tokens_visit_id ON queue_tokens(visit_id);
 CREATE INDEX idx_invoices_patient_id ON invoices(patient_id);
 CREATE INDEX idx_invoices_status ON invoices(status);
@@ -2002,22 +2254,40 @@ CREATE TRIGGER update_invoices_updated_at BEFORE UPDATE ON invoices
     FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
 
 -- ===============================================
--- FUNCTION: Auto-generate Invoice Number
+-- FUNCTION: Auto-generate Invoice Number (Atomic)
+-- Uses advisory lock to prevent race conditions
 -- ===============================================
 CREATE OR REPLACE FUNCTION generate_invoice_number()
 RETURNS VARCHAR AS $$
 DECLARE
     new_number VARCHAR;
     sequence_num INTEGER;
+    lock_key BIGINT;
+    date_prefix VARCHAR;
 BEGIN
-    -- Get the next sequence number for today
-    SELECT COUNT(*) + 1 INTO sequence_num
+    -- Generate date prefix: INV-YYYYMMDD
+    date_prefix := 'INV-' || TO_CHAR(CURRENT_DATE, 'YYYYMMDD');
+    
+    -- Generate lock key based on current date (same date = same lock)
+    lock_key := abs(hashtext(date_prefix))::bigint;
+    
+    -- Acquire advisory lock to prevent concurrent invoice number generation
+    -- This ensures only one invoice number is generated at a time for the same date
+    PERFORM pg_advisory_xact_lock(lock_key);
+    
+    -- Get the highest sequence number for today (atomic with lock)
+    -- Extract the numeric part after the last dash
+    SELECT COALESCE(MAX(
+        CAST(SUBSTRING(invoice_number FROM '(\d+)$') AS INTEGER)
+    ), 0) + 1 INTO sequence_num
     FROM invoices
-    WHERE DATE(created_at) = CURRENT_DATE;
+    WHERE DATE(created_at) = CURRENT_DATE
+    AND invoice_number LIKE date_prefix || '-%';
     
     -- Format: INV-YYYYMMDD-0001
-    new_number := 'INV-' || TO_CHAR(CURRENT_DATE, 'YYYYMMDD') || '-' || LPAD(sequence_num::TEXT, 4, '0');
+    new_number := date_prefix || '-' || LPAD(sequence_num::TEXT, 4, '0');
     
+    -- Lock is automatically released when transaction ends
     RETURN new_number;
 END;
 $$ LANGUAGE plpgsql;

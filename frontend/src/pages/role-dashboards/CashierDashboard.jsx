@@ -3,6 +3,7 @@ import { useState, useEffect, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useFeedback } from '@/contexts/FeedbackContext';
+import { formatCurrencySync, getCurrencySymbol, refreshCurrencyCache } from '@/utils/currency';
 import {
   Search,
   Filter,
@@ -70,6 +71,7 @@ import api from '@/services/api';
 import { PaymentDetailModal } from '@/components/library';
 import logger from '@/utils/logger';
 import DispenseHistoryTab from '@/features/dispenses/components/DispenseHistoryTab';
+import clinicSettingsService from '@/services/clinicSettingsService';
 
 // Animation variants
 const pageVariants = {
@@ -185,6 +187,9 @@ const CashierDashboard = () => {
   const [notes, setNotes] = useState('');
   const [showPaymentDialog, setShowPaymentDialog] = useState(false);
   const [isProcessing, setIsProcessing] = useState(false);
+  const [showQRCode, setShowQRCode] = useState(false);
+  const [qrScannedConfirmed, setQrScannedConfirmed] = useState(false);
+  const [clinicSettings, setClinicSettings] = useState(null);
 
   // Partial payment state
   const [isPartialPayment, setIsPartialPayment] = useState(false);
@@ -218,6 +223,25 @@ const CashierDashboard = () => {
       handleAutoRefresh();
     }, 60000);
     return () => clearInterval(interval);
+  }, []);
+
+  // Load clinic settings and refresh currency cache on mount
+  useEffect(() => {
+    const loadClinicSettings = async () => {
+      try {
+        // Refresh currency cache first
+        await refreshCurrencyCache();
+        
+        const result = await clinicSettingsService.getSettings();
+        if (result.success && result.data) {
+          const data = result.data.data || result.data;
+          setClinicSettings(data);
+        }
+      } catch (error) {
+        logger.error('Failed to load clinic settings:', error);
+      }
+    };
+    loadClinicSettings();
   }, []);
 
   // Load invoice history when switching to history tab or when completed invoices data changes
@@ -273,135 +297,124 @@ const CashierDashboard = () => {
       
       const response = Array.isArray(completedInvoicesData) ? completedInvoicesData : [];
       
-      // Group invoices by patient and date to consolidate credit payments
-      const invoiceGroups = new Map();
+      // Show each invoice separately - each invoice is tied to its visit
+      // Don't consolidate invoices - each visit should have its own invoice entry
+      const invoiceHistory = [];
       
       response.forEach((invoice) => {
-        const patientId = invoice.patient_id;
-        const completedDate = invoice.completed_at 
-          ? new Date(invoice.completed_at).toDateString() 
-          : new Date(invoice.created_at).toDateString();
-        const key = `${patientId}-${completedDate}`;
+        // Calculate total paid amount for THIS invoice only
+        // Only count payments that were made directly to this invoice
+        const totalPaid = invoice.payment_transactions?.reduce(
+          (sum, payment) => {
+            // Only count payments made to this invoice (not payments that went to other invoices)
+            // Payments to other invoices have notes like "Paid with current visit invoice #..."
+            const paymentNotes = (payment.payment_notes || '').toLowerCase();
+            const isPaymentToOtherInvoice = paymentNotes.includes('paid with current visit') || 
+                                           paymentNotes.includes('previous invoice');
+            
+            // If this payment was made to another invoice, don't count it here
+            if (isPaymentToOtherInvoice) {
+              return sum;
+            }
+            
+            return sum + parseFloat(payment.amount || 0);
+          },
+          0
+        ) || 0;
         
-        // Check if this invoice has credit payment (negative balance or notes mentioning credit)
-        const hasCreditPayment = invoice.payment_transactions?.some(
-          (payment) => 
-            parseFloat(payment.amount) < 0 || 
-            payment.notes?.toLowerCase().includes('credit') ||
-            payment.notes?.toLowerCase().includes('due credit')
-        ) || parseFloat(invoice.balance || 0) < 0;
+        // Calculate balance due for this invoice
+        const balanceDue = parseFloat(invoice.balance_due || 0);
         
-        // Check if payment notes mention paying off previous invoices
-        const paysOffPrevious = invoice.payment_transactions?.some(
-          (payment) => 
-            payment.notes?.toLowerCase().includes('paid with current visit') ||
-            payment.notes?.toLowerCase().includes('previous invoice')
-        );
+        // Check if this invoice has payments that mention paying off previous invoices
+        // This happens when outstanding balance is paid from a later visit
+        const hasOutstandingBalancePayment = invoice.payment_transactions?.some(
+          (payment) => {
+            const notes = (payment.payment_notes || '').toLowerCase();
+            return notes.includes('paid with current visit') || notes.includes('previous invoice');
+          }
+        ) || false;
         
-        if (!invoiceGroups.has(key)) {
-          invoiceGroups.set(key, []);
-        }
+        // Find payments on OTHER invoices that mention this invoice's number
+        // This happens when this invoice's outstanding balance was paid from a later visit
+        // The payment note will say "Paid with current visit invoice #THIS_INVOICE_NUMBER"
+        let outstandingBalancePaidFromLater = 0;
+        const thisInvoiceNumber = invoice.invoice_number || invoice.id;
+        response.forEach((otherInvoice) => {
+          if (otherInvoice.id !== invoice.id && otherInvoice.payment_transactions) {
+            otherInvoice.payment_transactions.forEach((payment) => {
+              const notes = (payment.payment_notes || '').toLowerCase();
+              // Check if payment note mentions this invoice number
+              if (notes.includes(`invoice #${thisInvoiceNumber.toLowerCase()}`) || 
+                  notes.includes(`invoice ${thisInvoiceNumber.toLowerCase()}`) ||
+                  notes.includes(`invoice#${thisInvoiceNumber.toLowerCase()}`)) {
+                outstandingBalancePaidFromLater += parseFloat(payment.amount || 0);
+              }
+            });
+          }
+        });
         
-        invoiceGroups.get(key).push({
-          invoice,
-          hasCreditPayment,
-          paysOffPrevious,
+        invoiceHistory.push({
+          id: invoice.invoice_number || invoice.id,
+          invoiceId: invoice.id,
+          visitId: invoice.visit_id,
+          patientName:
+            invoice.patients?.full_name ||
+            `${invoice.patients?.first_name || ''} ${invoice.patients?.last_name || ''}`.trim() ||
+            'Unknown Patient',
+          doctorName:
+            invoice.visits?.doctor?.full_name ||
+            `${invoice.visits?.doctor?.first_name || ''} ${invoice.visits?.doctor?.last_name || ''}`.trim() ||
+            'Unknown Doctor',
+          date: invoice.completed_at
+            ? new Date(invoice.completed_at).toLocaleDateString('en-US', {
+                year: 'numeric',
+                month: 'short',
+                day: 'numeric',
+              })
+            : invoice.visits?.visit_date
+            ? new Date(invoice.visits.visit_date).toLocaleDateString('en-US', {
+                year: 'numeric',
+                month: 'short',
+                day: 'numeric',
+              })
+            : invoice.created_at
+            ? new Date(invoice.created_at).toLocaleDateString('en-US', {
+                year: 'numeric',
+                month: 'short',
+                day: 'numeric',
+              })
+            : 'N/A',
+          time: invoice.completed_at
+            ? new Date(invoice.completed_at).toLocaleTimeString('en-US', {
+                hour: 'numeric',
+                minute: '2-digit',
+                hour12: true,
+              })
+            : invoice.created_at
+            ? new Date(invoice.created_at).toLocaleTimeString('en-US', {
+                hour: 'numeric',
+                minute: '2-digit',
+                hour12: true,
+              })
+            : 'N/A',
+          totalAmount: parseFloat(invoice.total_amount || 0),
+          amountPaid: totalPaid,
+          balanceDue: balanceDue > 0 ? balanceDue : 0,
+          status: invoice.status,
+          paymentMethod: invoice.payment_transactions?.find(p => {
+            const notes = (p.payment_notes || '').toLowerCase();
+            return !notes.includes('paid with current visit') && !notes.includes('previous invoice');
+          })?.payment_method || invoice.payment_transactions?.[0]?.payment_method || 'N/A',
+          processedBy:
+            invoice.completed_by_user?.full_name ||
+            `${invoice.completed_by_user?.first_name || ''} ${invoice.completed_by_user?.last_name || ''}`.trim() ||
+            'Unknown',
+          outstandingBalancePaidFromLater: outstandingBalancePaidFromLater > 0 ? outstandingBalancePaidFromLater : null,
+          rawData: invoice,
         });
       });
       
-      // Consolidate invoices in each group
-      const consolidatedInvoices = [];
-      
-      invoiceGroups.forEach((group) => {
-        // If group has only one invoice, add it as-is
-        if (group.length === 1) {
-          const { invoice } = group[0];
-          consolidatedInvoices.push({
-            id: invoice.invoice_number,
-            patientName:
-              invoice.patients?.full_name ||
-              `${invoice.patients?.first_name || ''} ${invoice.patients?.last_name || ''}`.trim() ||
-              'Unknown Patient',
-            doctorName:
-              invoice.visits?.doctor?.full_name ||
-              `${invoice.visits?.doctor?.first_name || ''} ${invoice.visits?.doctor?.last_name || ''}`.trim() ||
-              'Unknown Doctor',
-            date: invoice.completed_at
-              ? new Date(invoice.completed_at).toLocaleDateString('en-US', {
-                  year: 'numeric',
-                  month: 'short',
-                  day: 'numeric',
-                })
-              : 'N/A',
-            time: invoice.completed_at
-              ? new Date(invoice.completed_at).toLocaleTimeString('en-US', {
-                  hour: 'numeric',
-                  minute: '2-digit',
-                  hour12: true,
-                })
-              : 'N/A',
-            totalAmount: parseFloat(invoice.total_amount || 0),
-            status: invoice.status,
-            paymentMethod: invoice.payment_transactions?.[0]?.payment_method || 'N/A',
-            processedBy:
-              invoice.completed_by_user?.full_name ||
-              `${invoice.completed_by_user?.first_name || ''} ${invoice.completed_by_user?.last_name || ''}`.trim() ||
-              'Unknown',
-            hasCreditPayment: group[0].hasCreditPayment,
-            rawData: invoice,
-          });
-        } else {
-          // Multiple invoices on same day - consolidate if one pays off previous
-          const mainInvoice = group.find((g) => !g.paysOffPrevious) || group[0];
-          const creditInvoices = group.filter((g) => g.hasCreditPayment || g.paysOffPrevious);
-          
-          // Calculate total credit amount
-          const creditAmount = creditInvoices.reduce((sum, g) => {
-            const creditPayments = g.invoice.payment_transactions?.filter(
-              (p) => parseFloat(p.amount) < 0 || p.notes?.toLowerCase().includes('credit')
-            ) || [];
-            return sum + Math.abs(creditPayments.reduce((s, p) => s + parseFloat(p.amount || 0), 0));
-          }, 0);
-          
-          const { invoice } = mainInvoice;
-          consolidatedInvoices.push({
-            id: invoice.invoice_number,
-            patientName:
-              invoice.patients?.full_name ||
-              `${invoice.patients?.first_name || ''} ${invoice.patients?.last_name || ''}`.trim() ||
-              'Unknown Patient',
-            doctorName:
-              invoice.visits?.doctor?.full_name ||
-              `${invoice.visits?.doctor?.first_name || ''} ${invoice.visits?.doctor?.last_name || ''}`.trim() ||
-              'Unknown Doctor',
-            date: invoice.completed_at
-              ? new Date(invoice.completed_at).toLocaleDateString('en-US', {
-                  year: 'numeric',
-                  month: 'short',
-                  day: 'numeric',
-                })
-              : 'N/A',
-            time: invoice.completed_at
-              ? new Date(invoice.completed_at).toLocaleTimeString('en-US', {
-                  hour: 'numeric',
-                  minute: '2-digit',
-                  hour12: true,
-                })
-              : 'N/A',
-            totalAmount: parseFloat(invoice.total_amount || 0),
-            status: invoice.status,
-            paymentMethod: invoice.payment_transactions?.[0]?.payment_method || 'N/A',
-            processedBy:
-              invoice.completed_by_user?.full_name ||
-              `${invoice.completed_by_user?.first_name || ''} ${invoice.completed_by_user?.last_name || ''}`.trim() ||
-              'Unknown',
-            hasCreditPayment: creditAmount > 0,
-            creditAmount: creditAmount > 0 ? creditAmount : null,
-            rawData: invoice, // Main invoice data
-            consolidatedInvoices: creditInvoices.map((g) => g.invoice), // Store credit invoices for details
-          });
-        }
-      });
+      const consolidatedInvoices = invoiceHistory;
       
       // Sort by date (newest first)
       consolidatedInvoices.sort((a, b) => {
@@ -578,6 +591,13 @@ const CashierDashboard = () => {
     setDiscountAmount(0);
     setPaymentMethod('cash');
     setNotes('');
+    // Reset partial payment state when opening invoice
+    setIsPartialPayment(false);
+    setPartialAmount('');
+    setHoldReason('');
+    setPaymentDueDate('');
+    setShowQRCode(false);
+    setQrScannedConfirmed(false);
 
     // Check for outstanding balance and invoice limit
     if (invoice.patient_id) {
@@ -639,6 +659,17 @@ const CashierDashboard = () => {
     setIsEditingService(null);
     setShowAddServiceDialog(false);
     setNewService({ name: '', price: '', description: '' });
+    // Reset payment-related state
+    setPaymentMethod('cash');
+    setShowQRCode(false);
+    setQrScannedConfirmed(false);
+    setIsPartialPayment(false);
+    setPartialAmount('');
+    setHoldReason('');
+    setPaymentDueDate('');
+    setNotes('');
+    setDiscountPercent(0);
+    setDiscountAmount(0);
   };
 
   const handleMedicationAction = (medicationId, action) => {
@@ -850,10 +881,6 @@ const CashierDashboard = () => {
     setShowPaymentDialog(true);
   };
 
-  const handleDeclineInvoice = () => {
-    handleCloseInvoiceDetail();
-  };
-
   const handleLoadPrescriptions = async () => {
     if (!selectedInvoice) {
       return;
@@ -896,8 +923,62 @@ const CashierDashboard = () => {
     }
   };
 
+  // Browser refresh handling for payment processing
+  useEffect(() => {
+    const checkPendingPayment = async () => {
+      const pendingPayment = sessionStorage.getItem('pendingPayment');
+      if (pendingPayment) {
+        try {
+          const paymentData = JSON.parse(pendingPayment);
+          const { invoiceId, timestamp } = paymentData;
+          
+          // Check if payment is still pending (within last 5 minutes)
+          const fiveMinutesAgo = Date.now() - 5 * 60 * 1000;
+          if (timestamp > fiveMinutesAgo) {
+            // Verify payment status from server
+            try {
+              const invoice = await invoiceService.getInvoiceById(invoiceId);
+              if (invoice && invoice.status === 'paid') {
+                // Payment was successful, clear pending state
+                sessionStorage.removeItem('pendingPayment');
+                showSuccess('Payment was completed successfully before page refresh.');
+                await refetchPending();
+                await refetchCompleted();
+              } else {
+                // Payment might have failed, show warning
+                showError('Payment processing was interrupted. Please verify payment status and retry if needed.');
+                sessionStorage.removeItem('pendingPayment');
+              }
+            } catch (error) {
+              logger.error('Error checking pending payment status:', error);
+              // Keep pending state, user can manually check
+            }
+          } else {
+            // Too old, clear it
+            sessionStorage.removeItem('pendingPayment');
+          }
+        } catch (error) {
+          logger.error('Error parsing pending payment data:', error);
+          sessionStorage.removeItem('pendingPayment');
+        }
+      }
+    };
+
+    checkPendingPayment();
+  }, []);
+
   const handleProcessPayment = async () => {
     setIsProcessing(true);
+    
+    // Save payment state to sessionStorage for browser refresh recovery
+    const paymentState = {
+      invoiceId: selectedInvoice?.id,
+      timestamp: Date.now(),
+      amount: isPartialPayment ? partialAmount : calculateTotals().total,
+      paymentMethod,
+    };
+    sessionStorage.setItem('pendingPayment', JSON.stringify(paymentState));
+    
     try {
       const totals = calculateTotals();
 
@@ -953,8 +1034,19 @@ const CashierDashboard = () => {
       }
 
       // Step 3: Record payment for current invoice (full or partial)
-      if (isPartialPayment && partialAmount && parseFloat(partialAmount) < totals.total) {
-        // Process partial payment
+      // Skip payment recording if invoice total is $0 (outstanding balance is already handled in Step 2)
+      if (totals.total === 0) {
+        // For $0 invoices, just complete the invoice without recording payment
+        // Outstanding balance payments were already processed in Step 2
+        await invoiceService.completeInvoice(selectedInvoice.id, currentUser?.id);
+
+        let successMsg = `Visit completed successfully (no charge). Invoice ${selectedInvoice.invoice_number || selectedInvoice.id} has been marked as paid.`;
+        if (addOutstandingToInvoice && outstandingBalance) {
+          successMsg += ` Also paid off ${outstandingBalance.invoiceCount} previous invoice(s) totaling ${formatCurrencySync(outstandingBalance.totalBalance)}.`;
+        }
+        showSuccess(successMsg);
+      } else if (isPartialPayment && partialAmount && parseFloat(partialAmount) < totals.total) {
+        // Process partial payment for non-zero invoices
         const paymentAmount = parseFloat(partialAmount);
         await invoiceService.recordPartialPayment(selectedInvoice.id, {
           amount: paymentAmount,
@@ -966,33 +1058,25 @@ const CashierDashboard = () => {
 
         const balanceDue = totals.total - paymentAmount;
 
-        let successMsg = `Partial payment of $${paymentAmount.toFixed(2)} recorded. Balance due: $${balanceDue.toFixed(2)}`;
+        let successMsg = `Partial payment of ${formatCurrencySync(paymentAmount)} recorded. Balance due: ${formatCurrencySync(balanceDue)}`;
         if (addOutstandingToInvoice && outstandingBalance) {
-          successMsg += ` (including $${outstandingBalance.totalBalance.toFixed(2)} from previous invoices)`;
+          successMsg += ` (including ${formatCurrencySync(outstandingBalance.totalBalance)} from previous invoices)`;
         }
         showSuccess(successMsg);
       } else {
-        // Process full payment (or $0 invoice completion)
-        if (totals.total > 0) {
-          // Record payment for non-zero invoices
+        // Process full payment for non-zero invoices
         await invoiceService.recordPayment(selectedInvoice.id, {
           payment_method: paymentMethod,
           amount_paid: totals.total,
           notes: notes || 'Payment processed',
         });
-        }
-        // For $0 invoices, skip payment recording (backend doesn't allow $0 payments)
-        // The invoice completion will handle marking it as paid
 
         // Complete the invoice (this will also complete the visit)
-        // For $0 invoices, this will mark them as paid without requiring a payment transaction
         await invoiceService.completeInvoice(selectedInvoice.id, currentUser?.id);
 
-        let successMsg = totals.total === 0
-          ? `Visit completed successfully (no charge). Invoice ${selectedInvoice.invoice_number || selectedInvoice.id} has been marked as paid.`
-          : `Invoice ${selectedInvoice.invoice_number || selectedInvoice.id} completed successfully! Visit has been marked as completed.`;
+        let successMsg = `Invoice ${selectedInvoice.invoice_number || selectedInvoice.id} completed successfully! Visit has been marked as completed.`;
         if (addOutstandingToInvoice && outstandingBalance) {
-          successMsg += ` Also paid off ${outstandingBalance.invoiceCount} previous invoice(s) totaling $${outstandingBalance.totalBalance.toFixed(2)}.`;
+          successMsg += ` Also paid off ${outstandingBalance.invoiceCount} previous invoice(s) totaling ${formatCurrencySync(outstandingBalance.totalBalance)}.`;
         }
         showSuccess(successMsg);
       }
@@ -1013,6 +1097,9 @@ const CashierDashboard = () => {
         }, 100);
       }
 
+      // Clear pending payment state on success
+      sessionStorage.removeItem('pendingPayment');
+
       // Reset partial payment state
       setIsPartialPayment(false);
       setPartialAmount('');
@@ -1021,6 +1108,7 @@ const CashierDashboard = () => {
     } catch (error) {
       logger.error('Payment processing error:', error);
       showError('Failed to process payment: ' + error.message);
+      // Keep pending payment state on error so user can retry
     } finally {
       setIsProcessing(false);
     }
@@ -1109,7 +1197,7 @@ const CashierDashboard = () => {
               },
               {
                 label: 'Today Revenue',
-                value: `$${(stats?.todayRevenue || 0).toFixed(2)}`,
+                value: formatCurrencySync(stats?.todayRevenue || 0),
                 color: 'blue',
                 icon: DollarSign,
               },
@@ -1338,7 +1426,14 @@ const CashierDashboard = () => {
                                   </div>
                                 </td>
                                 <td className="px-4 py-3 text-sm font-semibold">
-                                  ${parseFloat(invoice.total_amount || 0).toFixed(2)}
+                                  <div className="flex items-center gap-2">
+                                    {formatCurrencySync(parseFloat(invoice.total_amount || 0))}
+                                    {parseFloat(invoice.total_amount || 0) === 0 && (
+                                      <Badge variant="outline" className="border-amber-300 bg-amber-50 text-amber-800 text-xs">
+                                        No Services
+                                      </Badge>
+                                    )}
+                                  </div>
                                 </td>
                                 <td className="px-4 py-3">
                                   <Badge className={getStatusColor(invoice.status)}>
@@ -1436,7 +1531,7 @@ const CashierDashboard = () => {
                                 </p>
                                 {invoice.creditAmount && (
                                   <p className="text-xs text-blue-700 mt-1 font-medium">
-                                    Includes ${invoice.creditAmount.toFixed(2)} credit from previous invoices
+                                    Includes {formatCurrencySync(invoice.creditAmount)} credit from previous invoices
                                   </p>
                                 )}
                               </div>
@@ -1450,12 +1545,38 @@ const CashierDashboard = () => {
                           </div>
                           <div className="flex items-center gap-4">
                             <div className="text-right">
-                              <p className="font-medium">${invoice.totalAmount.toFixed(2)}</p>
-                              <p className="text-sm capitalize text-muted-foreground">
+                              <p className="font-medium">{formatCurrencySync(invoice.totalAmount)}</p>
+                              {invoice.amountPaid > 0 && (
+                                <p className="text-xs text-muted-foreground">
+                                  Paid: {formatCurrencySync(invoice.amountPaid)}
+                                  {invoice.status === 'partial_paid' && invoice.balanceDue > 0 && (
+                                    <span className="text-amber-700 ml-1">(partial)</span>
+                                  )}
+                                </p>
+                              )}
+                              {invoice.outstandingBalancePaidFromLater > 0 && (
+                                <p className="text-xs text-blue-700 font-medium">
+                                  Outstanding paid: {formatCurrencySync(invoice.outstandingBalancePaidFromLater)} (from later visit)
+                                </p>
+                              )}
+                              {invoice.balanceDue > 0 && (
+                                <p className="text-xs text-amber-700 font-medium">
+                                  Balance: {formatCurrencySync(invoice.balanceDue)}
+                                </p>
+                              )}
+                              <p className="text-sm capitalize text-muted-foreground mt-1">
                                 {invoice.paymentMethod}
                               </p>
                             </div>
-                            <Badge className="bg-green-100 text-green-800">Completed</Badge>
+                            <Badge 
+                              className={
+                                invoice.status === 'partial_paid' 
+                                  ? 'bg-amber-100 text-amber-800' 
+                                  : 'bg-green-100 text-green-800'
+                              }
+                            >
+                              {invoice.status === 'partial_paid' ? 'Partial Paid' : 'Completed'}
+                            </Badge>
                             <div className="flex items-center gap-2">
                               <Button
                                 variant="outline"
@@ -1495,7 +1616,13 @@ const CashierDashboard = () => {
         {/* Invoice Detail Modal */}
         <PaymentDetailModal
           open={showInvoiceDetail}
-          onOpenChange={setShowInvoiceDetail}
+          onOpenChange={(open) => {
+            setShowInvoiceDetail(open);
+            if (!open) {
+              // Reset all state when modal is closed
+              handleCloseInvoiceDetail();
+            }
+          }}
           invoice={selectedInvoice}
           onPay={() => {
             // Open confirmation dialog instead of processing directly
@@ -1575,7 +1702,7 @@ const CashierDashboard = () => {
                             <p
                               className={`text-3xl font-bold ${invoiceLimitReached ? 'text-red-900' : 'text-amber-900'}`}
                             >
-                              ${outstandingBalance.totalBalance.toFixed(2)}
+                              {formatCurrencySync(outstandingBalance.totalBalance)}
                             </p>
 
                             {/* 2-Invoice Limit Warning */}
@@ -1607,8 +1734,7 @@ const CashierDashboard = () => {
                                   className={`flex items-center gap-2 text-xs ${invoiceLimitReached ? 'text-red-700' : 'text-amber-700'}`}
                                 >
                                   <Receipt className="h-3 w-3" />
-                                  Invoice #{inv.invoice_number || inv.id.slice(0, 8)} - $
-                                  {parseFloat(inv.balance_due).toFixed(2)} due
+                                  Invoice #{inv.invoice_number || inv.id.slice(0, 8)} - {formatCurrencySync(parseFloat(inv.balance_due))} due
                                   {inv.payment_due_date && (
                                     <span
                                       className={
@@ -1640,8 +1766,8 @@ const CashierDashboard = () => {
                             className={`flex-1 cursor-pointer text-sm font-medium ${invoiceLimitReached ? 'text-red-900' : 'text-amber-900'}`}
                           >
                             {invoiceLimitReached
-                              ? `⚠️ Must add outstanding balance (${outstandingBalance.totalBalance.toFixed(2)}) - cannot create another unpaid invoice`
-                              : `Add outstanding balance ($${outstandingBalance.totalBalance.toFixed(2)}) to current invoice`}
+                              ? `⚠️ Must add outstanding balance (${formatCurrencySync(outstandingBalance.totalBalance)}) - cannot create another unpaid invoice`
+                              : `Add outstanding balance (${formatCurrencySync(outstandingBalance.totalBalance)}) to current invoice`}
                           </label>
                         </div>
 
@@ -1714,7 +1840,7 @@ const CashierDashboard = () => {
                                       />
                                     </div>
                                     <div>
-                                      <Label className="text-xs">Price ($)</Label>
+                                      <Label className="text-xs">Price ({getCurrencySymbol()})</Label>
                                       <Input
                                         type="number"
                                         step="0.01"
@@ -1769,7 +1895,7 @@ const CashierDashboard = () => {
                                       </div>
                                       <div className="text-right">
                                         <p className="font-medium">
-                                          ${parseFloat(service.price || 0).toFixed(2)}
+                                          {formatCurrencySync(parseFloat(service.price || 0))}
                                         </p>
                                         <Badge
                                           variant="outline"
@@ -1904,11 +2030,11 @@ const CashierDashboard = () => {
                                       </Label>
                                       <div className="relative flex-1">
                                         <span className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground">
-                                          $
+                                          {getCurrencySymbol()}
                                         </span>
                                         <Input
                                           type="number"
-                                          value={(med.price / med.quantity).toFixed(2)}
+                                          value={(med.price / med.quantity)}
                                           onChange={(e) =>
                                             handlePriceChange(
                                               med.id,
@@ -1972,11 +2098,10 @@ const CashierDashboard = () => {
                                         </Button>
                                         <div className="ml-auto text-right">
                                           <div className="text-sm font-medium">
-                                            $
-                                            {(
+                                            {formatCurrencySync(
                                               (med.price / med.quantity) *
                                               med.dispensedQuantity
-                                            ).toFixed(2)}
+                                            )}
                                           </div>
                                           <div className="text-xs text-muted-foreground">
                                             Charge
@@ -2027,11 +2152,11 @@ const CashierDashboard = () => {
                       <div className="space-y-3">
                         <div className="flex justify-between">
                           <span>Services</span>
-                          <span>${totals.servicesTotal.toFixed(2)}</span>
+                          <span>{formatCurrencySync(totals.servicesTotal)}</span>
                         </div>
                         <div className="flex justify-between">
                           <span>Medications</span>
-                          <span>${totals.medicationsTotal.toFixed(2)}</span>
+                          <span>{formatCurrencySync(totals.medicationsTotal)}</span>
                         </div>
 
                         {/* Outstanding Balance Line Item */}
@@ -2041,14 +2166,14 @@ const CashierDashboard = () => {
                               <AlertCircle className="h-4 w-4" />
                               Previous Balance
                             </span>
-                            <span>${totals.outstandingBalance.toFixed(2)}</span>
+                            <span>{formatCurrencySync(totals.outstandingBalance)}</span>
                           </div>
                         )}
 
                         <Separator />
                         <div className="flex justify-between font-medium">
                           <span>Subtotal</span>
-                          <span>${totals.subtotal.toFixed(2)}</span>
+                          <span>{formatCurrencySync(totals.subtotal)}</span>
                         </div>
 
                         {/* Discount Section */}
@@ -2099,31 +2224,57 @@ const CashierDashboard = () => {
                         {totals.discountAmount > 0 && (
                           <div className="flex justify-between text-red-600">
                             <span>Discount</span>
-                            <span>-${totals.discountAmount.toFixed(2)}</span>
+                            <span>-{formatCurrencySync(totals.discountAmount)}</span>
                           </div>
                         )}
 
                         <Separator />
                         <div className="flex justify-between text-lg font-bold">
                           <span>Total</span>
-                          <span>${totals.total.toFixed(2)}</span>
+                          <span>{formatCurrencySync(totals.total)}</span>
                         </div>
                       </div>
 
                       {/* Payment Method */}
                       <div className="space-y-2">
                         <Label className="text-sm font-medium">Payment Method</Label>
-                        <Select value={paymentMethod} onValueChange={setPaymentMethod}>
+                        <Select 
+                          value={paymentMethod} 
+                          onValueChange={(value) => {
+                            setPaymentMethod(value);
+                            // Reset QR code state when payment method changes
+                            if (value !== 'online_payment') {
+                              setShowQRCode(false);
+                              setQrScannedConfirmed(false);
+                            }
+                          }}
+                        >
                           <SelectTrigger>
                             <SelectValue />
                           </SelectTrigger>
                           <SelectContent>
                             <SelectItem value="cash">Cash</SelectItem>
-                            <SelectItem value="card">Credit/Debit Card</SelectItem>
-                            <SelectItem value="insurance">Insurance</SelectItem>
-                            <SelectItem value="check">Check</SelectItem>
+                            <SelectItem value="online_payment">Online Payment</SelectItem>
                           </SelectContent>
                         </Select>
+                        {paymentMethod === 'online_payment' && (
+                          <Button
+                            type="button"
+                            variant="outline"
+                            size="sm"
+                            className="w-full"
+                            onClick={() => {
+                              if (!clinicSettings?.payment_qr_code_url) {
+                                showError('QR code is not configured. Please contact admin.');
+                                return;
+                              }
+                              setShowQRCode(true);
+                            }}
+                          >
+                            <Receipt className="mr-2 h-4 w-4" />
+                            Show QR Code
+                          </Button>
+                        )}
                       </div>
 
                       {/* Notes */}
@@ -2175,11 +2326,20 @@ const CashierDashboard = () => {
                         <div className="flex items-center justify-between">
                           <Label className="text-sm font-medium">Partial Payment</Label>
                           <Button
+                            type="button"
                             variant={isPartialPayment ? 'default' : 'outline'}
                             size="sm"
-                            onClick={() => {
-                              setIsPartialPayment(!isPartialPayment);
-                              if (!isPartialPayment) {
+                            onClick={(e) => {
+                              e.preventDefault();
+                              e.stopPropagation();
+                              const newPartialPaymentState = !isPartialPayment;
+                              setIsPartialPayment(newPartialPaymentState);
+                              if (newPartialPaymentState) {
+                                // Pre-fill with total amount when enabling partial payment
+                                const totals = calculateTotals();
+                                setPartialAmount(totals.total.toFixed(2));
+                                setHoldReason('');
+                              } else {
                                 setPartialAmount('');
                                 setHoldReason('');
                               }
@@ -2228,8 +2388,7 @@ const CashierDashboard = () => {
                               </div>
                               {partialAmount && parseFloat(partialAmount) < totals.total && (
                                 <p className="text-xs text-amber-700">
-                                  Balance Due: $
-                                  {(totals.total - parseFloat(partialAmount || 0)).toFixed(2)}
+                                  Balance Due: {formatCurrencySync(totals.total - parseFloat(partialAmount || 0))}
                                 </p>
                               )}
                             </div>
@@ -2291,14 +2450,6 @@ const CashierDashboard = () => {
                             ? 'Process Partial Payment'
                             : 'Approve & Process Full Payment'}
                         </Button>
-                        <Button
-                          onClick={handleDeclineInvoice}
-                          variant="outline"
-                          className="w-full gap-2"
-                        >
-                          <XCircle className="h-4 w-4" />
-                          Decline Invoice
-                        </Button>
                       </div>
                     </CardContent>
                   </Card>
@@ -2306,6 +2457,64 @@ const CashierDashboard = () => {
               </div>
             )}
         </PaymentDetailModal>
+
+        {/* QR Code Display Dialog */}
+        <Dialog open={showQRCode} onOpenChange={setShowQRCode}>
+          <DialogContent className="max-w-md">
+            <DialogHeader>
+              <DialogTitle>Payment QR Code</DialogTitle>
+              <DialogDescription>
+                Please scan the QR code to complete the payment
+              </DialogDescription>
+            </DialogHeader>
+            <div className="space-y-4">
+              {clinicSettings?.payment_qr_code_url ? (
+                <>
+                  <div className="flex justify-center">
+                    <div className="rounded-lg border-2 border-gray-300 bg-white p-4">
+                      <img
+                        src={clinicSettings.payment_qr_code_url}
+                        alt="Payment QR Code"
+                        className="h-64 w-64 object-contain"
+                        onError={() => {
+                          showError('Failed to load QR code image');
+                          setShowQRCode(false);
+                        }}
+                      />
+                    </div>
+                  </div>
+                  <div className="flex items-center space-x-2">
+                    <input
+                      type="checkbox"
+                      id="qrScanned"
+                      checked={qrScannedConfirmed}
+                      onChange={(e) => setQrScannedConfirmed(e.target.checked)}
+                      className="h-4 w-4 rounded border-gray-300"
+                    />
+                    <Label htmlFor="qrScanned" className="text-sm font-normal cursor-pointer">
+                      I have scanned and paid
+                    </Label>
+                  </div>
+                </>
+              ) : (
+                <div className="text-center text-red-600">
+                  QR code is not configured. Please contact admin.
+                </div>
+              )}
+            </div>
+            <DialogFooter>
+              <Button
+                variant="outline"
+                onClick={() => {
+                  setShowQRCode(false);
+                  setQrScannedConfirmed(false);
+                }}
+              >
+                Close
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
 
         {/* Payment Confirmation Dialog */}
         <Dialog open={showPaymentDialog} onOpenChange={setShowPaymentDialog}>
@@ -2326,7 +2535,9 @@ const CashierDashboard = () => {
                 </div>
                 <div className="flex justify-between">
                   <span>Payment Method:</span>
-                  <span className="font-medium capitalize">{paymentMethod}</span>
+                  <span className="font-medium capitalize">
+                    {paymentMethod === 'online_payment' ? 'Online Payment' : paymentMethod}
+                  </span>
                 </div>
                 <Separator />
 
@@ -2339,16 +2550,16 @@ const CashierDashboard = () => {
                     </div>
                     <div className="flex justify-between text-sm">
                       <span>Total Invoice Amount:</span>
-                      <span className="font-medium">${totals.total.toFixed(2)}</span>
+                      <span className="font-medium">{formatCurrencySync(totals.total)}</span>
                     </div>
                     <div className="flex justify-between text-lg font-bold text-green-700">
                       <span>Paying Now:</span>
-                      <span>${parseFloat(partialAmount || 0).toFixed(2)}</span>
+                      <span>{formatCurrencySync(parseFloat(partialAmount || 0))}</span>
                     </div>
                     <div className="flex justify-between text-sm text-red-700">
                       <span>Balance Due:</span>
                       <span className="font-medium">
-                        ${(totals.total - parseFloat(partialAmount || 0)).toFixed(2)}
+                        {formatCurrencySync(totals.total - parseFloat(partialAmount || 0))}
                       </span>
                     </div>
                     {holdReason && (
@@ -2366,7 +2577,7 @@ const CashierDashboard = () => {
                 ) : (
                   <div className="flex justify-between text-lg font-bold">
                     <span>Total Amount:</span>
-                    <span>${totals.total.toFixed(2)}</span>
+                    <span>{formatCurrencySync(totals.total)}</span>
                   </div>
                 )}
               </div>
@@ -2426,7 +2637,7 @@ const CashierDashboard = () => {
 
               <div>
                 <Label htmlFor="servicePrice">
-                  Price ($) <span className="text-red-500">*</span>
+                  Price ({getCurrencySymbol()}) <span className="text-red-500">*</span>
                 </Label>
                 <Input
                   id="servicePrice"
@@ -2593,7 +2804,7 @@ const CashierDashboard = () => {
                               <div className="flex-1">
                                 <div className="flex items-center gap-2">
                                   <p className="font-semibold">
-                                    ${Math.abs(parseFloat(payment.amount || 0)).toFixed(2)}
+                                    {formatCurrencySync(Math.abs(parseFloat(payment.amount || 0)))}
                                   </p>
                                   {isCreditPayment && (
                                     <Badge variant="outline" className="bg-blue-100 text-blue-800 border-blue-300">

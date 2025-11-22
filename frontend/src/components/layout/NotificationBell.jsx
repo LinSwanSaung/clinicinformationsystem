@@ -25,9 +25,16 @@ const NotificationBell = () => {
   });
 
   useEffect(() => {
-    const c = unreadQuery.data?.count;
-    if (typeof c === 'number') setUnreadCount(c);
-  }, [unreadQuery.data]);
+    // Backend returns: { success: true, data: { count: number } }
+    // apiService.get() returns the full response, so we need to access data.data.count
+    const c = unreadQuery.data?.data?.count ?? unreadQuery.data?.count;
+    if (typeof c === 'number') {
+      setUnreadCount(c);
+    } else if (unreadQuery.data && !unreadQuery.isError) {
+      // If we got a response but no count, reset to 0
+      setUnreadCount(0);
+    }
+  }, [unreadQuery.data, unreadQuery.isError]);
 
   // Fetch notifications
   const fetchNotifications = async () => {

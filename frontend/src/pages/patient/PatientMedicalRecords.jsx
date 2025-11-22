@@ -253,7 +253,6 @@ const PatientMedicalRecords = () => {
                       visit={visit}
                       isExpanded={expandedVisit === visit.id}
                       onToggleExpand={() => setExpandedVisit(expandedVisit === visit.id ? null : visit.id)}
-                      showDetailsButton={false}
                       onDownloadPDF={handleDownloadVisitPDF}
                     />
                   ))}
@@ -474,7 +473,6 @@ const PatientMedicalRecords = () => {
                       visit={visit}
                       isExpanded={expandedVisit === visit.id}
                       onToggleExpand={() => setExpandedVisit(expandedVisit === visit.id ? null : visit.id)}
-                      showDetailsButton={false}
                       onDownloadPDF={handleDownloadVisitPDF}
                     />
                   ))}

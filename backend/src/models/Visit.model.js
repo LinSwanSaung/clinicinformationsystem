@@ -551,7 +551,8 @@ class VisitModel extends BaseModel {
    */
   async getPatientActiveVisit(patientId) {
     try {
-      const { data, error } = await this.supabase
+      // Get visits with in_progress status
+      const { data: visits, error } = await this.supabase
         .from(this.tableName)
         .select(
           `
@@ -565,16 +566,67 @@ class VisitModel extends BaseModel {
         )
         .eq('patient_id', patientId)
         .eq('status', 'in_progress')
-        .order('visit_date', { ascending: false })
-        .limit(1)
-        .single();
+        .order('visit_date', { ascending: false });
 
-      if (error && error.code !== 'PGRST116') {
-        // PGRST116 = no rows returned
+      if (error) {
         throw new Error(`Failed to fetch active visit: ${error.message}`);
       }
 
-      return data || null;
+      if (!visits || visits.length === 0) {
+        return null;
+      }
+
+      // Check if any of these visits have a paid or partial_paid invoice
+      // If invoice is paid or partially paid, the visit MUST be completed
+      for (const visit of visits) {
+        const { data: invoices } = await this.supabase
+          .from('invoices')
+          .select('id, status')
+          .eq('visit_id', visit.id)
+          .in('status', ['paid', 'partial_paid'])
+          .limit(1);
+
+        // If no paid/partial_paid invoice found, this is a truly active visit
+        if (!invoices || invoices.length === 0) {
+          return visit;
+        }
+        
+        // If invoice is paid/partial_paid but visit is still in_progress, this is a data integrity issue
+        // Don't auto-complete - let admin handle via pending items page
+        // But don't block new visits - the invoice is paid, so visit should be considered "done" for blocking purposes
+        const invoiceStatus = invoices[0]?.status;
+        logger.warn(`[VISIT] Data integrity issue: Visit ${visit.id} has ${invoiceStatus} invoice but status is still in_progress. Will show in admin pending items.`);
+        
+        // Skip this visit - don't block new visits, but don't auto-complete either
+        // Admin will see this in pending items and can complete it manually
+        continue;
+      }
+
+      // All visits have paid invoices, so no active visit
+      return null;
+    } catch (error) {
+      throw error;
+    }
+  }
+
+  /**
+   * Check if a doctor has any active visits
+   * Used to prevent doctor deletion when they have active consultations
+   */
+  async getDoctorActiveVisits(doctorId) {
+    try {
+      const { data, error } = await this.supabase
+        .from(this.tableName)
+        .select('id, patient_id, visit_date, status')
+        .eq('doctor_id', doctorId)
+        .eq('status', 'in_progress')
+        .order('visit_date', { ascending: false });
+
+      if (error) {
+        throw new Error(`Failed to fetch doctor active visits: ${error.message}`);
+      }
+
+      return data || [];
     } catch (error) {
       throw error;
     }

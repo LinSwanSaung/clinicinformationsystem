@@ -1,7 +1,11 @@
 import PaymentTransactionModel from '../models/PaymentTransaction.model.js';
 import InvoiceService from './Invoice.service.js';
+import clinicSettingsService from './ClinicSettings.service.js';
+import { formatCurrencySync } from '../utils/currencyHelper.js';
 import { getUsersByIds, getPaymentWithRelations, getPatientRemainingCredit } from './repositories/BillingRepo.js';
+import { validatePaymentAmount, sanitizeString } from '../utils/validation.js';
 import PDFDocument from 'pdfkit';
+import logger from '../config/logger.js';
 
 /**
  * Payment Service - Business logic for payments
@@ -19,43 +23,61 @@ class PaymentService {
         throw new Error('Missing required fields: amount, payment_method');
       }
 
+      // Validate and sanitize payment amount (prevents overflow)
+      let validatedAmount;
+      try {
+        validatedAmount = validatePaymentAmount(amount);
+      } catch (validationError) {
+        throw new Error(`Invalid payment amount: ${validationError.message}`);
+      }
+
       // Validate payment method
-      const validMethods = ['cash', 'card', 'insurance', 'mobile_payment'];
+      const validMethods = ['cash', 'online_payment'];
       if (!validMethods.includes(payment_method)) {
         throw new Error(`Invalid payment method. Must be one of: ${validMethods.join(', ')}`);
       }
 
-      // Validate amount
-      if (parseFloat(amount) <= 0) {
-        throw new Error('Payment amount must be greater than 0');
+      // Sanitize string inputs
+      const sanitizedReference = payment_reference ? sanitizeString(payment_reference, { maxLength: 255 }) : null;
+      const sanitizedNotes = payment_notes ? sanitizeString(payment_notes, { maxLength: 1000 }) : null;
+
+      // Check for duplicate payment (same amount, same invoice, within last 5 seconds)
+      // This prevents accidental double-submission
+      const recentPayments = await PaymentTransactionModel.getRecentPaymentsByInvoice(invoiceId, 5000); // 5 seconds
+      const duplicatePayment = recentPayments.find(
+        p => Math.abs(parseFloat(p.amount) - validatedAmount) < 0.01 &&
+             p.payment_method === payment_method &&
+             p.received_by === receivedBy
+      );
+
+      if (duplicatePayment) {
+        logger.warn(`Duplicate payment detected for invoice ${invoiceId}: ${duplicatePayment.id}`);
+        throw new Error('Duplicate payment detected. Please wait a moment and check if payment was already processed.');
       }
 
-      // Create payment transaction
-      const paymentTransaction = {
-        invoice_id: invoiceId,
-        amount: parseFloat(amount),
+      // Use atomic function with advisory locks to prevent race conditions
+      // This ensures payment recording and invoice recalculation happen atomically
+      const atomicResult = await PaymentTransactionModel.recordPaymentAtomic(
+        invoiceId,
+        validatedAmount,
         payment_method,
-        payment_reference,
-        payment_notes,
-        received_by: receivedBy,
-      };
+        sanitizedReference,
+        sanitizedNotes,
+        receivedBy
+      );
 
-      const payment = await PaymentTransactionModel.createPayment(paymentTransaction);
-
-      // Recalculate invoice totals
-      await InvoiceService.recalculateInvoiceTotal(invoiceId);
-
-      // Check if invoice is fully paid
-      const invoice = await InvoiceService.getInvoiceById(invoiceId);
-      if (parseFloat(invoice.balance) <= 0) {
-        await InvoiceService.completeInvoice(invoiceId, receivedBy);
-      } else if (parseFloat(invoice.paid_amount) > 0) {
-        // Partial payment
-        const InvoiceModel = (await import('../models/Invoice.model.js')).default;
-        await InvoiceModel.updateInvoice(invoiceId, { status: 'partial' });
+      if (!atomicResult.success) {
+        throw new Error(atomicResult.message || 'Failed to record payment');
       }
 
-      return payment;
+      // Check if invoice is fully paid and complete it if needed
+      const updatedInvoice = atomicResult.invoice;
+      if (parseFloat(updatedInvoice.balance_due || updatedInvoice.balance || 0) <= 0) {
+        // Invoice is fully paid - complete it
+        await InvoiceService.completeInvoice(invoiceId, receivedBy);
+      }
+
+      return atomicResult.payment;
     } catch (error) {
       throw new Error(`Failed to record payment: ${error.message}`);
     }
@@ -208,6 +230,24 @@ class PaymentService {
         invoice.payment_transactions = paymentTransactions || [];
       }
 
+      // Get clinic settings for header and footer (capture at start to prevent changes during PDF generation)
+      const clinicSettings = await clinicSettingsService.getSettings();
+      const clinicName = clinicSettings.clinic_name || 'RealCIS';
+      const systemName = 'RealCIS';
+      const systemDescription = 'Healthcare System';
+      
+      // Get currency settings ONCE at the start and use throughout PDF generation
+      // This prevents currency from changing mid-generation
+      const currencySettings = await clinicSettingsService.getCurrencySettings();
+      const currencySymbol = currencySettings.currency_symbol || '$';
+      const currencyCode = currencySettings.currency_code || 'USD';
+      
+      // Store currency settings in a constant to ensure consistency throughout PDF
+      const PDF_CURRENCY = {
+        symbol: currencySymbol,
+        code: currencyCode,
+      };
+
       // Generate PDF using PDFKit with professional design
       const doc = new PDFDocument({ 
         size: 'A4', 
@@ -221,17 +261,44 @@ class PaymentService {
       };
 
       // Professional Header with colored background
-      const headerHeight = 120;
+      const headerHeight = clinicSettings.clinic_address || clinicSettings.clinic_phone || clinicSettings.clinic_email ? 140 : 120;
       doc.rect(0, 0, doc.page.width, headerHeight).fillAndStroke('#1e40af', '#1e40af');
       
+      // Clinic/System Name
       doc
         .fillColor('#ffffff')
         .fontSize(28)
         .font('Helvetica-Bold')
-        .text('RealCIS', 50, 30)
+        .text(clinicName, 50, 30)
         .fontSize(12)
-        .font('Helvetica')
-        .text('Healthcare System', 50, 62);
+        .font('Helvetica');
+      
+      // Show system name as subtitle if clinic name is different
+      if (clinicSettings.clinic_name) {
+        doc.text(`${systemName} ${systemDescription}`, 50, 62);
+      } else {
+        doc.text(systemDescription, 50, 62);
+      }
+
+      // Clinic contact information in header (if available)
+      let contactY = 85;
+      if (clinicSettings.clinic_address) {
+        doc
+          .fontSize(9)
+          .text(clinicSettings.clinic_address, 50, contactY, { width: 300 });
+        contactY += 12;
+      }
+      if (clinicSettings.clinic_phone) {
+        doc
+          .fontSize(9)
+          .text(`Phone: ${clinicSettings.clinic_phone}`, 50, contactY);
+        contactY += 12;
+      }
+      if (clinicSettings.clinic_email) {
+        doc
+          .fontSize(9)
+          .text(`Email: ${clinicSettings.clinic_email}`, 50, contactY);
+      }
 
       doc
         .fontSize(20)
@@ -240,10 +307,10 @@ class PaymentService {
 
       // Reset position after header
       doc.fillColor('#000000');
-      let yPos = 140;
+      let yPos = headerHeight + 20;
 
       // Invoice & Date Info Box
-      drawBox(50, yPos, doc.page.width - 100, 60, '#f0f9ff', '#bfdbfe');
+      drawBox(50, yPos, doc.page.width - 100, 80, '#f0f9ff', '#bfdbfe');
       doc
         .fillColor('#1e40af')
         .fontSize(14)
@@ -274,7 +341,23 @@ class PaymentService {
           yPos + 30
         );
 
-      yPos += 80;
+      // Display payment methods if payments exist
+      if (invoice.payment_transactions && invoice.payment_transactions.length > 0) {
+        const paymentMethods = [...new Set(
+          invoice.payment_transactions
+            .map(pt => pt.payment_method)
+            .filter(Boolean)
+            .map(method => method === 'online_payment' ? 'Online Payment' : method.charAt(0).toUpperCase() + method.slice(1))
+        )];
+        doc
+          .text(
+            `Payment Method${paymentMethods.length > 1 ? 's' : ''}: ${paymentMethods.join(', ') || 'N/A'}`,
+            doc.page.width - 150,
+            yPos + 45
+          );
+      }
+
+      yPos += 100;
 
       // Patient Information Box
       drawBox(50, yPos, doc.page.width - 100, 100, '#f0f9ff', '#bfdbfe');
@@ -358,8 +441,8 @@ class PaymentService {
               .font('Helvetica')
               .text(service.item_name || 'Service', 60, yPos, { width: 130 })
               .text(quantity.toString(), 200, yPos)
-              .text(`$${unitPrice.toFixed(2)}`, 280, yPos)
-              .text(`$${total.toFixed(2)}`, doc.page.width - 150, yPos, { align: 'right' });
+              .text(`${PDF_CURRENCY.symbol}${unitPrice.toFixed(2)}`, 280, yPos)
+              .text(`${PDF_CURRENCY.symbol}${total.toFixed(2)}`, doc.page.width - 150, yPos, { align: 'right' });
 
             if (service.notes || service.item_description) {
               doc
@@ -370,7 +453,7 @@ class PaymentService {
             }
             yPos += 15;
           });
-          yPos += 10;
+          yPos += 20; // Add margin after services section
         }
 
         // Medications
@@ -379,6 +462,9 @@ class PaymentService {
             doc.addPage();
             yPos = 50;
           }
+
+          // Add extra spacing before medications section
+          yPos += 10;
 
           doc
             .fillColor('#2563eb')
@@ -417,8 +503,8 @@ class PaymentService {
               .font('Helvetica')
               .text(med.item_name || 'Medication', 60, yPos, { width: 130 })
               .text(quantity.toString(), 200, yPos)
-              .text(`$${unitPrice.toFixed(2)}`, 280, yPos)
-              .text(`$${total.toFixed(2)}`, doc.page.width - 150, yPos, { align: 'right' });
+              .text(`${PDF_CURRENCY.symbol}${unitPrice.toFixed(2)}`, 280, yPos)
+              .text(`${PDF_CURRENCY.symbol}${total.toFixed(2)}`, doc.page.width - 150, yPos, { align: 'right' });
 
             if (med.notes || med.item_description) {
               doc
@@ -494,14 +580,14 @@ class PaymentService {
         .fontSize(10)
         .font('Helvetica')
         .text('Subtotal:', 60, yPos)
-        .text(`$${subtotal.toFixed(2)}`, doc.page.width - 150, yPos, { align: 'right' });
+        .text(`${PDF_CURRENCY.symbol}${subtotal.toFixed(2)}`, doc.page.width - 150, yPos, { align: 'right' });
 
       if (discount > 0) {
         yPos += 15;
         doc
           .fillColor('#059669')
           .text('Discount:', 60, yPos)
-          .text(`-$${discount.toFixed(2)}`, doc.page.width - 150, yPos, { align: 'right' });
+          .text(`-${PDF_CURRENCY.symbol}${discount.toFixed(2)}`, doc.page.width - 150, yPos, { align: 'right' });
       }
 
       yPos += 20;
@@ -514,7 +600,7 @@ class PaymentService {
         .fontSize(12)
         .font('Helvetica-Bold')
         .text('Total Amount:', 60, yPos)
-        .text(`$${total.toFixed(2)}`, doc.page.width - 150, yPos, { align: 'right' });
+        .text(`${PDF_CURRENCY.symbol}${total.toFixed(2)}`, doc.page.width - 150, yPos, { align: 'right' });
 
       // Credit Amount (from previous invoices or overpayment)
       // Show credit if there's any credit amount (matches frontend: totalCredit > 0)
@@ -525,7 +611,7 @@ class PaymentService {
           .fontSize(11)
           .font('Helvetica-Bold')
           .text('Credit from Previous Invoices:', 60, yPos)
-          .text(`$${creditAmount.toFixed(2)}`, doc.page.width - 150, yPos, { align: 'right' });
+          .text(`${PDF_CURRENCY.symbol}${creditAmount.toFixed(2)}`, doc.page.width - 150, yPos, { align: 'right' });
       }
 
       // Paid Amount
@@ -535,7 +621,7 @@ class PaymentService {
         .fontSize(11)
         .font('Helvetica-Bold')
         .text('Paid Amount:', 60, yPos)
-        .text(`$${paid.toFixed(2)}`, doc.page.width - 150, yPos, { align: 'right' });
+        .text(`${PDF_CURRENCY.symbol}${paid.toFixed(2)}`, doc.page.width - 150, yPos, { align: 'right' });
 
       // Balance Due (if positive)
       if (balance > 0) {
@@ -546,7 +632,7 @@ class PaymentService {
           .font('Helvetica-Bold')
           .text('Balance Due:', 60, yPos)
           .text(
-            `$${balance.toFixed(2)}`,
+            `${PDF_CURRENCY.symbol}${balance.toFixed(2)}`,
             doc.page.width - 150,
             yPos,
             { align: 'right' }
@@ -561,7 +647,7 @@ class PaymentService {
           .fontSize(11)
           .font('Helvetica-Bold')
           .text('Credit Remaining:', 60, yPos)
-          .text(`$${patientRemainingCredit.toFixed(2)} (Credit)`, doc.page.width - 150, yPos, { align: 'right' });
+          .text(`${PDF_CURRENCY.symbol}${patientRemainingCredit.toFixed(2)} (Credit)`, doc.page.width - 150, yPos, { align: 'right' });
       }
 
       yPos += 40;
@@ -622,12 +708,14 @@ class PaymentService {
             .fillColor(isCredit ? '#1e40af' : '#059669')
             .fontSize(11)
             .font('Helvetica-Bold')
-            .text(`$${Math.abs(parseFloat(pt.amount || 0)).toFixed(2)}`, 60, yPos + 8)
+            .text(`${PDF_CURRENCY.symbol}${Math.abs(parseFloat(pt.amount || 0)).toFixed(2)}`, 60, yPos + 8)
             .fillColor('#6b7280')
             .fontSize(9)
             .font('Helvetica')
             .text(
-              `${pt.payment_method ? pt.payment_method.toUpperCase() : 'N/A'}`,
+              `${pt.payment_method 
+                ? (pt.payment_method === 'online_payment' ? 'Online Payment' : pt.payment_method.charAt(0).toUpperCase() + pt.payment_method.slice(1))
+                : 'N/A'}`,
               60,
               yPos + 22
             );
@@ -677,7 +765,25 @@ class PaymentService {
         .text('Thank you for your payment!', doc.page.width / 2, yPos + 10, { align: 'center' })
         .fontSize(8)
         .text(
-          `Generated on: ${new Date().toLocaleString('en-US', {
+          `This invoice was generated by ${systemName} ${systemDescription}`,
+          doc.page.width / 2,
+          yPos + 25,
+          { align: 'center' }
+        );
+      
+      if (clinicSettings.clinic_name) {
+        doc
+          .text(
+            `For ${clinicSettings.clinic_name}`,
+            doc.page.width / 2,
+            yPos + 38,
+            { align: 'center' }
+          );
+      }
+      
+      doc
+        .text(
+          `Invoice #: ${invoice.invoice_number || 'N/A'} | Generated on: ${new Date().toLocaleString('en-US', {
             year: 'numeric',
             month: 'long',
             day: 'numeric',
@@ -685,7 +791,7 @@ class PaymentService {
             minute: '2-digit',
           })}`,
           doc.page.width / 2,
-          yPos + 25,
+          clinicSettings.clinic_name ? yPos + 51 : yPos + 38,
           { align: 'center' }
         );
 

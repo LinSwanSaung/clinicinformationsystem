@@ -142,3 +142,83 @@ export async function getReceptionistIds() {
 
   return (data || []).map((r) => r.id);
 }
+
+/**
+ * Get all cashier user IDs
+ * @returns {Promise<string[]>}
+ */
+export async function getCashierIds() {
+  const { data, error } = await supabase
+    .from('users')
+    .select('id')
+    .eq('role', 'cashier')
+    .eq('is_active', true);
+
+  if (error) {
+    throw error;
+  }
+
+  return (data || []).map((c) => c.id);
+}
+
+/**
+ * Get doctor user ID by doctor ID (for queue tokens)
+ * @param {string} doctorId - The doctor's user ID
+ * @returns {Promise<string|null>}
+ */
+export async function getDoctorId(doctorId) {
+  const { data, error } = await supabase
+    .from('users')
+    .select('id')
+    .eq('id', doctorId)
+    .eq('role', 'doctor')
+    .eq('is_active', true)
+    .maybeSingle();
+
+  if (error) {
+    throw error;
+  }
+
+  return data?.id || null;
+}
+
+/**
+ * Get portal user ID by patient ID (for patient notifications)
+ * @param {string} patientId - The patient's ID
+ * @returns {Promise<string|null>}
+ */
+export async function getPortalUserIdByPatientId(patientId) {
+  const { data, error } = await supabase
+    .from('users')
+    .select('id')
+    .eq('patient_id', patientId)
+    .eq('is_active', true)
+    .limit(1)
+    .maybeSingle();
+
+  if (error) {
+    throw error;
+  }
+
+  return data?.id || null;
+}
+
+/**
+ * Get user details by user ID(s) for email notifications
+ * @param {string|string[]} userIds - Single user ID or array of user IDs
+ * @returns {Promise<Array>}
+ */
+export async function getUserDetailsForEmail(userIds) {
+  const ids = Array.isArray(userIds) ? userIds : [userIds];
+  
+  const { data, error } = await supabase
+    .from('users')
+    .select('id, email, first_name, last_name')
+    .in('id', ids);
+
+  if (error) {
+    throw error;
+  }
+
+  return data || [];
+}

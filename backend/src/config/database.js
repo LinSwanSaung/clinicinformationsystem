@@ -99,7 +99,7 @@ export const dbConfig = {
  * Execute a Supabase query with retry logic for network resilience
  * Useful for handling VPN/network connectivity issues
  */
-export const executeWithRetry = async (queryFn, retries = 2, operationName = 'database operation') => {
+export const executeWithRetry = async (queryFn, retries = 3, operationName = 'database operation') => {
   for (let attempt = 1; attempt <= retries + 1; attempt++) {
     try {
       const result = await queryFn();
@@ -109,15 +109,22 @@ export const executeWithRetry = async (queryFn, retries = 2, operationName = 'da
         if (result.error) {
           // Check if it's a network error that might be retryable
           const errorMsg = result.error.message?.toLowerCase() || '';
+          const errorCode = result.error.code?.toLowerCase() || '';
           const isNetworkError = errorMsg.includes('fetch failed') || 
                                 errorMsg.includes('network') || 
                                 errorMsg.includes('timeout') ||
                                 errorMsg.includes('econnrefused') ||
-                                errorMsg.includes('enotfound');
+                                errorMsg.includes('enotfound') ||
+                                errorMsg.includes('econnreset') ||
+                                errorMsg.includes('etimedout') ||
+                                errorCode === 'pgrst301' || // Supabase connection error
+                                errorCode === '08006' || // Connection failure
+                                errorCode === '57p01'; // Admin shutdown
           
           if (isNetworkError && attempt <= retries) {
-            logger.warn(`⚠️ ${operationName} attempt ${attempt} failed (network error), retrying...`);
-            await new Promise(resolve => setTimeout(resolve, 1000 * attempt)); // Exponential backoff
+            const backoffDelay = Math.min(1000 * Math.pow(2, attempt - 1), 10000); // Exponential backoff, max 10s
+            logger.warn(`⚠️ ${operationName} attempt ${attempt}/${retries + 1} failed (network error), retrying in ${backoffDelay}ms...`);
+            await new Promise(resolve => setTimeout(resolve, backoffDelay));
             continue;
           }
         }
@@ -126,16 +133,23 @@ export const executeWithRetry = async (queryFn, retries = 2, operationName = 'da
       return result;
     } catch (error) {
       const errorMsg = error?.message?.toLowerCase() || '';
+      const errorCode = error?.code?.toLowerCase() || '';
       const isNetworkError = errorMsg.includes('fetch failed') || 
                             errorMsg.includes('network') || 
                             errorMsg.includes('timeout') ||
                             errorMsg.includes('econnrefused') ||
                             errorMsg.includes('enotfound') ||
-                            errorMsg.includes('abort');
+                            errorMsg.includes('econnreset') ||
+                            errorMsg.includes('etimedout') ||
+                            errorMsg.includes('abort') ||
+                            errorCode === 'pgrst301' ||
+                            errorCode === '08006' ||
+                            errorCode === '57p01';
       
       if (isNetworkError && attempt <= retries) {
-        logger.warn(`⚠️ ${operationName} attempt ${attempt} error (network), retrying...`, error.message);
-        await new Promise(resolve => setTimeout(resolve, 1000 * attempt)); // Exponential backoff
+        const backoffDelay = Math.min(1000 * Math.pow(2, attempt - 1), 10000); // Exponential backoff, max 10s
+        logger.warn(`⚠️ ${operationName} attempt ${attempt}/${retries + 1} error (network), retrying in ${backoffDelay}ms...`, error.message);
+        await new Promise(resolve => setTimeout(resolve, backoffDelay));
         continue;
       }
       

@@ -289,11 +289,15 @@ const AppointmentsPage = () => {
   });
 
   const generateTimeSlots = () => {
+    // Appointment slots use 30-minute intervals for buffer time
+    // (separate from consultation duration which is used for wait time calculations)
+    const APPOINTMENT_SLOT_INTERVAL = 30;
+    
     // If no doctor selected or no availability data, show default slots
     if (!selectedDoctor || !doctorAvailability.length || !selectedDate) {
       const slots = [];
       for (let hour = 9; hour < 17; hour++) {
-        for (let minute = 0; minute < 60; minute += consultationDuration) {
+        for (let minute = 0; minute < 60; minute += APPOINTMENT_SLOT_INTERVAL) {
           const formattedHour = hour.toString().padStart(2, '0');
           const formattedMinute = minute.toString().padStart(2, '0');
           slots.push(`${formattedHour}:${formattedMinute}`);
@@ -315,7 +319,7 @@ const AppointmentsPage = () => {
       return []; // No availability for this day
     }
 
-    // Generate time slots based on doctor's availability and consultation duration
+    // Generate time slots based on doctor's availability (30-minute intervals)
     const slots = [];
     const startTime = dayAvailability.start_time; // e.g., "09:00:00"
     const endTime = dayAvailability.end_time; // e.g., "17:00:00"
@@ -324,7 +328,7 @@ const AppointmentsPage = () => {
     const [startHour, startMinute] = startTime.split(':').map(Number);
     const [endHour, endMinute] = endTime.split(':').map(Number);
 
-    // Generate slots based on consultation duration within the available time range
+    // Generate slots based on 30-minute intervals within the available time range
     // Calculate end time in minutes for easier comparison
     const startTimeMinutes = startHour * 60 + startMinute;
     const endTimeMinutes = endHour * 60 + endMinute;
@@ -332,7 +336,7 @@ const AppointmentsPage = () => {
     for (
       let currentTimeMinutes = startTimeMinutes;
       currentTimeMinutes < endTimeMinutes;
-      currentTimeMinutes += consultationDuration
+      currentTimeMinutes += APPOINTMENT_SLOT_INTERVAL
     ) {
       const currentHour = Math.floor(currentTimeMinutes / 60);
       const currentMinute = currentTimeMinutes % 60;

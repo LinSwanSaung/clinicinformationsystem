@@ -25,8 +25,8 @@
     "payments": {},
     "invoices": {},
     "dashboard": {
-      "creditRemaining": "Credit Remaining",
-      "creditRemainingHelper": "Available credit that can be used against future invoices",
+      "creditRemaining": "Outstanding Balance",
+      "creditRemainingHelper": "Amount you still owe for unpaid invoices",
       "title": "Patient Portal",
       "subtitle": "Your health summary at a glance",
       "welcome": "Welcome back",

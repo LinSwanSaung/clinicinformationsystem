@@ -121,17 +121,18 @@ const PatientPortalDashboard = () => {
   logger.debug('[PatientPortalDashboard] profileState:', profileState);
   logger.debug('[PatientPortalDashboard] profileData:', profileData);
 
-  // Load patient remaining credit once profile is ready (via patient portal endpoint)
+  // Load patient outstanding balance once profile is ready (via patient portal endpoint)
   useEffect(() => {
     let mounted = true;
     (async () => {
       try {
         setCreditState((s) => ({ ...s, loading: true, error: null }));
-        const res = await patientPortalService.getRemainingCredit();
-        const value = Number(res?.data?.totalCredit ?? res?.totalCredit ?? 0);
+        const res = await patientPortalService.getOutstandingBalance();
+        // Get totalBalance from outstanding balance response
+        const value = Number(res?.data?.totalBalance ?? res?.totalBalance ?? 0);
         if (mounted) setCreditState({ value, loading: false, error: null });
       } catch (e) {
-        if (mounted) setCreditState({ value: 0, loading: false, error: e.message || 'Failed to load credit' });
+        if (mounted) setCreditState({ value: 0, loading: false, error: e.message || 'Failed to load outstanding balance' });
       }
     })();
     return () => {

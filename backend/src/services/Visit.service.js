@@ -147,6 +147,40 @@ class VisitService {
         throw new Error('Visit ID is required');
       }
 
+      // Validate visit status before completion
+      const visit = await this.getVisitDetails(visitId);
+      if (!visit) {
+        throw new Error('Visit not found');
+      }
+
+      if (visit.status === 'completed') {
+        throw new Error('Visit is already completed');
+      }
+
+      if (visit.status === 'cancelled') {
+        throw new Error('Cannot complete a cancelled visit');
+      }
+
+      // Note: Business rule - visits can be completed even with partial payments
+      // This allows patients to have new visits even if invoice is not fully paid
+      if (visit.invoice_id) {
+          // Check invoice status if invoice exists
+          try {
+            const { default: invoiceService } = await import('./Invoice.service.js');
+            const invoice = await invoiceService.getInvoiceById(visit.invoice_id);
+          
+          // Allow visit completion for: pending, partial_paid, or paid invoices
+          // This allows patients to have new visits even with outstanding balance
+          const allowedStatuses = ['pending', 'partial_paid', 'paid'];
+          if (invoice && !allowedStatuses.includes(invoice.status)) {
+            logger.warn(`[VISIT] Completing visit ${visitId} with invoice status '${invoice.status}'. This may be unexpected.`);
+          }
+        } catch (invoiceError) {
+          // If invoice check fails, log but allow completion (invoice might not exist yet)
+          logger.warn(`[VISIT] Could not verify invoice status for visit ${visitId}:`, invoiceError.message);
+        }
+      }
+
       const completedVisit = await this.visitModel.completeVisit(visitId, completionData);
 
       return {
@@ -187,6 +221,430 @@ class VisitService {
         total: data?.length || 0,
       };
     } catch (error) {
+      throw error;
+    }
+  }
+
+  /**
+   * Get all pending items that need admin attention
+   * Returns visits with various issues that require admin review
+   */
+  async getPendingItems() {
+    try {
+      const pendingItems = [];
+      const supabase = this.visitModel.supabase;
+
+      // Get pending visits that need admin attention:
+      // 1. Visits with consultation ended (visit_end_time set) but still in_progress
+      // 2. Visits with active queue tokens (serving status)
+      // 3. Visits in_progress for more than 1 hour without invoice or with unpaid invoice
+      
+      const oneHourAgo = new Date(Date.now() - 60 * 60 * 1000).toISOString();
+      const today = new Date().toISOString().split('T')[0];
+
+      // Query 1: Visits with visit_end_time set but still in_progress (consultation ended, visit not completed)
+      const { data: endedConsultationVisits, error: endedError } = await supabase
+        .from('visits')
+        .select(
+          `
+          id,
+          status,
+          visit_end_time,
+          updated_at,
+          resolved_by_admin,
+          resolved_reason,
+          patients!inner (
+            first_name,
+            last_name,
+            patient_number
+          ),
+          users (
+            first_name,
+            last_name
+          )
+        `
+        )
+        .eq('status', 'in_progress')
+        .not('visit_end_time', 'is', null)
+        .eq('resolved_by_admin', false)
+        .order('visit_end_time', { ascending: true });
+
+      // Query 2: Visits with active serving queue tokens
+      const { data: servingTokens, error: servingError } = await supabase
+        .from('queue_tokens')
+        .select(
+          `
+          id,
+          token_number,
+          visit_id,
+          status,
+          issued_date,
+          served_at,
+          updated_at,
+          visits!inner (
+            id,
+            status,
+            visit_end_time,
+            updated_at,
+            resolved_by_admin,
+            resolved_reason,
+            patients!inner (
+              first_name,
+              last_name,
+              patient_number
+            ),
+            users (
+              first_name,
+              last_name
+            )
+          )
+        `
+        )
+        .eq('status', 'serving')
+        .not('visit_id', 'is', null);
+
+      // Query 3: Long-running in_progress visits (older than 1 hour)
+      const { data: allInProgressVisits, error: longRunningError } = await supabase
+        .from('visits')
+        .select(
+          `
+          id,
+          status,
+          visit_start_time,
+          visit_end_time,
+          updated_at,
+          resolved_by_admin,
+          resolved_reason,
+          patients!inner (
+            first_name,
+            last_name,
+            patient_number
+          ),
+          users (
+            first_name,
+            last_name
+          )
+        `
+        )
+        .eq('status', 'in_progress')
+        .eq('resolved_by_admin', false)
+        .order('updated_at', { ascending: true });
+      
+      // Filter in code: visits that started more than 1 hour ago OR updated more than 1 hour ago
+      const longRunningVisits = allInProgressVisits?.filter((visit) => {
+        const startTime = visit.visit_start_time ? new Date(visit.visit_start_time) : null;
+        const updatedTime = visit.updated_at ? new Date(visit.updated_at) : null;
+        const oneHourAgoDate = new Date(oneHourAgo);
+        
+        return (
+          (startTime && startTime < oneHourAgoDate) ||
+          (updatedTime && updatedTime < oneHourAgoDate)
+        );
+      }) || [];
+
+      if (endedError) {
+        logger.error('[VISIT] Ended consultation visits query error:', endedError);
+      }
+      if (servingError) {
+        logger.error('[VISIT] Serving tokens query error:', servingError);
+      }
+      if (longRunningError) {
+        logger.error('[VISIT] Long-running visits query error:', longRunningError);
+      }
+
+      // Process ended consultation visits
+      if (!endedError && endedConsultationVisits) {
+        for (const visit of endedConsultationVisits) {
+          if (visit.resolved_by_admin) {
+            continue;
+          }
+
+          const { data: invoices } = await supabase
+            .from('invoices')
+            .select('id, status')
+            .eq('visit_id', visit.id)
+            .limit(1);
+
+          if (!invoices || invoices.length === 0) {
+            // No invoice - consultation ended but no invoice created
+            pendingItems.push({
+              entityType: 'visit',
+              entityId: visit.id,
+              currentStatus: visit.status,
+              lastUpdated: visit.visit_end_time || visit.updated_at,
+              patientName: `${visit.patients.first_name} ${visit.patients.last_name}`,
+              patientNumber: visit.patients.patient_number,
+              doctorName: visit.users ? `${visit.users.first_name} ${visit.users.last_name}` : null,
+              resolvedByAdmin: visit.resolved_by_admin,
+              resolvedReason: visit.resolved_reason,
+              issue: 'Consultation ended but visit not completed (no invoice)',
+            });
+          } else if (invoices[0].status === 'paid' || invoices[0].status === 'partial_paid') {
+            // Invoice is paid/partial_paid but visit is still in_progress
+            // This is a data integrity issue - invoice was processed but visit wasn't completed (tech/network issue)
+            pendingItems.push({
+              entityType: 'visit',
+              entityId: visit.id,
+              currentStatus: visit.status,
+              lastUpdated: visit.visit_end_time || visit.updated_at,
+              patientName: `${visit.patients.first_name} ${visit.patients.last_name}`,
+              patientNumber: visit.patients.patient_number,
+              doctorName: visit.users ? `${visit.users.first_name} ${visit.users.last_name}` : null,
+              resolvedByAdmin: visit.resolved_by_admin,
+              resolvedReason: visit.resolved_reason,
+              issue: `Invoice ${invoices[0].status === 'paid' ? 'completed' : 'partially paid'} but visit was not completed (set to progress). Please complete the visit manually.`,
+              invoiceId: invoices[0].id,
+              invoiceStatus: invoices[0].status,
+            });
+          } else {
+            // Invoice exists but is pending/draft - consultation ended but invoice not processed
+            pendingItems.push({
+              entityType: 'visit',
+              entityId: visit.id,
+              currentStatus: visit.status,
+              lastUpdated: visit.visit_end_time || visit.updated_at,
+              patientName: `${visit.patients.first_name} ${visit.patients.last_name}`,
+              patientNumber: visit.patients.patient_number,
+              doctorName: visit.users ? `${visit.users.first_name} ${visit.users.last_name}` : null,
+              resolvedByAdmin: visit.resolved_by_admin,
+              resolvedReason: visit.resolved_reason,
+              issue: 'Consultation ended but visit not completed (invoice pending)',
+              invoiceId: invoices[0].id,
+              invoiceStatus: invoices[0].status,
+            });
+          }
+        }
+      }
+
+      // Process visits with active serving tokens
+      if (!servingError && servingTokens) {
+        const visitIds = new Set();
+        servingTokens.forEach((token) => {
+          if (token.visits && !visitIds.has(token.visits.id)) {
+            if (token.visits.resolved_by_admin) {
+              return;
+            }
+            
+            visitIds.add(token.visits.id);
+            
+            const isStuckConsultation = token.issued_date && token.issued_date !== today;
+            
+            let issue;
+            if (isStuckConsultation) {
+              issue = `Stuck consultation: Token #${token.token_number} from ${token.issued_date} still marked as serving`;
+            } else if (token.visits.visit_end_time) {
+              issue = 'Data inconsistency: Consultation ended but token still serving';
+            } else {
+              issue = 'Active consultation in progress';
+            }
+            
+            pendingItems.push({
+              entityType: 'visit',
+              entityId: token.visits.id,
+              currentStatus: token.visits.status,
+              lastUpdated: token.updated_at || token.visits.updated_at,
+              patientName: `${token.visits.patients.first_name} ${token.visits.patients.last_name}`,
+              patientNumber: token.visits.patients.patient_number,
+              doctorName: token.visits.users
+                ? `${token.visits.users.first_name} ${token.visits.users.last_name}`
+                : null,
+              resolvedByAdmin: token.visits.resolved_by_admin,
+              resolvedReason: token.visits.resolved_reason,
+              issue,
+              tokenId: isStuckConsultation ? token.id : undefined,
+              tokenNumber: isStuckConsultation ? token.token_number : undefined,
+              issuedDate: isStuckConsultation ? token.issued_date : undefined,
+            });
+          }
+        });
+      }
+
+      // Process long-running visits
+      if (!longRunningError && longRunningVisits && longRunningVisits.length > 0) {
+        for (const visit of longRunningVisits) {
+          if (pendingItems.some((item) => item.entityId === visit.id && item.entityType === 'visit')) {
+            continue;
+          }
+
+          if (visit.resolved_by_admin) {
+            continue;
+          }
+
+          const { data: invoices } = await supabase
+            .from('invoices')
+            .select('id, status')
+            .eq('visit_id', visit.id)
+            .limit(1);
+
+          const invoiceStatus = invoices && invoices.length > 0 ? invoices[0].status : null;
+          const hasPaidInvoice = invoiceStatus === 'paid';
+          const hasPartialPaidInvoice = invoiceStatus === 'partial_paid';
+          const hasUnpaidInvoice = invoiceStatus && !hasPaidInvoice && !hasPartialPaidInvoice;
+
+          // Include visits with paid/partial_paid invoices - these are data integrity issues
+          // Invoice was processed but visit wasn't completed (tech/network issue)
+          // Show in pending items for admin to complete manually
+          if (hasPaidInvoice || hasPartialPaidInvoice) {
+            const statusText = invoiceStatus === 'paid' ? 'completed' : 'partially paid';
+            pendingItems.push({
+              entityType: 'visit',
+              entityId: visit.id,
+              currentStatus: visit.status,
+              lastUpdated: visit.updated_at,
+              patientName: `${visit.patients.first_name} ${visit.patients.last_name}`,
+              patientNumber: visit.patients.patient_number,
+              doctorName: visit.users ? `${visit.users.first_name} ${visit.users.last_name}` : null,
+              resolvedByAdmin: visit.resolved_by_admin,
+              resolvedReason: visit.resolved_reason,
+              issue: `Invoice ${statusText} but visit was not completed (set to progress). Please complete the visit manually.`,
+              invoiceId: invoices[0].id,
+              invoiceStatus: invoices[0].status,
+            });
+          } else if (!invoices || invoices.length === 0 || hasUnpaidInvoice) {
+            let issue = 'Long-running visit without completion';
+            if (visit.visit_end_time) {
+              // Check if invoice exists to provide better issue description
+              if (!invoices || invoices.length === 0) {
+                issue = 'Consultation ended but visit not completed (no invoice)';
+              } else {
+                issue = 'Consultation ended but visit not completed (no paid invoice)';
+              }
+            } else if (hasUnpaidInvoice) {
+              issue = 'Long-running visit with unpaid invoice';
+            } else if (!invoices || invoices.length === 0) {
+              issue = 'Long-running visit without invoice';
+            }
+
+            pendingItems.push({
+              entityType: 'visit',
+              entityId: visit.id,
+              currentStatus: visit.status,
+              lastUpdated: visit.updated_at,
+              patientName: `${visit.patients.first_name} ${visit.patients.last_name}`,
+              patientNumber: visit.patients.patient_number,
+              doctorName: visit.users ? `${visit.users.first_name} ${visit.users.last_name}` : null,
+              resolvedByAdmin: visit.resolved_by_admin,
+              resolvedReason: visit.resolved_reason,
+              issue,
+            });
+          }
+        }
+      }
+
+      // Check for data integrity issues: visits with paid invoices but still in_progress
+      // These should be completed automatically or flagged for admin
+      const { data: allInProgressWithInvoices, error: integrityError } = await supabase
+        .from('visits')
+        .select(
+          `
+          id,
+          status,
+          updated_at,
+          resolved_by_admin,
+          resolved_reason,
+          patients!inner (
+            first_name,
+            last_name,
+            patient_number
+          ),
+          users (
+            first_name,
+            last_name
+          )
+        `
+        )
+        .eq('status', 'in_progress')
+        .eq('resolved_by_admin', false);
+
+      if (!integrityError && allInProgressWithInvoices) {
+        for (const visit of allInProgressWithInvoices) {
+          // Skip if already in pending items
+          if (pendingItems.some((item) => item.entityId === visit.id && item.entityType === 'visit')) {
+            continue;
+          }
+
+          // Check if this visit has a paid invoice
+          const { data: visitInvoices } = await supabase
+            .from('invoices')
+            .select('id, status')
+            .eq('visit_id', visit.id)
+            .eq('status', 'paid')
+            .limit(1);
+
+          // If invoice is paid but visit is still in_progress, this is a data integrity issue
+          if (visitInvoices && visitInvoices.length > 0) {
+            pendingItems.push({
+              entityType: 'visit',
+              entityId: visit.id,
+              currentStatus: visit.status,
+              lastUpdated: visit.updated_at,
+              patientName: `${visit.patients.first_name} ${visit.patients.last_name}`,
+              patientNumber: visit.patients.patient_number,
+              doctorName: visit.users ? `${visit.users.first_name} ${visit.users.last_name}` : null,
+              resolvedByAdmin: visit.resolved_by_admin,
+              resolvedReason: visit.resolved_reason,
+              issue: `Data integrity issue: Invoice is paid but visit status is still in_progress. Visit should be completed.`,
+              invoiceId: visitInvoices[0].id,
+              invoiceStatus: visitInvoices[0].status,
+            });
+          }
+        }
+      }
+
+      // Remove duplicates
+      const uniquePendingItems = [];
+      const seenIds = new Set();
+      for (const item of pendingItems) {
+        const key = `${item.entityType}-${item.entityId}`;
+        if (!seenIds.has(key)) {
+          seenIds.add(key);
+          uniquePendingItems.push(item);
+        }
+      }
+
+      return {
+        success: true,
+        data: uniquePendingItems,
+        total: uniquePendingItems.length,
+      };
+    } catch (error) {
+      logger.error('[VISIT] Error getting pending items:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Debug method: Get recent visits with basic info
+   * Used for admin debugging purposes
+   */
+  async getDebugVisits(limit = 20) {
+    try {
+      const { data, error } = await this.visitModel.supabase
+        .from('visits')
+        .select(
+          `
+          id,
+          status,
+          created_at,
+          updated_at,
+          patients (first_name, last_name, patient_number),
+          users (first_name, last_name)
+        `
+        )
+        .order('created_at', { ascending: false })
+        .limit(limit);
+
+      if (error) {
+        throw error;
+      }
+
+      return {
+        data: data || [],
+        error: null,
+        count: data?.length || 0,
+      };
+    } catch (error) {
+      logger.error('Error in VisitService.getDebugVisits:', error);
       throw error;
     }
   }

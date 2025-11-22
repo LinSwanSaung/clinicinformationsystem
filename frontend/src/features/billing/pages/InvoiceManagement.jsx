@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { useParams, useNavigate, useLocation } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import { invoiceService } from '@/features/billing';
+import { formatCurrencySync } from '@/utils/currency';
 import {
   ArrowLeft,
   User,
@@ -235,7 +236,7 @@ const InvoiceManagement = () => {
       setTimeout(() => {
         navigate('/cashier', { 
           state: { 
-            message: `Payment of $${amountToRecord.toFixed(2)} for ${invoice.invoice_number || invoice.id} processed successfully` 
+            message: `Payment of ${formatCurrencySync(amountToRecord)} for ${invoice.invoice_number || invoice.id} processed successfully` 
           }
         });
       }, 1000);
@@ -384,7 +385,7 @@ const InvoiceManagement = () => {
                                     <p className="font-medium">{service.name}</p>
                                     <p className="text-sm text-muted-foreground">{service.description}</p>
                                   </div>
-                                  <p className="font-medium">${service.price.toFixed(2)}</p>
+                                  <p className="font-medium">{formatCurrencySync(service.price)}</p>
                                 </div>
                               ))}
                             </div>
@@ -449,7 +450,7 @@ const InvoiceManagement = () => {
                                   <p className="text-sm text-muted-foreground">{service.description}</p>
                                 </div>
                                 <div className="text-right">
-                                  <p className="font-bold">${service.price.toFixed(2)}</p>
+                                  <p className="font-bold">{formatCurrencySync(service.price)}</p>
                                   <Badge variant="outline" className="border-green-200 text-green-800">
                                     <CheckCircle className="h-3 w-3 mr-1" />
                                     Completed
@@ -480,7 +481,7 @@ const InvoiceManagement = () => {
                                   </p>
                                 </div>
                                 <div className="text-right">
-                                  <p className="font-medium">${med.price.toFixed(2)}</p>
+                                  <p className="font-medium">{formatCurrencySync(med.price)}</p>
                                   <Badge 
                                     className={
                                       med.action === 'dispense' 
@@ -556,7 +557,7 @@ const InvoiceManagement = () => {
                                   </span>
                                   <div className="ml-auto">
                                     <span className="text-sm font-medium">
-                                      Amount: ${(med.price * med.dispensedQuantity / med.quantity).toFixed(2)}
+                                      Amount: {formatCurrencySync(med.price * med.dispensedQuantity / med.quantity)}
                                     </span>
                                   </div>
                                 </motion.div>
@@ -603,16 +604,16 @@ const InvoiceManagement = () => {
                     <div className="space-y-3">
                       <div className="flex justify-between">
                         <span>Services</span>
-                        <span>${totals.servicesTotal.toFixed(2)}</span>
+                        <span>{formatCurrencySync(totals.servicesTotal)}</span>
                       </div>
                       <div className="flex justify-between">
                         <span>Medications</span>
-                        <span>${totals.medicationsTotal.toFixed(2)}</span>
+                        <span>{formatCurrencySync(totals.medicationsTotal)}</span>
                       </div>
                       <Separator />
                       <div className="flex justify-between font-medium">
                         <span>Subtotal</span>
-                        <span>${totals.subtotal.toFixed(2)}</span>
+                        <span>{formatCurrencySync(totals.subtotal)}</span>
                       </div>
                       
                       {/* Discount Section */}
@@ -659,14 +660,14 @@ const InvoiceManagement = () => {
                       {totals.discountAmount > 0 && (
                         <div className="flex justify-between text-red-600">
                           <span>Discount</span>
-                          <span>-${totals.discountAmount.toFixed(2)}</span>
+                          <span>-{formatCurrencySync(totals.discountAmount)}</span>
                         </div>
                       )}
                       
                       <Separator />
                       <div className="flex justify-between text-lg font-bold">
                         <span>Total</span>
-                        <span>${totals.total.toFixed(2)}</span>
+                        <span>{formatCurrencySync(totals.total)}</span>
                       </div>
                     </div>
 
@@ -682,7 +683,7 @@ const InvoiceManagement = () => {
                           max={totals.total}
                           value={paymentAmount}
                           onChange={(e) => setPaymentAmount(e.target.value)}
-                          placeholder={`Enter amount (Max: $${totals.total.toFixed(2)})`}
+                          placeholder={`Enter amount (Max: ${formatCurrencySync(totals.total)})`}
                           className="pl-7"
                         />
                       </div>
@@ -819,16 +820,16 @@ const InvoiceManagement = () => {
               <Separator />
               <div className="flex justify-between">
                 <span>Total Amount:</span>
-                <span className="font-semibold">${totals.total.toFixed(2)}</span>
+                <span className="font-semibold">{formatCurrencySync(totals.total)}</span>
               </div>
               <div className="flex justify-between text-lg font-bold text-primary">
                 <span>Payment Amount:</span>
-                <span>${paymentAmount ? parseFloat(paymentAmount).toFixed(2) : totals.total.toFixed(2)}</span>
+                <span>{formatCurrencySync(paymentAmount ? parseFloat(paymentAmount) : totals.total)}</span>
               </div>
               {paymentAmount && parseFloat(paymentAmount) < totals.total && (
                 <div className="flex justify-between text-amber-600">
                   <span>Remaining Balance:</span>
-                  <span>${(totals.total - parseFloat(paymentAmount)).toFixed(2)}</span>
+                  <span>{formatCurrencySync(totals.total - parseFloat(paymentAmount))}</span>
                 </div>
               )}
             </div>

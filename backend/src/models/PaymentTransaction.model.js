@@ -1,4 +1,5 @@
 import { BaseModel } from './BaseModel.js';
+import logger from '../config/logger.js';
 
 /**
  * PaymentTransaction Model - Payment records
@@ -61,8 +62,71 @@ class PaymentTransactionModel extends BaseModel {
   }
 
   /**
-   * Create payment transaction
+   * Get recent payments for an invoice (within specified time window in milliseconds)
+   * Used for duplicate payment detection
    */
+  async getRecentPaymentsByInvoice(invoiceId, timeWindowMs = 5000) {
+    const timeWindow = new Date(Date.now() - timeWindowMs);
+    
+    const { data, error } = await this.supabase
+      .from(this.tableName)
+      .select('id, amount, payment_method, received_by, received_at')
+      .eq('invoice_id', invoiceId)
+      .gte('received_at', timeWindow.toISOString())
+      .order('received_at', { ascending: false });
+
+    if (error) {
+      throw new Error(`Failed to fetch recent payments: ${error.message}`);
+    }
+
+    return data || [];
+  }
+
+  /**
+   * Atomically record payment using database function with advisory locks
+   * This prevents race conditions when multiple payments are recorded simultaneously
+   */
+  async recordPaymentAtomic(invoiceId, amount, paymentMethod, paymentReference, paymentNotes, receivedBy) {
+    try {
+      const { data, error } = await this.supabase.rpc('record_payment_atomic', {
+        p_invoice_id: invoiceId,
+        p_amount: amount,
+        p_payment_method: paymentMethod,
+        p_payment_reference: paymentReference || null,
+        p_payment_notes: paymentNotes || null,
+        p_received_by: receivedBy,
+      });
+
+      if (error) {
+        throw new Error(`Failed to record payment atomically: ${error.message}`);
+      }
+
+      if (!data || data.length === 0) {
+        throw new Error('No data returned from record_payment_atomic function');
+      }
+
+      const result = data[0];
+      
+      if (!result.success) {
+        throw new Error(result.message || 'Failed to record payment');
+      }
+
+      // Parse JSONB data back to objects
+      const paymentData = result.payment_data;
+      const invoiceData = result.invoice_data;
+      
+      return {
+        success: true,
+        message: result.message,
+        payment: paymentData,
+        invoice: invoiceData,
+      };
+    } catch (error) {
+      logger.error('Error in recordPaymentAtomic:', error);
+      throw error;
+    }
+  }
+
   async createPayment(paymentData) {
     const { data, error } = await this.supabase
       .from(this.tableName)

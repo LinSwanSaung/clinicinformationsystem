@@ -1,9 +1,10 @@
 import { useState, useEffect } from 'react';
-import { Plus, X, Search, DollarSign, Package, Check } from 'lucide-react';
+import { Plus, X, Search, DollarSign, Package, Check, Trash2 } from 'lucide-react';
 import serviceService from '@/services/serviceService';
 import invoiceService from '@/features/billing/services/invoiceService';
 import logger from '@/utils/logger';
 import { useFeedback } from '@/contexts/FeedbackContext';
+import { formatCurrencySync, refreshCurrencyCache, getCurrencySymbol } from '@/utils/currency';
 
 const ServiceSelector = ({ visitId, onServicesAdded }) => {
   const { showSuccess, showError, showWarning } = useFeedback();
@@ -15,6 +16,11 @@ const ServiceSelector = ({ visitId, onServicesAdded }) => {
   const [saving, setSaving] = useState(false);
   const [invoice, setInvoice] = useState(null);
   const [error, setError] = useState(null);
+
+  useEffect(() => {
+    // Refresh currency cache on mount
+    refreshCurrencyCache();
+  }, []);
 
   useEffect(() => {
     if (visitId) {
@@ -71,8 +77,21 @@ const ServiceSelector = ({ visitId, onServicesAdded }) => {
           invoiceData = await invoiceService.createInvoice(visitId);
           logger.debug('Invoice created successfully:', invoiceData);
         } catch (createError) {
-          logger.error('Error creating invoice:', createError);
-          throw new Error('Failed to create invoice. Please ensure you have an active visit.');
+          // Handle race condition: if invoice was created by another request, fetch it
+          const errorMsg = createError?.message?.toLowerCase() || '';
+          if (errorMsg.includes('already exists') || errorMsg.includes('duplicate') || errorMsg.includes('unique')) {
+            logger.debug('Invoice already exists (race condition), fetching existing invoice...');
+            try {
+              invoiceData = await invoiceService.getInvoiceByVisit(visitId);
+              logger.debug('Fetched existing invoice after race condition:', invoiceData);
+            } catch (fetchError) {
+              logger.error('Error fetching invoice after race condition:', fetchError);
+              throw new Error('Failed to create or fetch invoice. Please try again.');
+            }
+          } else {
+            logger.error('Error creating invoice:', createError);
+            throw new Error('Failed to create invoice. Please ensure you have an active visit.');
+          }
         }
       }
 
@@ -90,7 +109,7 @@ const ServiceSelector = ({ visitId, onServicesAdded }) => {
             return item.item_type === 'service';
           })
           .map((item) => ({
-            id: item.id,
+            id: item.id, // Invoice item ID (needed for removal)
             service_id: item.item_id,
             service_name: item.item_name,
             quantity: item.quantity,
@@ -144,6 +163,38 @@ const ServiceSelector = ({ visitId, onServicesAdded }) => {
 
   const removeService = (index) => {
     setSelectedServices(selectedServices.filter((_, i) => i !== index));
+  };
+
+  const removeAddedService = async (itemId) => {
+    if (!invoice) {
+      showError('No invoice found. Please try again.');
+      return;
+    }
+
+    // Only allow removal if invoice is pending (during consultation)
+    if (invoice.status !== 'pending' && invoice.status !== 'draft') {
+      showError('Cannot remove services from a paid or completed invoice.');
+      return;
+    }
+
+    try {
+      setSaving(true);
+      await invoiceService.removeInvoiceItem(invoice.id, itemId);
+      
+      // Reload invoice to update added services
+      await loadOrCreateInvoice();
+      
+      if (onServicesAdded) {
+        onServicesAdded();
+      }
+      
+      showSuccess('Service removed from invoice successfully!');
+    } catch (error) {
+      logger.error('Error removing service:', error);
+      showError('Failed to remove service. Please try again.');
+    } finally {
+      setSaving(false);
+    }
   };
 
   const updateService = (index, field, value) => {
@@ -279,20 +330,33 @@ const ServiceSelector = ({ visitId, onServicesAdded }) => {
             <div className="space-y-1.5">
               {addedServices.map((service, index) => (
                 <div
-                  key={index}
+                  key={service.id || index}
                   className="flex items-center justify-between rounded border border-green-200 bg-white p-2"
                 >
                   <div className="flex-1">
                     <div className="text-sm font-medium text-gray-900">{service.service_name}</div>
                     <div className="text-xs text-gray-600">
-                      Qty: {service.quantity} × ${parseFloat(service.unit_price).toFixed(2)} = $
-                      {(service.quantity * service.unit_price).toFixed(2)}
+                      Qty: {service.quantity} × {formatCurrencySync(parseFloat(service.unit_price))} = {formatCurrencySync(service.quantity * service.unit_price)}
                     </div>
                     {service.notes && (
                       <div className="mt-0.5 text-xs text-gray-500">{service.notes}</div>
                     )}
                   </div>
-                  <Check className="ml-2 h-4 w-4 flex-shrink-0 text-green-600" />
+                  <div className="ml-2 flex items-center gap-2">
+                    {invoice && (invoice.status === 'pending' || invoice.status === 'draft') ? (
+                      <button
+                        type="button"
+                        onClick={() => removeAddedService(service.id)}
+                        disabled={saving}
+                        className="flex-shrink-0 rounded p-1 text-red-600 hover:bg-red-50 hover:text-red-700 disabled:opacity-50 disabled:cursor-not-allowed"
+                        title="Remove service from invoice"
+                      >
+                        <Trash2 className="h-4 w-4" />
+                      </button>
+                    ) : (
+                      <Check className="h-4 w-4 flex-shrink-0 text-green-600" />
+                    )}
+                  </div>
                 </div>
               ))}
             </div>
@@ -300,7 +364,7 @@ const ServiceSelector = ({ visitId, onServicesAdded }) => {
               <div className="flex items-center justify-between text-sm">
                 <span className="font-semibold text-gray-700">Subtotal:</span>
                 <span className="font-bold text-green-700">
-                  ${addedServices.reduce((sum, s) => sum + s.quantity * s.unit_price, 0).toFixed(2)}
+                  {formatCurrencySync(addedServices.reduce((sum, s) => sum + s.quantity * s.unit_price, 0))}
                 </span>
               </div>
               {invoice && invoice.status === 'pending' && (
@@ -384,7 +448,7 @@ const ServiceSelector = ({ visitId, onServicesAdded }) => {
                               <span
                                 className={`whitespace-nowrap font-semibold ${isAdded ? 'text-green-600' : 'text-blue-600'}`}
                               >
-                                ${parseFloat(service.default_price).toFixed(2)}
+                                {formatCurrencySync(parseFloat(service.default_price))}
                               </span>
                               {isAdded ? (
                                 <Check className="h-3.5 w-3.5 flex-shrink-0 text-green-600" />
@@ -444,7 +508,7 @@ const ServiceSelector = ({ visitId, onServicesAdded }) => {
 
                       <div>
                         <label className="mb-0.5 block text-xs font-medium text-gray-700">
-                          Price (USD)
+                          Price ({getCurrencySymbol()})
                         </label>
                         <input
                           type="number"
@@ -473,8 +537,7 @@ const ServiceSelector = ({ visitId, onServicesAdded }) => {
                     <div className="flex items-center justify-between border-t border-gray-100 pt-1.5">
                       <span className="text-xs text-gray-500">Total:</span>
                       <span className="text-sm font-semibold text-gray-900">
-                        $
-                        {(parseFloat(service.quantity) * parseFloat(service.unit_price)).toFixed(2)}
+                        {formatCurrencySync(parseFloat(service.quantity) * parseFloat(service.unit_price))}
                       </span>
                     </div>
                   </div>
@@ -485,13 +548,11 @@ const ServiceSelector = ({ visitId, onServicesAdded }) => {
                 <div className="mb-3 flex items-center justify-between">
                   <span className="text-base font-semibold text-gray-900">Subtotal:</span>
                   <span className="text-base font-bold text-green-600">
-                    $
-                    {selectedServices
+                    {formatCurrencySync(selectedServices
                       .reduce(
                         (sum, s) => sum + parseFloat(s.quantity) * parseFloat(s.unit_price),
                         0
-                      )
-                      .toFixed(2)}
+                      ))}
                   </span>
                 </div>
 

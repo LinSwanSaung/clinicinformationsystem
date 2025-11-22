@@ -134,17 +134,19 @@ export function FormModal({
             >
               {cancelText}
             </Button>
-            <Button 
-              type="button"
-              onClick={(e) => {
-                e.preventDefault();
-                handleSubmit(e);
-              }}
-              disabled={submitDisabled || isLoading} 
-              ref={lastFocusableRef}
-            >
-              {isLoading ? (confirmLoadingText || 'Submitting...') : submitText}
-            </Button>
+            {submitText && (
+              <Button 
+                type="button"
+                onClick={(e) => {
+                  e.preventDefault();
+                  handleSubmit(e);
+                }}
+                disabled={submitDisabled || isLoading} 
+                ref={lastFocusableRef}
+              >
+                {isLoading ? (confirmLoadingText || 'Submitting...') : submitText}
+              </Button>
+            )}
           </DialogFooter>
         </form>
       </DialogContent>

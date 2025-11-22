@@ -121,6 +121,14 @@ class ApiService {
       const isLoginEndpoint = endpoint.includes('/auth/login');
       const hasAuthToken = !!localStorage.getItem('authToken');
       
+      // If there's no token, user is already logged out - silently ignore this error
+      // This prevents error logs when components make requests after logout
+      if (!hasAuthToken && !isLoginEndpoint) {
+        // User is already logged out, component is probably unmounting
+        // Silently ignore this error to avoid noise in logs
+        throw new Error('Unauthorized - user logged out');
+      }
+      
       if (!isLoginEndpoint || hasAuthToken) {
         // Global 401 handler: sign out and redirect (for authenticated requests)
         await handleUnauthorized();
@@ -141,7 +149,20 @@ class ApiService {
 
     if (!response.ok) {
       const raw = data.message || `HTTP error! status: ${response.status}`;
-      const message = toFriendlyMessage(raw, { endpoint, status: response.status, data });
+      let message = toFriendlyMessage(raw, { endpoint, status: response.status, data });
+      
+      // Handle specific error codes with user-friendly messages
+      if (data.code === 'ORPHAN_TOKEN') {
+        message = `Cannot complete consultation: Token is missing visit information. ` +
+          `This is a data integrity issue. Please contact support. Token #${data.tokenNumber || 'unknown'}`;
+      } else if (data.code === 'INVOICE_MISSING_VISIT') {
+        message = `Cannot complete invoice: Invoice is missing visit information. ` +
+          `This is a data integrity issue. Please contact support. Invoice #${data.invoiceNumber || 'unknown'}`;
+      } else if (data.code === 'VISIT_UPDATE_FAILED') {
+        message = `Consultation completed but failed to update visit. ` +
+          `The consultation may need to be reviewed. Please refresh and check the status.`;
+      }
+      
       // Dispatch global error for non-401 failures
       if (response.status !== 401) {
         window.dispatchEvent(
@@ -149,7 +170,7 @@ class ApiService {
             detail: {
               message,
               code: data.code,
-              details: data.errors || undefined,
+              details: data.errors || data.message || undefined,
             },
           })
         );

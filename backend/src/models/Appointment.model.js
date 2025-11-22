@@ -293,6 +293,28 @@ class AppointmentModel extends BaseModel {
   }
 
   /**
+   * Get pending appointments for a patient
+   * Used to check if patient can be deleted
+   */
+  async getPatientPendingAppointments(patientId) {
+    const today = new Date().toISOString().split('T')[0];
+    
+    const { data, error } = await this.supabase
+      .from(this.tableName)
+      .select('id, appointment_date, appointment_time, status')
+      .eq('patient_id', patientId)
+      .gte('appointment_date', today)
+      .in('status', ['scheduled', 'confirmed', 'pending', 'waiting'])
+      .order('appointment_date', { ascending: true });
+
+    if (error) {
+      throw new Error(`Failed to fetch pending appointments: ${error.message}`);
+    }
+
+    return data || [];
+  }
+
+  /**
    * Get appointments with combined filters
    */
   async getWithFilters(filters = {}) {

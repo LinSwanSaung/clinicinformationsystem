@@ -6,6 +6,7 @@ import VisitModel from '../models/Visit.model.js';
 import VitalsModel from '../models/Vitals.model.js';
 import PrescriptionModel from '../models/Prescription.model.js';
 import AppointmentModel from '../models/Appointment.model.js';
+import clinicSettingsService from './ClinicSettings.service.js';
 import logger from '../config/logger.js';
 import InvoiceService from './Invoice.service.js';
 
@@ -102,7 +103,8 @@ class PatientPortalService {
           // Count tokens ahead that are not yet serving
           // Only count tokens that come before this one in the sorted queue
           const ahead = sortedQueue.slice(0, index).filter(t => t.status !== 'serving').length;
-          const consultMinutes = token.consult_expected_minutes || 15;
+          // Use clinic settings for consultation duration, fallback to token value or default
+          const consultMinutes = token.consult_expected_minutes || await clinicSettingsService.getConsultationDuration() || 15;
           estimatedWait = token.status === 'serving' ? 0 : ahead * consultMinutes;
         }
       } catch (error) {
@@ -151,6 +153,13 @@ class PatientPortalService {
     // Reuse existing invoice logic
     const credit = await InvoiceService.getPatientRemainingCredit(patient.id);
     return credit;
+  }
+
+  async getOutstandingBalance(userId) {
+    const { patient } = await this.getLinkedPatient(userId);
+    // Get outstanding balance (what patient owes)
+    const balance = await InvoiceService.getPatientOutstandingBalance(patient.id);
+    return balance;
   }
 }
 

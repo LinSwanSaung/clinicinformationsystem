@@ -87,6 +87,7 @@ class QueueTokenModel extends BaseModel {
   /**
    * Get next token in queue for a doctor
    * Looks for tokens that are waiting, ready, or called (not yet being served)
+   * Orders by token_number first (ascending) to ensure patients are called in token order
    */
   async getNextToken(doctorId, date = null) {
     const queueDate = date || new Date().toISOString().split('T')[0];
@@ -109,8 +110,8 @@ class QueueTokenModel extends BaseModel {
       .eq('doctor_id', doctorId)
       .eq('issued_date', queueDate)
       .in('status', ['waiting', 'ready', 'called']) // Include all statuses that mean "ready to be seen"
-      .order('priority', { ascending: false })
-      .order('token_number')
+      .order('token_number', { ascending: true }) // Primary sort: token number order
+      .order('priority', { ascending: false }) // Secondary sort: priority (fallback)
       .limit(1)
       .single();
 
@@ -162,7 +163,96 @@ class QueueTokenModel extends BaseModel {
   /**
    * Update token status with timestamp
    */
-  async updateStatus(id, status, additionalData = {}) {
+  /**
+   * Atomically start consultation using database function with advisory locks
+   * This prevents race conditions when multiple requests try to start consultations
+   * for the same doctor simultaneously
+   */
+  async startConsultationAtomic(tokenId, doctorId) {
+    try {
+      const { data, error } = await this.supabase.rpc('start_consultation_atomic', {
+        p_token_id: tokenId,
+        p_doctor_id: doctorId,
+      });
+
+      if (error) {
+        throw new Error(`Failed to start consultation atomically: ${error.message}`);
+      }
+
+      if (!data || data.length === 0) {
+        throw new Error('No data returned from start_consultation_atomic function');
+      }
+
+      const result = data[0];
+      
+      if (!result.success) {
+        throw new Error(result.message || 'Failed to start consultation');
+      }
+
+      // Parse token_data JSONB back to object
+      const tokenData = result.token_data;
+      
+      return {
+        success: true,
+        message: result.message,
+        token: tokenData,
+      };
+    } catch (error) {
+      logger.error('Error in startConsultationAtomic:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Validate status transition
+   * @param {string} currentStatus - Current token status
+   * @param {string} newStatus - Desired new status
+   * @param {boolean} bypassValidation - If true, skip validation (for admin overrides)
+   * @returns {boolean} True if transition is valid
+   */
+  validateStatusTransition(currentStatus, newStatus, bypassValidation = false) {
+    if (bypassValidation) {
+      return true; // Admin can bypass validation
+    }
+
+    // Define valid status transitions (must match database constraint)
+    // Valid statuses: 'waiting', 'called', 'serving', 'completed', 'missed', 'cancelled', 'delayed'
+    const validTransitions = {
+      'waiting': ['called', 'delayed', 'missed', 'cancelled'],
+      'delayed': ['waiting', 'called', 'missed', 'cancelled'],
+      'called': ['serving', 'waiting', 'delayed', 'missed', 'cancelled'],
+      'serving': ['completed', 'cancelled'],
+      'completed': [], // Cannot transition from completed
+      'missed': ['cancelled'], // Can only be cancelled
+      'cancelled': [], // Cannot transition from cancelled
+    };
+
+    const allowedStatuses = validTransitions[currentStatus] || [];
+    
+    if (!allowedStatuses.includes(newStatus)) {
+      throw new Error(
+        `Invalid status transition: Cannot change from '${currentStatus}' to '${newStatus}'. ` +
+        `Valid transitions from '${currentStatus}': ${allowedStatuses.join(', ') || 'none'}`
+      );
+    }
+
+    return true;
+  }
+
+  async updateStatus(id, status, additionalData = {}, bypassValidation = false) {
+    // Get current status to validate transition
+    const currentToken = await this.findById(id);
+    if (!currentToken) {
+      throw new Error(`Token with id ${id} not found`);
+    }
+
+    const currentStatus = currentToken.status;
+
+    // Validate status transition (unless it's the same status or bypass is requested)
+    if (currentStatus !== status && !bypassValidation) {
+      this.validateStatusTransition(currentStatus, status, bypassValidation);
+    }
+
     const updateData = {
       status,
       updated_at: new Date().toISOString(),
@@ -399,6 +489,45 @@ class QueueTokenModel extends BaseModel {
 
     // Return first result or null
     return data && data.length > 0 ? data[0] : null;
+  }
+
+  /**
+   * Detect stuck consultations (serving tokens from previous days)
+   * Returns list of stuck tokens that should be auto-completed
+   */
+  async detectStuckConsultations(doctorId = null, maxAgeHours = 24) {
+    const cutoffTime = new Date();
+    cutoffTime.setHours(cutoffTime.getHours() - maxAgeHours);
+    const today = new Date().toISOString().split('T')[0];
+    
+    let query = this.supabase
+      .from(this.tableName)
+      .select(`
+        *,
+        patient:patients!patient_id (
+          id,
+          patient_number,
+          first_name,
+          last_name
+        )
+      `)
+      .eq('status', 'serving')
+      .neq('issued_date', today) // Only tokens from previous days
+      .lt('served_at', cutoffTime.toISOString()); // Older than maxAgeHours
+    
+    if (doctorId) {
+      query = query.eq('doctor_id', doctorId);
+    }
+    
+    query = query.order('served_at', { ascending: true });
+    
+    const { data, error } = await query;
+    
+    if (error) {
+      throw new Error(`Failed to detect stuck consultations: ${error.message}`);
+    }
+    
+    return data || [];
   }
 
   /**

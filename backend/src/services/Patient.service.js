@@ -98,6 +98,30 @@ class PatientService {
       throw new AppError('Patient not found', 404);
     }
 
+    // Check for active visits before deletion
+    const VisitModel = (await import('../models/Visit.model.js')).default;
+    const visitModel = new VisitModel();
+    const activeVisit = await visitModel.getPatientActiveVisit(patientId);
+
+    if (activeVisit) {
+      throw new AppError(
+        `Cannot delete patient. Patient has an active visit (Visit ID: ${activeVisit.id}). Please complete or cancel the visit first.`,
+        409
+      );
+    }
+
+    // Check for pending appointments
+    const AppointmentModel = (await import('../models/Appointment.model.js')).default;
+    const appointmentModel = new AppointmentModel();
+    const pendingAppointments = await appointmentModel.getPatientPendingAppointments(patientId);
+
+    if (pendingAppointments && pendingAppointments.length > 0) {
+      throw new AppError(
+        `Cannot delete patient. Patient has ${pendingAppointments.length} pending appointment(s). Please cancel or complete them first.`,
+        409
+      );
+    }
+
     // Note: In a real system, you might want to soft delete or check for dependencies
     await PatientModel.deleteById(patientId);
 

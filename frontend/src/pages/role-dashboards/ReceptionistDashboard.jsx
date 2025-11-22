@@ -3,6 +3,7 @@ import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { useFeedback } from '@/contexts/FeedbackContext';
+import clinicSettingsService from '@/services/clinicSettingsService';
 import {
   Calendar,
   Users,
@@ -81,6 +82,21 @@ const ReceptionistDashboard = () => {
     scheduled: 0,
     overdue: 0,
   });
+  const [lateThreshold, setLateThreshold] = useState(15); // Default 15 minutes
+
+  // Load clinic settings for late threshold
+  useEffect(() => {
+    const loadLateThreshold = async () => {
+      try {
+        const threshold = await clinicSettingsService.getLateThreshold();
+        setLateThreshold(threshold);
+      } catch (error) {
+        logger.error('Error loading late threshold:', error);
+        // Use default if error
+      }
+    };
+    loadLateThreshold();
+  }, []);
 
   // Helper function to check if appointment is overdue
   const isAppointmentOverdue = (appointment) => {
@@ -94,8 +110,8 @@ const ReceptionistDashboard = () => {
     const appointmentTime = new Date();
     appointmentTime.setHours(parseInt(hours), parseInt(minutes), 0, 0);
 
-    // Consider overdue if more than 15 minutes past appointment time
-    const overdueThreshold = 15 * 60 * 1000; // 15 minutes in milliseconds
+    // Use clinic settings for late threshold
+    const overdueThreshold = lateThreshold * 60 * 1000; // Convert minutes to milliseconds
     return now - appointmentTime > overdueThreshold;
   };
 

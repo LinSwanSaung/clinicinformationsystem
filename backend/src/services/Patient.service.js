@@ -41,7 +41,7 @@ class PatientService {
   /**
    * Create new patient
    */
-  async createPatient(patientData, createdBy) {
+  async createPatient(patientData, _createdBy) {
     // Check if patient with same phone number already exists (optional check)
     if (patientData.phone) {
       const existingPatient = await PatientModel.findOne({ phone: patientData.phone });
@@ -170,7 +170,7 @@ class PatientService {
    * Get recent patients
    */
   async getRecentPatients(days = 30, options = {}) {
-    return await PatientModel.getRecentPatients(days, options);
+    return PatientModel.getRecentPatients(days, options);
   }
 
   /**

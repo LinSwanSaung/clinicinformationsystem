@@ -33,7 +33,9 @@ export async function fetchDispenses(filters = {}) {
 		.gte('completed_at', start)
 		.lte('completed_at', end)
 		.order('completed_at', { ascending: false });
-	if (invErr) throw invErr;
+	if (invErr) {
+		throw invErr;
+	}
 	if (!invoices || invoices.length === 0) {
 		return { items: [], total: 0, summary: { totalItems: 0, totalUnits: 0, byMedicine: [] } };
 	}
@@ -50,7 +52,9 @@ export async function fetchDispenses(filters = {}) {
 		itemsQuery = itemsQuery.ilike('item_name', `%${search.trim()}%`);
 	}
 	const { data: invoiceItems, error: itemsErr } = await itemsQuery;
-	if (itemsErr) throw itemsErr;
+	if (itemsErr) {
+		throw itemsErr;
+	}
 
 	if (!invoiceItems || invoiceItems.length === 0) {
 		return { items: [], total: 0, summary: { totalItems: 0, totalUnits: 0, byMedicine: [] } };
@@ -60,25 +64,29 @@ export async function fetchDispenses(filters = {}) {
 	const patientIds = [...new Set(invoices.map((i) => i.patient_id).filter(Boolean))];
 	const userIds = [...new Set(invoices.map((i) => i.completed_by).filter(Boolean))];
 
-	let patientsMap = {};
+	const patientsMap = {};
 	if (patientIds.length > 0) {
 		const { data: patients, error: pErr } = await supabase
 			.from('patients')
 			.select('id, first_name, last_name, patient_number')
 			.in('id', patientIds);
-		if (pErr) throw pErr;
+		if (pErr) {
+			throw pErr;
+		}
 		(patients || []).forEach((p) => {
 			patientsMap[p.id] = p;
 		});
 	}
 
-	let usersMap = {};
+	const usersMap = {};
 	if (userIds.length > 0) {
 		const { data: users, error: uErr } = await supabase
 			.from('users')
 			.select('id, first_name, last_name, role')
 			.in('id', userIds);
-		if (uErr) throw uErr;
+		if (uErr) {
+			throw uErr;
+		}
 		(users || []).forEach((u) => {
 			usersMap[u.id] = u;
 		});
@@ -137,8 +145,12 @@ export async function fetchDispenses(filters = {}) {
 				valB = b.dispensedAt ? new Date(b.dispensedAt).getTime() : 0;
 				break;
 		}
-		if (valA < valB) return sortDir === 'asc' ? -1 : 1;
-		if (valA > valB) return sortDir === 'asc' ? 1 : -1;
+		if (valA < valB) {
+			return sortDir === 'asc' ? -1 : 1;
+		}
+		if (valA > valB) {
+			return sortDir === 'asc' ? 1 : -1;
+		}
 		return 0;
 	};
 	composed.sort(comparator);

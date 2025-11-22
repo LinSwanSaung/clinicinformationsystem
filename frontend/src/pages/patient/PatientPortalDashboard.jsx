@@ -1,18 +1,14 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import PageLayout from '@/components/layout/PageLayout';
-import { ProfileSummary, UpcomingAppointments, VitalsSnapshot, PortalSearchResults, AIHealthBlog } from '@/features/patient-portal';
+import { ProfileSummary, UpcomingAppointments, VitalsSnapshot, AIHealthBlog } from '@/features/patient-portal';
 import { LatestVisitSummary } from '@/features/visits';
 import { patientPortalService } from '@/features/patients';
-import { Separator } from '@/components/ui/separator';
 import logger from '@/utils/logger';
 import { StatCard } from '@/components/library/dashboard/StatCard';
 import { Wallet } from 'lucide-react';
-import invoiceService from '@/features/billing/services/invoiceService';
 
 const PatientPortalDashboard = () => {
-  const navigate = useNavigate();
   const { t, i18n } = useTranslation();
   const [profileState, setProfileState] = useState({ data: null, loading: true, error: null });
   const [visitsState, setVisitsState] = useState({ data: [], loading: true, error: null });

@@ -86,11 +86,15 @@ class PatientPortalService {
         sortedQueue = sortedQueue.sort((a, b) => {
           // First, sort by status priority
           const statusDiff = statusOrder[a.status] - statusOrder[b.status];
-          if (statusDiff !== 0) return statusDiff;
+          if (statusDiff !== 0) {
+            return statusDiff;
+          }
 
           // Then by priority (higher priority first)
           const priorityDiff = (b.priority || 1) - (a.priority || 1);
-          if (priorityDiff !== 0) return priorityDiff;
+          if (priorityDiff !== 0) {
+            return priorityDiff;
+          }
 
           // Finally by token_number (lower number first)
           return a.token_number - b.token_number;

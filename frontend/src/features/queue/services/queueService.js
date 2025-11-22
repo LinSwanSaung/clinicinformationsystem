@@ -134,18 +134,6 @@ class QueueService {
   }
 
   /**
-   * Mark patient as ready for doctor (Nurse action)
-   */
-  async markPatientReady(tokenId) {
-    try {
-      const response = await api.put(`${this.baseURL}/token/${tokenId}/mark-ready`);
-      return response.data;
-    } catch (error) {
-      throw new Error(error.response?.data?.message || 'Failed to mark patient as ready');
-    }
-  }
-
-  /**
    * Start consultation with a patient
    */
   async startConsultation(tokenId) {

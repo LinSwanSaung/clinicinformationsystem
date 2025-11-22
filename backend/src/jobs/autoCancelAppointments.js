@@ -13,7 +13,6 @@
 
 import cron from 'node-cron';
 import AppointmentModel from '../models/Appointment.model.js';
-import InvoiceModel from '../models/Invoice.model.js';
 import { logAuditEvent } from '../utils/auditLogger.js';
 import logger from '../config/logger.js';
 

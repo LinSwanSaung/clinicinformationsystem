@@ -7,7 +7,9 @@ class DoctorNote {
       .insert([noteData])
       .select('*')
       .single();
-    if (error) throw error;
+    if (error) {
+      throw error;
+    }
     return data;
   }
 
@@ -17,7 +19,9 @@ class DoctorNote {
       .select('*')
       .eq('visit_id', visitId)
       .order('created_at', { ascending: false });
-    if (error) throw error;
+    if (error) {
+      throw error;
+    }
     return data;
   }
 
@@ -27,7 +31,9 @@ class DoctorNote {
       .select('*')
       .eq('patient_id', patientId)
       .order('created_at', { ascending: false });
-    if (error) throw error;
+    if (error) {
+      throw error;
+    }
     return data;
   }
 
@@ -38,7 +44,9 @@ class DoctorNote {
       .eq('id', noteId)
       .select('*')
       .single();
-    if (error) throw error;
+    if (error) {
+      throw error;
+    }
     return data;
   }
 
@@ -49,7 +57,9 @@ class DoctorNote {
       .eq('id', noteId)
       .select('*')
       .single();
-    if (error) throw error;
+    if (error) {
+      throw error;
+    }
     return data;
   }
 }

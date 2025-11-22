@@ -45,7 +45,9 @@ export const authenticate = asyncHandler(async (req, res, next) => {
       decoded = jwt.verify(token, config.jwt.secret);
     } catch (primaryError) {
       const supabaseSecret = process.env.SUPABASE_JWT_SECRET;
-      if (!supabaseSecret) throw primaryError;
+      if (!supabaseSecret) {
+        throw primaryError;
+      }
       decoded = jwt.verify(token, supabaseSecret);
     }
 
@@ -55,7 +57,7 @@ export const authenticate = asyncHandler(async (req, res, next) => {
     try {
       const result = await executeWithRetry(
         async () => {
-          return await supabase
+          return supabase
       .from('users')
       .select('id, email, role, first_name, last_name, is_active, patient_id')
       .eq('id', userId)

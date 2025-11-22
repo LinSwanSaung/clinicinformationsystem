@@ -20,7 +20,9 @@ class PaymentTransactionModel extends BaseModel {
       .eq('invoice_id', invoiceId)
       .order('received_at', { ascending: false });
 
-    if (error) throw error;
+    if (error) {
+      throw error;
+    }
     
     // If no data, return empty array
     if (!data || data.length === 0) {
@@ -38,14 +40,16 @@ class PaymentTransactionModel extends BaseModel {
     ];
 
     // Fetch users separately if we have any user IDs
-    let userMap = {};
+    const userMap = {};
     if (userIds.length > 0) {
       const { data: users, error: usersError } = await this.supabase
         .from('users')
         .select('id, first_name, last_name, role')
         .in('id', userIds);
 
-      if (usersError) throw usersError;
+      if (usersError) {
+        throw usersError;
+      }
       
       // Create a map for quick lookup
       (users || []).forEach((user) => {
@@ -134,7 +138,9 @@ class PaymentTransactionModel extends BaseModel {
       .select()
       .single();
 
-    if (error) throw error;
+    if (error) {
+      throw error;
+    }
     return data;
   }
 
@@ -152,7 +158,9 @@ class PaymentTransactionModel extends BaseModel {
       .eq('id', id)
       .single();
 
-    if (error) throw error;
+    if (error) {
+      throw error;
+    }
     return data;
   }
 
@@ -171,7 +179,9 @@ class PaymentTransactionModel extends BaseModel {
       .lte('received_at', endDate)
       .order('received_at', { ascending: false });
 
-    if (error) throw error;
+    if (error) {
+      throw error;
+    }
     return data;
   }
 
@@ -184,7 +194,9 @@ class PaymentTransactionModel extends BaseModel {
       .select('amount')
       .eq('invoice_id', invoiceId);
 
-    if (error) throw error;
+    if (error) {
+      throw error;
+    }
     
     const total = data.reduce((sum, payment) => sum + parseFloat(payment.amount), 0);
     return total;
@@ -234,7 +246,9 @@ class PaymentTransactionModel extends BaseModel {
 
     const { data, error, count } = await query;
 
-    if (error) throw error;
+    if (error) {
+      throw error;
+    }
     
     return { data, total: count };
   }

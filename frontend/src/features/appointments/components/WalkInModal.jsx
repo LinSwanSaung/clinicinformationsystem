@@ -32,7 +32,7 @@ import logger from '@/utils/logger';
 import { useFeedback } from '@/contexts/FeedbackContext';
 
 const WalkInModal = ({ isOpen, onClose, onSubmit }) => {
-  const { showError, showSuccess, showWarning } = useFeedback();
+  const { showError, showWarning } = useFeedback();
   const [step, setStep] = useState(1); // 1: Select Patient, 2: Select Doctor
   const [selectedPatient, setSelectedPatient] = useState(null);
   const [selectedDoctor, setSelectedDoctor] = useState(null);

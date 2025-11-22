@@ -1,5 +1,4 @@
 import clinicSettingsService from '@/services/clinicSettingsService';
-import logger from '@/utils/logger';
 
 // Cache for currency settings
 let currencyCache = {

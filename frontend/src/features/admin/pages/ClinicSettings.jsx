@@ -10,7 +10,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Label } from '@/components/ui/label';
-import { Settings, Upload, Image as ImageIcon, Save } from 'lucide-react';
+import { Settings, Save } from 'lucide-react';
 import PageLayout from '@/components/layout/PageLayout';
 import clinicSettingsService from '@/services/clinicSettingsService';
 import { useFeedback } from '@/contexts/FeedbackContext';

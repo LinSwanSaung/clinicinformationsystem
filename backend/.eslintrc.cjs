@@ -19,7 +19,11 @@ module.exports = {
     'no-debugger': 'error',
     
     // Code quality
-    'no-unused-vars': ['error', { argsIgnorePattern: '^_' }],
+    'no-unused-vars': ['error', {
+      argsIgnorePattern: '^_',
+      varsIgnorePattern: '^_',
+      destructuredArrayIgnorePattern: '^_'
+    }],
     'prefer-const': 'error',
     'no-var': 'error',
     
@@ -63,6 +67,20 @@ module.exports = {
       files: ['src/services/repositories/**', 'src/config/**', 'scripts/**'],
       rules: {
         'no-restricted-imports': 'off',
+      },
+    },
+    // Allow console in utility/logger/database files (intentional usage)
+    {
+      files: ['database/**', 'src/config/logger.js'],
+      rules: {
+        'no-console': 'off',
+      },
+    },
+    // Disable require-await for model/service files (async needed for interface compatibility)
+    {
+      files: ['src/models/**', 'src/services/**', 'src/routes/**', 'src/middleware/**'],
+      rules: {
+        'require-await': 'off',
       },
     },
   ],

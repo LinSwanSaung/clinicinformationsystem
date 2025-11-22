@@ -29,7 +29,7 @@ export default function ServiceCatalog() {
   const [page, setPage] = useState(1);
   const pageSize = 25;
 
-  const { data, isLoading, error, refetch } = useServices({ q, category: category || undefined, status });
+  const { data, isLoading, error } = useServices({ q, category: category || undefined, status });
   const { create, update, remove } = useServiceMutations();
 
   const filtered = useMemo(() => {

@@ -17,7 +17,7 @@ class AuthService {
     try {
       // Find user by email with retry logic for network resilience
       const user = await executeWithRetry(
-        async () => await UserModel.findByEmail(email),
+        async () => UserModel.findByEmail(email),
         2, // 2 retries
         'User lookup'
       );
@@ -57,16 +57,17 @@ class AuthService {
 
       // Update last login timestamp with retry logic
       await executeWithRetry(
-        async () => await UserModel.updateLastLogin(user.id),
+        async () => UserModel.updateLastLogin(user.id),
         1, // 1 retry for non-critical operation
         'Update last login'
       ).catch(err => {
         // Non-critical, log but don't fail login
+        // eslint-disable-next-line no-console
         console.warn('Failed to update last login timestamp:', err.message);
       });
 
       // Remove sensitive data
-      const { password_hash, ...userWithoutPassword } = user;
+      const { password_hash: _password_hash, ...userWithoutPassword } = user;
 
       return {
         token,
@@ -93,7 +94,7 @@ class AuthService {
   /**
    * User registration
    */
-  async register(userData, createdBy) {
+  async register(userData, _createdBy) {
     // Check if user already exists
     const existingUser = await UserModel.findByEmail(userData.email);
     
@@ -105,7 +106,7 @@ class AuthService {
     const newUser = await UserModel.create(userData);
 
     // Remove sensitive data
-    const { password_hash, ...userWithoutPassword } = newUser;
+    const { password_hash: _password_hash, ...userWithoutPassword } = newUser;
 
     // Send welcome email for patient accounts
     try {
@@ -159,7 +160,7 @@ class AuthService {
       role: newUser.role
     });
 
-    const { password_hash, ...userWithoutPassword } = newUser;
+    const { password_hash: _password_hash, ...userWithoutPassword } = newUser;
 
     return {
       token,
@@ -212,7 +213,7 @@ class AuthService {
 
     const updatedUser = await UserModel.linkPatientAccount(user.id, patient.id);
 
-    const { password_hash, ...userWithoutPassword } = updatedUser;
+    const { password_hash: _password_hash, ...userWithoutPassword } = updatedUser;
 
     const token = this.generateToken({
       userId: updatedUser.id,

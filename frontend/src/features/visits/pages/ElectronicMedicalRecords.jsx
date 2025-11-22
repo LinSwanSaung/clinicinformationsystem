@@ -15,7 +15,7 @@ import { useFeedback } from '@/contexts/FeedbackContext';
 const ElectronicMedicalRecords = () => {
   const location = useLocation();
   const navigate = useNavigate();
-  const { showSuccess, showError, showWarning, showInfo } = useFeedback();
+  const { showSuccess, showError, showInfo } = useFeedback();
 
   // State management
   const [selectedPatient, setSelectedPatient] = useState(location.state?.patient || null);

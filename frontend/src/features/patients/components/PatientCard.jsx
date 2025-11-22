@@ -33,7 +33,7 @@ const PatientCard = ({
   onStartConsultation,
   onCompleteVisit,
   readOnly = false,
-  readyTab = false,
+  readyTab: _readyTab = false,
   userRole = 'nurse',
   onViewFullPatientData
 }) => {
@@ -52,7 +52,7 @@ const PatientCard = ({
   const [isVitalsModalOpen, setIsVitalsModalOpen] = useState(false);
   const [isDelayModalOpen, setIsDelayModalOpen] = useState(false);
   const [delayReason, setDelayReason] = useState(patient.delayReason || '');
-  const [urgency, setUrgency] = useState(patient.urgency || 'Normal');
+  const [_urgency, _setUrgency] = useState(patient.urgency || 'Normal');
   const [notes, setNotes] = useState(patient.notes || '');
 
   // Role-based navigation handler
@@ -405,11 +405,10 @@ const PatientCard = ({
             onOpenChange={setIsVitalsModalOpen}
             title={`${patient.vitalsRecorded ? 'Edit' : 'Add'} Vitals & Notes for ${patient.name}`}
             submitText="Save Vitals"
-            onSubmit={(e) => {
+            onSubmit={(_e) => {
               // Preserve existing save logic
               const resolvedPatientId = patient?.patientId ?? patient?.patient_id ?? patient?.patient?.id ?? patient?.id;
               if (!resolvedPatientId) {
-                // eslint-disable-next-line no-console
                 logger.error('[PatientCard] Unable to resolve patient ID for vitals save:', patient);
                 showError('Could not determine patient ID. Please refresh and try again.');
                 return;

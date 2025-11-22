@@ -48,7 +48,6 @@ export function PdfDownloadButton({
       document.body.removeChild(link);
       window.URL.revokeObjectURL(url);
     } catch (error) {
-      // eslint-disable-next-line no-console
       logger.error('Failed to download PDF:', error);
       showError('Failed to download file. Please try again.');
     } finally {

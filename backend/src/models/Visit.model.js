@@ -16,12 +16,11 @@ class VisitModel extends BaseModel {
   async getPatientVisitHistory(patientId, options = {}) {
     const { limit = 50, offset = 0, includeCompleted = true, includeInProgress = false } = options;
 
-    try {
-      // Build query
-      let query = this.supabase
-        .from(this.tableName)
-        .select(
-          `
+    // Build query
+    let query = this.supabase
+      .from(this.tableName)
+      .select(
+        `
           *,
           doctor:users!doctor_id (
             id,
@@ -35,42 +34,39 @@ class VisitModel extends BaseModel {
             reason_for_visit
           )
         `
-        )
-        .eq('patient_id', patientId);
+      )
+      .eq('patient_id', patientId);
 
-      // Filter by status based on options
-      // If includeInProgress is true, show all visits (no status filter)
-      // Otherwise, show only completed or in_progress based on includeCompleted flag
-      if (!includeInProgress) {
-        if (includeCompleted) {
-          // Show only completed visits
-          query = query.eq('status', 'completed');
-        } else {
-          // Show only in_progress visits
-          query = query.eq('status', 'in_progress');
-        }
+    // Filter by status based on options
+    // If includeInProgress is true, show all visits (no status filter)
+    // Otherwise, show only completed or in_progress based on includeCompleted flag
+    if (!includeInProgress) {
+      if (includeCompleted) {
+        // Show only completed visits
+        query = query.eq('status', 'completed');
+      } else {
+        // Show only in_progress visits
+        query = query.eq('status', 'in_progress');
       }
-
-      const { data: visits, error } = await query
-        .order('visit_date', { ascending: false })
-        .range(offset, offset + limit - 1);
-
-      if (error) {
-        logger.error(`[VISIT MODEL] ❌ Error fetching visits:`, error);
-        throw new Error(`Failed to fetch patient visit history: ${error.message}`);
-      }
-
-      // Enhance each visit with related data
-      const enhancedVisits = await Promise.all(
-        (visits || []).map(async (visit) => {
-          return await this.enhanceVisitWithRelatedData(visit);
-        })
-      );
-
-      return enhancedVisits;
-    } catch (error) {
-      throw error;
     }
+
+    const { data: visits, error } = await query
+      .order('visit_date', { ascending: false })
+      .range(offset, offset + limit - 1);
+
+    if (error) {
+      logger.error(`[VISIT MODEL] ❌ Error fetching visits:`, error);
+      throw new Error(`Failed to fetch patient visit history: ${error.message}`);
+    }
+
+    // Enhance each visit with related data
+    const enhancedVisits = await Promise.all(
+      (visits || []).map(async (visit) => {
+        return this.enhanceVisitWithRelatedData(visit);
+      })
+    );
+
+    return enhancedVisits;
   }
 
   /**
@@ -143,7 +139,7 @@ class VisitModel extends BaseModel {
   /**
    * Get allergies recorded during the visit
    */
-  async getVisitAllergies(visitId, visitDate) {
+  async getVisitAllergies(visitId, _visitDate) {
     try {
       const { data, error } = await this.supabase
         .from('patient_allergies')
@@ -176,7 +172,7 @@ class VisitModel extends BaseModel {
   /**
    * Get diagnoses recorded during the visit
    */
-  async getVisitDiagnoses(visitId, visitDate) {
+  async getVisitDiagnoses(visitId, _visitDate) {
     try {
       const { data, error } = await this.supabase
         .from('patient_diagnoses')
@@ -292,21 +288,16 @@ class VisitModel extends BaseModel {
    * Get services provided during the visit
    * Note: This assumes you'll add a visit_services table
    */
-  async getVisitServices(visitId) {
-    try {
-      // This is a placeholder - you may need to create this table
-      // For now, we'll return basic services based on visit type
-      return [
-        {
-          service_name: 'Consultation',
-          description: 'General medical consultation',
-          cost: 50.0,
-        },
-      ];
-    } catch (error) {
-      logger.error('Error in getVisitServices:', error);
-      return [];
-    }
+  async getVisitServices(_visitId) {
+    // This is a placeholder - you may need to create this table
+    // For now, we'll return basic services based on visit type
+    return [
+      {
+        service_name: 'Consultation',
+        description: 'General medical consultation',
+        cost: 50.0,
+      },
+    ];
   }
 
   /**
@@ -331,7 +322,9 @@ class VisitModel extends BaseModel {
    * Calculate total cost of services
    */
   calculateServicesTotal(services) {
-    if (!services || services.length === 0) return 0;
+    if (!services || services.length === 0) {
+      return 0;
+    }
 
     return services.reduce((total, service) => {
       return total + (parseFloat(service.cost) || 0);
@@ -342,8 +335,7 @@ class VisitModel extends BaseModel {
    * Get visit by ID with all related data
    */
   async getVisitWithDetails(visitId) {
-    try {
-      const { data: visit, error } = await this.supabase
+    const { data: visit, error } = await this.supabase
         .from(this.tableName)
         .select(
           `
@@ -374,10 +366,7 @@ class VisitModel extends BaseModel {
         throw new Error(`Failed to fetch visit details: ${error.message}`);
       }
 
-      return await this.enhanceVisitWithRelatedData(visit);
-    } catch (error) {
-      throw error;
-    }
+      return this.enhanceVisitWithRelatedData(visit);
   }
 
   /**
@@ -391,8 +380,7 @@ class VisitModel extends BaseModel {
    * @returns {Promise<Object>} Completed visit data
    */
   async completeVisit(visitId, completionData = {}) {
-    try {
-      const visit = await this.getVisitWithDetails(visitId);
+    const visit = await this.getVisitWithDetails(visitId);
 
       // Idempotency check: if visit is already completed, return it
       if (visit.status === 'completed') {
@@ -431,16 +419,12 @@ class VisitModel extends BaseModel {
       }
 
       return data;
-    } catch (error) {
-      throw error;
-    }
   }
 
   /**
    * Find active visits for a patient within a date range
    */
   async getPatientActiveVisits(patientId, startDate, endDate) {
-    try {
       const { data, error } = await this.supabase
         .from(this.tableName)
         .select(
@@ -464,9 +448,6 @@ class VisitModel extends BaseModel {
       }
 
       return data || [];
-    } catch (error) {
-      throw error;
-    }
   }
 
   /**
@@ -550,8 +531,7 @@ class VisitModel extends BaseModel {
    * Used for getting current visit vitals
    */
   async getPatientActiveVisit(patientId) {
-    try {
-      // Get visits with in_progress status
+    // Get visits with in_progress status
       const { data: visits, error } = await this.supabase
         .from(this.tableName)
         .select(
@@ -604,9 +584,6 @@ class VisitModel extends BaseModel {
 
       // All visits have paid invoices, so no active visit
       return null;
-    } catch (error) {
-      throw error;
-    }
   }
 
   /**
@@ -614,8 +591,7 @@ class VisitModel extends BaseModel {
    * Used to prevent doctor deletion when they have active consultations
    */
   async getDoctorActiveVisits(doctorId) {
-    try {
-      const { data, error } = await this.supabase
+    const { data, error } = await this.supabase
         .from(this.tableName)
         .select('id, patient_id, visit_date, status')
         .eq('doctor_id', doctorId)
@@ -627,9 +603,6 @@ class VisitModel extends BaseModel {
       }
 
       return data || [];
-    } catch (error) {
-      throw error;
-    }
   }
 }
 

@@ -4,19 +4,16 @@ import { useAuth } from '../../contexts/AuthContext';
 import { useFeedback } from '@/contexts/FeedbackContext';
 import PageLayout from '@/components/layout/PageLayout';
 import { Card } from '../../components/ui/card';
-import { Input } from '../../components/ui/input';
 import { SearchBar, LoadingSpinner } from '@/components/library';
 import { Button } from '../../components/ui/button';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '../../components/ui/tabs';
-import { 
-  Search, 
-  UserCheck, 
+import {
+  UserCheck,
   UserCog,
   CheckCircle,
   RefreshCw,
   PlayCircle,
-  XCircle,
-  X
+  XCircle
 } from 'lucide-react';
 import { PatientCard, PatientStats } from '@/features/patients';
 import { patientService } from '@/features/patients';

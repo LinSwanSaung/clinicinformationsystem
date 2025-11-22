@@ -118,7 +118,7 @@ const CustomTooltip = ({ active, payload }) => {
   );
 };
 
-const VitalCard = memo(({ title, value, unit, delta, chartData, dataKey, color }) => {
+const VitalCard = memo(({ title, value, unit, delta, chartData, dataKey, color: _color }) => {
   // Check if we have enough data points
   const validValues = useMemo(() => {
     if (!chartData || chartData.length < 1) return [];

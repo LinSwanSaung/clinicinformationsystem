@@ -1,7 +1,6 @@
 import { useState } from 'react';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Badge } from '@/components/ui/badge';
 import { Calendar, ChevronDown, Plus, FileText } from 'lucide-react';
 
 const ClinicalNotesDisplay = ({ 
@@ -27,7 +26,7 @@ const ClinicalNotesDisplay = ({
       <div className="flex items-center justify-between mb-6">
         <div className="flex items-center space-x-3">
           <FileText size={24} className="text-purple-600" />
-          <h3 className="text-lg font-bold">Doctor's Notes</h3>
+          <h3 className="text-lg font-bold">Doctor&apos;s Notes</h3>
         </div>
         {showAddButton && canAddNotes && onAddNote && (
           <Button variant="outline" size="sm" className="text-sm px-4 py-2" onClick={onAddNote}>
@@ -113,9 +112,9 @@ const ClinicalNotesDisplay = ({
         ) : (
           <div className="text-center py-8">
             <FileText size={32} className="mx-auto text-gray-400 mb-3" />
-            <p className="text-gray-500 text-sm">No doctor's notes available</p>
+            <p className="text-gray-500 text-sm">No doctor&apos;s notes available</p>
             {canAddNotes && (
-              <p className="text-gray-400 text-xs mt-2">Click "Add Note" to create the first note</p>
+              <p className="text-gray-400 text-xs mt-2">Click &quot;Add Note&quot; to create the first note</p>
             )}
           </div>
         )}

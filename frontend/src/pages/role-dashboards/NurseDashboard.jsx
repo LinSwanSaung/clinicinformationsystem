@@ -9,9 +9,8 @@ import { vitalsService } from '@/features/medical';
 import { Card, CardContent, CardHeader, CardTitle } from '../../components/ui/card';
 import { Input } from '../../components/ui/input';
 import { Button } from '../../components/ui/button';
-import { Badge } from '../../components/ui/badge';
-import { 
-  Search, 
+import {
+  Search,
   FileText,
   Users,
   Clock,
@@ -19,10 +18,8 @@ import {
   Eye,
   UserCog,
   ArrowLeft,
-  CheckCircle,
-  AlertCircle
+  CheckCircle
 } from 'lucide-react';
-import doctorService from '@/services/doctorService';
 import { queueService } from '@/features/queue';
 import { useQuery } from '@tanstack/react-query';
 import { useAuth } from '@/contexts/AuthContext';
@@ -86,7 +83,7 @@ const NurseDashboard = () => {
   const [isUserActive, setIsUserActive] = useState(false); // Track user activity
   
   // Use feedback system for notifications
-  const { showSuccess, showError, showWarning, showInfo } = useFeedback();
+  const { showSuccess, showError, showWarning } = useFeedback();
   const [queueStats, setQueueStats] = useState({
     totalDoctors: 0,
     activeDoctors: 0,

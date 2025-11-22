@@ -24,7 +24,7 @@ const getApiBaseUrl = () => {
   return '/api';
 };
 
-function toFriendlyMessage(message = '', { endpoint, status, data } = {}) {
+function toFriendlyMessage(message = '', { endpoint: _endpoint, status, data } = {}) {
   const lower = String(message || '').toLowerCase();
   if (data?.code === '23505' || lower.includes('duplicate key value')) {
     if (lower.includes('services_service_code_key') || lower.includes('service_code')) {
@@ -83,7 +83,6 @@ class ApiService {
     }
 
     const method = (rest.method ? rest.method.toUpperCase() : 'GET');
-    // eslint-disable-next-line no-unused-vars
     const { method: _ignored, ...restWithoutMethod } = rest;
     const fetchOptions = { ...restWithoutMethod, method };
 

@@ -55,7 +55,7 @@ class InvoiceService {
         // Handle race condition: if another request created invoice between check and create
         // Check for unique constraint violation or duplicate key error
         const errorMsg = createError?.message?.toLowerCase() || '';
-        const errorCode = createError?.code?.toLowerCase() || '';
+        const _errorCode = createError?.code?.toLowerCase() || '';
         
         // Check for visit_id duplicate (another invoice for same visit)
         if (
@@ -409,7 +409,7 @@ class InvoiceService {
       });
 
       await this.recalculateInvoiceTotal(invoiceId);
-      return await this.getInvoiceById(invoiceId);
+      return this.getInvoiceById(invoiceId);
     } catch (error) {
       throw new Error(`Failed to update discount: ${error.message}`);
     }
@@ -481,13 +481,13 @@ class InvoiceService {
       // 5. Use transaction pattern to ensure atomicity
       const transaction = new TransactionRunner();
       let completedInvoice = null;
-      let completedVisit = null;
+      const _completedVisit = null;
 
       try {
         // Step 1: Complete the invoice (with rollback compensation)
         completedInvoice = await transaction.add(
           async () => {
-            return await InvoiceModel.completeInvoice(invoiceId, completedBy);
+            return InvoiceModel.completeInvoice(invoiceId, completedBy);
           },
           async () => {
             // Compensation: revert invoice status if visit completion fails
@@ -501,7 +501,7 @@ class InvoiceService {
 
         // Step 2: Complete the visit (this is the ONLY place visits should be completed)
         // Business rule: Visits are completed when invoice is paid, not when consultation ends
-        completedVisit = await transaction.add(
+        const _completedVisit = await transaction.add(
           async () => {
             // Use completeVisit() to ensure costs are calculated correctly
             // This method calculates total_cost from consultation fee + services

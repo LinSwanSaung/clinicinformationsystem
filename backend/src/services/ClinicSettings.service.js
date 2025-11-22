@@ -129,7 +129,7 @@ class ClinicSettingsService {
       const uniqueFileName = `logo/${Date.now()}-${crypto.randomUUID()}.${fileExtension}`;
 
       // Upload to Supabase Storage
-      const { data: uploadData, error: uploadError } = await supabase.storage
+      const { data: _data, error: uploadError } = await supabase.storage
         .from('clinic-assets')
         .upload(uniqueFileName, fileBuffer, {
           contentType: mimeType,
@@ -170,7 +170,7 @@ class ClinicSettingsService {
       const uniqueFileName = `qr-codes/${Date.now()}-${crypto.randomUUID()}.${fileExtension}`;
 
       // Upload to Supabase Storage
-      const { data: uploadData, error: uploadError } = await supabase.storage
+      const { data: _data, error: uploadError } = await supabase.storage
         .from('clinic-assets')
         .upload(uniqueFileName, fileBuffer, {
           contentType: mimeType,

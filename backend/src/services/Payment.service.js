@@ -1,7 +1,6 @@
 import PaymentTransactionModel from '../models/PaymentTransaction.model.js';
 import InvoiceService from './Invoice.service.js';
 import clinicSettingsService from './ClinicSettings.service.js';
-import { formatCurrencySync } from '../utils/currencyHelper.js';
 import { getUsersByIds, getPaymentWithRelations, getPatientRemainingCredit } from './repositories/BillingRepo.js';
 import { validatePaymentAmount, sanitizeString } from '../utils/validation.js';
 import PDFDocument from 'pdfkit';

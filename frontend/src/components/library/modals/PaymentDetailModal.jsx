@@ -20,7 +20,7 @@ export function PaymentDetailModal({
   invoice,
   onPay,
   isProcessing,
-  onDownloadReceipt, // reserved for future use; behavior unchanged today
+  onDownloadReceipt: _onDownloadReceipt, // reserved for future use; behavior unchanged today
   children,
 }) {
   // Prevent form auto-submission when invoice updates (e.g., after adding a service)

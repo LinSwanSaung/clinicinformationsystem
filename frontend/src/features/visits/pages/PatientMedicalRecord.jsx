@@ -35,8 +35,8 @@ const PatientMedicalRecord = () => {
   const [hasActiveVisit, setHasActiveVisit] = useState(false);
   const [visitCheckComplete, setVisitCheckComplete] = useState(false); // Track if visit check is done
   const [patientFiles, setPatientFiles] = useState([]);
-  // eslint-disable-next-line no-unused-vars
-  const [uploadingFiles, setUploadingFiles] = useState(false);
+   
+  const [_uploadingFiles, setUploadingFiles] = useState(false);
 
   // Doctor notes management
   const [doctorNotesList, setDoctorNotesList] = useState([
@@ -1006,7 +1006,7 @@ const PatientMedicalRecord = () => {
         <Dialog open={isAddNoteModalOpen} onOpenChange={(open) => !open && closeAllModals()}>
           <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
             <DialogHeader>
-              <DialogTitle>Add Doctor's Note</DialogTitle>
+              <DialogTitle>Add Doctor&apos;s Note</DialogTitle>
             </DialogHeader>
             <DoctorNotesForm
               formData={noteFormData}
@@ -1022,7 +1022,7 @@ const PatientMedicalRecord = () => {
         <Dialog open={isEditNoteModalOpen} onOpenChange={(open) => !open && closeAllModals()}>
           <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
             <DialogHeader>
-              <DialogTitle>Edit Doctor's Note</DialogTitle>
+              <DialogTitle>Edit Doctor&apos;s Note</DialogTitle>
             </DialogHeader>
             <DoctorNotesForm
               formData={noteFormData}

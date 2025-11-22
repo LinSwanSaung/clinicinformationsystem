@@ -39,7 +39,7 @@ export default [
       ...react.configs.recommended.rules,
       ...react.configs['jsx-runtime'].rules,
       'react-hooks/rules-of-hooks': 'error',
-      'react-hooks/exhaustive-deps': 'warn',
+      'react-hooks/exhaustive-deps': 'warn', // Helps catch real bugs - keep as warn
       'react-refresh/only-export-components': ['warn', { allowConstantExport: true }],
       'react/react-in-jsx-scope': 'off', // Not needed with automatic JSX runtime
       'react/jsx-uses-react': 'off', // Not needed with automatic JSX runtime
@@ -47,7 +47,13 @@ export default [
       'react/prop-types': 'off', // Not using PropTypes in this project
       'no-unused-vars': 'off', // Turn off base rule in favor of unused-imports
       'unused-imports/no-unused-imports': 'error',
-      'unused-imports/no-unused-vars': ['warn', { args: 'after-used', ignoreRestSiblings: true, varsIgnorePattern: '^_' }],
+      'unused-imports/no-unused-vars': ['warn', { 
+        args: 'after-used', 
+        argsIgnorePattern: '^_',
+        ignoreRestSiblings: true, 
+        varsIgnorePattern: '^_',
+        destructuredArrayIgnorePattern: '^_'
+      }],
       // Prevent direct Supabase imports in UI layer - use services/hooks instead
       // Prevent legacy component imports - use library versions instead
       'no-restricted-imports': [
@@ -127,6 +133,13 @@ export default [
     },
     rules: {
       'no-undef': 'off',
+    },
+  },
+  // Allow react-refresh warnings in utility/constant files (acceptable)
+  {
+    files: ['**/components/ui/**', '**/contexts/**', '**/utils/**'],
+    rules: {
+      'react-refresh/only-export-components': 'off', // ✅ Acceptable - these export utilities/constants
     },
   },
 ];

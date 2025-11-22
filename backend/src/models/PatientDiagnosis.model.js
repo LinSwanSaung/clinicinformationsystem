@@ -23,7 +23,9 @@ class PatientDiagnosisModel extends BaseModel {
     }
 
     const { data, error } = await query;
-    if (error) throw error;
+    if (error) {
+      throw error;
+    }
     return data;
   }
 
@@ -37,7 +39,9 @@ class PatientDiagnosisModel extends BaseModel {
       .eq('visit_id', visitId)
       .is('deleted_at', null);
 
-    if (error) throw error;
+    if (error) {
+      throw error;
+    }
     return data;
   }
 
@@ -51,7 +55,9 @@ class PatientDiagnosisModel extends BaseModel {
       .select()
       .single();
 
-    if (error) throw error;
+    if (error) {
+      throw error;
+    }
     return data;
   }
 
@@ -66,7 +72,9 @@ class PatientDiagnosisModel extends BaseModel {
       .select()
       .single();
 
-    if (error) throw error;
+    if (error) {
+      throw error;
+    }
     return data;
   }
 
@@ -90,7 +98,9 @@ class PatientDiagnosisModel extends BaseModel {
       .select()
       .single();
 
-    if (error) throw error;
+    if (error) {
+      throw error;
+    }
     return data;
   }
 
@@ -102,7 +112,9 @@ class PatientDiagnosisModel extends BaseModel {
       .from('active_patient_diagnoses')
       .select('*');
 
-    if (error) throw error;
+    if (error) {
+      throw error;
+    }
     return data;
   }
 
@@ -116,7 +128,9 @@ class PatientDiagnosisModel extends BaseModel {
       .eq('id', id)
       .single();
 
-    if (error) throw error;
+    if (error) {
+      throw error;
+    }
     return data;
   }
 
@@ -134,7 +148,9 @@ class PatientDiagnosisModel extends BaseModel {
       .select()
       .single();
 
-    if (error) throw error;
+    if (error) {
+      throw error;
+    }
     return data;
   }
 }

@@ -1,7 +1,6 @@
 import express from 'express';
 import { authenticate, authorize } from '../middleware/auth.js';
 import { asyncHandler } from '../middleware/errorHandler.js';
-import { ROLES } from '../constants/roles.js';
 import PatientPortalService from '../services/PatientPortal.service.js';
 
 const router = express.Router();

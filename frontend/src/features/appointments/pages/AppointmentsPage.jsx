@@ -1,7 +1,7 @@
 import { LoadingSpinner, EmptyState } from '@/components/library';
-/* eslint-disable no-unused-vars, no-useless-catch, react-hooks/exhaustive-deps, no-constant-condition */
+/* eslint-disable react-hooks/exhaustive-deps */
 import { useState, useEffect, useRef } from 'react';
-import { useNavigate, useLocation } from 'react-router-dom';
+import { useLocation } from 'react-router-dom';
 import {
   Calendar as CalendarIcon,
   Clock,
@@ -37,7 +37,6 @@ import AppointmentPatientCard from '../components/AppointmentPatientCard';
 import AppointmentDetailModal from '../components/AppointmentDetailModal';
 
 const AppointmentsPage = () => {
-  const navigate = useNavigate();
   const location = useLocation();
 
   // Consultation duration in minutes (fetched from clinic_settings table)
@@ -164,7 +163,6 @@ const AppointmentsPage = () => {
         setError(msg);
       }
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [appointmentsError]);
 
   // Update calendar display when month changes
@@ -351,7 +349,7 @@ const AppointmentsPage = () => {
   };
 
   // Get available time slots (excluding already booked appointments)
-  const getAvailableTimeSlots = () => {
+  const _getAvailableTimeSlots = () => {
     const allSlots = generateTimeSlots();
 
     if (!selectedDoctor || !selectedDate) {
@@ -460,7 +458,7 @@ const AppointmentsPage = () => {
     return isAvailable;
   };
   // Custom day renderer for calendar to highlight available days
-  const renderDay = (date) => {
+  const _renderDay = (date) => {
     const isAvailable = isDateAvailable(date);
     const isSelected = selectedDate && date.toDateString() === selectedDate.toDateString();
     const isPast = date < new Date();
@@ -482,7 +480,7 @@ const AppointmentsPage = () => {
   // Generate calendar days for current month view
   const generateCalendarDays = (month) => {
     const firstDay = new Date(month.getFullYear(), month.getMonth(), 1);
-    const lastDay = new Date(month.getFullYear(), month.getMonth() + 1, 0);
+    const _lastDay = new Date(month.getFullYear(), month.getMonth() + 1, 0);
     const startDate = new Date(firstDay);
     startDate.setDate(firstDay.getDate() - firstDay.getDay()); // Start from Sunday
 
@@ -624,7 +622,7 @@ const AppointmentsPage = () => {
     }
   };
 
-  const handleStatusChange = async (appointmentId, newStatus) => {
+  const _handleStatusChange = async (appointmentId, newStatus) => {
     try {
       const result = await updateAppointmentStatusMutation.mutateAsync({
         appointmentId,

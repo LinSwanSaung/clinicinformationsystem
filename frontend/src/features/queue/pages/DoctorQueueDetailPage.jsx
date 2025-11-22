@@ -1,11 +1,10 @@
 import { useState, useEffect } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { motion } from 'framer-motion';
-import { 
-  Users, 
-  Clock, 
+import {
+  Clock,
   ArrowLeft,
-  CheckCircle, 
+  CheckCircle,
   AlertTriangle,
   Activity,
   RefreshCw,
@@ -19,14 +18,14 @@ import { Badge } from '@/components/ui/badge';
 import PageLayout from '@/components/layout/PageLayout';
 import { queueService } from '@/features/queue';
 
-// Animation variants
-const pageVariants = {
+// Animation variants (reserved for future use)
+const _pageVariants = {
   initial: { opacity: 0, y: 20 },
   animate: { opacity: 1, y: 0, transition: { duration: 0.4, ease: "easeOut" } },
   exit: { opacity: 0, y: -20, transition: { duration: 0.3 } }
 };
 
-const containerVariants = {
+const _containerVariants = {
   hidden: { opacity: 0 },
   visible: {
     opacity: 1,
@@ -37,7 +36,7 @@ const containerVariants = {
   }
 };
 
-const itemVariants = {
+const _itemVariants = {
   hidden: { opacity: 0, y: 20, scale: 0.95 },
   visible: { 
     opacity: 1, 
@@ -50,7 +49,7 @@ const itemVariants = {
   }
 };
 
-const cardVariants = {
+const _cardVariants = {
   hidden: { opacity: 0, y: 20, scale: 0.9 },
   visible: { 
     opacity: 1, 

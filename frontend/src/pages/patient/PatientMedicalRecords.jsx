@@ -11,18 +11,18 @@ import { Skeleton } from '../../components/ui/skeleton';
 // Import reusable medical components (read-only versions)
 import { PatientInformationHeader, patientPortalService } from '@/features/patients';
 import { NavigationTabs } from '@/components/library';
-import { PatientVitalsDisplay, MedicalInformationPanel, ClinicalNotesDisplay, allergyService, diagnosisService, vitalsService } from '@/features/medical';
-import { VisitHistoryCard, visitService } from '@/features/visits';
+import { PatientVitalsDisplay, MedicalInformationPanel, allergyService, diagnosisService } from '@/features/medical';
+import { VisitHistoryCard } from '@/features/visits';
 import api from '@/services/api';
 import logger from '@/utils/logger';
 
 const PatientMedicalRecords = () => {
   const navigate = useNavigate();
-  const { t, i18n } = useTranslation();
+  const { t } = useTranslation();
   const { showError } = useFeedback();
   
   // Basic state
-  const [profileData, setProfileData] = useState(null);
+  const [_profileData, setProfileData] = useState(null);
   const [patientData, setPatientData] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);

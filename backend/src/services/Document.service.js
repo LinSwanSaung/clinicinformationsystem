@@ -30,7 +30,7 @@ class DocumentService {
       const uniqueFileName = `${patientId}/${crypto.randomUUID()}.${fileExtension}`;
 
       // Upload to Supabase Storage
-      const { data: uploadData, error: uploadError } = await supabase.storage
+      const { data: _data, error: uploadError } = await supabase.storage
         .from(this.storageBucket)
         .upload(uniqueFileName, fileBuffer, {
           contentType: mimeType,

@@ -8,7 +8,9 @@ export function getAbortSignal() {
 export function abortAllRequests() {
   try {
     sharedController.abort();
-  } catch {}
+  } catch {
+    // Ignore errors when aborting - controller might already be aborted
+  }
   sharedController = new AbortController();
 }
 
@@ -16,6 +18,7 @@ export function getAuthToken() {
   try {
     return localStorage.getItem('authToken');
   } catch {
+    // localStorage might not be available in some environments
     return null;
   }
 }
@@ -32,7 +35,9 @@ export async function handleUnauthorized() {
     try {
       localStorage.removeItem('authToken');
       localStorage.removeItem('user');
-    } catch {}
+    } catch {
+      // localStorage might not be available
+    }
     // Abort any in-flight requests
     abortAllRequests();
     // Redirect to login

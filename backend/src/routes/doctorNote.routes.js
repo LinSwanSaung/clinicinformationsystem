@@ -1,7 +1,6 @@
 import express from 'express';
 import DoctorNoteService from '../services/DoctorNote.service.js';
 import { asyncHandler } from '../middleware/errorHandler.js';
-import { ROLES } from '../constants/roles.js';
 import { authenticate, authorize } from '../middleware/auth.js';
 
 const router = express.Router();

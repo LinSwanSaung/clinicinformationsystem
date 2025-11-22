@@ -1,136 +1,76 @@
 import apiService from '@/services/api';
-import logger from '@/utils/logger';
 
 class PatientService {
   async getAllPatients() {
-    try {
-      const response = await apiService.get('/patients');
-      return response;
-    } catch (error) {
-      throw error;
-    }
+    const response = await apiService.get('/patients');
+    return response;
   }
 
   async getPatientById(id) {
-    try {
-      const response = await apiService.get(`/patients/${id}`);
-      return response;
-    } catch (error) {
-      throw error;
-    }
+    const response = await apiService.get(`/patients/${id}`);
+    return response;
   }
 
   async createPatient(patientData) {
-    try {
-      const response = await apiService.post('/patients', patientData);
-      return response;
-    } catch (error) {
-      throw error;
-    }
+    const response = await apiService.post('/patients', patientData);
+    return response;
   }
 
   async updatePatient(id, patientData) {
-    try {
-      const response = await apiService.put(`/patients/${id}`, patientData);
-      return response;
-    } catch (error) {
-      throw error;
-    }
+    const response = await apiService.put(`/patients/${id}`, patientData);
+    return response;
   }
 
   async deletePatient(id) {
-    try {
-      const response = await apiService.delete(`/patients/${id}`);
-      return response;
-    } catch (error) {
-      throw error;
-    }
+    const response = await apiService.delete(`/patients/${id}`);
+    return response;
   }
 
   async searchPatients(searchTerm) {
-    try {
-      const response = await apiService.get(`/patients/search?q=${encodeURIComponent(searchTerm)}`);
-      return response;
-    } catch (error) {
-      throw error;
-    }
+    const response = await apiService.get(`/patients/search?q=${encodeURIComponent(searchTerm)}`);
+    return response;
   }
 
   // Get patients by status
   async getPatientsByStatus(isActive = true) {
-    try {
-      const response = await apiService.get(`/patients?is_active=${isActive}`);
-      return response;
-    } catch (error) {
-      logger.error('Failed to fetch patients by status:', error);
-      throw error;
-    }
+    const response = await apiService.get(`/patients?is_active=${isActive}`);
+    return response;
   }
 
   // Get patient statistics
   async getPatientStats() {
-    try {
-      const response = await apiService.get('/patients/stats');
-      return response;
-    } catch (error) {
-      logger.error('Failed to fetch patient stats:', error);
-      throw error;
-    }
+    const response = await apiService.get('/patients/stats');
+    return response;
   }
 
   // Get recent patients
   async getRecentPatients(limit = 10) {
-    try {
-      const response = await apiService.get(`/patients/recent?limit=${limit}`);
-      return response;
-    } catch (error) {
-      logger.error('Failed to fetch recent patients:', error);
-      throw error;
-    }
+    const response = await apiService.get(`/patients/recent?limit=${limit}`);
+    return response;
   }
 
   // Get patients with upcoming appointments
   async getPatientsWithUpcomingAppointments() {
-    try {
-      const response = await apiService.get('/patients/upcoming-appointments');
-      return response;
-    } catch (error) {
-      logger.error('Failed to fetch patients with upcoming appointments:', error);
-      throw error;
-    }
+    const response = await apiService.get('/patients/upcoming-appointments');
+    return response;
   }
 
   // Toggle patient active status
   async togglePatientStatus(id, isActive) {
-    try {
-      const response = await apiService.patch(`/patients/${id}/status`, { is_active: isActive });
-      return response;
-    } catch (error) {
-      logger.error(`Failed to toggle patient status for ${id}:`, error);
-      throw error;
-    }
+    const response = await apiService.patch(`/patients/${id}/status`, { is_active: isActive });
+    return response;
   }
 
   // Get nurse patients (patients assigned to current nurse or recent interactions)
   async getNursePatients() {
-    try {
-      const response = await apiService.get('/patients/nurse');
-      return response;
-    } catch (error) {
-      logger.error('Failed to fetch nurse patients:', error);
-      throw error;
-    }
+    const response = await apiService.get('/patients/nurse');
+    return response;
   }
 
   // Get doctor patients (patients assigned to current doctor)
   async getDoctorPatients() {
-    try {
-      const response = await apiService.get('/patients/doctor');
-      return response;
-    } catch (error) {
-      logger.error('Failed to fetch doctor patients:', error);
-      throw error;
-    }
+    const response = await apiService.get('/patients/doctor');
+    return response;
   }
 }
 

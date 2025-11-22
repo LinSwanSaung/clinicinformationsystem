@@ -1,6 +1,6 @@
 import express from 'express';
 import { authenticate, authorize } from '../middleware/auth.js';
-import { asyncHandler, AppError } from '../middleware/errorHandler.js';
+import { asyncHandler } from '../middleware/errorHandler.js';
 import { ROLES } from '../constants/roles.js';
 import userModel from '../models/User.model.js';
 import { logAuditEvent } from '../utils/auditLogger.js';
@@ -26,8 +26,11 @@ router.get(
 
     // Respect explicit is_active filter if provided ("true"/"false")
     if (typeof is_active === 'string') {
-      if (is_active.toLowerCase() === 'true') filters.is_active = true;
-      else if (is_active.toLowerCase() === 'false') filters.is_active = false;
+      if (is_active.toLowerCase() === 'true') {
+        filters.is_active = true;
+      } else if (is_active.toLowerCase() === 'false') {
+        filters.is_active = false;
+      }
     }
 
     // Exclude deleted by default unless includeDeleted=true
@@ -122,7 +125,9 @@ router.post(
         meta: { role: newUser?.role },
         ip: req.ip,
       });
-    } catch (e) {}
+    } catch (e) {
+      // Ignore audit log errors - don't fail the request if logging fails
+    }
   })
 );
 
@@ -181,7 +186,7 @@ router.put(
 
     // Remove sensitive fields that shouldn't be updated via this endpoint
     // But allow password updates for admins
-    const { password_hash, id: bodyId, created_at, deleted_at, ...allowedFields } = updateData;
+    const { password_hash: _password_hash, id: _bodyId, created_at: _created_at, deleted_at: _deleted_at, ...allowedFields } = updateData;
 
     // Handle password separately if provided
     if (updateData.password) {
@@ -247,7 +252,9 @@ router.put(
         },
         ip: req.ip,
       });
-    } catch (e) {}
+    } catch (e) {
+      // Ignore audit log errors - don't fail the request if logging fails
+    }
 
     res.status(200).json({
       success: true,
@@ -353,7 +360,9 @@ router.patch(
         meta: { previous_status: !is_active },
         ip: req.ip,
       });
-    } catch (e) {}
+    } catch (e) {
+      // Ignore audit log errors - don't fail the request if logging fails
+    }
   })
 );
 
@@ -420,7 +429,9 @@ router.delete(
         result: 'success',
         ip: req.ip,
       });
-    } catch (e) {}
+    } catch (e) {
+      // Ignore audit log errors - don't fail the request if logging fails
+    }
   })
 );
 

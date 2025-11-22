@@ -14,21 +14,27 @@ class DoctorNoteService {
       is_private: noteData.is_private !== undefined ? noteData.is_private : false,
       created_at: new Date().toISOString()
     };
-    return await DoctorNote.create(noteToCreate);
+    return DoctorNote.create(noteToCreate);
   }
 
   static async getNotesByVisit(visitId) {
-    if (!visitId) throw new Error('Visit ID is required');
-    return await DoctorNote.findByVisit(visitId);
+    if (!visitId) {
+      throw new Error('Visit ID is required');
+    }
+    return DoctorNote.findByVisit(visitId);
   }
 
   static async getNotesByPatient(patientId) {
-    if (!patientId) throw new Error('Patient ID is required');
-    return await DoctorNote.findByPatient(patientId);
+    if (!patientId) {
+      throw new Error('Patient ID is required');
+    }
+    return DoctorNote.findByPatient(patientId);
   }
 
   static async updateNote(noteId, noteData) {
-    if (!noteId) throw new Error('Note ID is required');
+    if (!noteId) {
+      throw new Error('Note ID is required');
+    }
     const allowedUpdates = {
       content: noteData.content,
       note_type: noteData.note_type,
@@ -36,12 +42,14 @@ class DoctorNoteService {
       updated_at: new Date().toISOString()
     };
     Object.keys(allowedUpdates).forEach(key => allowedUpdates[key] === undefined && delete allowedUpdates[key]);
-    return await DoctorNote.update(noteId, allowedUpdates);
+    return DoctorNote.update(noteId, allowedUpdates);
   }
 
   static async deleteNote(noteId) {
-    if (!noteId) throw new Error('Note ID is required');
-    return await DoctorNote.delete(noteId);
+    if (!noteId) {
+      throw new Error('Note ID is required');
+    }
+    return DoctorNote.delete(noteId);
   }
 }
 

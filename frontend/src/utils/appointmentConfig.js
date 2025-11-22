@@ -1,10 +1,9 @@
-import { 
-  CheckCircle, 
-  AlertTriangle, 
-  XCircle, 
-  Clock, 
+import {
+  CheckCircle,
+  AlertTriangle,
+  XCircle,
+  Clock,
   UserCheck,
-  FileText,
   Stethoscope
 } from 'lucide-react';
 

@@ -57,15 +57,11 @@ export class UserModel extends BaseModel {
    * Removes sensitive fields and ensures proper validation
    */
   async updateById(id, data) {
-    try {
-      // Remove any fields that shouldn't be directly updated
-      const { password, password_hash, ...updateData } = data;
-      
-      // Call parent updateById method
-      return await super.updateById(id, updateData);
-    } catch (error) {
-      throw error;
-    }
+    // Remove any fields that shouldn't be directly updated
+    const { password: _password, password_hash: _password_hash, ...updateData } = data;
+    
+    // Call parent updateById method
+    return super.updateById(id, updateData);
   }
 
   /**
@@ -199,7 +195,9 @@ export class UserModel extends BaseModel {
    * Find user linked to a patient record
    */
   async findByPatientId(patientId) {
-    if (!patientId) return null;
+    if (!patientId) {
+      return null;
+    }
     return this.findOne({ patient_id: patientId });
   }
 

@@ -3,7 +3,7 @@ import { Separator } from '@/components/ui/separator';
 import { useState, useEffect } from 'react';
 import clinicSettingsService from '@/services/clinicSettingsService';
 import { APP_CONFIG } from '@/constants/app';
-import { formatCurrencySync, getCurrencySymbol, refreshCurrencyCache } from '@/utils/currency';
+import { formatCurrencySync, refreshCurrencyCache } from '@/utils/currency';
 
 function get(obj, ...keys) {
   for (const k of keys) {

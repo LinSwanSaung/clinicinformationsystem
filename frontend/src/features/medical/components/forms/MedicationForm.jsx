@@ -30,7 +30,8 @@ const commonDurations = [
   '21 days', '30 days', '60 days', '90 days'
 ];
 
-// Combobox component for autocomplete with free text
+// Combobox component for autocomplete with free text (reserved for future use)
+// eslint-disable-next-line unused-imports/no-unused-vars
 const Combobox = ({ value, onChange, options, placeholder, className = "" }) => {
   const [isOpen, setIsOpen] = useState(false);
   const [inputValue, setInputValue] = useState(value);

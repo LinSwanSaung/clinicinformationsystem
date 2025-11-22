@@ -20,7 +20,9 @@ const levelValue = LOG_LEVELS[currentLevel.toUpperCase()] ?? LOG_LEVELS.INFO;
  * Removes sensitive fields from log objects
  */
 function sanitizeData(data) {
-  if (!data || typeof data !== 'object') return data;
+  if (!data || typeof data !== 'object') {
+    return data;
+  }
 
   const sensitiveFields = [
     'password',

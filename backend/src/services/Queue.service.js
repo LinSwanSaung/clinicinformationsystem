@@ -214,7 +214,7 @@ class QueueService {
       // Step 2: Create token (with rollback compensation)
       newToken = await transaction.add(
         async () => {
-          return await this.queueTokenModel.createToken({
+          return this.queueTokenModel.createToken({
             patient_id,
             doctor_id,
             appointment_id,
@@ -449,7 +449,6 @@ class QueueService {
       return {
         success: true,
         fixed: fixedTokens.length,
-        errors: errors.length,
         fixedTokens,
         errors: errors.length > 0 ? errors : undefined,
         message: `Successfully fixed ${fixedTokens.length} stuck consultation(s).`,
@@ -581,8 +580,7 @@ class QueueService {
    * Call next patient in queue
    */
   async callNextPatient(doctorId) {
-    try {
-      // Check if doctor has any active consultation
+    // Check if doctor has any active consultation
       const activeConsultation = await this.queueTokenModel.getActiveConsultation(doctorId);
       if (activeConsultation) {
         throw new Error('Doctor is currently serving another patient');
@@ -643,9 +641,6 @@ class QueueService {
         token: calledToken,
         message: `Patient ${calledToken.patient.first_name} ${calledToken.patient.last_name} (Token #${calledToken.token_number}) has been called`,
       };
-    } catch (error) {
-      throw error;
-    }
   }
 
   /**
@@ -774,7 +769,7 @@ class QueueService {
     try {
       // First, get the current token to check its status (with retry for network resilience)
       const currentToken = await executeWithRetry(
-        async () => await this.queueTokenModel.findById(tokenId),
+        async () => this.queueTokenModel.findById(tokenId),
         2,
         'Find queue token'
       );
@@ -796,7 +791,7 @@ class QueueService {
       let updatedToken;
       try {
         const atomicResult = await executeWithRetry(
-          async () => await this.queueTokenModel.startConsultationAtomic(tokenId, currentToken.doctor_id),
+          async () => this.queueTokenModel.startConsultationAtomic(tokenId, currentToken.doctor_id),
           2,
           'Start consultation atomically'
         );
@@ -808,11 +803,11 @@ class QueueService {
         updatedToken = atomicResult.token;
       } catch (atomicError) {
         // If atomic function fails, check for stuck tokens from previous days
-        const errorMsg = atomicError?.message?.toLowerCase() || '';
+        const _errorMsg = atomicError?.message?.toLowerCase() || '';
         
         // Check for stuck consultations from previous days
         const existingServingToken = await executeWithRetry(
-          async () => await this.queueTokenModel.getActiveConsultation(currentToken.doctor_id, true), // includeAllDates = true
+          async () => this.queueTokenModel.getActiveConsultation(currentToken.doctor_id, true), // includeAllDates = true
           1,
           'Check for stuck consultations (all dates)'
         );
@@ -1015,14 +1010,14 @@ class QueueService {
       // Use transaction pattern to ensure atomicity
       const transaction = new TransactionRunner();
       let updatedToken = null;
-      let updatedVisit = null;
-      let updatedAppointment = null;
+      let _updatedVisit = null;
+      let _updatedAppointment = null;
 
       try {
         // Step 1: Update token status (with rollback compensation)
         updatedToken = await transaction.add(
           async () => {
-            return await this.queueTokenModel.updateStatus(tokenId, 'completed');
+            return this.queueTokenModel.updateStatus(tokenId, 'completed');
           },
           async () => {
             // Compensation: revert token status if later steps fail
@@ -1031,7 +1026,7 @@ class QueueService {
         );
 
         // Step 2: Complete visit when consultation ends (with rollback compensation)
-        updatedVisit = await transaction.add(
+        _updatedVisit = await transaction.add(
           async () => {
             // Business rule: Complete visit when consultation ends to allow new visits
             // Invoice can remain partial_paid, but visit should be completed
@@ -1052,7 +1047,7 @@ class QueueService {
             } catch (visitError) {
               // If visit completion fails, just set end time as fallback
               logger.warn(`[QueueService] Failed to complete visit ${token.visit_id}, setting end time only:`, visitError);
-              return await this.visitService.updateVisit(token.visit_id, {
+              return this.visitService.updateVisit(token.visit_id, {
                 visit_end_time: new Date().toISOString(),
               });
             }
@@ -1065,9 +1060,9 @@ class QueueService {
 
         // Step 3: Update appointment status if linked (with rollback compensation)
         if (token.appointment_id) {
-          updatedAppointment = await transaction.add(
+          _updatedAppointment = await transaction.add(
             async () => {
-              return await this.appointmentModel.update(token.appointment_id, {
+              return this.appointmentModel.update(token.appointment_id, {
                 status: 'completed',
               });
             },
@@ -1259,7 +1254,7 @@ class QueueService {
             status: 'no_show',
           });
         } catch (apptError) {
-          
+          // Ignore appointment update errors - token update is more important
         }
       }
 
@@ -1284,42 +1279,38 @@ class QueueService {
    * Cancel queue token
    */
   async cancelToken(tokenId) {
-    try {
-      const token = await this.queueTokenModel.findById(tokenId);
-      if (!token) {
-        throw new Error('Token not found');
-      }
+    const token = await this.queueTokenModel.findById(tokenId);
+    if (!token) {
+      throw new Error('Token not found');
+    }
 
-      const updatedToken = await this.queueTokenModel.updateStatus(tokenId, 'cancelled');
+    const updatedToken = await this.queueTokenModel.updateStatus(tokenId, 'cancelled');
 
-      // Update appointment status if linked
-      if (updatedToken.appointment_id) {
-        await this.appointmentModel.update(updatedToken.appointment_id, {
+    // Update appointment status if linked
+    if (updatedToken.appointment_id) {
+      await this.appointmentModel.update(updatedToken.appointment_id, {
+        status: 'cancelled',
+      });
+    }
+
+    // Cancel the associated visit if it exists
+    if (updatedToken.visit_id) {
+      try {
+        await this.visitService.updateVisit(updatedToken.visit_id, {
           status: 'cancelled',
         });
+        
+      } catch (visitError) {
+        logger.error(`⚠️ Failed to cancel visit ${updatedToken.visit_id}:`, visitError.message);
+        // Don't fail the token cancellation if visit cancellation fails
       }
-
-      // Cancel the associated visit if it exists
-      if (updatedToken.visit_id) {
-        try {
-          await this.visitService.updateVisit(updatedToken.visit_id, {
-            status: 'cancelled',
-          });
-          
-        } catch (visitError) {
-          logger.error(`⚠️ Failed to cancel visit ${updatedToken.visit_id}:`, visitError.message);
-          // Don't fail the token cancellation if visit cancellation fails
-        }
-      }
-
-      return {
-        success: true,
-        token: updatedToken,
-        message: 'Token cancelled',
-      };
-    } catch (error) {
-      throw error;
     }
+
+    return {
+      success: true,
+      token: updatedToken,
+      message: 'Token cancelled',
+    };
   }
 
   /**
@@ -1419,91 +1410,79 @@ class QueueService {
    * Get comprehensive queue status for a doctor
    */
   async getQueueStatus(doctorId, date = null) {
-    try {
-      const queueDate = date || new Date().toISOString().split('T')[0];
+    const queueDate = date || new Date().toISOString().split('T')[0];
 
-      
+    // Get token-based queue
+    const tokens = await this.queueTokenModel.getByDoctorAndDate(doctorId, queueDate);
 
-      // Get token-based queue
-      const tokens = await this.queueTokenModel.getByDoctorAndDate(doctorId, queueDate);
-      
+    // Get statistics
+    const tokenStats = await this.queueTokenModel.getQueueStats(doctorId, queueDate);
 
-      // Get statistics
-      const tokenStats = await this.queueTokenModel.getQueueStats(doctorId, queueDate);
+    // Get current status
+    const activeConsultation = await this.queueTokenModel.getActiveConsultation(doctorId);
+    const nextToken = await this.queueTokenModel.getNextToken(doctorId, queueDate);
 
-      // Get current status
-      const activeConsultation = await this.queueTokenModel.getActiveConsultation(doctorId);
-      const nextToken = await this.queueTokenModel.getNextToken(doctorId, queueDate);
-
-      return {
-        doctor_id: doctorId,
-        date: queueDate,
-        tokens: tokens,
-        appointments: [],
-        statistics: {
-          tokens: tokenStats,
-          appointments: { total: 0, queued: 0, completed: 0 },
-          combined: {
-            totalPatients: tokenStats.total,
-            waitingPatients: tokenStats.waiting,
-            completedToday: tokenStats.completed,
-          },
+    return {
+      doctor_id: doctorId,
+      date: queueDate,
+      tokens: tokens,
+      appointments: [],
+      statistics: {
+        tokens: tokenStats,
+        appointments: { total: 0, queued: 0, completed: 0 },
+        combined: {
+          totalPatients: tokenStats.total,
+          waitingPatients: tokenStats.waiting,
+          completedToday: tokenStats.completed,
         },
-        currentStatus: {
-          activeConsultation: activeConsultation,
-          nextInQueue: nextToken,
-          isAvailable: !activeConsultation,
-        },
-      };
-    } catch (error) {
-      throw error;
-    }
+      },
+      currentStatus: {
+        activeConsultation: activeConsultation,
+        nextInQueue: nextToken,
+        isAvailable: !activeConsultation,
+      },
+    };
   }
 
   /**
    * Get patient's queue position and estimated wait time
    */
   async getPatientQueueInfo(patientId, doctorId) {
-    try {
-      const currentToken = await this.queueTokenModel.getPatientCurrentToken(patientId, doctorId);
+    const currentToken = await this.queueTokenModel.getPatientCurrentToken(patientId, doctorId);
 
-      if (!currentToken) {
-        return {
-          hasToken: false,
-          message: 'No active token found',
-        };
-      }
-
-      // Calculate position in queue
-      const queueTokens = await this.queueTokenModel.getCurrentQueueStatus(doctorId);
-      const position =
-        queueTokens.filter(
-          (token) => token.status === 'waiting' && token.token_number < currentToken.token_number
-        ).length + 1;
-
-      // Estimate wait time using clinic settings for consultation duration
-      const consultationDuration = await clinicSettingsService.getConsultationDuration();
-      const estimatedWaitMinutes = (position - 1) * consultationDuration;
-
+    if (!currentToken) {
       return {
-        hasToken: true,
-        token: currentToken,
-        queuePosition: position,
-        estimatedWaitTime: estimatedWaitMinutes,
-        status: currentToken.status,
-        message: this.getPatientStatusMessage(currentToken.status, position, estimatedWaitMinutes),
+        hasToken: false,
+        message: 'No active token found',
       };
-    } catch (error) {
-      throw error;
     }
+
+    // Calculate position in queue
+    const queueTokens = await this.queueTokenModel.getCurrentQueueStatus(doctorId);
+    const position =
+      queueTokens.filter(
+        (token) => token.status === 'waiting' && token.token_number < currentToken.token_number
+      ).length + 1;
+
+    // Estimate wait time using clinic settings for consultation duration
+    const consultationDuration = await clinicSettingsService.getConsultationDuration();
+    const estimatedWaitMinutes = (position - 1) * consultationDuration;
+
+    return {
+      hasToken: true,
+      token: currentToken,
+      queuePosition: position,
+      estimatedWaitTime: estimatedWaitMinutes,
+      status: currentToken.status,
+      message: this.getPatientStatusMessage(currentToken.status, position, estimatedWaitMinutes),
+    };
   }
 
   /**
    * Get queue display board data (for public displays)
    */
   async getQueueDisplayBoard(doctorId) {
-    try {
-      const currentQueue = await this.queueTokenModel.getCurrentQueueStatus(doctorId);
+    const currentQueue = await this.queueTokenModel.getCurrentQueueStatus(doctorId);
       const activeConsultation = await this.queueTokenModel.getActiveConsultation(doctorId);
 
       const displayData = {
@@ -1531,9 +1510,6 @@ class QueueService {
       };
 
       return displayData;
-    } catch (error) {
-      throw error;
-    }
   }
 
   // ===============================================
@@ -1544,47 +1520,43 @@ class QueueService {
    * Process scheduled appointments into queue
    */
   async processScheduledAppointments(doctorId, date = null) {
-    try {
-      const appointmentDate = date || new Date().toISOString().split('T')[0];
+    const appointmentDate = date || new Date().toISOString().split('T')[0];
 
-      // Get scheduled appointments for the day
-      const appointments = await this.appointmentModel.getByDate(appointmentDate);
-      const doctorAppointments = appointments.filter((apt) => apt.doctor_id === doctorId);
+    // Get scheduled appointments for the day
+    const appointments = await this.appointmentModel.getByDate(appointmentDate);
+    const doctorAppointments = appointments.filter((apt) => apt.doctor_id === doctorId);
 
-      const processedAppointments = [];
+    const processedAppointments = [];
 
-      for (const appointment of doctorAppointments) {
-        // Check if appointment already has a token
-        const existingToken = await this.queueTokenModel.getPatientCurrentToken(
-          appointment.patient_id,
-          doctorId
-        );
+    for (const appointment of doctorAppointments) {
+      // Check if appointment already has a token
+      const existingToken = await this.queueTokenModel.getPatientCurrentToken(
+        appointment.patient_id,
+        doctorId
+      );
 
-        if (!existingToken && appointment.status === 'scheduled') {
-          // Issue token for scheduled appointment
-          const tokenResult = await this.issueToken({
-            patient_id: appointment.patient_id,
-            doctor_id: doctorId,
-            appointment_id: appointment.id,
-            priority: 2, // Scheduled appointments get normal priority
-          });
+      if (!existingToken && appointment.status === 'scheduled') {
+        // Issue token for scheduled appointment
+        const tokenResult = await this.issueToken({
+          patient_id: appointment.patient_id,
+          doctor_id: doctorId,
+          appointment_id: appointment.id,
+          priority: 2, // Scheduled appointments get normal priority
+        });
 
-          processedAppointments.push({
-            appointment: appointment,
-            token: tokenResult.token,
-          });
-        }
+        processedAppointments.push({
+          appointment: appointment,
+          token: tokenResult.token,
+        });
       }
-
-      return {
-        success: true,
-        processed: processedAppointments.length,
-        appointments: processedAppointments,
-        message: `Processed ${processedAppointments.length} scheduled appointments`,
-      };
-    } catch (error) {
-      throw error;
     }
+
+    return {
+      success: true,
+      processed: processedAppointments.length,
+      appointments: processedAppointments,
+      message: `Processed ${processedAppointments.length} scheduled appointments`,
+    };
   }
 
   // ===============================================
@@ -1617,26 +1589,22 @@ class QueueService {
    * Get queue analytics for reporting
    */
   async getQueueAnalytics(doctorId, startDate, endDate) {
-    try {
-      const tokenHistory = await this.queueTokenModel.getQueueHistory(doctorId, startDate, endDate);
+    const tokenHistory = await this.queueTokenModel.getQueueHistory(doctorId, startDate, endDate);
 
-      const analytics = {
-        totalPatients: tokenHistory.length,
-        averageTokensPerDay: tokenHistory.length / this.getDaysBetweenDates(startDate, endDate),
-        statusBreakdown: {
-          completed: tokenHistory.filter((t) => t.status === 'completed').length,
-          missed: tokenHistory.filter((t) => t.status === 'missed').length,
-          cancelled: tokenHistory.filter((t) => t.status === 'cancelled').length,
-        },
-        averageWaitTime: this.calculateAverageWaitTime(tokenHistory),
-        peakHours: this.calculatePeakHours(tokenHistory),
-        patientSatisfaction: this.calculatePatientSatisfaction(tokenHistory),
-      };
+    const analytics = {
+      totalPatients: tokenHistory.length,
+      averageTokensPerDay: tokenHistory.length / this.getDaysBetweenDates(startDate, endDate),
+      statusBreakdown: {
+        completed: tokenHistory.filter((t) => t.status === 'completed').length,
+        missed: tokenHistory.filter((t) => t.status === 'missed').length,
+        cancelled: tokenHistory.filter((t) => t.status === 'cancelled').length,
+      },
+      averageWaitTime: this.calculateAverageWaitTime(tokenHistory),
+      peakHours: this.calculatePeakHours(tokenHistory),
+      patientSatisfaction: this.calculatePatientSatisfaction(tokenHistory),
+    };
 
-      return analytics;
-    } catch (error) {
-      throw error;
-    }
+    return analytics;
   }
 
   /**
@@ -1647,7 +1615,9 @@ class QueueService {
       (token) => token.status === 'completed' && token.served_at && token.issued_time
     );
 
-    if (completedTokens.length === 0) return 0;
+    if (completedTokens.length === 0) {
+      return 0;
+    }
 
     const totalWaitMinutes = completedTokens.reduce((sum, token) => {
       const waitTime = new Date(token.served_at) - new Date(token.issued_time);
@@ -1681,7 +1651,9 @@ class QueueService {
     const completedTokens = tokenHistory.filter((t) => t.status === 'completed');
     const missedTokens = tokenHistory.filter((t) => t.status === 'missed');
 
-    if (completedTokens.length === 0) return 0;
+    if (completedTokens.length === 0) {
+      return 0;
+    }
 
     // Simple satisfaction based on completion rate and wait times
     const completionRate = completedTokens.length / (completedTokens.length + missedTokens.length);

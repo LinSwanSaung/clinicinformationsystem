@@ -222,7 +222,7 @@ router.post(
     const visitService = new VisitService();
     const supabase = visitService.visitModel.supabase;
 
-    let tableName, idColumn, statusColumn, oldStatus;
+    let tableName, idColumn, statusColumn;
 
     // Determine table and columns based on entity type
     switch (entityType) {
@@ -262,7 +262,7 @@ router.post(
       throw new AppError(`${entityType} record not found`, 404);
     }
 
-    oldStatus = currentRecord[statusColumn];
+    const oldStatus = currentRecord[statusColumn];
 
     // Update the record
     const { error: updateError } = await supabase

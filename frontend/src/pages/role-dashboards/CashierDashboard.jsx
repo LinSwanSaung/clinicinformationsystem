@@ -1,12 +1,9 @@
-/* eslint-disable no-unused-vars, no-useless-catch, react-hooks/exhaustive-deps, no-console */
 import { useState, useEffect, useMemo } from 'react';
-import { useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useFeedback } from '@/contexts/FeedbackContext';
 import { formatCurrencySync, getCurrencySymbol, refreshCurrencyCache } from '@/utils/currency';
 import {
   Search,
-  Filter,
   X,
   Clock,
   DollarSign,
@@ -18,10 +15,8 @@ import {
   CheckCircle,
   RefreshCw,
   Calendar,
-  ChevronDown,
   Receipt,
   Package,
-  Users,
   History,
   Eye,
   Check,
@@ -31,7 +26,6 @@ import {
   Percent,
   Calculator,
   Save,
-  Printer,
   Download,
   Tag,
   Edit2,
@@ -50,7 +44,6 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
-import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Separator } from '@/components/ui/separator';
 import InvoiceDetails from '@/features/billing/components/InvoiceDetails.jsx';
@@ -104,7 +97,7 @@ const itemVariants = {
   },
 };
 
-const cardVariants = {
+const _cardVariants = {
   hidden: { opacity: 0, y: 20, scale: 0.9 },
   visible: {
     opacity: 1,
@@ -128,7 +121,7 @@ const cardVariants = {
   tap: { scale: 0.98 },
 };
 
-const searchVariants = {
+const _searchVariants = {
   centered: {
     width: '100%',
     maxWidth: '500px',
@@ -146,10 +139,9 @@ const searchVariants = {
 };
 
 const CashierDashboard = () => {
-  const navigate = useNavigate();
 
   // Use feedback system instead of inline state
-  const { showSuccess, showError } = useFeedback();
+  const { showSuccess, showError, showWarning } = useFeedback();
 
   // Invoices via React Query hooks
   const {
@@ -159,7 +151,7 @@ const CashierDashboard = () => {
   } = useInvoices({ type: 'pending' });
   const {
     data: completedInvoicesData,
-    isLoading: isCompletedLoading,
+    isLoading: _isCompletedLoading,
     refetch: refetchCompleted,
   } = useInvoices({ type: 'completed', limit: 50, offset: 0 });
 
@@ -173,9 +165,9 @@ const CashierDashboard = () => {
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState('all');
   const [priorityFilter, setPriorityFilter] = useState('all');
-  const [showFilters, setShowFilters] = useState(false);
+  const [_showFilters, setShowFilters] = useState(false);
   const [isRefreshing, setIsRefreshing] = useState(false);
-  const [lastRefreshTime, setLastRefreshTime] = useState(new Date());
+  const [_lastRefreshTime, setLastRefreshTime] = useState(new Date());
 
   // Invoice detail modal state
   const [selectedInvoice, setSelectedInvoice] = useState(null);
@@ -199,7 +191,7 @@ const CashierDashboard = () => {
 
   // Outstanding balance state
   const [outstandingBalance, setOutstandingBalance] = useState(null);
-  const [showOutstandingAlert, setShowOutstandingAlert] = useState(false);
+  const [_showOutstandingAlert, setShowOutstandingAlert] = useState(false);
   const [addOutstandingToInvoice, setAddOutstandingToInvoice] = useState(false);
   const [invoiceLimitReached, setInvoiceLimitReached] = useState(false);
 
@@ -212,7 +204,7 @@ const CashierDashboard = () => {
   // Payment history invoice modal state
   const [invoiceModalOpen, setInvoiceModalOpen] = useState(false);
   const [selectedPayment, setSelectedPayment] = useState(null);
-  const [patientRemainingCredit, setPatientRemainingCredit] = useState(0);
+  const [_patientRemainingCredit, setPatientRemainingCredit] = useState(0);
 
   // Debounced search term for performance
   const debouncedSearchTerm = useDebounce(searchTerm, 300);
@@ -327,7 +319,7 @@ const CashierDashboard = () => {
         
         // Check if this invoice has payments that mention paying off previous invoices
         // This happens when outstanding balance is paid from a later visit
-        const hasOutstandingBalancePayment = invoice.payment_transactions?.some(
+        const _hasOutstandingBalancePayment = invoice.payment_transactions?.some(
           (payment) => {
             const notes = (payment.payment_notes || '').toLowerCase();
             return notes.includes('paid with current visit') || notes.includes('previous invoice');
@@ -1127,7 +1119,7 @@ const CashierDashboard = () => {
     }
   };
 
-  const getPriorityColor = (priority) => {
+  const _getPriorityColor = (priority) => {
     switch (priority) {
       case 'high':
         return 'bg-red-100 text-red-800 border-red-200';
@@ -1142,8 +1134,8 @@ const CashierDashboard = () => {
 
   const totals = calculateTotals();
 
-  // Skeleton loader component
-  const SkeletonCard = () => (
+  // Skeleton loader component (reserved for future use)
+  const _SkeletonCard = () => (
     <Card className="border-l-4 border-l-gray-200">
       <div className="space-y-4 p-4">
         <div className="flex items-start justify-between">
@@ -1207,7 +1199,7 @@ const CashierDashboard = () => {
                 color: 'gray',
                 icon: Receipt,
               },
-            ].map((stat, index) => (
+            ].map((stat, _index) => (
               <motion.div
                 key={stat.label}
                 variants={itemVariants}

@@ -18,7 +18,9 @@ class InvoiceItemModel extends BaseModel {
       .eq('invoice_id', invoiceId)
       .order('added_at', { ascending: true });
 
-    if (error) throw error;
+    if (error) {
+      throw error;
+    }
     return data;
   }
 
@@ -32,7 +34,9 @@ class InvoiceItemModel extends BaseModel {
       .eq('id', id)
       .single();
 
-    if (error) throw error;
+    if (error) {
+      throw error;
+    }
     return data;
   }
 
@@ -46,7 +50,9 @@ class InvoiceItemModel extends BaseModel {
       .select()
       .single();
 
-    if (error) throw error;
+    if (error) {
+      throw error;
+    }
     return data;
   }
 
@@ -61,7 +67,9 @@ class InvoiceItemModel extends BaseModel {
       .select()
       .single();
 
-    if (error) throw error;
+    if (error) {
+      throw error;
+    }
     return data;
   }
 
@@ -76,7 +84,9 @@ class InvoiceItemModel extends BaseModel {
       .select()
       .single();
 
-    if (error) throw error;
+    if (error) {
+      throw error;
+    }
     return data;
   }
 
@@ -89,7 +99,9 @@ class InvoiceItemModel extends BaseModel {
       .insert(items)
       .select();
 
-    if (error) throw error;
+    if (error) {
+      throw error;
+    }
     return data;
   }
 
@@ -103,7 +115,9 @@ class InvoiceItemModel extends BaseModel {
       .eq('invoice_id', invoiceId)
       .select();
 
-    if (error) throw error;
+    if (error) {
+      throw error;
+    }
     return data;
   }
 }

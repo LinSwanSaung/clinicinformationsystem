@@ -125,26 +125,6 @@ class AppointmentModel extends BaseModel {
     return data;
   }
 
-  /**
-   * Update appointment status
-   */
-  async updateStatus(id, status) {
-    const { data, error } = await this.supabase
-      .from(this.tableName)
-      .update({ 
-        status,
-        updated_at: new Date().toISOString()
-      })
-      .eq('id', id)
-      .select()
-      .single();
-
-    if (error) {
-      throw new Error(`Failed to update appointment status: ${error.message}`);
-    }
-
-    return data;
-  }
 
   /**
    * Generic update method for appointments

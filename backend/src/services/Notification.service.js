@@ -32,7 +32,9 @@ class NotificationService {
    */
   async notifyPatientByPatientId(patientId, { title, message, type = 'info', relatedEntityType, relatedEntityId }) {
     const userId = await this.getPortalUserIdByPatientId(patientId);
-    if (!userId) return null;
+    if (!userId) {
+      return null;
+    }
     return this.createNotification({
       userId,
       title,

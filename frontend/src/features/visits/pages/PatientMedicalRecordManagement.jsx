@@ -42,7 +42,7 @@ const PatientMedicalRecordManagement = () => {
   const [doctorNotes, setDoctorNotes] = useState([]);
   const [patientFiles, setPatientFiles] = useState([]);
   const [loading, setLoading] = useState(false);
-  const [uploadingFiles, setUploadingFiles] = useState(false);
+  const [_uploadingFiles, setUploadingFiles] = useState(false);
   const [hasActiveVisit, setHasActiveVisit] = useState(false);
 
   // Modal states for add functionality (DOCTOR ONLY)
@@ -322,7 +322,7 @@ const PatientMedicalRecordManagement = () => {
         diagnosed_date: new Date().toISOString().split('T')[0]
       };
 
-      const createdAllergy = await allergyService.createAllergy(allergyData);
+      const _createdAllergy = await allergyService.createAllergy(allergyData);
       
       // Reload all medical data to ensure consistency
       await loadPatientMedicalData();
@@ -382,7 +382,7 @@ const PatientMedicalRecordManagement = () => {
         // Remove diagnosed_by - let backend handle it with actual user from auth
       };
 
-      const createdDiagnosis = await diagnosisService.createDiagnosis(diagnosisData);
+      const _createdDiagnosis = await diagnosisService.createDiagnosis(diagnosisData);
       
       // Reload all medical data to ensure consistency
       await loadPatientMedicalData();
@@ -409,7 +409,7 @@ const PatientMedicalRecordManagement = () => {
     }
   };
 
-  const handleAddMedication = () => {
+  const _handleAddMedication = () => {
     logger.debug('Add medication for patient:', selectedPatient?.id);
     // TODO: Implement medication management
   };

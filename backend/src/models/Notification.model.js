@@ -18,7 +18,9 @@ class NotificationModel extends BaseModel {
       .select()
       .single();
 
-    if (error) throw error;
+    if (error) {
+      throw error;
+    }
     return data;
   }
 
@@ -33,7 +35,9 @@ class NotificationModel extends BaseModel {
       .order('created_at', { ascending: false })
       .limit(limit);
 
-    if (error) throw error;
+    if (error) {
+      throw error;
+    }
     return data;
   }
 
@@ -47,7 +51,9 @@ class NotificationModel extends BaseModel {
       .eq('user_id', userId)
       .eq('is_read', false);
 
-    if (error) throw error;
+    if (error) {
+      throw error;
+    }
     return count;
   }
 
@@ -65,7 +71,9 @@ class NotificationModel extends BaseModel {
       .select()
       .single();
 
-    if (error) throw error;
+    if (error) {
+      throw error;
+    }
     return data;
   }
 
@@ -83,7 +91,9 @@ class NotificationModel extends BaseModel {
       .eq('is_read', false)
       .select();
 
-    if (error) throw error;
+    if (error) {
+      throw error;
+    }
     return data;
   }
 
@@ -96,7 +106,9 @@ class NotificationModel extends BaseModel {
       .delete()
       .eq('id', notificationId);
 
-    if (error) throw error;
+    if (error) {
+      throw error;
+    }
     return true;
   }
 }

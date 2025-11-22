@@ -4,9 +4,7 @@ import {
   ArrowLeft,
   User,
   Calendar,
-  DollarSign,
   Plus,
-  Trash2,
   Save,
   CreditCard
 } from 'lucide-react';
@@ -17,7 +15,7 @@ import { useFeedback } from '@/contexts/FeedbackContext';
 const InvoiceDetailsPage = () => {
   const { id } = useParams();
   const navigate = useNavigate();
-  const { showSuccess, showError, showWarning } = useFeedback();
+  const { showSuccess, showError } = useFeedback();
   
   const [invoice, setInvoice] = useState(null);
   const [loading, setLoading] = useState(true);

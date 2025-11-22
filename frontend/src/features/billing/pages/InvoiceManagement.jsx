@@ -1,32 +1,25 @@
 import { useState, useEffect } from 'react';
 import { useParams, useNavigate, useLocation } from 'react-router-dom';
-import { motion, AnimatePresence } from 'framer-motion';
+import { motion } from 'framer-motion';
 import { invoiceService } from '@/features/billing';
 import { formatCurrencySync } from '@/utils/currency';
 import {
   ArrowLeft,
   User,
   Calendar,
-  Clock,
   FileText,
-  Pill,
   DollarSign,
   Minus,
   Plus,
-  Check,
-  X,
-  AlertCircle,
   CreditCard,
   Receipt,
   Package,
-  ShoppingCart,
   Percent,
   Calculator,
   Save,
   Printer,
   Download,
   CheckCircle,
-  XCircle,
   Tag
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -38,8 +31,6 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Separator } from '@/components/ui/separator';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Textarea } from '@/components/ui/textarea';
-import { Alert, AlertDescription } from '@/components/ui/alert';
-import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { FormModal } from '@/components/library';
 import PageLayout from '@/components/layout/PageLayout';
 import logger from '@/utils/logger';

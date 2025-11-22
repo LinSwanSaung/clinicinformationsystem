@@ -39,7 +39,11 @@ module.exports = {
     'react/react-in-jsx-scope': 'off', // Not needed in React 17+
     
     // Code quality
-    'no-unused-vars': ['error', { argsIgnorePattern: '^_' }],
+    'no-unused-vars': ['error', {
+      argsIgnorePattern: '^_',
+      varsIgnorePattern: '^_',
+      destructuredArrayIgnorePattern: '^_'
+    }],
     'prefer-const': 'error',
     'no-var': 'error',
     

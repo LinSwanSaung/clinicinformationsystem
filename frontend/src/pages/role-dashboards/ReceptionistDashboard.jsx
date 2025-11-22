@@ -1,32 +1,19 @@
-/* eslint-disable no-unused-vars, no-useless-catch, react-hooks/exhaustive-deps, no-console */
 import { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { useFeedback } from '@/contexts/FeedbackContext';
 import clinicSettingsService from '@/services/clinicSettingsService';
 import {
   Calendar,
-  Users,
-  UserCircle,
-  FileText,
-  Star,
-  Clock,
   Search,
   Filter,
   CheckCircle,
-  AlertTriangle,
   XCircle,
-  ChevronDown,
-  User,
-  Stethoscope,
-  MoreHorizontal,
   AlertCircle,
   UserPlus,
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
 import {
   Select,
@@ -35,14 +22,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-} from '@/components/ui/dropdown-menu';
 import { AppointmentCard, WalkInModal } from '@/features/appointments';
-import NotificationBell from '@/components/layout/NotificationBell';
 import {
   getStatusColor,
   getStatusIcon,
@@ -52,18 +32,15 @@ import {
 } from '@/utils/appointmentConfig';
 import { userService } from '@/features/admin';
 import { patientService } from '@/features/patients';
-import { appointmentService, useAppointments, useUpdateAppointmentStatus } from '@/features/appointments';
+import { useAppointments, useUpdateAppointmentStatus } from '@/features/appointments';
 import { queueService } from '@/features/queue';
-import { useAuth } from '@/contexts/AuthContext';
 import PageLayout from '@/components/layout/PageLayout';
 import useDebounce from '@/hooks/useDebounce';
 import logger from '@/utils/logger';
 
 const ReceptionistDashboard = () => {
-  const navigate = useNavigate();
-  const { logout } = useAuth();
   const { t } = useTranslation();
-  const { showSuccess, showError } = useFeedback();
+  const { showError } = useFeedback();
   const [isLoading, setIsLoading] = useState(true);
   const [todayAppointments, setTodayAppointments] = useState([]);
   const [filteredAppointments, setFilteredAppointments] = useState([]);
@@ -118,7 +95,7 @@ const ReceptionistDashboard = () => {
   // Load doctors and patients; appointments are provided by React Query hook
   const {
     data: allAppointments,
-    isLoading: isAppointmentsLoading,
+    isLoading: _isAppointmentsLoading,
     refetch: refetchAppointments,
   } = useAppointments();
   const { mutateAsync: mutateAppointmentStatus } = useUpdateAppointmentStatus();
@@ -401,50 +378,46 @@ const ReceptionistDashboard = () => {
   };
 
   const handleWalkInSubmit = async (walkInData) => {
-    try {
-      // Prepare data for backend API - only the fields the backend expects
-      const tokenData = {
-        patient_id: walkInData.patient.id, // UUID string
-        doctor_id: walkInData.doctor.id, // UUID string
-        priority: 3, // number - normal priority for walk-ins
+    // Prepare data for backend API - only the fields the backend expects
+    const tokenData = {
+      patient_id: walkInData.patient.id, // UUID string
+      doctor_id: walkInData.doctor.id, // UUID string
+      priority: 3, // number - normal priority for walk-ins
+    };
+
+    // Call backend API to create queue token
+    const response = await queueService.issueToken(tokenData);
+
+    if (response.success) {
+      const tokenResult = response.data || {};
+      const issuedToken = tokenResult.token || null;
+      const tokenMessage = tokenResult.message || response.message;
+
+      // Create a new appointment entry for local state
+      const newAppointment = {
+        id: issuedToken?.id || `walkin-${Date.now()}`,
+        patient_name: `${walkInData.patient.first_name} ${walkInData.patient.last_name}`,
+        appointment_time: walkInData.appointment_time,
+        doctor_name: `Dr. ${walkInData.doctor.first_name} ${walkInData.doctor.last_name}`,
+        visit_type: walkInData.visit_type,
+        status: walkInData.status,
+        notes: walkInData.notes,
+        isWalkIn: true,
+        token_number: issuedToken?.token_number || tokenResult.token_number || null,
+        queueMessage: tokenMessage,
       };
 
-      // Call backend API to create queue token
-      const response = await queueService.issueToken(tokenData);
+      // Add to the appointment list
+      setTodayAppointments((prev) => [...prev, newAppointment]);
 
-      if (response.success) {
-        const tokenResult = response.data || {};
-        const issuedToken = tokenResult.token || null;
-        const tokenMessage = tokenResult.message || response.message;
-
-        // Create a new appointment entry for local state
-        const newAppointment = {
-          id: issuedToken?.id || `walkin-${Date.now()}`,
-          patient_name: `${walkInData.patient.first_name} ${walkInData.patient.last_name}`,
-          appointment_time: walkInData.appointment_time,
-          doctor_name: `Dr. ${walkInData.doctor.first_name} ${walkInData.doctor.last_name}`,
-          visit_type: walkInData.visit_type,
-          status: walkInData.status,
-          notes: walkInData.notes,
-          isWalkIn: true,
-          token_number: issuedToken?.token_number || tokenResult.token_number || null,
-          queueMessage: tokenMessage,
-        };
-
-        // Add to the appointment list
-        setTodayAppointments((prev) => [...prev, newAppointment]);
-
-        // Update stats
-        setStats((prev) => ({
-          ...prev,
-          todayAppointments: prev.todayAppointments + 1,
-          arrived: prev.arrived + 1, // Walk-ins are marked as ready/arrived
-        }));
-      } else {
-        throw new Error(response.message || 'Failed to create walk-in appointment');
-      }
-    } catch (error) {
-      throw error;
+      // Update stats
+      setStats((prev) => ({
+        ...prev,
+        todayAppointments: prev.todayAppointments + 1,
+        arrived: prev.arrived + 1, // Walk-ins are marked as ready/arrived
+      }));
+    } else {
+      throw new Error(response.message || 'Failed to create walk-in appointment');
     }
   };
 
@@ -503,7 +476,7 @@ const ReceptionistDashboard = () => {
               color: 'text-red-600',
               delay: 0.3,
             },
-          ].map((stat, index) => {
+          ].map((stat, _index) => {
             const Icon = stat.icon;
             return (
               <motion.div

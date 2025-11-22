@@ -163,40 +163,28 @@ class DoctorAvailabilityService {
    * Delete availability schedule
    */
   async deleteAvailability(availabilityId) {
-    try {
-      const response = await apiService.delete(`/doctor-availability/${availabilityId}`);
-      return response;
-    } catch (error) {
-      throw error;
-    }
+    const response = await apiService.delete(`/doctor-availability/${availabilityId}`);
+    return response;
   }
 
   /**
    * Get available doctors for a specific day and time
    */
   async getAvailableDoctors(dayOfWeek, time) {
-    try {
-      const response = await apiService.get('/doctor-availability/available-doctors', {
-        params: { day_of_week: dayOfWeek, time }
-      });
-      return response;
-    } catch (error) {
-      throw error;
-    }
+    const response = await apiService.get('/doctor-availability/available-doctors', {
+      params: { day_of_week: dayOfWeek, time }
+    });
+    return response;
   }
 
   /**
    * Check if a doctor is available at a specific time
    */
   async checkDoctorAvailability(doctorId, dayOfWeek, time) {
-    try {
-      const response = await apiService.get('/doctor-availability/check-availability', {
-        params: { doctor_id: doctorId, day_of_week: dayOfWeek, time }
-      });
-      return response;
-    } catch (error) {
-      throw error;
-    }
+    const response = await apiService.get('/doctor-availability/check-availability', {
+      params: { doctor_id: doctorId, day_of_week: dayOfWeek, time }
+    });
+    return response;
   }
 
   /**

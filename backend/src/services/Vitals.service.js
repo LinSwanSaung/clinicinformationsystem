@@ -35,7 +35,7 @@ class VitalsService {
             visitId = activeVisits[0].id;
 
           } else {
-
+            // No active visit found - will create new visit
           }
         } catch (error) {
           logger.warn('Error finding active visit:', error);
@@ -108,7 +108,7 @@ class VitalsService {
               await this.queueTokenModel.updateTokenPriority(token.id, priority);
             }
           } else {
-
+            // No queue token found - priority update not needed
           }
         } catch (priorityError) {
           // Don't fail the vitals creation if priority update fails

@@ -5,6 +5,7 @@
  * ============================================================================ */
 
 import OpenAI from 'openai';
+import logger from '../config/logger.js';
 
 const LANGUAGE_CONFIGS = {
   en: {

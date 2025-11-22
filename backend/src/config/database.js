@@ -165,7 +165,9 @@ export const testConnection = async (retries = 2) => {
     await executeWithRetry(
       async () => {
         const { data, error } = await supabase.from('users').select('count', { count: 'exact', head: true });
-        if (error) throw error;
+        if (error) {
+          throw error;
+        }
         return { data, error };
       },
       retries,

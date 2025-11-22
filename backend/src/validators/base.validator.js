@@ -28,7 +28,7 @@ export const commonSchemas = {
   id: Joi.string().uuid().required(),
   email: Joi.string().email().required(),
   password: Joi.string().min(8).required(),
-  phone: Joi.string().pattern(/^[\+]?[1-9][\d]{0,15}$/).optional(),
+  phone: Joi.string().pattern(/^[+]?[1-9][\d]{0,15}$/).optional(),
   date: Joi.date().iso().required(),
   pagination: {
     page: Joi.number().integer().min(1).default(1),

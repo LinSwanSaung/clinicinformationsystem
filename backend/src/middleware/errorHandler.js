@@ -5,7 +5,7 @@
 
 import logger from '../config/logger.js';
 
-export const errorHandler = (error, req, res, next) => {
+export const errorHandler = (error, req, res, _next) => {
   // Suppress logging for 401 errors when there's no Authorization header
   // This happens when components make requests after user logs out
   const hasAuthHeader = req.headers.authorization && req.headers.authorization.startsWith('Bearer ');

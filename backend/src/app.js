@@ -82,8 +82,8 @@ const corsOptions = {
 
     // CRITICAL: Always allow Vercel preview URLs first (before other checks)
     // This ensures CORS headers are set for all Vercel deployments
-    // Check for any Vercel domain pattern
-    if (origin.includes('.vercel.app') || origin.includes('vercel.app')) {
+    // Check for any Vercel domain pattern (works for both local testing and Vercel deployment)
+    if (origin && (origin.includes('.vercel.app') || origin.includes('vercel.app'))) {
       return callback(null, true);
     }
 

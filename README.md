@@ -37,29 +37,64 @@ A modern, responsive Clinic Information System designed for low-resource healthc
 ## 🛠️ Installation & Setup
 
 ### Prerequisites
-- Node.js (v16 or higher)
+- Node.js (v18 or higher)
 - npm or yarn
+- Supabase account (for database)
+- Vercel account (for frontend deployment)
+- Railway/Render account (for backend deployment)
 
-### Installation Steps
+### Local Development Setup
 
 1. **Clone the repository**
    ```bash
    git clone <repository-url>
-   cd thrivecare
+   cd clinicinformationsystem
    ```
 
-2. **Install dependencies**
+2. **Install frontend dependencies**
    ```bash
+   cd frontend
    npm install
    ```
 
-3. **Start the development server**
+3. **Install backend dependencies**
    ```bash
+   cd ../backend
+   npm install
+   ```
+
+4. **Set up environment variables**
+   - Copy `.env.example` to `.env` in both `frontend/` and `backend/` directories
+   - Configure your Supabase credentials and other required variables
+
+5. **Start development servers**
+   
+   Frontend (Terminal 1):
+   ```bash
+   cd frontend
+   npm run dev
+   ```
+   
+   Backend (Terminal 2):
+   ```bash
+   cd backend
    npm run dev
    ```
 
-4. **Open your browser**
+6. **Open your browser**
    Navigate to `http://localhost:5173`
+
+### 🚀 Deployment
+
+For production deployment instructions, see [DEPLOYMENT.md](./docs/DEPLOYMENT.md)
+
+**Quick Deploy to Vercel:**
+1. Connect your GitHub repository to Vercel
+2. Configure build settings (already set in `vercel.json`)
+3. Add environment variables
+4. Deploy!
+
+The repository includes GitHub Actions CI/CD pipelines for automated deployments.
 
 ## 🔐 Demo Credentials
 

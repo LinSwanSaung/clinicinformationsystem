@@ -5,7 +5,8 @@
       "src": "frontend/package.json",
       "use": "@vercel/static-build",
       "config": {
-        "distDir": "dist"
+        "distDir": "dist",
+        "buildCommand": "npm run build"
       }
     },
     {
@@ -25,7 +26,7 @@
   ],
   "rewrites": [
     {
-      "source": "/(.*)",
+      "source": "/(?!api)(.*)",
       "destination": "/index.html"
     }
   ],
@@ -41,4 +42,3 @@
     }
   ]
 }
-

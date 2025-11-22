@@ -1,7 +1,26 @@
 import { getAbortSignal, handleUnauthorized } from '@/features/auth';
 
 // API Base Configuration
-const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:3001/api';
+// Use relative path for same-origin requests (when frontend and backend are in same Vercel project)
+// Use absolute URL only if explicitly set (for separate backend deployments)
+const getApiBaseUrl = () => {
+  const envUrl = import.meta.env.VITE_API_URL;
+  
+  // If VITE_API_URL is explicitly set and is an absolute URL, use it
+  if (envUrl && (envUrl.startsWith('http://') || envUrl.startsWith('https://'))) {
+    return envUrl;
+  }
+  
+  // In production/Vercel, use relative path (same origin - no CORS needed)
+  if (import.meta.env.PROD) {
+    return '/api';
+  }
+  
+  // In development, use localhost
+  return 'http://localhost:3001/api';
+};
+
+const API_BASE_URL = getApiBaseUrl();
 
 function toFriendlyMessage(message = '', { endpoint, status, data } = {}) {
   const lower = String(message || '').toLowerCase();

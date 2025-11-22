@@ -4,7 +4,7 @@
 import app from '../backend/src/app.js';
 
 // Wrapper to ensure CORS headers are set for all requests, including OPTIONS
-export default async function handler(req, res) {
+export default function handler(req, res) {
   // Extract origin from request headers
   const origin = req.headers.origin;
   
@@ -33,5 +33,6 @@ export default async function handler(req, res) {
   }
 
   // Pass all other requests to Express app (which will also set CORS headers via middleware)
+  // Express handles errors internally via errorHandler middleware
   return app(req, res);
 }

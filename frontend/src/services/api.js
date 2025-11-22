@@ -7,17 +7,22 @@ const getApiBaseUrl = () => {
   const envUrl = import.meta.env.VITE_API_URL;
   
   // If VITE_API_URL is explicitly set and is an absolute URL, use it
-  if (envUrl && (envUrl.startsWith('http://') || envUrl.startsWith('https://'))) {
+  if (envUrl && envUrl.trim() && (envUrl.startsWith('http://') || envUrl.startsWith('https://'))) {
     return envUrl;
   }
   
-  // In production/Vercel, use relative path (same origin - no CORS needed)
-  if (import.meta.env.PROD) {
-    return '/api';
+  // Default to relative path /api for production/Vercel deployments
+  // This avoids CORS issues when frontend and backend are on same domain
+  // Only use localhost in development mode when explicitly running locally
+  const isDevelopment = import.meta.env.DEV || import.meta.env.MODE === 'development';
+  
+  if (isDevelopment && !envUrl) {
+    // Only use localhost if explicitly in dev mode and no VITE_API_URL set
+    return 'http://localhost:3001/api';
   }
   
-  // In development, use localhost
-  return 'http://localhost:3001/api';
+  // Default: use relative path (works for Vercel and any same-origin setup)
+  return '/api';
 };
 
 const API_BASE_URL = getApiBaseUrl();

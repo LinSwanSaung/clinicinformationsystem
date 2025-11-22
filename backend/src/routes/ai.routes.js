@@ -17,9 +17,9 @@ router.get('/models', authenticate, async (req, res) => {
     res.json({ success: true, models });
   } catch (error) {
     logger.error('[AI Route] Error listing models:', error);
-    res.status(500).json({ 
-      success: false, 
-      error: error.message 
+    res.status(500).json({
+      success: false,
+      error: error.message,
     });
   }
 });
@@ -32,11 +32,10 @@ router.get('/health-advice/:patientId', authenticate, async (req, res) => {
   try {
     const { patientId } = req.params;
     const { lang = 'en' } = req.query;
-    
 
     // Get patient's latest diagnosis
     const diagnoses = await diagnosisService.getDiagnosesByPatient(patientId);
-    
+
     if (!diagnoses || diagnoses.length === 0) {
       // No diagnosis - return general wellness tips
       const wellnessTips = await aiService.generateWellnessTips(lang);
@@ -45,17 +44,17 @@ router.get('/health-advice/:patientId', authenticate, async (req, res) => {
         data: {
           type: 'wellness',
           content: wellnessTips.tips,
-          generatedAt: wellnessTips.generatedAt
-        }
+          generatedAt: wellnessTips.generatedAt,
+        },
       });
     }
 
     // Get the most recent diagnosis
     const latestDiagnosis = diagnoses[0];
-    
+
     // Get patient info for age/gender context
     const patient = await patientService.getPatientById(patientId);
-    
+
     // Calculate age from DOB
     let age = null;
     if (patient.date_of_birth) {
@@ -79,14 +78,14 @@ router.get('/health-advice/:patientId', authenticate, async (req, res) => {
         diagnosis: latestDiagnosis.diagnosis_name,
         diagnosedDate: latestDiagnosis.diagnosed_date,
         content: healthAdvice.advice,
-        generatedAt: healthAdvice.generatedAt
-      }
+        generatedAt: healthAdvice.generatedAt,
+      },
     });
   } catch (error) {
     logger.error('[AI Route] Error generating health advice:', error);
     res.status(500).json({
       success: false,
-      error: error.message || 'Failed to generate health advice'
+      error: error.message || 'Failed to generate health advice',
     });
   }
 });
@@ -99,20 +98,20 @@ router.get('/wellness-tips', authenticate, async (req, res) => {
   try {
     const { lang = 'en' } = req.query;
     const wellnessTips = await aiService.generateWellnessTips(lang);
-    
+
     res.json({
       success: true,
       data: {
         type: 'wellness',
         content: wellnessTips.tips,
-        generatedAt: wellnessTips.generatedAt
-      }
+        generatedAt: wellnessTips.generatedAt,
+      },
     });
   } catch (error) {
     logger.error('[AI Route] Error generating wellness tips:', error);
     res.status(500).json({
       success: false,
-      error: error.message || 'Failed to generate wellness tips'
+      error: error.message || 'Failed to generate wellness tips',
     });
   }
 });

@@ -7,13 +7,13 @@ class ClinicSettingsService {
       const response = await api.get('/clinic-settings');
       return {
         success: true,
-        data: response.data
+        data: response.data,
       };
     } catch (error) {
       logger.error('Error fetching clinic settings:', error);
       return {
         success: false,
-        error: error.response?.data?.message || 'Failed to fetch clinic settings'
+        error: error.response?.data?.message || 'Failed to fetch clinic settings',
       };
     }
   }
@@ -23,13 +23,13 @@ class ClinicSettingsService {
       const response = await api.put('/clinic-settings', settings);
       return {
         success: true,
-        data: response.data
+        data: response.data,
       };
     } catch (error) {
       logger.error('Error updating clinic settings:', error);
       return {
         success: false,
-        error: error.response?.data?.message || 'Failed to update clinic settings'
+        error: error.response?.data?.message || 'Failed to update clinic settings',
       };
     }
   }
@@ -67,17 +67,17 @@ class ClinicSettingsService {
     try {
       const formData = new FormData();
       formData.append('logo', file);
-      
+
       const response = await api.post('/clinic-settings/upload-logo', formData);
       return {
         success: true,
-        data: response.data
+        data: response.data,
       };
     } catch (error) {
       logger.error('Error uploading logo:', error);
       return {
         success: false,
-        error: error.response?.data?.message || 'Failed to upload logo'
+        error: error.response?.data?.message || 'Failed to upload logo',
       };
     }
   }
@@ -87,17 +87,17 @@ class ClinicSettingsService {
     try {
       const formData = new FormData();
       formData.append('qr_code', file);
-      
+
       const response = await api.post('/clinic-settings/upload-qr-code', formData);
       return {
         success: true,
-        data: response.data
+        data: response.data,
       };
     } catch (error) {
       logger.error('Error uploading QR code:', error);
       return {
         success: false,
-        error: error.response?.data?.message || 'Failed to upload QR code'
+        error: error.response?.data?.message || 'Failed to upload QR code',
       };
     }
   }

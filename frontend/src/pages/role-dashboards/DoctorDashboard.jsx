@@ -4,20 +4,10 @@ import { useAuth } from '../../contexts/AuthContext';
 import { useFeedback } from '@/contexts/FeedbackContext';
 import PageLayout from '@/components/layout/PageLayout';
 import { Card } from '../../components/ui/card';
-import { Input } from '../../components/ui/input';
 import { SearchBar, LoadingSpinner } from '@/components/library';
 import { Button } from '../../components/ui/button';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '../../components/ui/tabs';
-import { 
-  Search, 
-  UserCheck, 
-  UserCog,
-  CheckCircle,
-  RefreshCw,
-  PlayCircle,
-  XCircle,
-  X
-} from 'lucide-react';
+import { UserCheck, UserCog, CheckCircle, RefreshCw, PlayCircle, XCircle } from 'lucide-react';
 import { PatientCard, PatientStats } from '@/features/patients';
 import { patientService } from '@/features/patients';
 import { queueService } from '@/features/queue';
@@ -36,9 +26,11 @@ const fetchTokenVitals = async (token) => {
       logger.debug(`❌ Token #${token.token_number} has no visit_id - treating as fresh visit`);
       return null;
     }
-    
-    logger.debug(`🔍 Fetching vitals for token #${token.token_number} - visit_id: ${token.visit_id}`);
-    
+
+    logger.debug(
+      `🔍 Fetching vitals for token #${token.token_number} - visit_id: ${token.visit_id}`
+    );
+
     // Fetch vitals for this specific visit only
     try {
       const vitalsResponse = await vitalsService.getVisitVitals(token.visit_id);
@@ -51,7 +43,7 @@ const fetchTokenVitals = async (token) => {
     } catch (error) {
       console.warn('Failed to fetch visit vitals:', error);
     }
-    
+
     // No vitals for this visit - return null to show "Add Vitals & Notes"
     return null;
   } catch (error) {
@@ -66,7 +58,10 @@ const fetchTokenVitals = async (token) => {
 const transformTokenToPatientData = (token) => {
   // Construct blood pressure string only if we have valid values
   let bloodPressure = null;
-  if (token.patient?.vitals?.blood_pressure_systolic && token.patient?.vitals?.blood_pressure_diastolic) {
+  if (
+    token.patient?.vitals?.blood_pressure_systolic &&
+    token.patient?.vitals?.blood_pressure_diastolic
+  ) {
     bloodPressure = `${token.patient.vitals.blood_pressure_systolic}/${token.patient.vitals.blood_pressure_diastolic}`;
   }
 
@@ -80,7 +75,9 @@ const transformTokenToPatientData = (token) => {
 
   return {
     id: token.patient?.id || token.id,
-    name: `${token.patient?.first_name || ''} ${token.patient?.last_name || ''}`.trim() || 'Unknown Patient',
+    name:
+      `${token.patient?.first_name || ''} ${token.patient?.last_name || ''}`.trim() ||
+      'Unknown Patient',
     age: age,
     gender: token.patient?.gender || 'N/A',
     phone: token.patient?.phone || 'N/A',
@@ -94,7 +91,7 @@ const transformTokenToPatientData = (token) => {
       bp: bloodPressure,
       temp: token.patient?.vitals?.temperature || null,
       weight: token.patient?.vitals?.weight || null,
-      oxygenSaturation: token.patient?.vitals?.oxygen_saturation || null
+      oxygenSaturation: token.patient?.vitals?.oxygen_saturation || null,
     },
     appointmentTime: (() => {
       // For appointments: combine appointment_date + appointment_time
@@ -107,7 +104,7 @@ const transformTokenToPatientData = (token) => {
           day: 'numeric',
           hour: '2-digit',
           minute: '2-digit',
-          hour12: true
+          hour12: true,
         });
       }
       // For walk-ins: use token created_at
@@ -118,11 +115,11 @@ const transformTokenToPatientData = (token) => {
           day: 'numeric',
           hour: '2-digit',
           minute: '2-digit',
-          hour12: true
+          hour12: true,
         });
       }
       return 'N/A';
-    })()
+    })(),
   };
 };
 
@@ -138,7 +135,7 @@ const DoctorDashboard = () => {
   const [refreshing, setRefreshing] = useState(false);
   const [autoRefresh, setAutoRefresh] = useState(true); // Auto-refresh enabled by default
   const refreshIntervalRef = useRef(null);
-  
+
   // Get current doctor ID from authenticated user
   const currentDoctorId = user?.id;
 
@@ -159,7 +156,7 @@ const DoctorDashboard = () => {
   // Load patients and queue data on component mount
   useEffect(() => {
     loadDoctorData();
-    
+
     // Session recovery: Check for active consultation on page refresh
     const checkActiveConsultation = async () => {
       try {
@@ -167,7 +164,7 @@ const DoctorDashboard = () => {
         if (savedConsultation) {
           const consultationData = JSON.parse(savedConsultation);
           const { tokenId, timestamp } = consultationData;
-          
+
           // Check if consultation is still active (within last 2 hours)
           const twoHoursAgo = Date.now() - 2 * 60 * 60 * 1000;
           if (timestamp > twoHoursAgo) {
@@ -176,8 +173,8 @@ const DoctorDashboard = () => {
               const queueResponse = await queueService.getDoctorQueueStatus(currentDoctorId);
               if (queueResponse.success && queueResponse.data) {
                 const tokens = queueResponse.data.tokens || [];
-                const activeToken = tokens.find(t => t.id === tokenId && t.status === 'serving');
-                
+                const activeToken = tokens.find((t) => t.id === tokenId && t.status === 'serving');
+
                 if (activeToken) {
                   // Consultation is still active, restore state
                   logger.info('Recovered active consultation from session:', tokenId);
@@ -202,7 +199,7 @@ const DoctorDashboard = () => {
         sessionStorage.removeItem('activeConsultation');
       }
     };
-    
+
     if (currentDoctorId) {
       checkActiveConsultation();
     }
@@ -211,7 +208,7 @@ const DoctorDashboard = () => {
   // Create a stable refresh function for auto-refresh
   // Uses a ref to access the current selectedTab value without causing re-renders
   const selectedTabRef = useRef(selectedTab);
-  
+
   // Update ref when selectedTab changes
   useEffect(() => {
     selectedTabRef.current = selectedTab;
@@ -220,14 +217,14 @@ const DoctorDashboard = () => {
   const silentRefreshQueue = useCallback(async () => {
     try {
       const queueResponse = await queueService.getDoctorQueueStatus(currentDoctorId);
-      
+
       if (queueResponse.success && queueResponse.data) {
         const newTokens = queueResponse.data.tokens || [];
-        const activeTokens = newTokens.filter(token => token.status !== 'cancelled');
-        
+        const activeTokens = newTokens.filter((token) => token.status !== 'cancelled');
+
         // Check if there's an active consultation
-        const hasActiveConsultation = activeTokens.some(token => token.status === 'serving');
-        
+        const hasActiveConsultation = activeTokens.some((token) => token.status === 'serving');
+
         // Fetch vitals for each patient in the queue
         const tokensWithVitals = await Promise.all(
           activeTokens.map(async (token) => {
@@ -238,9 +235,9 @@ const DoctorDashboard = () => {
             return token;
           })
         );
-        
+
         setQueueData(tokensWithVitals);
-        
+
         // Auto-switch to consulting tab if there's an active consultation
         // but only if user is on ready tab (not on completed tab)
         if (hasActiveConsultation && selectedTabRef.current === 'ready') {
@@ -283,24 +280,26 @@ const DoctorDashboard = () => {
   const loadDoctorData = async () => {
     try {
       setLoading(true);
-      
+
       // Only proceed if we have a valid doctor ID
       if (!currentDoctorId) {
         setQueueData([]);
         setPatients([]);
         return;
       }
-      
+
       // Load queue status for the doctor
       const queueResponse = await queueService.getDoctorQueueStatus(currentDoctorId);
-      
+
       if (queueResponse.success) {
         const tokens = queueResponse.data.tokens || [];
-        
+
         // Filter out cancelled appointments
-        const activeTokens = tokens.filter(token => token.status !== 'cancelled');
-        logger.debug(`📋 [DOCTOR] Filtered to ${activeTokens.length} active tokens (excluded ${tokens.length - activeTokens.length} cancelled)`);
-        
+        const activeTokens = tokens.filter((token) => token.status !== 'cancelled');
+        logger.debug(
+          `📋 [DOCTOR] Filtered to ${activeTokens.length} active tokens (excluded ${tokens.length - activeTokens.length} cancelled)`
+        );
+
         // Fetch vitals for each patient in the queue
         const tokensWithVitals = await Promise.all(
           activeTokens.map(async (token) => {
@@ -308,22 +307,27 @@ const DoctorDashboard = () => {
             if (vitals) {
               token.patient.vitals = vitals;
               token.patient.vitalsRecorded = true;
-              logger.debug(`✅ [DOCTOR] ${token.patient.first_name} - vitalsRecorded: true, vitals:`, vitals);
+              logger.debug(
+                `✅ [DOCTOR] ${token.patient.first_name} - vitalsRecorded: true, vitals:`,
+                vitals
+              );
             } else {
               // No vitals found - this should trigger "Add Vitals & Notes" button
               token.patient.vitals = null;
               token.patient.vitalsRecorded = false;
-              logger.debug(`❌ [DOCTOR] ${token.patient.first_name} - vitalsRecorded: false, should show "Add Vitals & Notes"`);
+              logger.debug(
+                `❌ [DOCTOR] ${token.patient.first_name} - vitalsRecorded: false, should show "Add Vitals & Notes"`
+              );
             }
             return token;
           })
         );
-        
+
         setQueueData(tokensWithVitals);
       } else {
         setQueueData([]);
       }
-      
+
       // Load general patients data (backup/fallback)
       const patientsResponse = await patientService.getDoctorPatients();
       if (patientsResponse.success) {
@@ -344,17 +348,19 @@ const DoctorDashboard = () => {
     try {
       setRefreshing(true);
       const queueResponse = await queueService.getDoctorQueueStatus(currentDoctorId);
-      
+
       if (queueResponse.success && queueResponse.data) {
         const newTokens = queueResponse.data.tokens || [];
-        
+
         // Filter out cancelled appointments
-        const activeTokens = newTokens.filter(token => token.status !== 'cancelled');
-        logger.debug(`📋 [DOCTOR REFRESH] Filtered to ${activeTokens.length} active tokens (excluded ${newTokens.length - activeTokens.length} cancelled)`);
-        
+        const activeTokens = newTokens.filter((token) => token.status !== 'cancelled');
+        logger.debug(
+          `📋 [DOCTOR REFRESH] Filtered to ${activeTokens.length} active tokens (excluded ${newTokens.length - activeTokens.length} cancelled)`
+        );
+
         // Check if there's an active consultation (status === 'serving')
-        const hasActiveConsultation = activeTokens.some(token => token.status === 'serving');
-        
+        const hasActiveConsultation = activeTokens.some((token) => token.status === 'serving');
+
         // Fetch vitals for each patient in the queue
         const tokensWithVitals = await Promise.all(
           activeTokens.map(async (token) => {
@@ -365,15 +371,15 @@ const DoctorDashboard = () => {
             return token;
           })
         );
-        
+
         setQueueData(tokensWithVitals);
-        
+
         // Automatically switch to consulting tab if there's an active consultation
         // and user is not already viewing completed tab
         if (hasActiveConsultation && selectedTab !== 'completed') {
           setSelectedTab('consulting');
         }
-        
+
         if (!silent) {
           showNotification('success', 'Queue data refreshed successfully');
         }
@@ -393,50 +399,49 @@ const DoctorDashboard = () => {
 
   // Filter and sort queue data based on search, tab and time
   const filteredQueueData = queueData
-    .filter(token => {
+    .filter((token) => {
       // Search filter
-      const patientName = `${token.patient?.first_name || ''} ${token.patient?.last_name || ''}`.toLowerCase();
-      const matchesSearch = searchQuery === '' || patientName.includes(searchQuery.toLowerCase()) || 
-                           token.token_number?.toString().includes(searchQuery);
-      
+      const patientName =
+        `${token.patient?.first_name || ''} ${token.patient?.last_name || ''}`.toLowerCase();
+      const matchesSearch =
+        searchQuery === '' ||
+        patientName.includes(searchQuery.toLowerCase()) ||
+        token.token_number?.toString().includes(searchQuery);
+
       // Tab filter based on token status
-      const matchesTab = (
+      const matchesTab =
         (selectedTab === 'ready' && ['ready', 'called', 'waiting'].includes(token.status)) ||
         (selectedTab === 'consulting' && token.status === 'serving') ||
-        (selectedTab === 'completed' && ['completed', 'cancelled'].includes(token.status))
-      );
-      
+        (selectedTab === 'completed' && ['completed', 'cancelled'].includes(token.status));
 
-      
       // Time filter
-      const matchesTime = timeFilter === 'all' || 
-                         (timeFilter === 'morning' && new Date(token.created_at).getHours() < 12) ||
-                         (timeFilter === 'afternoon' && new Date(token.created_at).getHours() >= 12);
-      
+      const matchesTime =
+        timeFilter === 'all' ||
+        (timeFilter === 'morning' && new Date(token.created_at).getHours() < 12) ||
+        (timeFilter === 'afternoon' && new Date(token.created_at).getHours() >= 12);
+
       return matchesSearch && matchesTab && matchesTime;
     })
     .sort((a, b) => {
       // Sort by priority first (higher priority = lower number, so descending)
       const priorityDiff = (b.priority || 3) - (a.priority || 3);
       if (priorityDiff !== 0) return priorityDiff;
-      
+
       // If same priority, sort by token number (ascending)
       return a.token_number - b.token_number;
     });
 
-
-
   // Fallback to regular patients if no queue data
-  const filteredPatients = patients.filter(patient => {
+  const filteredPatients = patients.filter((patient) => {
     const matchesSearch = patient.name?.toLowerCase().includes(searchQuery.toLowerCase());
-    const matchesTab = (
+    const matchesTab =
       (selectedTab === 'ready' && (patient.status === 'ready' || patient.status === 'delayed')) ||
       (selectedTab === 'consulting' && patient.status === 'seeing_doctor') ||
-      (selectedTab === 'completed' && patient.status === 'completed')
-    );
+      (selectedTab === 'completed' && patient.status === 'completed');
 
     // Time frame filtering
-    const matchesTime = timeFilter === 'all' || 
+    const matchesTime =
+      timeFilter === 'all' ||
       (timeFilter === 'morning' && patient.appointmentTime?.includes('AM')) ||
       (timeFilter === 'afternoon' && patient.appointmentTime?.includes('PM'));
 
@@ -447,25 +452,26 @@ const DoctorDashboard = () => {
     try {
       setRefreshing(true);
       const response = await patientService.startConsultation(patientId);
-      
+
       // Save active consultation to session storage for recovery
       if (response?.tokenId) {
-        sessionStorage.setItem('activeConsultation', JSON.stringify({
-          tokenId: response.tokenId,
-          patientId: patientId,
-          timestamp: Date.now(),
-        }));
+        sessionStorage.setItem(
+          'activeConsultation',
+          JSON.stringify({
+            tokenId: response.tokenId,
+            patientId: patientId,
+            timestamp: Date.now(),
+          })
+        );
       }
-      
+
       // Refresh queue data to get latest status from server
       await refreshQueue(false);
-      
+
       // Update local patients state as fallback
-      setPatients(patients.map(p => 
-        p.id === patientId 
-          ? { ...p, status: 'seeing_doctor' }
-          : p
-      ));
+      setPatients(
+        patients.map((p) => (p.id === patientId ? { ...p, status: 'seeing_doctor' } : p))
+      );
     } catch (error) {
       logger.error('Failed to start consultation:', error);
       showNotification('error', `Failed to start consultation: ${error.message}`);
@@ -477,43 +483,46 @@ const DoctorDashboard = () => {
   const handleCompleteVisit = async (patientId) => {
     try {
       setRefreshing(true);
-      
+
       // Find the patient to get their visit_id
-      const patient = patients.find(p => p.id === patientId);
+      const patient = patients.find((p) => p.id === patientId);
       if (!patient) {
         throw new Error('Patient not found');
       }
-      
+
       // Get visit_id from patient data (could be visit_id, current_visit_id, or active_visit_id)
       const visitId = patient.visit_id || patient.current_visit_id || patient.active_visit_id;
-      
+
       if (!visitId) {
         // If no visit_id, this patient doesn't have an active visit
         // This shouldn't happen in normal flow, but handle gracefully
-        showNotification('error', 'No active visit found for this patient. Please use the queue system.');
+        showNotification(
+          'error',
+          'No active visit found for this patient. Please use the queue system.'
+        );
         return;
       }
-      
+
       // Validate visit status before completion
       try {
         const visitDetails = await visitService.getVisitDetails(visitId);
         if (!visitDetails) {
           throw new Error('Visit not found');
         }
-        
+
         // Check if visit is already completed
         if (visitDetails.status === 'completed') {
           showNotification('warning', 'This visit is already completed.');
           await refreshQueue(false);
           return;
         }
-        
+
         // Check if visit is cancelled
         if (visitDetails.status === 'cancelled') {
           showNotification('error', 'Cannot complete a cancelled visit.');
           return;
         }
-        
+
         // Check if visit has an invoice and its status
         // Note: Visits should be completed through invoice payment, not directly
         // This is a fallback for edge cases
@@ -523,7 +532,10 @@ const DoctorDashboard = () => {
             const invoice = await invoiceService.getInvoiceById(visitDetails.invoice_id);
             if (invoice && invoice.status === 'paid') {
               // Invoice is paid, visit should be completed through invoice flow
-              showNotification('info', 'Visit should be completed through invoice payment. Checking status...');
+              showNotification(
+                'info',
+                'Visit should be completed through invoice payment. Checking status...'
+              );
               await refreshQueue(false);
               return;
             }
@@ -537,22 +549,18 @@ const DoctorDashboard = () => {
         showNotification('error', `Failed to validate visit: ${validationError.message}`);
         return;
       }
-      
+
       // Complete the visit using visitService
       await visitService.completeVisit(visitId, {
         completed_by: currentDoctorId,
       });
-      
+
       // Refresh queue data to get latest status from server
       await refreshQueue(false);
-      
+
       // Update local patients state as fallback
-      setPatients(patients.map(p => 
-        p.id === patientId 
-          ? { ...p, status: 'completed' }
-          : p
-      ));
-      
+      setPatients(patients.map((p) => (p.id === patientId ? { ...p, status: 'completed' } : p)));
+
       showNotification('success', 'Visit completed successfully');
     } catch (error) {
       logger.error('Failed to complete visit:', error);
@@ -569,17 +577,15 @@ const DoctorDashboard = () => {
       const response = await queueService.completeConsultation(tokenId);
       if (response.success) {
         // Update queue data immediately and force re-render
-        const updatedQueueData = queueData.map(token => 
-          token.id === tokenId 
-            ? { ...token, status: 'completed' }
-            : token
+        const updatedQueueData = queueData.map((token) =>
+          token.id === tokenId ? { ...token, status: 'completed' } : token
         );
-        
+
         // Use React's batch update to update both state and tab together
         setQueueData([...updatedQueueData]); // Spread to create new array reference
         setSelectedTab('completed');
         showNotification('success', 'Consultation completed successfully!');
-        
+
         // Immediately refresh queue data to get latest status from server
         await refreshQueue(true); // Silent refresh to avoid duplicate notification
       }
@@ -614,7 +620,7 @@ const DoctorDashboard = () => {
       setRefreshing(true);
       logger.debug('[UI] Calling next patient and starting consultation...');
       const response = await queueService.callNextAndStart(currentDoctorId);
-      
+
       logger.debug('[UI] Response:', response);
 
       // Check if response exists
@@ -625,17 +631,17 @@ const DoctorDashboard = () => {
 
       if (response.hasActiveConsultation) {
         // Doctor has active consultation, ask if they want to end it
-        const activePatient = response.activeToken?.patient 
-          ? `${response.activeToken.patient.first_name} ${response.activeToken.patient.last_name}` 
+        const activePatient = response.activeToken?.patient
+          ? `${response.activeToken.patient.first_name} ${response.activeToken.patient.last_name}`
           : 'a patient';
-        
+
         logger.debug('[UI] Active consultation detected:', activePatient);
-        
+
         const confirmed = window.confirm(
           `You have an active consultation with ${activePatient} (Token #${response.activeToken?.token_number}).\n\n` +
-          `Would you like to end this consultation and start with the next patient?`
+            `Would you like to end this consultation and start with the next patient?`
         );
-        
+
         if (confirmed) {
           logger.debug('[UI] User confirmed, ending active consultation...');
           await handleForceEndConsultation();
@@ -675,7 +681,7 @@ const DoctorDashboard = () => {
     try {
       logger.debug('[UI] Ending active consultation...');
       const response = await queueService.forceEndConsultation(currentDoctorId);
-      
+
       logger.debug('[UI] End consultation response:', response);
 
       // Check if response exists
@@ -706,19 +712,17 @@ const DoctorDashboard = () => {
       const response = await queueService.startConsultation(tokenId);
       if (response.success) {
         // Optimistically update local state immediately
-        const updatedQueueData = queueData.map(token => 
-          token.id === tokenId 
-            ? { ...token, status: 'serving' }
-            : token
+        const updatedQueueData = queueData.map((token) =>
+          token.id === tokenId ? { ...token, status: 'serving' } : token
         );
         setQueueData([...updatedQueueData]); // Spread to create new array reference
-        
+
         // Immediately switch to consulting tab
         setSelectedTab('consulting');
-        
+
         // Refresh queue data to get latest status from server
         await refreshQueue(true); // Silent refresh to avoid duplicate notification
-        
+
         showNotification('success', 'Consultation started successfully!');
       }
     } catch (error) {
@@ -736,7 +740,7 @@ const DoctorDashboard = () => {
       } else if (error.message && error.message.includes("should be 'called'")) {
         const confirmAction = window.confirm(
           `Cannot start consultation: ${error.message}\n\n` +
-          `The patient needs to be called first. Click "OK" to call next patient.`
+            `The patient needs to be called first. Click "OK" to call next patient.`
         );
         if (confirmAction) {
           await handleCallNextPatient();
@@ -749,10 +753,6 @@ const DoctorDashboard = () => {
     }
   };
 
-
-
-
-
   return (
     <PageLayout
       title="Doctor Dashboard"
@@ -760,7 +760,7 @@ const DoctorDashboard = () => {
       fullWidth
     >
       {/* Notifications now handled by Toast system (top-right corner) */}
-      
+
       <div className="space-y-8 p-8">
         {/* Loading state */}
         {loading ? (
@@ -773,8 +773,8 @@ const DoctorDashboard = () => {
             <PatientStats patients={patients} userRole="doctor" />
 
             {/* Search and actions bar */}
-            <div className="flex gap-4 items-center">
-              <div className="relative flex-1 max-w-md">
+            <div className="flex items-center gap-4">
+              <div className="relative max-w-md flex-1">
                 <SearchBar
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
@@ -783,8 +783,8 @@ const DoctorDashboard = () => {
                 />
               </div>
               <div className="min-w-[200px]">
-                <select 
-                  className="h-12 px-4 py-2 text-base rounded-md border border-gray-200 focus:outline-none focus:ring-2 focus:ring-blue-500 w-full"
+                <select
+                  className="h-12 w-full rounded-md border border-gray-200 px-4 py-2 text-base focus:outline-none focus:ring-2 focus:ring-blue-500"
                   value={timeFilter}
                   onChange={(e) => setTimeFilter(e.target.value)}
                 >
@@ -793,26 +793,26 @@ const DoctorDashboard = () => {
                   <option value="afternoon">Afternoon (PM)</option>
                 </select>
               </div>
-              <Button 
+              <Button
                 onClick={handleCallNextAndStart}
-                className="h-12 px-6 bg-blue-600 hover:bg-blue-700 text-white font-semibold shadow-lg"
+                className="h-12 bg-blue-600 px-6 font-semibold text-white shadow-lg hover:bg-blue-700"
                 disabled={refreshing}
                 title="Call next patient by priority (urgent > appointment > token) and start consultation immediately"
               >
                 <PlayCircle className="mr-2" size={20} />
                 Call Next & Start
               </Button>
-              <Button 
+              <Button
                 onClick={handleForceEndConsultation}
                 variant="outline"
-                className="h-12 px-4 border-red-300 text-red-600 hover:bg-red-50"
+                className="h-12 border-red-300 px-4 text-red-600 hover:bg-red-50"
                 disabled={refreshing}
                 title="End any active consultation (fixes stuck consultations)"
               >
                 <XCircle className="mr-2" size={18} />
                 End Consultation
               </Button>
-              <Button 
+              <Button
                 onClick={refreshQueue}
                 variant="outline"
                 className="h-12 px-4"
@@ -821,189 +821,189 @@ const DoctorDashboard = () => {
                 <RefreshCw className={`${refreshing ? 'animate-spin' : ''}`} size={18} />
                 Refresh
               </Button>
-              <Button 
+              <Button
                 onClick={() => setAutoRefresh(!autoRefresh)}
                 variant={autoRefresh ? 'default' : 'outline'}
-                className={`h-12 px-4 ${autoRefresh ? 'bg-green-600 hover:bg-green-700 text-white' : ''}`}
-                title={autoRefresh ? 'Auto-refresh is ON - Click to disable' : 'Auto-refresh is OFF - Click to enable'}
+                className={`h-12 px-4 ${autoRefresh ? 'bg-green-600 text-white hover:bg-green-700' : ''}`}
+                title={
+                  autoRefresh
+                    ? 'Auto-refresh is ON - Click to disable'
+                    : 'Auto-refresh is OFF - Click to enable'
+                }
               >
                 <RefreshCw className={`mr-2 ${autoRefresh ? 'animate-pulse' : ''}`} size={18} />
                 {autoRefresh ? 'Auto-refresh ON' : 'Auto-refresh OFF'}
               </Button>
             </div>
 
-        {/* Patient tabs and cards */}
-        <Card className="p-8">
-          <Tabs 
-            value={selectedTab} 
-            onValueChange={setSelectedTab}
-            className="w-full"
-          >
-            <TabsList className="grid grid-cols-3 w-full max-w-lg mx-auto mb-8 h-12">
-              <TabsTrigger value="ready" className="text-base py-3">
-                <UserCheck className="w-5 h-5 mr-2" />
-                Ready
-                <span className="ml-2 bg-blue-100 text-blue-600 px-2 py-1 rounded-full text-xs">
-                  {queueData.filter(t => ['ready', 'called', 'waiting'].includes(t.status)).length}
-                </span>
-              </TabsTrigger>
-              <TabsTrigger value="consulting" className="text-base py-3">
-                <UserCog className="w-5 h-5 mr-2" />
-                In Consultation
-                <span className="ml-2 bg-orange-100 text-orange-600 px-2 py-1 rounded-full text-xs">
-                  {queueData.filter(t => t.status === 'serving').length}
-                </span>
-              </TabsTrigger>
-              <TabsTrigger value="completed" className="text-base py-3">
-                <CheckCircle className="w-5 h-5 mr-2" />
-                Completed
-                <span className="ml-2 bg-green-100 text-green-600 px-2 py-1 rounded-full text-xs">
-                  {queueData.filter(t => ['completed', 'cancelled'].includes(t.status)).length}
-                </span>
-              </TabsTrigger>
-            </TabsList>
+            {/* Patient tabs and cards */}
+            <Card className="p-8">
+              <Tabs value={selectedTab} onValueChange={setSelectedTab} className="w-full">
+                <TabsList className="mx-auto mb-8 grid h-12 w-full max-w-lg grid-cols-3">
+                  <TabsTrigger value="ready" className="py-3 text-base">
+                    <UserCheck className="mr-2 h-5 w-5" />
+                    Ready
+                    <span className="ml-2 rounded-full bg-blue-100 px-2 py-1 text-xs text-blue-600">
+                      {
+                        queueData.filter((t) => ['ready', 'called', 'waiting'].includes(t.status))
+                          .length
+                      }
+                    </span>
+                  </TabsTrigger>
+                  <TabsTrigger value="consulting" className="py-3 text-base">
+                    <UserCog className="mr-2 h-5 w-5" />
+                    In Consultation
+                    <span className="ml-2 rounded-full bg-orange-100 px-2 py-1 text-xs text-orange-600">
+                      {queueData.filter((t) => t.status === 'serving').length}
+                    </span>
+                  </TabsTrigger>
+                  <TabsTrigger value="completed" className="py-3 text-base">
+                    <CheckCircle className="mr-2 h-5 w-5" />
+                    Completed
+                    <span className="ml-2 rounded-full bg-green-100 px-2 py-1 text-xs text-green-600">
+                      {
+                        queueData.filter((t) => ['completed', 'cancelled'].includes(t.status))
+                          .length
+                      }
+                    </span>
+                  </TabsTrigger>
+                </TabsList>
 
-            <TabsContent value="ready" className="mt-0">
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5 gap-6">
-                {/* Show queue tokens if available, otherwise show regular patients */}
-                {filteredQueueData.length > 0 ? (
-                  filteredQueueData.map(token => {
-                    const patientData = transformTokenToPatientData(token);
-                    
-                    return (
-                      <PatientCard
-                        key={token.id}
-                        patient={patientData}
-                        userRole="doctor"
-                        onStartConsultation={() => handleStartTokenConsultation(token.id)}
-                        onCompleteVisit={() => handleCompleteTokenConsultation(token.id)}
-                        onViewFullPatientData={(patient) => {
-                          navigate('/doctor/patient-record', { 
-                            state: { 
-                              patient,
-                              visit_id: token.visit_id 
-                            } 
-                          });
-                        }}
-                      />
-                    );
-                  })
-                ) : (
-                  filteredPatients.map(patient => (
-                    <PatientCard
-                      key={patient.id}
-                      patient={patient}
-                      userRole="doctor"
-                      onStartConsultation={handleStartConsultation}
-                      onCompleteVisit={handleCompleteVisit}
-                      onViewFullPatientData={(patient) => {
-                        navigate('/doctor/patient-record', { state: { patient } });
-                      }}
-                    />
-                  ))
-                )}
-                {(filteredQueueData.length === 0 && filteredPatients.length === 0) && (
-                  <div className="col-span-full text-center py-12 text-gray-500 text-lg">
-                    No patients ready for consultation.
-                  </div>
-                )}
-              </div>
-            </TabsContent>
+                <TabsContent value="ready" className="mt-0">
+                  <div className="grid grid-cols-1 gap-6 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5">
+                    {/* Show queue tokens if available, otherwise show regular patients */}
+                    {filteredQueueData.length > 0
+                      ? filteredQueueData.map((token) => {
+                          const patientData = transformTokenToPatientData(token);
 
-            <TabsContent value="consulting" className="mt-0">
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5 gap-6">
-                {/* Show queue tokens if available, otherwise show regular patients */}
-                {filteredQueueData.length > 0 ? (
-                  filteredQueueData.map(token => {
-                    const patientData = transformTokenToPatientData(token);
-                    
-                    return (
-                      <PatientCard
-                        key={token.id}
-                        patient={patientData}
-                        userRole="doctor"
-                        onStartConsultation={() => handleStartTokenConsultation(token.id)}
-                        onCompleteVisit={() => handleCompleteTokenConsultation(token.id)}
-                        onViewFullPatientData={(patient) => {
-                          navigate('/doctor/patient-record', { 
-                            state: { 
-                              patient,
-                              visit_id: token.visit_id 
-                            } 
-                          });
-                        }}
-                      />
-                    );
-                  })
-                ) : (
-                  filteredPatients.map(patient => (
-                    <PatientCard
-                      key={patient.id}
-                      patient={patient}
-                      userRole="doctor"
-                      onStartConsultation={handleStartConsultation}
-                      onCompleteVisit={handleCompleteVisit}
-                      onViewFullPatientData={(patient) => {
-                        navigate('/doctor/patient-record', { state: { patient } });
-                      }}
-                    />
-                  ))
-                )}
-                {(filteredQueueData.length === 0 && filteredPatients.length === 0) && (
-                  <div className="col-span-full text-center py-12 text-gray-500 text-lg">
-                    No patients currently in consultation.
+                          return (
+                            <PatientCard
+                              key={token.id}
+                              patient={patientData}
+                              userRole="doctor"
+                              onStartConsultation={() => handleStartTokenConsultation(token.id)}
+                              onCompleteVisit={() => handleCompleteTokenConsultation(token.id)}
+                              onViewFullPatientData={(patient) => {
+                                navigate('/doctor/patient-record', {
+                                  state: {
+                                    patient,
+                                    visit_id: token.visit_id,
+                                  },
+                                });
+                              }}
+                            />
+                          );
+                        })
+                      : filteredPatients.map((patient) => (
+                          <PatientCard
+                            key={patient.id}
+                            patient={patient}
+                            userRole="doctor"
+                            onStartConsultation={handleStartConsultation}
+                            onCompleteVisit={handleCompleteVisit}
+                            onViewFullPatientData={(patient) => {
+                              navigate('/doctor/patient-record', { state: { patient } });
+                            }}
+                          />
+                        ))}
+                    {filteredQueueData.length === 0 && filteredPatients.length === 0 && (
+                      <div className="col-span-full py-12 text-center text-lg text-gray-500">
+                        No patients ready for consultation.
+                      </div>
+                    )}
                   </div>
-                )}
-              </div>
-            </TabsContent>
+                </TabsContent>
 
-            <TabsContent value="completed" className="mt-0">
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5 gap-6">
-                {/* Show queue tokens if available, otherwise show regular patients */}
-                {filteredQueueData.length > 0 ? (
-                  filteredQueueData.map(token => {
-                    const patientData = transformTokenToPatientData(token);
-                    
-                    return (
-                      <PatientCard
-                        key={token.id}
-                        patient={patientData}
-                        userRole="doctor"
-                        readOnly={true}
-                        onViewFullPatientData={(patient) => {
-                          navigate('/doctor/patient-record', { 
-                            state: { 
-                              patient,
-                              visit_id: token.visit_id 
-                            } 
-                          });
-                        }}
-                      />
-                    );
-                  })
-                ) : (
-                  filteredPatients.map(patient => (
-                    <PatientCard
-                      key={patient.id}
-                      patient={patient}
-                      userRole="doctor"
-                      readOnly={true}
-                      onViewFullPatientData={(patient) => {
-                        navigate('/doctor/patient-record', { state: { patient } });
-                      }}
-                    />
-                  ))
-                )}
-                {(filteredQueueData.length === 0 && filteredPatients.length === 0) && (
-                  <div className="col-span-full text-center py-12 text-gray-500 text-lg">
-                    No completed consultations today.
+                <TabsContent value="consulting" className="mt-0">
+                  <div className="grid grid-cols-1 gap-6 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5">
+                    {/* Show queue tokens if available, otherwise show regular patients */}
+                    {filteredQueueData.length > 0
+                      ? filteredQueueData.map((token) => {
+                          const patientData = transformTokenToPatientData(token);
+
+                          return (
+                            <PatientCard
+                              key={token.id}
+                              patient={patientData}
+                              userRole="doctor"
+                              onStartConsultation={() => handleStartTokenConsultation(token.id)}
+                              onCompleteVisit={() => handleCompleteTokenConsultation(token.id)}
+                              onViewFullPatientData={(patient) => {
+                                navigate('/doctor/patient-record', {
+                                  state: {
+                                    patient,
+                                    visit_id: token.visit_id,
+                                  },
+                                });
+                              }}
+                            />
+                          );
+                        })
+                      : filteredPatients.map((patient) => (
+                          <PatientCard
+                            key={patient.id}
+                            patient={patient}
+                            userRole="doctor"
+                            onStartConsultation={handleStartConsultation}
+                            onCompleteVisit={handleCompleteVisit}
+                            onViewFullPatientData={(patient) => {
+                              navigate('/doctor/patient-record', { state: { patient } });
+                            }}
+                          />
+                        ))}
+                    {filteredQueueData.length === 0 && filteredPatients.length === 0 && (
+                      <div className="col-span-full py-12 text-center text-lg text-gray-500">
+                        No patients currently in consultation.
+                      </div>
+                    )}
                   </div>
-                )}
-              </div>
-            </TabsContent>
-          </Tabs>
-        </Card>
-        </>
+                </TabsContent>
+
+                <TabsContent value="completed" className="mt-0">
+                  <div className="grid grid-cols-1 gap-6 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5">
+                    {/* Show queue tokens if available, otherwise show regular patients */}
+                    {filteredQueueData.length > 0
+                      ? filteredQueueData.map((token) => {
+                          const patientData = transformTokenToPatientData(token);
+
+                          return (
+                            <PatientCard
+                              key={token.id}
+                              patient={patientData}
+                              userRole="doctor"
+                              readOnly={true}
+                              onViewFullPatientData={(patient) => {
+                                navigate('/doctor/patient-record', {
+                                  state: {
+                                    patient,
+                                    visit_id: token.visit_id,
+                                  },
+                                });
+                              }}
+                            />
+                          );
+                        })
+                      : filteredPatients.map((patient) => (
+                          <PatientCard
+                            key={patient.id}
+                            patient={patient}
+                            userRole="doctor"
+                            readOnly={true}
+                            onViewFullPatientData={(patient) => {
+                              navigate('/doctor/patient-record', { state: { patient } });
+                            }}
+                          />
+                        ))}
+                    {filteredQueueData.length === 0 && filteredPatients.length === 0 && (
+                      <div className="col-span-full py-12 text-center text-lg text-gray-500">
+                        No completed consultations today.
+                      </div>
+                    )}
+                  </div>
+                </TabsContent>
+              </Tabs>
+            </Card>
+          </>
         )}
       </div>
     </PageLayout>

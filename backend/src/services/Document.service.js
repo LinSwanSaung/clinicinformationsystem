@@ -30,7 +30,7 @@ class DocumentService {
       const uniqueFileName = `${patientId}/${crypto.randomUUID()}.${fileExtension}`;
 
       // Upload to Supabase Storage
-      const { data: uploadData, error: uploadError } = await supabase.storage
+      const { data: _data, error: uploadError } = await supabase.storage
         .from(this.storageBucket)
         .upload(uniqueFileName, fileBuffer, {
           contentType: mimeType,
@@ -179,10 +179,7 @@ class DocumentService {
       }
 
       // Delete from database
-      const { error: dbError } = await supabase
-        .from(this.tableName)
-        .delete()
-        .eq('id', documentId);
+      const { error: dbError } = await supabase.from(this.tableName).delete().eq('id', documentId);
 
       if (dbError) {
         throw new Error(`Failed to delete document: ${dbError.message}`);
@@ -195,4 +192,3 @@ class DocumentService {
 }
 
 export default new DocumentService();
-

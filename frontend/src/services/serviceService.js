@@ -7,7 +7,9 @@ const serviceService = {
     const params = {};
     if (status) params.status = status;
     if (category) params.category = category;
-    const response = await apiService.get('/services', { params: Object.keys(params).length ? params : undefined });
+    const response = await apiService.get('/services', {
+      params: Object.keys(params).length ? params : undefined,
+    });
     return response.data;
   },
 
@@ -24,7 +26,7 @@ const serviceService = {
     if (status) params.status = status;
     if (category) params.category = category;
     const response = await apiService.get('/services/search', {
-      params
+      params,
     });
     return response.data;
   },

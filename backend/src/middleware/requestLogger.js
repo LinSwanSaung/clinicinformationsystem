@@ -7,7 +7,7 @@ import logger from '../config/logger.js';
 
 export const requestLogger = (req, res, next) => {
   const start = Date.now();
-  
+
   // Log request details (debug level - only in development)
   logger.debug(`Request: ${req.method} ${req.url}`, {
     ip: req.ip,
@@ -16,9 +16,9 @@ export const requestLogger = (req, res, next) => {
 
   // Override res.end to log response details
   const originalEnd = res.end;
-  res.end = function(...args) {
+  res.end = function (...args) {
     const duration = Date.now() - start;
-    
+
     // Only log slow requests or errors in production
     if (res.statusCode >= 400 || duration > 1000) {
       logger.warn(`Response: ${req.method} ${req.url} - ${res.statusCode}`, {

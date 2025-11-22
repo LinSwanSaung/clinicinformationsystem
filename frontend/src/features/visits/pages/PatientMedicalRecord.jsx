@@ -3,12 +3,7 @@ import { useLocation, useNavigate } from 'react-router-dom';
 import { useFeedback } from '@/contexts/FeedbackContext';
 import PageLayout from '@/components/layout/PageLayout';
 import { Card } from '@/components/ui/card';
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-} from '@/components/ui/dialog';
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { DoctorNotesForm, DiagnosisForm, AllergyForm } from '@/features/medical';
 import { User, Activity, Calendar, FileText, DollarSign, AlertCircle } from 'lucide-react';
 
@@ -16,7 +11,17 @@ import { User, Activity, Calendar, FileText, DollarSign, AlertCircle } from 'luc
 import { PatientInformationHeader } from '@/features/patients';
 import { NavigationTabs } from '@/components/library';
 import { ServiceSelector } from '@/features/appointments';
-import { PatientVitalsDisplay, MedicalInformationPanel, ClinicalNotesDisplay, PatientDocumentManager, allergyService, diagnosisService, prescriptionService, doctorNotesService, documentService } from '@/features/medical';
+import {
+  PatientVitalsDisplay,
+  MedicalInformationPanel,
+  ClinicalNotesDisplay,
+  PatientDocumentManager,
+  allergyService,
+  diagnosisService,
+  prescriptionService,
+  doctorNotesService,
+  documentService,
+} from '@/features/medical';
 import { VisitHistoryCard, visitService } from '@/features/visits';
 import logger from '@/utils/logger';
 
@@ -35,8 +40,8 @@ const PatientMedicalRecord = () => {
   const [hasActiveVisit, setHasActiveVisit] = useState(false);
   const [visitCheckComplete, setVisitCheckComplete] = useState(false); // Track if visit check is done
   const [patientFiles, setPatientFiles] = useState([]);
-  // eslint-disable-next-line no-unused-vars
-  const [uploadingFiles, setUploadingFiles] = useState(false);
+
+  const [_uploadingFiles, setUploadingFiles] = useState(false);
 
   // Doctor notes management
   const [doctorNotesList, setDoctorNotesList] = useState([
@@ -429,9 +434,7 @@ const PatientMedicalRecord = () => {
           ...med,
           name: med.name ? med.name.trim() : '', // Trim whitespace from custom names
         }))
-        .filter(
-          (med) => med.name && med.name.length > 0 && med.dosage && med.frequency
-        );
+        .filter((med) => med.name && med.name.length > 0 && med.dosage && med.frequency);
 
       // Step 1: Mark previous active prescriptions as completed
       // This ensures old medications don't remain "active" when new ones are prescribed
@@ -562,9 +565,7 @@ const PatientMedicalRecord = () => {
           ...med,
           name: med.name ? med.name.trim() : '', // Trim whitespace from custom names
         }))
-        .filter(
-          (med) => med.name && med.name.length > 0 && med.dosage && med.frequency
-        );
+        .filter((med) => med.name && med.name.length > 0 && med.dosage && med.frequency);
 
       // Step 1: Update the doctor note in the backend
       const noteContent = `Diagnosis: ${noteFormData.diagnosis}\n\nClinical Notes: ${noteFormData.note}`;
@@ -739,7 +740,9 @@ const PatientMedicalRecord = () => {
 
       // Check for specific error from backend
       if (error.response?.data?.code === 'NO_ACTIVE_VISIT') {
-        showWarning('Security Check Failed: Cannot add diagnosis because patient has no active visit.');
+        showWarning(
+          'Security Check Failed: Cannot add diagnosis because patient has no active visit.'
+        );
       } else {
         showError(
           'Failed to add diagnosis: ' +
@@ -807,7 +810,9 @@ const PatientMedicalRecord = () => {
 
       // Check for specific error from backend
       if (error.response?.data?.code === 'NO_ACTIVE_VISIT') {
-        showWarning('Security Check Failed: Cannot add allergy. Patient does not have an active visit.');
+        showWarning(
+          'Security Check Failed: Cannot add allergy. Patient does not have an active visit.'
+        );
       } else {
         showError(
           'Failed to add allergy: ' +
@@ -1004,9 +1009,9 @@ const PatientMedicalRecord = () => {
 
         {/* Add Note Modal */}
         <Dialog open={isAddNoteModalOpen} onOpenChange={(open) => !open && closeAllModals()}>
-          <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
+          <DialogContent className="max-h-[90vh] max-w-4xl overflow-y-auto">
             <DialogHeader>
-              <DialogTitle>Add Doctor's Note</DialogTitle>
+              <DialogTitle>Add Doctor&apos;s Note</DialogTitle>
             </DialogHeader>
             <DoctorNotesForm
               formData={noteFormData}
@@ -1020,9 +1025,9 @@ const PatientMedicalRecord = () => {
 
         {/* Edit Note Modal */}
         <Dialog open={isEditNoteModalOpen} onOpenChange={(open) => !open && closeAllModals()}>
-          <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
+          <DialogContent className="max-h-[90vh] max-w-4xl overflow-y-auto">
             <DialogHeader>
-              <DialogTitle>Edit Doctor's Note</DialogTitle>
+              <DialogTitle>Edit Doctor&apos;s Note</DialogTitle>
             </DialogHeader>
             <DoctorNotesForm
               formData={noteFormData}
@@ -1079,11 +1084,15 @@ const PatientMedicalRecord = () => {
             <div className="space-y-4">
               {!activeVisitId && (
                 <div className="rounded-md border border-yellow-200 bg-yellow-50 p-3 text-sm text-yellow-800">
-                  Patient does not have an active visit. This allergy will be recorded without linking
-                  to a visit.
+                  Patient does not have an active visit. This allergy will be recorded without
+                  linking to a visit.
                 </div>
               )}
-              <AllergyForm allergy={allergyFormData} onChange={setAllergyFormData} disabled={false} />
+              <AllergyForm
+                allergy={allergyFormData}
+                onChange={setAllergyFormData}
+                disabled={false}
+              />
               <div className="flex justify-end space-x-3 border-t pt-4">
                 <button
                   onClick={() => setIsAddAllergyModalOpen(false)}

@@ -1,24 +1,19 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import {
-  Card,
-  CardContent,
-  CardHeader,
-  CardTitle,
-  CardDescription
-} from '@/components/ui/card';
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Calendar } from '@/components/ui/calendar';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { format } from 'date-fns';
 import {
-  CalendarIcon,
-  UserPlus,
-  Save,
-  ArrowLeft
-} from 'lucide-react';
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
+import { format } from 'date-fns';
+import { CalendarIcon, UserPlus, Save, ArrowLeft } from 'lucide-react';
 import { AlertModal } from '@/components/library';
 import PageLayout from '@/components/layout/PageLayout';
 import { patientService } from '@/features/patients';
@@ -30,7 +25,7 @@ const RegisterPatient = () => {
   const [alertMessage, setAlertMessage] = useState('');
   const [alertType, setAlertType] = useState('success');
   const [isLoading, setIsLoading] = useState(false);
-  
+
   // Form state matching database schema
   const [formData, setFormData] = useState({
     first_name: '',
@@ -48,19 +43,19 @@ const RegisterPatient = () => {
     medical_conditions: '',
     current_medications: '',
     insurance_provider: '',
-    insurance_number: ''
+    insurance_number: '',
   });
 
   const handleInputChange = (field, value) => {
-    setFormData(prev => ({
+    setFormData((prev) => ({
       ...prev,
-      [field]: value
+      [field]: value,
     }));
   };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    
+
     // Basic validation
     if (!formData.first_name || !formData.last_name) {
       setAlertType('error');
@@ -70,7 +65,7 @@ const RegisterPatient = () => {
     }
 
     setIsLoading(true);
-    
+
     try {
       // Prepare data for API
       const patientData = {
@@ -81,12 +76,12 @@ const RegisterPatient = () => {
       logger.debug('Sending patient data:', patientData);
       const response = await patientService.createPatient(patientData);
       logger.debug('Response from server:', response);
-      
+
       if (response.success) {
         setAlertType('success');
         setAlertMessage('Patient registered successfully!');
         setShowAlert(true);
-        
+
         // Navigate after delay
         setTimeout(() => {
           navigate('/receptionist/dashboard');
@@ -108,20 +103,20 @@ const RegisterPatient = () => {
 
   return (
     <div className="min-h-screen bg-background">
-      <PageLayout 
+      <PageLayout
         title="Register New Patient"
         subtitle="Add a new patient to the system"
         titleIcon={<UserPlus className="h-8 w-8" />}
       >
-        <div className="max-w-4xl mx-auto p-6">
+        <div className="mx-auto max-w-4xl p-6">
           {showAlert && (
-            <AlertModal 
+            <AlertModal
               type={alertType}
               message={alertMessage}
               onClose={() => setShowAlert(false)}
             />
           )}
-          
+
           <Card>
             <CardHeader>
               <div className="flex items-center justify-between">
@@ -142,16 +137,16 @@ const RegisterPatient = () => {
                 </Button>
               </div>
             </CardHeader>
-            
+
             <CardContent>
               <form onSubmit={handleSubmit} className="space-y-6">
                 {/* Personal Information */}
                 <div className="space-y-4">
-                  <h3 className="text-lg font-semibold border-b pb-2">Personal Information</h3>
-                  
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <h3 className="border-b pb-2 text-lg font-semibold">Personal Information</h3>
+
+                  <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
                     <div>
-                      <label className="text-sm font-medium block mb-2">First Name *</label>
+                      <label className="mb-2 block text-sm font-medium">First Name *</label>
                       <Input
                         value={formData.first_name}
                         onChange={(e) => handleInputChange('first_name', e.target.value)}
@@ -161,7 +156,7 @@ const RegisterPatient = () => {
                       />
                     </div>
                     <div>
-                      <label className="text-sm font-medium block mb-2">Last Name *</label>
+                      <label className="mb-2 block text-sm font-medium">Last Name *</label>
                       <Input
                         value={formData.last_name}
                         onChange={(e) => handleInputChange('last_name', e.target.value)}
@@ -172,17 +167,21 @@ const RegisterPatient = () => {
                     </div>
                   </div>
 
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
                     <div>
-                      <label className="text-sm font-medium block mb-2">Date of Birth</label>
+                      <label className="mb-2 block text-sm font-medium">Date of Birth</label>
                       <Popover>
                         <PopoverTrigger asChild>
                           <Button
                             variant="outline"
-                            className="w-full h-11 font-normal justify-start text-left"
+                            className="h-11 w-full justify-start text-left font-normal"
                           >
                             <CalendarIcon className="mr-2 h-4 w-4" />
-                            {formData.date_of_birth ? format(formData.date_of_birth, 'PPP') : <span>Pick a date</span>}
+                            {formData.date_of_birth ? (
+                              format(formData.date_of_birth, 'PPP')
+                            ) : (
+                              <span>Pick a date</span>
+                            )}
                           </Button>
                         </PopoverTrigger>
                         <PopoverContent className="w-auto p-0">
@@ -196,7 +195,7 @@ const RegisterPatient = () => {
                       </Popover>
                     </div>
                     <div>
-                      <label className="text-sm font-medium block mb-2">Gender</label>
+                      <label className="mb-2 block text-sm font-medium">Gender</label>
                       <Select onValueChange={(value) => handleInputChange('gender', value)}>
                         <SelectTrigger className="h-11">
                           <SelectValue placeholder="Select gender" />
@@ -213,11 +212,11 @@ const RegisterPatient = () => {
 
                 {/* Contact Information */}
                 <div className="space-y-4">
-                  <h3 className="text-lg font-semibold border-b pb-2">Contact Information</h3>
-                  
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <h3 className="border-b pb-2 text-lg font-semibold">Contact Information</h3>
+
+                  <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
                     <div>
-                      <label className="text-sm font-medium block mb-2">Phone Number</label>
+                      <label className="mb-2 block text-sm font-medium">Phone Number</label>
                       <Input
                         type="tel"
                         value={formData.phone}
@@ -227,7 +226,7 @@ const RegisterPatient = () => {
                       />
                     </div>
                     <div>
-                      <label className="text-sm font-medium block mb-2">Email</label>
+                      <label className="mb-2 block text-sm font-medium">Email</label>
                       <Input
                         type="email"
                         value={formData.email}
@@ -238,7 +237,7 @@ const RegisterPatient = () => {
                     </div>
                   </div>
                   <div>
-                    <label className="text-sm font-medium block mb-2">Address</label>
+                    <label className="mb-2 block text-sm font-medium">Address</label>
                     <Input
                       value={formData.address}
                       onChange={(e) => handleInputChange('address', e.target.value)}
@@ -250,33 +249,39 @@ const RegisterPatient = () => {
 
                 {/* Emergency Contact */}
                 <div className="space-y-4">
-                  <h3 className="text-lg font-semibold border-b pb-2">Emergency Contact</h3>
-                  
-                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                  <h3 className="border-b pb-2 text-lg font-semibold">Emergency Contact</h3>
+
+                  <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
                     <div>
-                      <label className="text-sm font-medium block mb-2">Contact Name</label>
+                      <label className="mb-2 block text-sm font-medium">Contact Name</label>
                       <Input
                         value={formData.emergency_contact_name}
-                        onChange={(e) => handleInputChange('emergency_contact_name', e.target.value)}
+                        onChange={(e) =>
+                          handleInputChange('emergency_contact_name', e.target.value)
+                        }
                         placeholder="Enter contact name"
                         className="h-11"
                       />
                     </div>
                     <div>
-                      <label className="text-sm font-medium block mb-2">Contact Phone</label>
+                      <label className="mb-2 block text-sm font-medium">Contact Phone</label>
                       <Input
                         type="tel"
                         value={formData.emergency_contact_phone}
-                        onChange={(e) => handleInputChange('emergency_contact_phone', e.target.value)}
+                        onChange={(e) =>
+                          handleInputChange('emergency_contact_phone', e.target.value)
+                        }
                         placeholder="Enter contact phone"
                         className="h-11"
                       />
                     </div>
                     <div>
-                      <label className="text-sm font-medium block mb-2">Relationship</label>
+                      <label className="mb-2 block text-sm font-medium">Relationship</label>
                       <Input
                         value={formData.emergency_contact_relationship}
-                        onChange={(e) => handleInputChange('emergency_contact_relationship', e.target.value)}
+                        onChange={(e) =>
+                          handleInputChange('emergency_contact_relationship', e.target.value)
+                        }
                         placeholder="e.g. Spouse, Parent"
                         className="h-11"
                       />
@@ -286,11 +291,11 @@ const RegisterPatient = () => {
 
                 {/* Medical Information */}
                 <div className="space-y-4">
-                  <h3 className="text-lg font-semibold border-b pb-2">Medical Information</h3>
-                  
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <h3 className="border-b pb-2 text-lg font-semibold">Medical Information</h3>
+
+                  <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
                     <div>
-                      <label className="text-sm font-medium block mb-2">Blood Group</label>
+                      <label className="mb-2 block text-sm font-medium">Blood Group</label>
                       <Select onValueChange={(value) => handleInputChange('blood_group', value)}>
                         <SelectTrigger className="h-11">
                           <SelectValue placeholder="Select blood group" />
@@ -310,7 +315,7 @@ const RegisterPatient = () => {
                   </div>
 
                   <div>
-                    <label className="text-sm font-medium block mb-2">Known Allergies</label>
+                    <label className="mb-2 block text-sm font-medium">Known Allergies</label>
                     <Input
                       value={formData.allergies}
                       onChange={(e) => handleInputChange('allergies', e.target.value)}
@@ -319,7 +324,7 @@ const RegisterPatient = () => {
                     />
                   </div>
                   <div>
-                    <label className="text-sm font-medium block mb-2">Medical Conditions</label>
+                    <label className="mb-2 block text-sm font-medium">Medical Conditions</label>
                     <Input
                       value={formData.medical_conditions}
                       onChange={(e) => handleInputChange('medical_conditions', e.target.value)}
@@ -328,7 +333,7 @@ const RegisterPatient = () => {
                     />
                   </div>
                   <div>
-                    <label className="text-sm font-medium block mb-2">Current Medications</label>
+                    <label className="mb-2 block text-sm font-medium">Current Medications</label>
                     <Input
                       value={formData.current_medications}
                       onChange={(e) => handleInputChange('current_medications', e.target.value)}
@@ -340,11 +345,11 @@ const RegisterPatient = () => {
 
                 {/* Insurance Information */}
                 <div className="space-y-4">
-                  <h3 className="text-lg font-semibold border-b pb-2">Insurance Information</h3>
-                  
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <h3 className="border-b pb-2 text-lg font-semibold">Insurance Information</h3>
+
+                  <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
                     <div>
-                      <label className="text-sm font-medium block mb-2">Insurance Provider</label>
+                      <label className="mb-2 block text-sm font-medium">Insurance Provider</label>
                       <Input
                         value={formData.insurance_provider}
                         onChange={(e) => handleInputChange('insurance_provider', e.target.value)}
@@ -353,7 +358,7 @@ const RegisterPatient = () => {
                       />
                     </div>
                     <div>
-                      <label className="text-sm font-medium block mb-2">Insurance Number</label>
+                      <label className="mb-2 block text-sm font-medium">Insurance Number</label>
                       <Input
                         value={formData.insurance_number}
                         onChange={(e) => handleInputChange('insurance_number', e.target.value)}
@@ -365,13 +370,8 @@ const RegisterPatient = () => {
                 </div>
 
                 {/* Form Actions */}
-                <div className="flex flex-col sm:flex-row gap-4 pt-6">
-                  <Button
-                    type="submit"
-                    size="lg"
-                    className="flex-1 h-12"
-                    disabled={isLoading}
-                  >
+                <div className="flex flex-col gap-4 pt-6 sm:flex-row">
+                  <Button type="submit" size="lg" className="h-12 flex-1" disabled={isLoading}>
                     <Save className="mr-2 h-4 w-4" />
                     {isLoading ? 'Registering...' : 'Register Patient'}
                   </Button>
@@ -379,7 +379,7 @@ const RegisterPatient = () => {
                     type="button"
                     variant="outline"
                     size="lg"
-                    className="flex-1 h-12"
+                    className="h-12 flex-1"
                     onClick={() => navigate('/receptionist/dashboard')}
                     disabled={isLoading}
                   >

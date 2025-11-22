@@ -6,7 +6,7 @@ import { validate, commonSchemas } from './base.validator.js';
  */
 const loginSchema = Joi.object({
   email: commonSchemas.email,
-  password: Joi.string().required()
+  password: Joi.string().required(),
 });
 
 /**
@@ -17,25 +17,27 @@ const registerSchema = Joi.object({
   password: commonSchemas.password,
   first_name: Joi.string().trim().min(1).max(50).required(),
   last_name: Joi.string().trim().min(1).max(50).required(),
-  role: Joi.string().valid('admin', 'doctor', 'nurse', 'receptionist', 'cashier', 'pharmacist', 'patient').required(),
+  role: Joi.string()
+    .valid('admin', 'doctor', 'nurse', 'receptionist', 'cashier', 'pharmacist', 'patient')
+    .required(),
   phone: commonSchemas.phone,
   specialty: Joi.string().trim().max(100).when('role', {
     is: 'doctor',
     then: Joi.required(),
-    otherwise: Joi.optional()
-  })
+    otherwise: Joi.optional(),
+  }),
 });
 
 const patientRegisterSchema = Joi.object({
   email: commonSchemas.email,
   password: commonSchemas.password,
   first_name: Joi.string().trim().min(1).max(50).required(),
-  last_name: Joi.string().trim().min(1).max(50).required()
+  last_name: Joi.string().trim().min(1).max(50).required(),
 });
 
 const patientBindSchema = Joi.object({
   patient_number: Joi.string().trim().required(),
-  date_of_birth: Joi.date().less('now').required()
+  date_of_birth: Joi.date().less('now').required(),
 });
 
 /**
@@ -44,10 +46,9 @@ const patientBindSchema = Joi.object({
 const changePasswordSchema = Joi.object({
   currentPassword: Joi.string().required(),
   newPassword: commonSchemas.password,
-  confirmPassword: Joi.string().valid(Joi.ref('newPassword')).required()
-    .messages({
-      'any.only': 'Confirm password must match new password'
-    })
+  confirmPassword: Joi.string().valid(Joi.ref('newPassword')).required().messages({
+    'any.only': 'Confirm password must match new password',
+  }),
 });
 
 // Export validation middleware

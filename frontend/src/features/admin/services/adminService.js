@@ -8,7 +8,7 @@ class AdminService {
   async getPendingItems() {
     const response = await api.get('/admin/pending-items');
     // Backend returns array directly, not nested in data property
-    return Array.isArray(response) ? response : (response.data || []);
+    return Array.isArray(response) ? response : response.data || [];
   }
 
   /**
@@ -25,7 +25,7 @@ class AdminService {
       entityType,
       entityId,
       newStatus,
-      reason
+      reason,
     });
     return response.data;
   }

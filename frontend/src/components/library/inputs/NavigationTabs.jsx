@@ -1,6 +1,6 @@
 /**
  * NavigationTabs - Tab navigation component
- * 
+ *
  * Application-level component for tab navigation with icons and custom styling.
  * Not a base UI primitive - uses base HTML/button elements.
  */
@@ -32,4 +32,3 @@ const NavigationTabs = ({
 };
 
 export default NavigationTabs;
-

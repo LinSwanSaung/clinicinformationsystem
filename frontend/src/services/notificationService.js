@@ -8,7 +8,7 @@ const notificationService = {
   async getNotifications(limit = 50) {
     try {
       const response = await apiService.get('/notifications', {
-        params: { limit }
+        params: { limit },
       });
       return response.data;
     } catch (error) {
@@ -70,7 +70,7 @@ const notificationService = {
       logger.error('Error deleting notification:', error);
       throw error.response?.data || error;
     }
-  }
+  },
 };
 
 export default notificationService;

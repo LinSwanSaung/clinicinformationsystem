@@ -35,7 +35,9 @@ const ResponseSchema = z.object({
         .object({
           totalItems: z.number().default(0),
           totalUnits: z.number().default(0),
-          byMedicine: z.array(z.object({ medicineName: z.string(), units: z.number() })).default([]),
+          byMedicine: z
+            .array(z.object({ medicineName: z.string(), units: z.number() }))
+            .default([]),
         })
         .default({ totalItems: 0, totalUnits: 0, byMedicine: [] }),
       page: z.number().optional(),
@@ -60,7 +62,11 @@ export function useDispenses(params) {
       }
       // Normalize if API responded raw
       if (Array.isArray(res)) {
-        return { items: res, total: res.length, summary: { totalItems: res.length, totalUnits: 0, byMedicine: [] } };
+        return {
+          items: res,
+          total: res.length,
+          summary: { totalItems: res.length, totalUnits: 0, byMedicine: [] },
+        };
       }
       return { items: [], total: 0, summary: { totalItems: 0, totalUnits: 0, byMedicine: [] } };
     },
@@ -68,7 +74,11 @@ export function useDispenses(params) {
   });
 
   return {
-    data: query.data || { items: [], total: 0, summary: { totalItems: 0, totalUnits: 0, byMedicine: [] } },
+    data: query.data || {
+      items: [],
+      total: 0,
+      summary: { totalItems: 0, totalUnits: 0, byMedicine: [] },
+    },
     isLoading: query.isLoading,
     error: query.error,
     refetch: query.refetch,
@@ -76,5 +86,3 @@ export function useDispenses(params) {
 }
 
 export default useDispenses;
-
-

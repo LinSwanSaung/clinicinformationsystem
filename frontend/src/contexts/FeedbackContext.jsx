@@ -107,19 +107,19 @@ export function FeedbackProvider({ children }) {
 
 /**
  * Hook to use feedback system across all components
- * 
+ *
  * @example
  * const { showSuccess, showError } = useFeedback();
- * 
+ *
  * // Success message
  * showSuccess('Patient record saved successfully');
- * 
+ *
  * // Error message
  * showError('Failed to save patient record');
- * 
+ *
  * // With title
  * showSuccess('Record updated', { title: 'Update Complete' });
- * 
+ *
  * // With action button
  * showError('Network error', {
  *   action: <Button onClick={retry}>Retry</Button>
@@ -132,4 +132,3 @@ export function useFeedback() {
   }
   return context;
 }
-

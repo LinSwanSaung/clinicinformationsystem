@@ -5,14 +5,16 @@
 
 import logger from '../config/logger.js';
 
-export const errorHandler = (error, req, res, next) => {
+export const errorHandler = (error, req, res, _next) => {
   // Suppress logging for 401 errors when there's no Authorization header
   // This happens when components make requests after user logs out
-  const hasAuthHeader = req.headers.authorization && req.headers.authorization.startsWith('Bearer ');
-  const isUnauthorizedNoToken = error.statusCode === 401 && 
-                                 (error.message === 'Access token required' || error.message === 'Invalid token') &&
-                                 !hasAuthHeader;
-  
+  const hasAuthHeader =
+    req.headers.authorization && req.headers.authorization.startsWith('Bearer ');
+  const isUnauthorizedNoToken =
+    error.statusCode === 401 &&
+    (error.message === 'Access token required' || error.message === 'Invalid token') &&
+    !hasAuthHeader;
+
   if (isUnauthorizedNoToken) {
     // User is already logged out, component is probably unmounting
     // Log at debug level instead of error to avoid noise

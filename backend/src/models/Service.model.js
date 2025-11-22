@@ -19,7 +19,9 @@ class ServiceModel extends BaseModel {
       .order('category')
       .order('service_name');
 
-    if (error) throw error;
+    if (error) {
+      throw error;
+    }
     return data;
   }
 
@@ -33,7 +35,9 @@ class ServiceModel extends BaseModel {
       .eq('is_active', !!isActive)
       .order('category')
       .order('service_name');
-    if (error) throw error;
+    if (error) {
+      throw error;
+    }
     return data;
   }
 
@@ -43,7 +47,9 @@ class ServiceModel extends BaseModel {
       .select('*')
       .order('category')
       .order('service_name');
-    if (error) throw error;
+    if (error) {
+      throw error;
+    }
     return data;
   }
 
@@ -59,7 +65,9 @@ class ServiceModel extends BaseModel {
     }
     query = query.order('category').order('service_name');
     const { data, error } = await query;
-    if (error) throw error;
+    if (error) {
+      throw error;
+    }
     return data;
   }
 
@@ -74,7 +82,9 @@ class ServiceModel extends BaseModel {
       .eq('is_active', true)
       .order('service_name');
 
-    if (error) throw error;
+    if (error) {
+      throw error;
+    }
     return data;
   }
 
@@ -89,7 +99,9 @@ class ServiceModel extends BaseModel {
       .eq('is_active', true)
       .order('service_name');
 
-    if (error) throw error;
+    if (error) {
+      throw error;
+    }
     return data;
   }
 
@@ -107,7 +119,9 @@ class ServiceModel extends BaseModel {
     }
 
     const { data, error } = await query;
-    if (error) throw error;
+    if (error) {
+      throw error;
+    }
     return data;
   }
 
@@ -126,7 +140,9 @@ class ServiceModel extends BaseModel {
       query = query.eq('category', category);
     }
     const { data, error } = await query;
-    if (error) throw error;
+    if (error) {
+      throw error;
+    }
     return data;
   }
 
@@ -140,7 +156,9 @@ class ServiceModel extends BaseModel {
       .eq('id', id)
       .single();
 
-    if (error) throw error;
+    if (error) {
+      throw error;
+    }
     return data;
   }
 
@@ -154,7 +172,9 @@ class ServiceModel extends BaseModel {
       .select()
       .single();
 
-    if (error) throw error;
+    if (error) {
+      throw error;
+    }
     return data;
   }
 
@@ -169,7 +189,9 @@ class ServiceModel extends BaseModel {
       .select()
       .single();
 
-    if (error) throw error;
+    if (error) {
+      throw error;
+    }
     return data;
   }
 
@@ -184,7 +206,9 @@ class ServiceModel extends BaseModel {
       .select()
       .single();
 
-    if (error) throw error;
+    if (error) {
+      throw error;
+    }
     return data;
   }
 }

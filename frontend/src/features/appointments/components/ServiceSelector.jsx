@@ -79,7 +79,11 @@ const ServiceSelector = ({ visitId, onServicesAdded }) => {
         } catch (createError) {
           // Handle race condition: if invoice was created by another request, fetch it
           const errorMsg = createError?.message?.toLowerCase() || '';
-          if (errorMsg.includes('already exists') || errorMsg.includes('duplicate') || errorMsg.includes('unique')) {
+          if (
+            errorMsg.includes('already exists') ||
+            errorMsg.includes('duplicate') ||
+            errorMsg.includes('unique')
+          ) {
             logger.debug('Invoice already exists (race condition), fetching existing invoice...');
             try {
               invoiceData = await invoiceService.getInvoiceByVisit(visitId);
@@ -180,14 +184,14 @@ const ServiceSelector = ({ visitId, onServicesAdded }) => {
     try {
       setSaving(true);
       await invoiceService.removeInvoiceItem(invoice.id, itemId);
-      
+
       // Reload invoice to update added services
       await loadOrCreateInvoice();
-      
+
       if (onServicesAdded) {
         onServicesAdded();
       }
-      
+
       showSuccess('Service removed from invoice successfully!');
     } catch (error) {
       logger.error('Error removing service:', error);
@@ -336,7 +340,8 @@ const ServiceSelector = ({ visitId, onServicesAdded }) => {
                   <div className="flex-1">
                     <div className="text-sm font-medium text-gray-900">{service.service_name}</div>
                     <div className="text-xs text-gray-600">
-                      Qty: {service.quantity} × {formatCurrencySync(parseFloat(service.unit_price))} = {formatCurrencySync(service.quantity * service.unit_price)}
+                      Qty: {service.quantity} × {formatCurrencySync(parseFloat(service.unit_price))}{' '}
+                      = {formatCurrencySync(service.quantity * service.unit_price)}
                     </div>
                     {service.notes && (
                       <div className="mt-0.5 text-xs text-gray-500">{service.notes}</div>
@@ -348,7 +353,7 @@ const ServiceSelector = ({ visitId, onServicesAdded }) => {
                         type="button"
                         onClick={() => removeAddedService(service.id)}
                         disabled={saving}
-                        className="flex-shrink-0 rounded p-1 text-red-600 hover:bg-red-50 hover:text-red-700 disabled:opacity-50 disabled:cursor-not-allowed"
+                        className="flex-shrink-0 rounded p-1 text-red-600 hover:bg-red-50 hover:text-red-700 disabled:cursor-not-allowed disabled:opacity-50"
                         title="Remove service from invoice"
                       >
                         <Trash2 className="h-4 w-4" />
@@ -364,7 +369,9 @@ const ServiceSelector = ({ visitId, onServicesAdded }) => {
               <div className="flex items-center justify-between text-sm">
                 <span className="font-semibold text-gray-700">Subtotal:</span>
                 <span className="font-bold text-green-700">
-                  {formatCurrencySync(addedServices.reduce((sum, s) => sum + s.quantity * s.unit_price, 0))}
+                  {formatCurrencySync(
+                    addedServices.reduce((sum, s) => sum + s.quantity * s.unit_price, 0)
+                  )}
                 </span>
               </div>
               {invoice && invoice.status === 'pending' && (
@@ -537,7 +544,9 @@ const ServiceSelector = ({ visitId, onServicesAdded }) => {
                     <div className="flex items-center justify-between border-t border-gray-100 pt-1.5">
                       <span className="text-xs text-gray-500">Total:</span>
                       <span className="text-sm font-semibold text-gray-900">
-                        {formatCurrencySync(parseFloat(service.quantity) * parseFloat(service.unit_price))}
+                        {formatCurrencySync(
+                          parseFloat(service.quantity) * parseFloat(service.unit_price)
+                        )}
                       </span>
                     </div>
                   </div>
@@ -548,11 +557,12 @@ const ServiceSelector = ({ visitId, onServicesAdded }) => {
                 <div className="mb-3 flex items-center justify-between">
                   <span className="text-base font-semibold text-gray-900">Subtotal:</span>
                   <span className="text-base font-bold text-green-600">
-                    {formatCurrencySync(selectedServices
-                      .reduce(
+                    {formatCurrencySync(
+                      selectedServices.reduce(
                         (sum, s) => sum + parseFloat(s.quantity) * parseFloat(s.unit_price),
                         0
-                      ))}
+                      )
+                    )}
                   </span>
                 </div>
 

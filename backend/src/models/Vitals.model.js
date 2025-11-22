@@ -12,7 +12,8 @@ class VitalsModel extends BaseModel {
     const { data, error } = await this.supabase
       .from(this.tableName)
       .insert(vitalsData)
-      .select(`
+      .select(
+        `
         *,
         patient:patients!patient_id (
           id,
@@ -26,7 +27,8 @@ class VitalsModel extends BaseModel {
           last_name,
           role
         )
-      `)
+      `
+      )
       .single();
 
     if (error) {
@@ -42,7 +44,8 @@ class VitalsModel extends BaseModel {
   async getByPatientId(patientId, limit = null) {
     let query = this.supabase
       .from(this.tableName)
-      .select(`
+      .select(
+        `
         *,
         patient:patients!patient_id (
           id,
@@ -56,7 +59,8 @@ class VitalsModel extends BaseModel {
           last_name,
           role
         )
-      `)
+      `
+      )
       .eq('patient_id', patientId)
       .order('recorded_at', { ascending: false });
 
@@ -79,7 +83,8 @@ class VitalsModel extends BaseModel {
   async getLatestByPatientId(patientId) {
     const { data, error } = await this.supabase
       .from(this.tableName)
-      .select(`
+      .select(
+        `
         *,
         patient:patients!patient_id (
           id,
@@ -93,13 +98,15 @@ class VitalsModel extends BaseModel {
           last_name,
           role
         )
-      `)
+      `
+      )
       .eq('patient_id', patientId)
       .order('recorded_at', { ascending: false })
       .limit(1)
       .single();
 
-    if (error && error.code !== 'PGRST116') { // PGRST116 is "no rows returned"
+    if (error && error.code !== 'PGRST116') {
+      // PGRST116 is "no rows returned"
       throw new Error(`Failed to fetch latest vitals: ${error.message}`);
     }
 
@@ -114,7 +121,8 @@ class VitalsModel extends BaseModel {
       .from(this.tableName)
       .update(vitalsData)
       .eq('id', id)
-      .select(`
+      .select(
+        `
         *,
         patient:patients!patient_id (
           id,
@@ -128,7 +136,8 @@ class VitalsModel extends BaseModel {
           last_name,
           role
         )
-      `)
+      `
+      )
       .single();
 
     if (error) {
@@ -162,7 +171,8 @@ class VitalsModel extends BaseModel {
   async getByVisitId(visitId) {
     const { data, error } = await this.supabase
       .from(this.tableName)
-      .select(`
+      .select(
+        `
         *,
         patient:patients!patient_id (
           id,
@@ -176,7 +186,8 @@ class VitalsModel extends BaseModel {
           last_name,
           role
         )
-      `)
+      `
+      )
       .eq('visit_id', visitId)
       .order('recorded_at', { ascending: false });
 

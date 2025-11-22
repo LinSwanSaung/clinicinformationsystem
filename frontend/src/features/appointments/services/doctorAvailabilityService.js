@@ -45,10 +45,10 @@ class DoctorAvailabilityService {
 
     const dayOfWeek = targetDate.toLocaleDateString('en-US', { weekday: 'long' });
     const currentTime = targetDate.toTimeString().slice(0, 5); // HH:MM format
-    
+
     // Find ALL availability slots for the target day - using is_active instead of is_available
-    const dayAvailabilitySlots = availability.filter(slot => 
-      slot.day_of_week === dayOfWeek && slot.is_active
+    const dayAvailabilitySlots = availability.filter(
+      (slot) => slot.day_of_week === dayOfWeek && slot.is_active
     );
 
     if (dayAvailabilitySlots.length === 0) {
@@ -59,14 +59,14 @@ class DoctorAvailabilityService {
     for (const slot of dayAvailabilitySlots) {
       const startTime = slot.start_time.slice(0, 5); // Ensure HH:MM format
       const endTime = slot.end_time.slice(0, 5); // Ensure HH:MM format
-      
+
       const isWithinHours = currentTime >= startTime && currentTime <= endTime;
-      
+
       if (isWithinHours) {
         return true;
       }
     }
-    
+
     return false;
   }
 
@@ -75,14 +75,14 @@ class DoctorAvailabilityService {
    */
   getDoctorStatus(doctor, availability, queueStats) {
     const isAvailableToday = this.isDoctorAvailableOnDate(availability);
-    
+
     if (!isAvailableToday) {
       return {
         status: 'unavailable',
         text: 'Not Available Today',
         color: 'bg-gray-100 text-gray-500',
         canAcceptPatients: false,
-        description: 'Doctor is not scheduled for today'
+        description: 'Doctor is not scheduled for today',
       };
     }
 
@@ -96,7 +96,7 @@ class DoctorAvailabilityService {
         text: 'In Consultation',
         color: 'bg-blue-100 text-blue-800',
         canAcceptPatients: waitingPatients < maxPatientsPerDay,
-        description: `Currently with ${activeConsultation.patient?.first_name} ${activeConsultation.patient?.last_name}`
+        description: `Currently with ${activeConsultation.patient?.first_name} ${activeConsultation.patient?.last_name}`,
       };
     }
 
@@ -106,7 +106,7 @@ class DoctorAvailabilityService {
         text: 'Queue Full',
         color: 'bg-red-100 text-red-800',
         canAcceptPatients: false,
-        description: `Queue is full (${waitingPatients}/${maxPatientsPerDay} patients)`
+        description: `Queue is full (${waitingPatients}/${maxPatientsPerDay} patients)`,
       };
     }
 
@@ -116,7 +116,7 @@ class DoctorAvailabilityService {
         text: 'Available',
         color: 'bg-yellow-100 text-yellow-800',
         canAcceptPatients: true,
-        description: `${waitingPatients} patient(s) waiting`
+        description: `${waitingPatients} patient(s) waiting`,
       };
     }
 
@@ -125,7 +125,7 @@ class DoctorAvailabilityService {
       text: 'Available',
       color: 'bg-green-100 text-green-800',
       canAcceptPatients: true,
-      description: 'Ready to see patients'
+      description: 'Ready to see patients',
     };
   }
 
@@ -149,7 +149,10 @@ class DoctorAvailabilityService {
    */
   async updateAvailability(availabilityId, availabilityData) {
     try {
-      const response = await apiService.put(`/doctor-availability/${availabilityId}`, availabilityData);
+      const response = await apiService.put(
+        `/doctor-availability/${availabilityId}`,
+        availabilityData
+      );
       return response;
     } catch (error) {
       if (error.message && error.message.includes('Upstream service unavailable')) {
@@ -163,40 +166,28 @@ class DoctorAvailabilityService {
    * Delete availability schedule
    */
   async deleteAvailability(availabilityId) {
-    try {
-      const response = await apiService.delete(`/doctor-availability/${availabilityId}`);
-      return response;
-    } catch (error) {
-      throw error;
-    }
+    const response = await apiService.delete(`/doctor-availability/${availabilityId}`);
+    return response;
   }
 
   /**
    * Get available doctors for a specific day and time
    */
   async getAvailableDoctors(dayOfWeek, time) {
-    try {
-      const response = await apiService.get('/doctor-availability/available-doctors', {
-        params: { day_of_week: dayOfWeek, time }
-      });
-      return response;
-    } catch (error) {
-      throw error;
-    }
+    const response = await apiService.get('/doctor-availability/available-doctors', {
+      params: { day_of_week: dayOfWeek, time },
+    });
+    return response;
   }
 
   /**
    * Check if a doctor is available at a specific time
    */
   async checkDoctorAvailability(doctorId, dayOfWeek, time) {
-    try {
-      const response = await apiService.get('/doctor-availability/check-availability', {
-        params: { doctor_id: doctorId, day_of_week: dayOfWeek, time }
-      });
-      return response;
-    } catch (error) {
-      throw error;
-    }
+    const response = await apiService.get('/doctor-availability/check-availability', {
+      params: { doctor_id: doctorId, day_of_week: dayOfWeek, time },
+    });
+    return response;
   }
 
   /**
@@ -204,10 +195,9 @@ class DoctorAvailabilityService {
    */
   async checkTimeSlotAvailability(doctorId, date, time) {
     try {
-      const response = await apiService.get(
-        `/doctor-availability/${doctorId}/check-slot`,
-        { params: { date, time } }
-      );
+      const response = await apiService.get(`/doctor-availability/${doctorId}/check-slot`, {
+        params: { date, time },
+      });
       return response.data;
     } catch (error) {
       logger.error('Error checking time slot availability:', error);
@@ -220,10 +210,9 @@ class DoctorAvailabilityService {
    */
   async getAvailableTimeSlots(doctorId, date) {
     try {
-      const response = await apiService.get(
-        `/doctor-availability/${doctorId}/available-slots`,
-        { params: { date } }
-      );
+      const response = await apiService.get(`/doctor-availability/${doctorId}/available-slots`, {
+        params: { date },
+      });
       return response.data;
     } catch (error) {
       logger.error('Error getting available time slots:', error);

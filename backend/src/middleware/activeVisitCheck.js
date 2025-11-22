@@ -4,7 +4,7 @@ import logger from '../config/logger.js';
 /**
  * Middleware to check if a patient has an active visit before allowing data modifications
  * This ensures data integrity and security by preventing unauthorized data entry
- * 
+ *
  * Usage: Apply this middleware to routes that create/update patient medical data
  */
 
@@ -24,7 +24,7 @@ export const requireActiveVisit = async (req, res, next) => {
       return res.status(400).json({
         success: false,
         message: 'Patient ID is required',
-        code: 'PATIENT_ID_REQUIRED'
+        code: 'PATIENT_ID_REQUIRED',
       });
     }
 
@@ -34,9 +34,10 @@ export const requireActiveVisit = async (req, res, next) => {
     if (!activeVisit) {
       return res.status(403).json({
         success: false,
-        message: 'Cannot add or modify patient data without an active visit. Please ensure the patient has an active consultation.',
+        message:
+          'Cannot add or modify patient data without an active visit. Please ensure the patient has an active consultation.',
         code: 'NO_ACTIVE_VISIT',
-        patientId: patientId
+        patientId: patientId,
       });
     }
 
@@ -51,7 +52,7 @@ export const requireActiveVisit = async (req, res, next) => {
     return res.status(500).json({
       success: false,
       message: 'Failed to verify active visit status',
-      error: error.message
+      error: error.message,
     });
   }
 };
@@ -82,5 +83,5 @@ export const checkActiveVisit = async (req, res, next) => {
 
 export default {
   requireActiveVisit,
-  checkActiveVisit
+  checkActiveVisit,
 };

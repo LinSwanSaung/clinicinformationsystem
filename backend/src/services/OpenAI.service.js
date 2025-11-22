@@ -5,6 +5,7 @@
  * ============================================================================ */
 
 import OpenAI from 'openai';
+import logger from '../config/logger.js';
 
 const LANGUAGE_CONFIGS = {
   en: {
@@ -15,44 +16,45 @@ const LANGUAGE_CONFIGS = {
       watchOut: 'Things to Watch Out For',
       callDoctor: 'When to Call Your Doctor',
       livingWell: 'Living Well With This',
-      oneMoreThing: 'One More Thing'
+      oneMoreThing: 'One More Thing',
     },
     wellnessSections: [
       { emoji: '🥗', title: 'Eating Well' },
       { emoji: '🏃‍♀️', title: 'Getting Moving' },
       { emoji: '🧘', title: 'Taking Care of Your Mind' },
       { emoji: '😴', title: 'Sleeping Better' },
-      { emoji: '🛡️', title: 'Staying Healthy' }
-    ]
+      { emoji: '🛡️', title: 'Staying Healthy' },
+    ],
   },
   my: {
     code: 'my',
-    description: 'Respond entirely in Burmese (Myanmar language) using Unicode Myanmar script. Keep the tone respectful, warm, and easy to understand for Myanmar patients.',
+    description:
+      'Respond entirely in Burmese (Myanmar language) using Unicode Myanmar script. Keep the tone respectful, warm, and easy to understand for Myanmar patients.',
     headings: {
       whatYouCanDo: 'လုပ်ဆောင်နိုင်သောအချက်များ',
       watchOut: 'သတိထားရမည့်အချက်များ',
       callDoctor: 'ဘယ်အချိန်ဆရာဝန်ကိုခေါ်သင့်သလဲ',
       livingWell: 'ရောဂါနှင့်တည်တံ့နေရန်',
-      oneMoreThing: 'နောက်ထပ်အကြောင်းတစ်ခု'
+      oneMoreThing: 'နောက်ထပ်အကြောင်းတစ်ခု',
     },
     wellnessSections: [
       { emoji: '🥗', title: 'အာဟာရပြည့်ဝစွာ စားသောက်ပါ' },
       { emoji: '🏃‍♀️', title: 'ခန္ဓာကိုယ်ကို လှုပ်ရှားစေပါ' },
       { emoji: '🧘', title: 'စိတ်ကျန်းမာရေးကို ဂရုစိုက်ပါ' },
       { emoji: '😴', title: 'အိပ်စက်ချိန်ကို ရှင်းလင်းစွာထားပါ' },
-      { emoji: '🛡️', title: 'ကျန်းမာရေးကို ကာကွယ်စောင့်ရှောက်ပါ' }
-    ]
-  }
+      { emoji: '🛡️', title: 'ကျန်းမာရေးကို ကာကွယ်စောင့်ရှောက်ပါ' },
+    ],
+  },
 };
 
 class AIService {
   constructor() {
     // Initialize OpenAI client with GitHub Models endpoint
     this.client = new OpenAI({
-      baseURL: process.env.AI_BASE_URL || "https://models.github.ai/inference",
-      apiKey: process.env.GITHUB_TOKEN
+      baseURL: process.env.AI_BASE_URL || 'https://models.github.ai/inference',
+      apiKey: process.env.GITHUB_TOKEN,
     });
-    this.model = process.env.AI_MODEL || "gpt-4o-mini";
+    this.model = process.env.AI_MODEL || 'gpt-4o-mini';
     // AIService initialized with GitHub Models
   }
 
@@ -63,7 +65,12 @@ class AIService {
     return config;
   }
 
-  async generateHealthAdvice(diagnosisName, patientAge = null, patientGender = null, language = 'en') {
+  async generateHealthAdvice(
+    diagnosisName,
+    patientAge = null,
+    patientGender = null,
+    language = 'en'
+  ) {
     try {
       const langConfig = this.getLanguageConfig(language);
       const { headings } = langConfig;
@@ -93,13 +100,16 @@ Keep paragraphs short (1-2 sentences each) and use bullet lists where it improve
 
       const response = await this.client.chat.completions.create({
         messages: [
-          { role: "system", content: "You are a caring healthcare coach providing patient-friendly health advice." },
-          { role: "user", content: prompt }
+          {
+            role: 'system',
+            content: 'You are a caring healthcare coach providing patient-friendly health advice.',
+          },
+          { role: 'user', content: prompt },
         ],
         model: this.model,
         temperature: 0.7,
         max_tokens: 2000,
-        top_p: 1
+        top_p: 1,
       });
 
       const text = response.choices[0].message.content;
@@ -108,7 +118,7 @@ Keep paragraphs short (1-2 sentences each) and use bullet lists where it improve
         success: true,
         advice: text,
         diagnosis: diagnosisName,
-        generatedAt: new Date().toISOString()
+        generatedAt: new Date().toISOString(),
       };
     } catch (error) {
       logger.error('[AIService] Error generating health advice:', error);
@@ -135,13 +145,16 @@ Keep the tone motivating, friendly, and realistic.`;
 
       const response = await this.client.chat.completions.create({
         messages: [
-          { role: "system", content: "You are a cheerful wellness coach providing motivating health tips." },
-          { role: "user", content: prompt }
+          {
+            role: 'system',
+            content: 'You are a cheerful wellness coach providing motivating health tips.',
+          },
+          { role: 'user', content: prompt },
         ],
         model: this.model,
         temperature: 0.7,
         max_tokens: 1500,
-        top_p: 1
+        top_p: 1,
       });
 
       const text = response.choices[0].message.content;
@@ -149,7 +162,7 @@ Keep the tone motivating, friendly, and realistic.`;
       return {
         success: true,
         tips: text,
-        generatedAt: new Date().toISOString()
+        generatedAt: new Date().toISOString(),
       };
     } catch (error) {
       logger.error('[AIService] Error generating wellness tips:', error);
@@ -164,7 +177,7 @@ Keep the tone motivating, friendly, and realistic.`;
       { id: 'gpt-4o', name: 'GPT-4o' },
       { id: 'gpt-4o-mini', name: 'GPT-4o Mini (Current)' },
       { id: 'gpt-4', name: 'GPT-4' },
-      { id: 'gpt-3.5-turbo', name: 'GPT-3.5 Turbo' }
+      { id: 'gpt-3.5-turbo', name: 'GPT-3.5 Turbo' },
     ];
   }
 }

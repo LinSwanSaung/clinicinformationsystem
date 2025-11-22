@@ -24,6 +24,7 @@
 import { readFileSync } from 'fs';
 import { fileURLToPath } from 'url';
 import { dirname, join } from 'path';
+// eslint-disable-next-line no-restricted-imports
 import { createClient } from '@supabase/supabase-js';
 import dotenv from 'dotenv';
 
@@ -80,13 +81,13 @@ async function getDatabaseTables() {
 
       // If we can query users table, try to get table list another way
       // For Supabase, we'll use a workaround
-      return await getTablesViaQuery();
+      return getTablesViaQuery();
     }
 
     return data?.map((row) => row.table_name.toLowerCase()).sort() || [];
   } catch (error) {
     // Fallback method
-    return await getTablesViaQuery();
+    return getTablesViaQuery();
   }
 }
 

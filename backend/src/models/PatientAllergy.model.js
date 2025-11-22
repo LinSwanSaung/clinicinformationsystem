@@ -19,7 +19,9 @@ class PatientAllergyModel extends BaseModel {
       .is('deleted_at', null)
       .order('created_at', { ascending: false });
 
-    if (error) throw error;
+    if (error) {
+      throw error;
+    }
     return data;
   }
 
@@ -27,13 +29,11 @@ class PatientAllergyModel extends BaseModel {
    * Create new allergy
    */
   async create(allergyData) {
-    const { data, error } = await supabase
-      .from(this.table)
-      .insert(allergyData)
-      .select()
-      .single();
+    const { data, error } = await supabase.from(this.table).insert(allergyData).select().single();
 
-    if (error) throw error;
+    if (error) {
+      throw error;
+    }
     return data;
   }
 
@@ -48,7 +48,9 @@ class PatientAllergyModel extends BaseModel {
       .select()
       .single();
 
-    if (error) throw error;
+    if (error) {
+      throw error;
+    }
     return data;
   }
 
@@ -58,16 +60,18 @@ class PatientAllergyModel extends BaseModel {
   async softDelete(id) {
     const { data, error } = await supabase
       .from(this.table)
-      .update({ 
-        is_active: false, 
+      .update({
+        is_active: false,
         deleted_at: new Date(),
-        updated_at: new Date() 
+        updated_at: new Date(),
       })
       .eq('id', id)
       .select()
       .single();
 
-    if (error) throw error;
+    if (error) {
+      throw error;
+    }
     return data;
   }
 
@@ -75,11 +79,11 @@ class PatientAllergyModel extends BaseModel {
    * Get active allergies with patient info
    */
   async getActiveAllergies() {
-    const { data, error } = await supabase
-      .from('active_patient_allergies')
-      .select('*');
+    const { data, error } = await supabase.from('active_patient_allergies').select('*');
 
-    if (error) throw error;
+    if (error) {
+      throw error;
+    }
     return data;
   }
 
@@ -87,13 +91,11 @@ class PatientAllergyModel extends BaseModel {
    * Find allergy by ID
    */
   async findById(id) {
-    const { data, error } = await supabase
-      .from(this.table)
-      .select('*')
-      .eq('id', id)
-      .single();
+    const { data, error } = await supabase.from(this.table).select('*').eq('id', id).single();
 
-    if (error) throw error;
+    if (error) {
+      throw error;
+    }
     return data;
   }
 }

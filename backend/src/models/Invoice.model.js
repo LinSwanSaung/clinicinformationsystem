@@ -48,7 +48,9 @@ class InvoiceModel extends BaseModel {
       .eq('id', id)
       .single();
 
-    if (error) throw error;
+    if (error) {
+      throw error;
+    }
     return data;
   }
 
@@ -102,7 +104,9 @@ class InvoiceModel extends BaseModel {
       .in('status', ['pending', 'draft'])
       .order('created_at', { ascending: false });
 
-    if (error) throw error;
+    if (error) {
+      throw error;
+    }
     return data;
   }
 
@@ -127,7 +131,9 @@ class InvoiceModel extends BaseModel {
       .order('completed_at', { ascending: false, nullsFirst: false })
       .range(offset, offset + limit - 1);
 
-    if (error) throw error;
+    if (error) {
+      throw error;
+    }
 
     // Manually fetch doctor and completed_by user info for each invoice
     if (data && data.length > 0) {
@@ -176,7 +182,9 @@ class InvoiceModel extends BaseModel {
       .eq('patient_id', patientId)
       .order('created_at', { ascending: false });
 
-    if (error) throw error;
+    if (error) {
+      throw error;
+    }
     return data;
   }
 
@@ -190,7 +198,9 @@ class InvoiceModel extends BaseModel {
       .select()
       .single();
 
-    if (error) throw error;
+    if (error) {
+      throw error;
+    }
     return data;
   }
 
@@ -205,7 +215,9 @@ class InvoiceModel extends BaseModel {
       .select()
       .single();
 
-    if (error) throw error;
+    if (error) {
+      throw error;
+    }
     return data;
   }
 
@@ -225,7 +237,9 @@ class InvoiceModel extends BaseModel {
       .select()
       .single();
 
-    if (error) throw error;
+    if (error) {
+      throw error;
+    }
     return data;
   }
 
@@ -246,7 +260,9 @@ class InvoiceModel extends BaseModel {
       .select()
       .single();
 
-    if (error) throw error;
+    if (error) {
+      throw error;
+    }
     return data;
   }
 
@@ -267,7 +283,9 @@ class InvoiceModel extends BaseModel {
       .gt('balance_due', 0)
       .order('created_at', { ascending: false });
 
-    if (error) throw error;
+    if (error) {
+      throw error;
+    }
     return data || [];
   }
 
@@ -281,10 +299,11 @@ class InvoiceModel extends BaseModel {
       .eq('patient_id', patientId)
       .gt('balance_due', 0);
 
-    if (error) throw error;
+    if (error) {
+      throw error;
+    }
     return count || 0;
   }
-
 
   /**
    * Get payment history for an invoice
@@ -301,7 +320,9 @@ class InvoiceModel extends BaseModel {
       .eq('invoice_id', invoiceId)
       .order('payment_date', { ascending: false });
 
-    if (error) throw error;
+    if (error) {
+      throw error;
+    }
     return data || [];
   }
 
@@ -322,7 +343,9 @@ class InvoiceModel extends BaseModel {
       .select()
       .single();
 
-    if (error) throw error;
+    if (error) {
+      throw error;
+    }
     return data;
   }
 
@@ -341,7 +364,9 @@ class InvoiceModel extends BaseModel {
       .select()
       .single();
 
-    if (error) throw error;
+    if (error) {
+      throw error;
+    }
     return data;
   }
 }

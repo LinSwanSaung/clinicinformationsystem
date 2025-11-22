@@ -1,13 +1,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import useDebounce from '@/hooks/useDebounce';
 import { useNavigate } from 'react-router-dom';
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from '@/components/ui/card';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import PageLayout from '@/components/layout/PageLayout';

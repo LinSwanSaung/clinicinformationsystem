@@ -8,7 +8,7 @@ class PatientAccountService {
 
   async bindAccount(userId, patientId) {
     const response = await api.post(`/auth/patient-accounts/${userId}/bind`, {
-      patient_id: patientId
+      patient_id: patientId,
     });
     return response;
   }

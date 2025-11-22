@@ -54,9 +54,9 @@ class PatientPortalService {
         last_name: user.last_name,
         patient_id: user.patient_id,
         role: user.role,
-        last_login: user.last_login
+        last_login: user.last_login,
       },
-      patient
+      patient,
     };
   }
 
@@ -75,10 +75,13 @@ class PatientPortalService {
     if (token.doctor_id) {
       try {
         const queueDate = token.issued_date || new Date().toISOString().split('T')[0];
-        const doctorQueue = await this.queueTokenModel.getByDoctorAndDate(token.doctor_id, queueDate);
+        const doctorQueue = await this.queueTokenModel.getByDoctorAndDate(
+          token.doctor_id,
+          queueDate
+        );
 
         const activeStatuses = ['waiting', 'called', 'serving'];
-        let sortedQueue = doctorQueue.filter(t => activeStatuses.includes(t.status));
+        let sortedQueue = doctorQueue.filter((t) => activeStatuses.includes(t.status));
 
         // Sort queue properly: serving first, then called, then waiting
         // Within each status group, sort by priority (desc) then token_number (asc)
@@ -86,25 +89,32 @@ class PatientPortalService {
         sortedQueue = sortedQueue.sort((a, b) => {
           // First, sort by status priority
           const statusDiff = statusOrder[a.status] - statusOrder[b.status];
-          if (statusDiff !== 0) return statusDiff;
+          if (statusDiff !== 0) {
+            return statusDiff;
+          }
 
           // Then by priority (higher priority first)
           const priorityDiff = (b.priority || 1) - (a.priority || 1);
-          if (priorityDiff !== 0) return priorityDiff;
+          if (priorityDiff !== 0) {
+            return priorityDiff;
+          }
 
           // Finally by token_number (lower number first)
           return a.token_number - b.token_number;
         });
 
-        const index = sortedQueue.findIndex(t => t.id === token.id);
+        const index = sortedQueue.findIndex((t) => t.id === token.id);
         if (index !== -1) {
           position = index + 1;
 
           // Count tokens ahead that are not yet serving
           // Only count tokens that come before this one in the sorted queue
-          const ahead = sortedQueue.slice(0, index).filter(t => t.status !== 'serving').length;
+          const ahead = sortedQueue.slice(0, index).filter((t) => t.status !== 'serving').length;
           // Use clinic settings for consultation duration, fallback to token value or default
-          const consultMinutes = token.consult_expected_minutes || await clinicSettingsService.getConsultationDuration() || 15;
+          const consultMinutes =
+            token.consult_expected_minutes ||
+            (await clinicSettingsService.getConsultationDuration()) ||
+            15;
           estimatedWait = token.status === 'serving' ? 0 : ahead * consultMinutes;
         }
       } catch (error) {
@@ -115,7 +125,7 @@ class PatientPortalService {
     return {
       token,
       position,
-      estimated_wait_minutes: estimatedWait
+      estimated_wait_minutes: estimatedWait,
     };
   }
 
@@ -127,7 +137,7 @@ class PatientPortalService {
     const visits = await this.visitModel.getPatientVisitHistory(patient.id, {
       limit,
       offset,
-      includeInProgress: true
+      includeInProgress: true,
     });
 
     return visits;

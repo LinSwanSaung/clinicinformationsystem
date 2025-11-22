@@ -19,4 +19,3 @@ export { useUpdateAppointmentStatus } from './hooks/useUpdateAppointmentStatus';
 // Services
 export { default as appointmentService } from './services/appointmentService';
 export { default as doctorAvailabilityService } from './services/doctorAvailabilityService';
-

@@ -87,7 +87,6 @@ class VisitService {
         throw new Error(`Missing required fields: ${missingFields.join(', ')}`);
       }
 
-
       // Set default values and remove fields not in schema
       // eslint-disable-next-line no-unused-vars
       const { created_by, updated_by, ...cleanVisitData } = visitData;
@@ -100,7 +99,6 @@ class VisitService {
       };
 
       const visit = await this.visitModel.create(visitToCreate);
-
 
       return {
         success: true,
@@ -164,20 +162,25 @@ class VisitService {
       // Note: Business rule - visits can be completed even with partial payments
       // This allows patients to have new visits even if invoice is not fully paid
       if (visit.invoice_id) {
-          // Check invoice status if invoice exists
-          try {
-            const { default: invoiceService } = await import('./Invoice.service.js');
-            const invoice = await invoiceService.getInvoiceById(visit.invoice_id);
-          
+        // Check invoice status if invoice exists
+        try {
+          const { default: invoiceService } = await import('./Invoice.service.js');
+          const invoice = await invoiceService.getInvoiceById(visit.invoice_id);
+
           // Allow visit completion for: pending, partial_paid, or paid invoices
           // This allows patients to have new visits even with outstanding balance
           const allowedStatuses = ['pending', 'partial_paid', 'paid'];
           if (invoice && !allowedStatuses.includes(invoice.status)) {
-            logger.warn(`[VISIT] Completing visit ${visitId} with invoice status '${invoice.status}'. This may be unexpected.`);
+            logger.warn(
+              `[VISIT] Completing visit ${visitId} with invoice status '${invoice.status}'. This may be unexpected.`
+            );
           }
         } catch (invoiceError) {
           // If invoice check fails, log but allow completion (invoice might not exist yet)
-          logger.warn(`[VISIT] Could not verify invoice status for visit ${visitId}:`, invoiceError.message);
+          logger.warn(
+            `[VISIT] Could not verify invoice status for visit ${visitId}:`,
+            invoiceError.message
+          );
         }
       }
 
@@ -238,7 +241,7 @@ class VisitService {
       // 1. Visits with consultation ended (visit_end_time set) but still in_progress
       // 2. Visits with active queue tokens (serving status)
       // 3. Visits in_progress for more than 1 hour without invoice or with unpaid invoice
-      
+
       const oneHourAgo = new Date(Date.now() - 60 * 60 * 1000).toISOString();
       const today = new Date().toISOString().split('T')[0];
 
@@ -329,18 +332,19 @@ class VisitService {
         .eq('status', 'in_progress')
         .eq('resolved_by_admin', false)
         .order('updated_at', { ascending: true });
-      
+
       // Filter in code: visits that started more than 1 hour ago OR updated more than 1 hour ago
-      const longRunningVisits = allInProgressVisits?.filter((visit) => {
-        const startTime = visit.visit_start_time ? new Date(visit.visit_start_time) : null;
-        const updatedTime = visit.updated_at ? new Date(visit.updated_at) : null;
-        const oneHourAgoDate = new Date(oneHourAgo);
-        
-        return (
-          (startTime && startTime < oneHourAgoDate) ||
-          (updatedTime && updatedTime < oneHourAgoDate)
-        );
-      }) || [];
+      const longRunningVisits =
+        allInProgressVisits?.filter((visit) => {
+          const startTime = visit.visit_start_time ? new Date(visit.visit_start_time) : null;
+          const updatedTime = visit.updated_at ? new Date(visit.updated_at) : null;
+          const oneHourAgoDate = new Date(oneHourAgo);
+
+          return (
+            (startTime && startTime < oneHourAgoDate) ||
+            (updatedTime && updatedTime < oneHourAgoDate)
+          );
+        }) || [];
 
       if (endedError) {
         logger.error('[VISIT] Ended consultation visits query error:', endedError);
@@ -424,11 +428,11 @@ class VisitService {
             if (token.visits.resolved_by_admin) {
               return;
             }
-            
+
             visitIds.add(token.visits.id);
-            
+
             const isStuckConsultation = token.issued_date && token.issued_date !== today;
-            
+
             let issue;
             if (isStuckConsultation) {
               issue = `Stuck consultation: Token #${token.token_number} from ${token.issued_date} still marked as serving`;
@@ -437,7 +441,7 @@ class VisitService {
             } else {
               issue = 'Active consultation in progress';
             }
-            
+
             pendingItems.push({
               entityType: 'visit',
               entityId: token.visits.id,
@@ -462,7 +466,9 @@ class VisitService {
       // Process long-running visits
       if (!longRunningError && longRunningVisits && longRunningVisits.length > 0) {
         for (const visit of longRunningVisits) {
-          if (pendingItems.some((item) => item.entityId === visit.id && item.entityType === 'visit')) {
+          if (
+            pendingItems.some((item) => item.entityId === visit.id && item.entityType === 'visit')
+          ) {
             continue;
           }
 
@@ -559,7 +565,9 @@ class VisitService {
       if (!integrityError && allInProgressWithInvoices) {
         for (const visit of allInProgressWithInvoices) {
           // Skip if already in pending items
-          if (pendingItems.some((item) => item.entityId === visit.id && item.entityType === 'visit')) {
+          if (
+            pendingItems.some((item) => item.entityId === visit.id && item.entityType === 'visit')
+          ) {
             continue;
           }
 
@@ -1423,7 +1431,7 @@ class VisitService {
         .fillColor('#6b7280')
         .text('Healthcare System', { align: 'center' })
         .moveDown(1);
-      
+
       doc
         .fillColor('#000000')
         .fontSize(20)
@@ -1520,12 +1528,9 @@ class VisitService {
         .fillColor('#9ca3af')
         .fontSize(8)
         .font('Helvetica')
-        .text(
-          'This is a computer-generated document. No signature is required.',
-          50,
-          footerY,
-          { align: 'center' }
-        )
+        .text('This is a computer-generated document. No signature is required.', 50, footerY, {
+          align: 'center',
+        })
         .text(
           `Generated on ${new Date().toLocaleDateString('en-US', {
             year: 'numeric',

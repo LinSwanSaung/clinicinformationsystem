@@ -55,16 +55,14 @@ const NotificationBell = () => {
   const handleMarkAsRead = async (notificationId) => {
     try {
       await notificationService.markAsRead(notificationId);
-      
+
       // Update local state
-      setNotifications(prev =>
-        prev.map(notif =>
-          notif.id === notificationId ? { ...notif, is_read: true } : notif
-        )
+      setNotifications((prev) =>
+        prev.map((notif) => (notif.id === notificationId ? { ...notif, is_read: true } : notif))
       );
-      
+
       // Decrease unread count
-      setUnreadCount(prev => Math.max(0, prev - 1));
+      setUnreadCount((prev) => Math.max(0, prev - 1));
     } catch (error) {
       logger.error('Error marking notification as read:', error);
     }
@@ -74,12 +72,10 @@ const NotificationBell = () => {
   const handleMarkAllAsRead = async () => {
     try {
       await notificationService.markAllAsRead();
-      
+
       // Update local state
-      setNotifications(prev =>
-        prev.map(notif => ({ ...notif, is_read: true }))
-      );
-      
+      setNotifications((prev) => prev.map((notif) => ({ ...notif, is_read: true })));
+
       setUnreadCount(0);
     } catch (error) {
       logger.error('Error marking all as read:', error);
@@ -119,7 +115,7 @@ const NotificationBell = () => {
     const now = new Date();
     const diffMs = now - date;
     const diffMins = Math.floor(diffMs / 60000);
-    
+
     if (diffMins < 1) return 'Just now';
     if (diffMins < 60) return `${diffMins}m ago`;
     if (diffMins < 1440) return `${Math.floor(diffMins / 60)}h ago`;
@@ -129,10 +125,14 @@ const NotificationBell = () => {
   // Get notification icon color based on type
   const getNotificationColor = (type) => {
     switch (type) {
-      case 'success': return 'text-green-600';
-      case 'warning': return 'text-yellow-600';
-      case 'error': return 'text-red-600';
-      default: return 'text-blue-600';
+      case 'success':
+        return 'text-green-600';
+      case 'warning':
+        return 'text-yellow-600';
+      case 'error':
+        return 'text-red-600';
+      default:
+        return 'text-blue-600';
     }
   };
 
@@ -141,14 +141,14 @@ const NotificationBell = () => {
       {/* Bell Icon */}
       <button
         onClick={toggleDropdown}
-        className="relative p-2 text-gray-600 hover:text-gray-900 hover:bg-gray-100 rounded-lg transition-colors"
+        className="relative rounded-lg p-2 text-gray-600 transition-colors hover:bg-gray-100 hover:text-gray-900"
         aria-label="Notifications"
       >
-        <Bell className="w-6 h-6" />
-        
+        <Bell className="h-6 w-6" />
+
         {/* Unread Badge */}
         {unreadCount > 0 && (
-          <span className="absolute top-0 right-0 inline-flex items-center justify-center w-5 h-5 text-xs font-bold text-white bg-red-500 rounded-full">
+          <span className="absolute right-0 top-0 inline-flex h-5 w-5 items-center justify-center rounded-full bg-red-500 text-xs font-bold text-white">
             {unreadCount > 9 ? '9+' : unreadCount}
           </span>
         )}
@@ -156,14 +156,14 @@ const NotificationBell = () => {
 
       {/* Dropdown */}
       {isOpen && (
-        <div className="absolute right-0 mt-2 w-96 bg-white rounded-lg shadow-lg border border-gray-200 z-50">
+        <div className="absolute right-0 z-50 mt-2 w-96 rounded-lg border border-gray-200 bg-white shadow-lg">
           {/* Header */}
-          <div className="flex items-center justify-between p-4 border-b border-gray-200">
+          <div className="flex items-center justify-between border-b border-gray-200 p-4">
             <h3 className="text-lg font-semibold text-gray-900">Notifications</h3>
             {unreadCount > 0 && (
               <button
                 onClick={handleMarkAllAsRead}
-                className="text-sm text-blue-600 hover:text-blue-700 font-medium"
+                className="text-sm font-medium text-blue-600 hover:text-blue-700"
               >
                 Mark all as read
               </button>
@@ -174,7 +174,7 @@ const NotificationBell = () => {
           <div className="max-h-96 overflow-y-auto">
             {loading ? (
               <div className="p-8 text-center text-gray-500">
-                <div className="inline-block w-6 h-6 border-2 border-blue-600 border-t-transparent rounded-full animate-spin"></div>
+                <div className="inline-block h-6 w-6 animate-spin rounded-full border-2 border-blue-600 border-t-transparent"></div>
                 <p className="mt-2">Loading...</p>
               </div>
             ) : notifications.length === 0 ? (
@@ -190,16 +190,16 @@ const NotificationBell = () => {
                 {notifications.map((notification) => (
                   <li
                     key={notification.id}
-                    className={`p-4 hover:bg-gray-50 transition-colors ${
+                    className={`p-4 transition-colors hover:bg-gray-50 ${
                       !notification.is_read ? 'bg-blue-50' : ''
                     }`}
                   >
                     <div className="flex items-start gap-3">
                       <div className={`mt-1 ${getNotificationColor(notification.type)}`}>
-                        <Bell className="w-5 h-5" />
+                        <Bell className="h-5 w-5" />
                       </div>
-                      
-                      <div className="flex-1 min-w-0">
+
+                      <div className="min-w-0 flex-1">
                         <div className="flex items-start justify-between gap-2">
                           <h4 className="text-sm font-semibold text-gray-900">
                             {notification.title}
@@ -213,11 +213,9 @@ const NotificationBell = () => {
                             </button>
                           )}
                         </div>
-                        
-                        <p className="mt-1 text-sm text-gray-600">
-                          {notification.message}
-                        </p>
-                        
+
+                        <p className="mt-1 text-sm text-gray-600">{notification.message}</p>
+
                         <p className="mt-1 text-xs text-gray-500">
                           {formatTime(notification.created_at)}
                         </p>
@@ -231,8 +229,8 @@ const NotificationBell = () => {
 
           {/* Footer */}
           {notifications.length > 0 && (
-            <div className="p-3 border-t border-gray-200 text-center">
-              <button className="text-sm text-blue-600 hover:text-blue-700 font-medium">
+            <div className="border-t border-gray-200 p-3 text-center">
+              <button className="text-sm font-medium text-blue-600 hover:text-blue-700">
                 View all notifications
               </button>
             </div>

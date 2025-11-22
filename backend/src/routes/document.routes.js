@@ -84,7 +84,9 @@ router.post(
           meta: { file_name: docData?.document_name },
           ip: req.ip,
         });
-      } catch (e) {}
+      } catch (e) {
+        // Ignore audit log errors - don't fail the request if logging fails
+      }
 
       res.status(201).json({
         success: true,
@@ -134,7 +136,9 @@ router.get(
           result: 'success',
           ip: req.ip,
         });
-      } catch (e) {}
+      } catch (e) {
+        // Ignore audit log errors - don't fail the request if logging fails
+      }
 
       // Redirect to public URL
       return res.redirect(publicUrl);

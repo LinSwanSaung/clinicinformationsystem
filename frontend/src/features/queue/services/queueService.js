@@ -134,18 +134,6 @@ class QueueService {
   }
 
   /**
-   * Mark patient as ready for doctor (Nurse action)
-   */
-  async markPatientReady(tokenId) {
-    try {
-      const response = await api.put(`${this.baseURL}/token/${tokenId}/mark-ready`);
-      return response.data;
-    } catch (error) {
-      throw new Error(error.response?.data?.message || 'Failed to mark patient as ready');
-    }
-  }
-
-  /**
    * Start consultation with a patient
    */
   async startConsultation(tokenId) {
@@ -156,7 +144,9 @@ class QueueService {
       logger.error('🚨 QueueService startConsultation error:', error);
       logger.error('🚨 Error response:', error.response);
       logger.error('🚨 Error data:', error.response?.data);
-      throw new Error(error.response?.data?.message || error.message || 'Failed to start consultation');
+      throw new Error(
+        error.response?.data?.message || error.message || 'Failed to start consultation'
+      );
     }
   }
 
@@ -206,7 +196,7 @@ class QueueService {
   async getPatientQueueInfo(patientId, doctorId) {
     try {
       const response = await api.get(`${this.baseURL}/patient/${patientId}/info`, {
-        params: { doctorId }
+        params: { doctorId },
       });
       return response.data;
     } catch (error) {
@@ -224,7 +214,7 @@ class QueueService {
   async processScheduledAppointments(doctorId, date = null) {
     try {
       const response = await api.post(`${this.baseURL}/doctor/${doctorId}/process-appointments`, {
-        date
+        date,
       });
       return response.data;
     } catch (error) {
@@ -242,7 +232,7 @@ class QueueService {
   async getQueueAnalytics(doctorId, startDate, endDate) {
     try {
       const response = await api.get(`${this.baseURL}/doctor/${doctorId}/analytics`, {
-        params: { startDate, endDate }
+        params: { startDate, endDate },
       });
       return response.data;
     } catch (error) {
@@ -290,9 +280,9 @@ class QueueService {
       // First get all doctors and their availability
       const [doctorsResponse, allAvailabilityResponse] = await Promise.all([
         api.get('/users?role=doctor'),
-        doctorAvailabilityService.getAllDoctorAvailability()
+        doctorAvailabilityService.getAllDoctorAvailability(),
       ]);
-      
+
       const doctors = doctorsResponse.data || [];
       const allAvailability = allAvailabilityResponse.data || [];
 
@@ -301,37 +291,43 @@ class QueueService {
         doctors.map(async (doctor) => {
           try {
             const queueStatus = await this.getDoctorQueueStatus(doctor.id, date);
-            
+
             // Get availability for this doctor
-            const doctorAvailability = allAvailability.filter(avail => avail.doctor_id === doctor.id);
-            
+            const doctorAvailability = allAvailability.filter(
+              (avail) => avail.doctor_id === doctor.id
+            );
+
             // Get comprehensive status including availability
             const status = doctorAvailabilityService.getDoctorStatus(
-              doctor, 
-              doctorAvailability, 
+              doctor,
+              doctorAvailability,
               queueStatus // Pass queueStatus directly, not queueStatus.data
             );
-            
+
             return {
               ...doctor,
-              queueStatus: queueStatus.success ? queueStatus.data : {
-                doctor_id: doctor.id,
-                date: date || new Date().toISOString().split('T')[0],
-                tokens: [],
-                summary: { waiting: 0, serving: 0, completed: 0, total: 0 }
-              },
+              queueStatus: queueStatus.success
+                ? queueStatus.data
+                : {
+                    doctor_id: doctor.id,
+                    date: date || new Date().toISOString().split('T')[0],
+                    tokens: [],
+                    summary: { waiting: 0, serving: 0, completed: 0, total: 0 },
+                  },
               availability: doctorAvailability,
-              status: status
+              status: status,
             };
           } catch (error) {
             // Get availability for this doctor even if queue fails
-            const doctorAvailability = allAvailability.filter(avail => avail.doctor_id === doctor.id);
+            const doctorAvailability = allAvailability.filter(
+              (avail) => avail.doctor_id === doctor.id
+            );
             const status = doctorAvailabilityService.getDoctorStatus(
-              doctor, 
-              doctorAvailability, 
+              doctor,
+              doctorAvailability,
               null
             );
-            
+
             return {
               ...doctor,
               queueStatus: {
@@ -342,16 +338,16 @@ class QueueService {
                 statistics: {
                   tokens: { total: 0, waiting: 0, completed: 0 },
                   appointments: { total: 0, queued: 0, completed: 0 },
-                  combined: { totalPatients: 0, waitingPatients: 0, completedToday: 0 }
+                  combined: { totalPatients: 0, waitingPatients: 0, completedToday: 0 },
                 },
                 currentStatus: {
                   activeConsultation: null,
                   nextInQueue: null,
-                  isAvailable: status.canAcceptPatients
-                }
+                  isAvailable: status.canAcceptPatients,
+                },
               },
               availability: doctorAvailability,
-              status: status
+              status: status,
             };
           }
         })
@@ -369,12 +365,10 @@ class QueueService {
   async getAvailableDoctorsForWalkIn(date = null) {
     try {
       const allDoctors = await this.getAllDoctorsQueueStatus(date);
-      
+
       // Filter to only include doctors who can accept patients
-      const availableDoctors = allDoctors.data.filter(doctor => 
-        doctor.status.canAcceptPatients
-      );
-      
+      const availableDoctors = allDoctors.data.filter((doctor) => doctor.status.canAcceptPatients);
+
       return { success: true, data: availableDoctors };
     } catch (error) {
       throw new Error('Failed to fetch available doctors for walk-in');
@@ -387,15 +381,17 @@ class QueueService {
   async getQueueSummary(date = null) {
     try {
       const doctorQueues = await this.getAllDoctorsQueueStatus(date);
-      
+
       if (!doctorQueues.success || !doctorQueues.data) {
         throw new Error('Invalid doctor queues data');
       }
 
       const summary = {
         totalDoctors: doctorQueues.data.length,
-        activeDoctors: doctorQueues.data.filter(d => {
-          return d.queueStatus && d.queueStatus.currentStatus && d.queueStatus.currentStatus.isAvailable;
+        activeDoctors: doctorQueues.data.filter((d) => {
+          return (
+            d.queueStatus && d.queueStatus.currentStatus && d.queueStatus.currentStatus.isAvailable
+          );
         }).length,
         totalPatients: doctorQueues.data.reduce((sum, d) => {
           if (d.queueStatus && d.queueStatus.statistics && d.queueStatus.statistics.combined) {
@@ -416,9 +412,13 @@ class QueueService {
           return sum;
         }, 0),
         averageWaitTime: this.calculateAverageWaitTime(doctorQueues.data),
-        busyDoctors: doctorQueues.data.filter(d => {
-          return d.queueStatus && d.queueStatus.currentStatus && d.queueStatus.currentStatus.activeConsultation;
-        }).length
+        busyDoctors: doctorQueues.data.filter((d) => {
+          return (
+            d.queueStatus &&
+            d.queueStatus.currentStatus &&
+            d.queueStatus.currentStatus.activeConsultation
+          );
+        }).length,
       };
 
       return { success: true, data: summary };
@@ -433,17 +433,17 @@ class QueueService {
    */
   calculateAverageWaitTime(doctorQueues) {
     try {
-      const allTokens = doctorQueues.flatMap(d => {
+      const allTokens = doctorQueues.flatMap((d) => {
         if (d.queueStatus && d.queueStatus.tokens) {
           return d.queueStatus.tokens;
         }
         return [];
       });
-      
-      const waitingTokens = allTokens.filter(t => t && t.status === 'waiting');
-      
+
+      const waitingTokens = allTokens.filter((t) => t && t.status === 'waiting');
+
       if (waitingTokens.length === 0) return 0;
-      
+
       const totalWaitTime = waitingTokens.reduce((sum, token) => {
         try {
           const waitTime = Math.floor((new Date() - new Date(token.issued_time)) / (1000 * 60));
@@ -452,7 +452,7 @@ class QueueService {
           return sum;
         }
       }, 0);
-      
+
       return Math.round(totalWaitTime / waitingTokens.length);
     } catch (error) {
       logger.error('Error calculating average wait time:', error);
@@ -470,7 +470,7 @@ class QueueService {
       serving: 'bg-green-100 text-green-800 border-green-200',
       completed: 'bg-gray-100 text-gray-800 border-gray-200',
       missed: 'bg-red-100 text-red-800 border-red-200',
-      cancelled: 'bg-gray-100 text-gray-600 border-gray-200'
+      cancelled: 'bg-gray-100 text-gray-600 border-gray-200',
     };
     return statusColors[status] || 'bg-gray-100 text-gray-800 border-gray-200';
   }
@@ -484,7 +484,7 @@ class QueueService {
       2: 'bg-yellow-100 text-yellow-800',
       3: 'bg-orange-100 text-orange-800',
       4: 'bg-red-100 text-red-800',
-      5: 'bg-purple-100 text-purple-800'
+      5: 'bg-purple-100 text-purple-800',
     };
     return priorityColors[priority] || 'bg-gray-100 text-gray-800';
   }
@@ -518,7 +518,9 @@ class QueueService {
    */
   async forceCompleteActiveConsultation(doctorId) {
     try {
-      const response = await api.put(`${this.baseURL}/doctor/${doctorId}/force-complete-consultation`);
+      const response = await api.put(
+        `${this.baseURL}/doctor/${doctorId}/force-complete-consultation`
+      );
       return response.data;
     } catch (error) {
       throw new Error(error.response?.data?.message || 'Failed to force complete consultation');
@@ -535,7 +537,7 @@ class QueueService {
   async delayAppointmentQueue(appointmentQueueId, reason = null) {
     try {
       const response = await api.put(`${this.baseURL}/appointment/${appointmentQueueId}/delay`, {
-        reason
+        reason,
       });
       return response.data;
     } catch (error) {
@@ -561,7 +563,7 @@ class QueueService {
   async delayToken(tokenId, reason = null) {
     try {
       const response = await api.put(`${this.baseURL}/token/${tokenId}/delay`, {
-        reason
+        reason,
       });
       return response.data;
     } catch (error) {

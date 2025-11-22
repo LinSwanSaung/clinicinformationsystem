@@ -37,7 +37,7 @@ class DocumentService {
         formData.append('patient_id', patientId);
         formData.append('document_type', documentType);
         formData.append('file_name', file.name);
-        
+
         return this.uploadDocument(formData);
       });
 
@@ -45,7 +45,7 @@ class DocumentService {
       return {
         success: true,
         message: `Successfully uploaded ${results.length} document(s)`,
-        data: results
+        data: results,
       };
     } catch (error) {
       logger.error('Error uploading multiple documents:', error);

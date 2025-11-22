@@ -1,4 +1,12 @@
-import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react';
+import {
+  createContext,
+  useCallback,
+  useContext,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from 'react';
 import { AlertModal } from '@/components/library';
 
 const ErrorModalContext = createContext({
@@ -63,5 +71,3 @@ export function ErrorModalProvider({ children }) {
 export function useErrorModal() {
   return useContext(ErrorModalContext);
 }
-
-

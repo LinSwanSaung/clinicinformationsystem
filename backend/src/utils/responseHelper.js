@@ -11,19 +11,24 @@ export const successResponse = (res, data, message = 'Success', statusCode = 200
     success: true,
     message,
     data,
-    timestamp: new Date().toISOString()
+    timestamp: new Date().toISOString(),
   });
 };
 
 /**
  * Error response
  */
-export const errorResponse = (res, message = 'Something went wrong', statusCode = 500, errors = null) => {
+export const errorResponse = (
+  res,
+  message = 'Something went wrong',
+  statusCode = 500,
+  errors = null
+) => {
   return res.status(statusCode).json({
     success: false,
     message,
     ...(errors && { errors }),
-    timestamp: new Date().toISOString()
+    timestamp: new Date().toISOString(),
   });
 };
 
@@ -41,8 +46,8 @@ export const paginatedResponse = (res, data, pagination, message = 'Success') =>
       total: pagination.total,
       totalPages: Math.ceil(pagination.total / pagination.limit),
       hasNextPage: pagination.page * pagination.limit < pagination.total,
-      hasPrevPage: pagination.page > 1
+      hasPrevPage: pagination.page > 1,
     },
-    timestamp: new Date().toISOString()
+    timestamp: new Date().toISOString(),
   });
 };

@@ -18,7 +18,9 @@ class InvoiceItemModel extends BaseModel {
       .eq('invoice_id', invoiceId)
       .order('added_at', { ascending: true });
 
-    if (error) throw error;
+    if (error) {
+      throw error;
+    }
     return data;
   }
 
@@ -32,7 +34,9 @@ class InvoiceItemModel extends BaseModel {
       .eq('id', id)
       .single();
 
-    if (error) throw error;
+    if (error) {
+      throw error;
+    }
     return data;
   }
 
@@ -46,7 +50,9 @@ class InvoiceItemModel extends BaseModel {
       .select()
       .single();
 
-    if (error) throw error;
+    if (error) {
+      throw error;
+    }
     return data;
   }
 
@@ -61,7 +67,9 @@ class InvoiceItemModel extends BaseModel {
       .select()
       .single();
 
-    if (error) throw error;
+    if (error) {
+      throw error;
+    }
     return data;
   }
 
@@ -76,7 +84,9 @@ class InvoiceItemModel extends BaseModel {
       .select()
       .single();
 
-    if (error) throw error;
+    if (error) {
+      throw error;
+    }
     return data;
   }
 
@@ -84,12 +94,11 @@ class InvoiceItemModel extends BaseModel {
    * Bulk create invoice items
    */
   async createItems(items) {
-    const { data, error } = await this.supabase
-      .from(this.tableName)
-      .insert(items)
-      .select();
+    const { data, error } = await this.supabase.from(this.tableName).insert(items).select();
 
-    if (error) throw error;
+    if (error) {
+      throw error;
+    }
     return data;
   }
 
@@ -103,7 +112,9 @@ class InvoiceItemModel extends BaseModel {
       .eq('invoice_id', invoiceId)
       .select();
 
-    if (error) throw error;
+    if (error) {
+      throw error;
+    }
     return data;
   }
 }

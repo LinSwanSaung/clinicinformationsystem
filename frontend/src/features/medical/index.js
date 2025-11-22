@@ -22,4 +22,3 @@ export { allergyService } from './services/allergyService';
 export { diagnosisService } from './services/diagnosisService';
 export { default as doctorNotesService } from './services/doctorNotesService';
 export { default as documentService } from './services/documentService';
-

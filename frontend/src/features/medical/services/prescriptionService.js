@@ -21,7 +21,7 @@ export const createPrescription = async (prescriptionData) => {
 export const getPrescriptionsByPatient = async (patientId, includeInactive = false) => {
   try {
     const response = await api.get(`/prescriptions/patient/${patientId}`, {
-      params: { includeInactive }
+      params: { includeInactive },
     });
     return response.data?.data || response.data;
   } catch (error) {
@@ -68,5 +68,5 @@ export default {
   getPrescriptionsByPatient,
   getPrescriptionsByVisit,
   updatePrescriptionStatus,
-  cancelPrescription
+  cancelPrescription,
 };

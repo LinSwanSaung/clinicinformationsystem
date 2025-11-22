@@ -57,7 +57,9 @@ class DoctorService {
    */
   async getDoctorsBySpecialization(specialization) {
     try {
-      const response = await apiService.get(`/users?role=doctor&specialty=${encodeURIComponent(specialization)}`);
+      const response = await apiService.get(
+        `/users?role=doctor&specialty=${encodeURIComponent(specialization)}`
+      );
       return response;
     } catch (error) {
       logger.error('Failed to fetch doctors by specialization:', error);
@@ -93,7 +95,7 @@ class DoctorService {
       const response = await apiService.get(`/appointments/doctor/${id}${queryParams}`);
       return {
         doctorId: id,
-        appointments: response
+        appointments: response,
       };
     } catch (error) {
       logger.error('Failed to fetch doctor schedule:', error);
@@ -111,7 +113,7 @@ class DoctorService {
     try {
       const queryParams = new URLSearchParams({
         doctor_id: doctorId,
-        ...filters
+        ...filters,
       });
       const response = await apiService.get(`/appointments?${queryParams}`);
       return response;

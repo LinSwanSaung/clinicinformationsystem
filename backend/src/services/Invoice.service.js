@@ -55,31 +55,35 @@ class InvoiceService {
         // Handle race condition: if another request created invoice between check and create
         // Check for unique constraint violation or duplicate key error
         const errorMsg = createError?.message?.toLowerCase() || '';
-        const errorCode = createError?.code?.toLowerCase() || '';
-        
+        const _errorCode = createError?.code?.toLowerCase() || '';
+
         // Check for visit_id duplicate (another invoice for same visit)
         if (
           errorMsg.includes('uq_invoices_one_per_visit') ||
-          errorMsg.includes('visit_id') && (errorMsg.includes('duplicate') || errorMsg.includes('unique'))
+          (errorMsg.includes('visit_id') &&
+            (errorMsg.includes('duplicate') || errorMsg.includes('unique')))
         ) {
           // Invoice was created by another request for same visit, fetch and return it
-          logger.warn('[InvoiceService] Race condition detected - invoice created by another request for same visit, fetching existing invoice');
+          logger.warn(
+            '[InvoiceService] Race condition detected - invoice created by another request for same visit, fetching existing invoice'
+          );
           const existingInvoice = await InvoiceModel.getInvoiceByVisit(visitId);
           if (existingInvoice) {
             return existingInvoice;
           }
         }
-        
+
         // Check for invoice_number duplicate (shouldn't happen with atomic function, but handle it)
         if (
-          errorMsg.includes('invoice_number') && (errorMsg.includes('duplicate') || errorMsg.includes('unique')) ||
+          (errorMsg.includes('invoice_number') &&
+            (errorMsg.includes('duplicate') || errorMsg.includes('unique'))) ||
           errorMsg.includes('invoices_invoice_number_key')
         ) {
           // Invoice number collision - retry once (trigger will generate new number)
           logger.warn('[InvoiceService] Invoice number collision detected, retrying...');
           try {
             // Small delay to let other transaction complete
-            await new Promise(resolve => setTimeout(resolve, 100));
+            await new Promise((resolve) => setTimeout(resolve, 100));
             const invoice = await InvoiceModel.createInvoice(invoiceData);
             return invoice;
           } catch (retryError) {
@@ -91,7 +95,7 @@ class InvoiceService {
             throw retryError;
           }
         }
-        
+
         // Re-throw if it's not a duplicate error
         throw createError;
       }
@@ -180,7 +184,9 @@ class InvoiceService {
       // Cashiers can add services even if doctor forgot to add them
       const editableStatuses = ['pending', 'draft', 'partial_paid'];
       if (!editableStatuses.includes(invoice.status)) {
-        throw new Error(`Cannot add services to invoice with status '${invoice.status}'. Only allowed for pending, draft, or partial_paid invoices.`);
+        throw new Error(
+          `Cannot add services to invoice with status '${invoice.status}'. Only allowed for pending, draft, or partial_paid invoices.`
+        );
       }
 
       const { service_id, service_name, quantity = 1, unit_price, notes } = serviceData;
@@ -341,12 +347,16 @@ class InvoiceService {
 
         // Check if visit is still in progress
         if (visit.data.status !== 'in_progress') {
-          throw new Error('Cannot remove services after consultation is completed. Only allowed during active consultation.');
+          throw new Error(
+            'Cannot remove services after consultation is completed. Only allowed during active consultation.'
+          );
         }
 
         // Check if invoice is still editable (pending or draft status)
         if (!['pending', 'draft'].includes(invoice.status)) {
-          throw new Error('Cannot remove services from a paid or completed invoice. Only allowed during active consultation.');
+          throw new Error(
+            'Cannot remove services from a paid or completed invoice. Only allowed during active consultation.'
+          );
         }
       }
 
@@ -409,7 +419,7 @@ class InvoiceService {
       });
 
       await this.recalculateInvoiceTotal(invoiceId);
-      return await this.getInvoiceById(invoiceId);
+      return this.getInvoiceById(invoiceId);
     } catch (error) {
       throw new Error(`Failed to update discount: ${error.message}`);
     }
@@ -449,10 +459,15 @@ class InvoiceService {
                 payment_status: 'paid',
                 completed_by: completedBy,
               });
-              logger.info(`[InvoiceService] Auto-completed visit ${invoice.visit_id} for already-paid invoice ${invoiceId}`);
+              logger.info(
+                `[InvoiceService] Auto-completed visit ${invoice.visit_id} for already-paid invoice ${invoiceId}`
+              );
             }
           } catch (visitError) {
-            logger.error(`[InvoiceService] Failed to complete visit ${invoice.visit_id} for already-paid invoice:`, visitError);
+            logger.error(
+              `[InvoiceService] Failed to complete visit ${invoice.visit_id} for already-paid invoice:`,
+              visitError
+            );
             // Don't throw - invoice is already paid, just log the error
           }
         }
@@ -463,13 +478,13 @@ class InvoiceService {
       if (!invoice.visit_id) {
         throw new ApplicationError(
           `Cannot complete invoice ${invoice.invoice_number || invoiceId}: Invoice is missing visit information. ` +
-          `Please contact support to resolve this data integrity issue. The invoice cannot be completed until this is fixed.`,
+            `Please contact support to resolve this data integrity issue. The invoice cannot be completed until this is fixed.`,
           400,
           'INVOICE_MISSING_VISIT',
-          { 
-            invoiceId, 
+          {
+            invoiceId,
             invoiceNumber: invoice.invoice_number,
-            message: 'Invoice missing visit association - data integrity issue'
+            message: 'Invoice missing visit association - data integrity issue',
           }
         );
       }
@@ -481,13 +496,13 @@ class InvoiceService {
       // 5. Use transaction pattern to ensure atomicity
       const transaction = new TransactionRunner();
       let completedInvoice = null;
-      let completedVisit = null;
+      const _completedVisit = null;
 
       try {
         // Step 1: Complete the invoice (with rollback compensation)
         completedInvoice = await transaction.add(
           async () => {
-            return await InvoiceModel.completeInvoice(invoiceId, completedBy);
+            return InvoiceModel.completeInvoice(invoiceId, completedBy);
           },
           async () => {
             // Compensation: revert invoice status if visit completion fails
@@ -501,7 +516,7 @@ class InvoiceService {
 
         // Step 2: Complete the visit (this is the ONLY place visits should be completed)
         // Business rule: Visits are completed when invoice is paid, not when consultation ends
-        completedVisit = await transaction.add(
+        const _completedVisit = await transaction.add(
           async () => {
             // Use completeVisit() to ensure costs are calculated correctly
             // This method calculates total_cost from consultation fee + services
@@ -516,7 +531,6 @@ class InvoiceService {
             // (This is handled by the transaction runner calling all compensations)
           }
         );
-
 
         // 6. Log visit status change for audit
         try {
@@ -645,16 +659,16 @@ class InvoiceService {
       // Policy: Maximum 2 partial payments per invoice
       const existingPayments = await PaymentTransactionModel.getPaymentsByInvoice(invoiceId);
       const totalAmount = parseFloat(invoice.total_amount || 0);
-      const partialPaymentCount = existingPayments.filter(
-        (p) => {
-          const paymentAmount = parseFloat(p.amount || 0);
-          // Count as partial if payment is less than total amount
-          return paymentAmount < totalAmount;
-        }
-      ).length;
-      
+      const partialPaymentCount = existingPayments.filter((p) => {
+        const paymentAmount = parseFloat(p.amount || 0);
+        // Count as partial if payment is less than total amount
+        return paymentAmount < totalAmount;
+      }).length;
+
       if (partialPaymentCount >= 2) {
-        throw new Error('Maximum 2 partial payments allowed per invoice. Please pay the remaining balance in full.');
+        throw new Error(
+          'Maximum 2 partial payments allowed per invoice. Please pay the remaining balance in full.'
+        );
       }
 
       const amountPaid = parseFloat(paymentData.amount);
@@ -685,7 +699,7 @@ class InvoiceService {
       }
 
       const updatedInvoice = atomicResult.invoice;
-      
+
       // CRITICAL: Complete the visit when any payment is made (partial or full)
       // This allows patients to have new visits even if invoice is not fully paid
       // Business rule: Visit completion is separate from invoice payment status
@@ -697,20 +711,25 @@ class InvoiceService {
           if (visitDetails?.data?.status !== 'completed') {
             // Determine payment status based on invoice status
             const paymentStatus = updatedInvoice.status === 'paid' ? 'paid' : 'partial';
-            
+
             // Complete the visit automatically when payment is made (allows new visits)
             await this.visitService.completeVisit(updatedInvoice.visit_id, {
               payment_status: paymentStatus,
               completed_by: paymentData.processed_by,
             });
             visitCompleted = true;
-            logger.info(`[InvoiceService] Auto-completed visit ${updatedInvoice.visit_id} after payment (status: ${updatedInvoice.status})`);
+            logger.info(
+              `[InvoiceService] Auto-completed visit ${updatedInvoice.visit_id} after payment (status: ${updatedInvoice.status})`
+            );
           } else {
             visitCompleted = true; // Visit was already completed
           }
         } catch (visitError) {
           // Log error but don't fail payment - visit can be completed manually later
-          logger.error(`[InvoiceService] Failed to auto-complete visit ${updatedInvoice.visit_id} after payment:`, visitError);
+          logger.error(
+            `[InvoiceService] Failed to auto-complete visit ${updatedInvoice.visit_id} after payment:`,
+            visitError
+          );
         }
       }
 
@@ -722,9 +741,10 @@ class InvoiceService {
           const patientName = patient
             ? `${patient.first_name} ${patient.last_name}`.trim()
             : 'Patient';
-          
-          const paymentStatusText = updatedInvoice.status === 'paid' ? 'fully paid' : 'partially paid';
-          
+
+          const paymentStatusText =
+            updatedInvoice.status === 'paid' ? 'fully paid' : 'partially paid';
+
           await NotificationService.notifyReceptionists({
             title: 'Visit Completed',
             message: `${patientName} has completed their visit. Invoice #${updatedInvoice.invoice_number || updatedInvoice.id} has been ${paymentStatusText}.`,
@@ -734,10 +754,13 @@ class InvoiceService {
           });
         } catch (notifError) {
           // Log error but don't fail payment
-          logger.error('[InvoiceService] Failed to send reception notification after payment:', notifError);
+          logger.error(
+            '[InvoiceService] Failed to send reception notification after payment:',
+            notifError
+          );
         }
       }
-      
+
       // If this is a partial payment, update hold fields
       if (parseFloat(updatedInvoice.balance_due || 0) > 0) {
         // Use InvoiceModel method instead of direct database access
@@ -771,7 +794,10 @@ class InvoiceService {
             transaction: atomicResult.payment,
           };
         } catch (holdError) {
-          logger.warn('[InvoiceService] Failed to update hold fields for partial payment:', holdError);
+          logger.warn(
+            '[InvoiceService] Failed to update hold fields for partial payment:',
+            holdError
+          );
           // Don't throw - payment was successful, just hold fields failed
           // Return the updated invoice without hold fields
         }
@@ -869,7 +895,9 @@ class InvoiceService {
    */
   async getPatientRemainingCredit(patientId) {
     try {
-      const { getPatientRemainingCredit: getCredit } = await import('./repositories/BillingRepo.js');
+      const { getPatientRemainingCredit: getCredit } = await import(
+        './repositories/BillingRepo.js'
+      );
       const totalCredit = await getCredit(patientId);
       return {
         totalCredit,

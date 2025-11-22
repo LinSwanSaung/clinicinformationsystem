@@ -27,7 +27,9 @@ export function startAppointmentReminders() {
       // Get late threshold from clinic settings for arrival time recommendation
       const lateThreshold = await clinicSettingsService.getLateThreshold();
       for (const appt of appointments) {
-        if (!appt.appointment_time) continue;
+        if (!appt.appointment_time) {
+          continue;
+        }
         const [h, m] = appt.appointment_time.split(':').map((n) => parseInt(n, 10));
         const apptDate = new Date(today);
         apptDate.setHours(h, m, 0, 0);
@@ -54,5 +56,3 @@ export function startAppointmentReminders() {
   logger.info('⏰ Appointment reminder job scheduled (every 5 minutes)');
   return task;
 }
-
-

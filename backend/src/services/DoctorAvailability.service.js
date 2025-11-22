@@ -1,10 +1,5 @@
 import DoctorAvailabilityModel from '../models/DoctorAvailability.model.js';
-import {
-  getAvailabilityByDoctorId as repoGetAvailabilityByDoctorId,
-  getAvailabilityByDoctorAndDay as repoGetAvailabilityByDoctorAndDay,
-  getAllAvailabilityWithDoctorDetails as repoGetAllAvailabilityWithDoctorDetails,
-  getAppointmentsByDoctorAndDate as repoGetAppointmentsByDoctorAndDate,
-} from './repositories/DoctorAvailabilityRepo.js';
+import { getAppointmentsByDoctorAndDate as repoGetAppointmentsByDoctorAndDate } from './repositories/DoctorAvailabilityRepo.js';
 import logger from '../config/logger.js';
 
 class DoctorAvailabilityService {
@@ -16,121 +11,93 @@ class DoctorAvailabilityService {
    * Get all doctor availability records
    */
   async getAllAvailability(options = {}) {
-    try {
-      const { doctorId } = options;
+    const { doctorId } = options;
 
-      if (doctorId) {
-        return await this.doctorAvailabilityModel.getByDoctorId(doctorId);
-      }
-
-      const allAvailability = await this.doctorAvailabilityModel.getAllWithDoctorDetails();
-
-      // Filter out any records with null doctor_id to prevent validation errors
-      return allAvailability.filter((record) => record && record.doctor_id);
-    } catch (error) {
-      throw error;
+    if (doctorId) {
+      return this.doctorAvailabilityModel.getByDoctorId(doctorId);
     }
+
+    const allAvailability = await this.doctorAvailabilityModel.getAllWithDoctorDetails();
+
+    // Filter out any records with null doctor_id to prevent validation errors
+    return allAvailability.filter((record) => record && record.doctor_id);
   }
 
   /**
    * Get availability by doctor ID
    */
   async getAvailabilityByDoctorId(doctorId) {
-    try {
-      return await this.doctorAvailabilityModel.getByDoctorId(doctorId);
-    } catch (error) {
-      throw error;
-    }
+    return this.doctorAvailabilityModel.getByDoctorId(doctorId);
   }
 
   /**
    * Create new availability record
    */
   async createAvailability(availabilityData) {
-    try {
-      // Validate required fields
-      this.validateAvailabilityData(availabilityData);
+    // Validate required fields
+    this.validateAvailabilityData(availabilityData);
 
-      // Process day name to ensure consistency
-      const processedData = {
-        ...availabilityData,
-        day_of_week: this.standardizeDayName(availabilityData.day_of_week),
-      };
+    // Process day name to ensure consistency
+    const processedData = {
+      ...availabilityData,
+      day_of_week: this.standardizeDayName(availabilityData.day_of_week),
+    };
 
-      // Check for conflicts
-      await this.checkForTimeConflicts(processedData);
+    // Check for conflicts
+    await this.checkForTimeConflicts(processedData);
 
-      return await this.doctorAvailabilityModel.create(processedData);
-    } catch (error) {
-      throw error;
-    }
+    return this.doctorAvailabilityModel.create(processedData);
   }
 
   /**
    * Update availability record
    */
   async updateAvailability(id, availabilityData) {
-    try {
-      // Check if record exists
-      const existingRecord = await this.doctorAvailabilityModel.findById(id);
-      if (!existingRecord) {
-        throw new Error('Availability record not found');
-      }
-
-      // Validate and process data
-      this.validateAvailabilityData(availabilityData, true);
-      const processedData = {
-        ...availabilityData,
-        day_of_week: this.standardizeDayName(availabilityData.day_of_week),
-      };
-
-      // Check for conflicts (excluding current record)
-      await this.checkForTimeConflicts(processedData, id);
-
-      return await this.doctorAvailabilityModel.update(id, processedData);
-    } catch (error) {
-      throw error;
+    // Check if record exists
+    const existingRecord = await this.doctorAvailabilityModel.findById(id);
+    if (!existingRecord) {
+      throw new Error('Availability record not found');
     }
+
+    // Validate and process data
+    this.validateAvailabilityData(availabilityData, true);
+    const processedData = {
+      ...availabilityData,
+      day_of_week: this.standardizeDayName(availabilityData.day_of_week),
+    };
+
+    // Check for conflicts (excluding current record)
+    await this.checkForTimeConflicts(processedData, id);
+
+    return this.doctorAvailabilityModel.update(id, processedData);
   }
 
   /**
    * Delete availability record
    */
   async deleteAvailability(id) {
-    try {
-      const existingRecord = await this.doctorAvailabilityModel.findById(id);
-      if (!existingRecord) {
-        throw new Error('Availability record not found');
-      }
-
-      return await this.doctorAvailabilityModel.delete(id);
-    } catch (error) {
-      throw error;
+    const existingRecord = await this.doctorAvailabilityModel.findById(id);
+    if (!existingRecord) {
+      throw new Error('Availability record not found');
     }
+
+    return this.doctorAvailabilityModel.delete(id);
   }
 
   /**
    * Get available doctors for a specific day and time
    */
   async getAvailableDoctors(dayOfWeek, time) {
-    try {
-      const dayName = this.standardizeDayName(dayOfWeek);
-      return await this.doctorAvailabilityModel.getAvailableDoctors(dayName, time);
-    } catch (error) {
-      throw error;
-    }
+    const dayName = this.standardizeDayName(dayOfWeek);
+    return this.doctorAvailabilityModel.getAvailableDoctors(dayName, time);
   }
 
   /**
    * Check if a doctor is available at a specific time
    */
   async isDoctorAvailable(doctorId, dayOfWeek, time) {
-    try {
-      const dayName = this.standardizeDayName(dayOfWeek);
-      return await this.doctorAvailabilityModel.isDoctorAvailable(doctorId, dayName, time);
-    } catch (error) {
-      throw error;
-    }
+    const dayName = this.standardizeDayName(dayOfWeek);
+    return this.doctorAvailabilityModel.isDoctorAvailable(doctorId, dayName, time);
   }
 
   /**
@@ -174,29 +141,25 @@ class DoctorAvailabilityService {
    * Check for time conflicts
    */
   async checkForTimeConflicts(data, excludeId = null) {
-    try {
-      const existingSlots = await this.doctorAvailabilityModel.getByDoctorAndDay(
-        data.doctor_id,
-        data.day_of_week
-      );
+    const existingSlots = await this.doctorAvailabilityModel.getByDoctorAndDay(
+      data.doctor_id,
+      data.day_of_week
+    );
 
-      for (const slot of existingSlots) {
-        // Skip if this is the same record we're updating
-        if (excludeId && slot.id === excludeId) {
-          continue;
-        }
-
-        // Check for time overlap
-        const hasOverlap = data.start_time < slot.end_time && data.end_time > slot.start_time;
-
-        if (hasOverlap) {
-          throw new Error(
-            `Time conflict detected with existing availability slot: ${slot.start_time} - ${slot.end_time}`
-          );
-        }
+    for (const slot of existingSlots) {
+      // Skip if this is the same record we're updating
+      if (excludeId && slot.id === excludeId) {
+        continue;
       }
-    } catch (error) {
-      throw error;
+
+      // Check for time overlap
+      const hasOverlap = data.start_time < slot.end_time && data.end_time > slot.start_time;
+
+      if (hasOverlap) {
+        throw new Error(
+          `Time conflict detected with existing availability slot: ${slot.start_time} - ${slot.end_time}`
+        );
+      }
     }
   }
 
@@ -379,7 +342,9 @@ class DoctorAvailabilityService {
         'mark_tokens_missed_during_unavailability'
       );
 
-      if (error) throw error;
+      if (error) {
+        throw error;
+      }
 
       return {
         success: true,
@@ -403,7 +368,9 @@ class DoctorAvailabilityService {
         { p_doctor_id: doctorId }
       );
 
-      if (error) throw error;
+      if (error) {
+        throw error;
+      }
 
       return {
         success: true,
@@ -430,7 +397,9 @@ class DoctorAvailabilityService {
         }
       );
 
-      if (error) throw error;
+      if (error) {
+        throw error;
+      }
       return {
         success: true,
         cancelledTokens: data || [],
@@ -453,7 +422,9 @@ class DoctorAvailabilityService {
         { p_doctor_id: doctorId }
       );
 
-      if (error) throw error;
+      if (error) {
+        throw error;
+      }
 
       return {
         success: true,
@@ -475,7 +446,9 @@ class DoctorAvailabilityService {
         { p_doctor_id: doctorId }
       );
 
-      if (error) throw error;
+      if (error) {
+        throw error;
+      }
 
       return {
         success: true,
@@ -497,7 +470,9 @@ class DoctorAvailabilityService {
         { p_doctor_id: doctorId }
       );
 
-      if (error) throw error;
+      if (error) {
+        throw error;
+      }
 
       return {
         success: true,
@@ -528,7 +503,9 @@ class DoctorAvailabilityService {
         .eq('issued_date', new Date().toISOString().split('T')[0])
         .in('status', ['waiting', 'called', 'delayed', 'serving']);
 
-      if (tokenError) throw tokenError;
+      if (tokenError) {
+        throw tokenError;
+      }
 
       const status = {
         isCurrentlyAvailable: currentAvailability.isAvailable,
@@ -564,7 +541,9 @@ class DoctorAvailabilityService {
         .eq('role', 'doctor')
         .eq('is_active', true);
 
-      if (doctorError) throw doctorError;
+      if (doctorError) {
+        throw doctorError;
+      }
 
       // Get status for each doctor
       const doctorStatuses = await Promise.all(
@@ -589,4 +568,3 @@ class DoctorAvailabilityService {
 }
 
 export default DoctorAvailabilityService;
-

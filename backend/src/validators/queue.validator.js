@@ -10,19 +10,19 @@ const queueTokenSchema = Joi.object({
   doctor_id: Joi.string().uuid().required(),
   appointment_id: Joi.string().uuid().optional(),
   priority: Joi.number().integer().min(1).max(5).optional().default(1),
-  estimated_wait_time: Joi.number().integer().min(0).max(480).optional().default(7)
+  estimated_wait_time: Joi.number().integer().min(0).max(480).optional().default(7),
 });
 
 const queueActionSchema = Joi.object({
-  tokenId: Joi.string().uuid().required()
+  tokenId: Joi.string().uuid().required(),
 });
 
 const doctorIdSchema = Joi.object({
-  doctorId: Joi.string().uuid().required()
+  doctorId: Joi.string().uuid().required(),
 });
 
 const patientIdSchema = Joi.object({
-  patientId: Joi.string().uuid().required()
+  patientId: Joi.string().uuid().required(),
 });
 
 // ===============================================
@@ -30,11 +30,13 @@ const patientIdSchema = Joi.object({
 // ===============================================
 
 const queueStatusQuerySchema = Joi.object({
-  date: Joi.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional()
+  date: Joi.string()
+    .regex(/^\d{4}-\d{2}-\d{2}$/)
+    .optional(),
 });
 
 const patientQueueInfoQuerySchema = Joi.object({
-  doctorId: Joi.string().uuid().required()
+  doctorId: Joi.string().uuid().required(),
 });
 
 // ===============================================
@@ -42,15 +44,19 @@ const patientQueueInfoQuerySchema = Joi.object({
 // ===============================================
 
 const queueAnalyticsQuerySchema = Joi.object({
-  startDate: Joi.string().regex(/^\d{4}-\d{2}-\d{2}$/).required(),
-  endDate: Joi.string().regex(/^\d{4}-\d{2}-\d{2}$/).required()
+  startDate: Joi.string()
+    .regex(/^\d{4}-\d{2}-\d{2}$/)
+    .required(),
+  endDate: Joi.string()
+    .regex(/^\d{4}-\d{2}-\d{2}$/)
+    .required()
     .custom((value, helpers) => {
       const startDate = helpers.state.ancestors[0].startDate;
       if (startDate && new Date(value) < new Date(startDate)) {
         return helpers.error('any.invalid');
       }
       return value;
-    }, 'End date validation')
+    }, 'End date validation'),
 });
 
 // ===============================================
@@ -58,23 +64,31 @@ const queueAnalyticsQuerySchema = Joi.object({
 // ===============================================
 
 const bulkTokensSchema = Joi.object({
-  tokens: Joi.array().items(
-    Joi.object({
-      patient_id: Joi.string().uuid().required(),
-      doctor_id: Joi.string().uuid().required(),
-      appointment_id: Joi.string().uuid().optional(),
-      priority: Joi.number().integer().min(1).max(5).optional().default(1)
-    })
-  ).min(1).max(50).required()
+  tokens: Joi.array()
+    .items(
+      Joi.object({
+        patient_id: Joi.string().uuid().required(),
+        doctor_id: Joi.string().uuid().required(),
+        appointment_id: Joi.string().uuid().optional(),
+        priority: Joi.number().integer().min(1).max(5).optional().default(1),
+      })
+    )
+    .min(1)
+    .max(50)
+    .required(),
 });
 
 const bulkStatusUpdateSchema = Joi.object({
-  updates: Joi.array().items(
-    Joi.object({
-      tokenId: Joi.string().uuid().required(),
-      status: Joi.string().valid('serving', 'completed', 'missed', 'cancelled').required()
-    })
-  ).min(1).max(50).required()
+  updates: Joi.array()
+    .items(
+      Joi.object({
+        tokenId: Joi.string().uuid().required(),
+        status: Joi.string().valid('serving', 'completed', 'missed', 'cancelled').required(),
+      })
+    )
+    .min(1)
+    .max(50)
+    .required(),
 });
 
 // ===============================================
@@ -82,7 +96,9 @@ const bulkStatusUpdateSchema = Joi.object({
 // ===============================================
 
 const processAppointmentsSchema = Joi.object({
-  date: Joi.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional()
+  date: Joi.string()
+    .regex(/^\d{4}-\d{2}-\d{2}$/)
+    .optional(),
 });
 
 // ===============================================
@@ -90,12 +106,15 @@ const processAppointmentsSchema = Joi.object({
 // ===============================================
 
 const queueReorderSchema = Joi.object({
-  queueUpdates: Joi.array().items(
-    Joi.object({
-      tokenId: Joi.string().uuid().required(),
-      newPosition: Joi.number().integer().min(1).required()
-    })
-  ).min(1).required()
+  queueUpdates: Joi.array()
+    .items(
+      Joi.object({
+        tokenId: Joi.string().uuid().required(),
+        newPosition: Joi.number().integer().min(1).required(),
+      })
+    )
+    .min(1)
+    .required(),
 });
 
 // ===============================================
@@ -106,7 +125,7 @@ const emergencyTokenSchema = Joi.object({
   patient_id: Joi.string().uuid().required(),
   doctor_id: Joi.string().uuid().required(),
   emergency_reason: Joi.string().min(10).max(500).required(),
-  severity_level: Joi.string().valid('critical', 'urgent', 'semi-urgent').required()
+  severity_level: Joi.string().valid('critical', 'urgent', 'semi-urgent').required(),
 });
 
 // ===============================================
@@ -115,7 +134,7 @@ const emergencyTokenSchema = Joi.object({
 
 const waitTimeUpdateSchema = Joi.object({
   averageConsultationMinutes: Joi.number().integer().min(5).max(120).optional(),
-  breakTimeMinutes: Joi.number().integer().min(0).max(60).optional()
+  breakTimeMinutes: Joi.number().integer().min(0).max(60).optional(),
 });
 
 // ===============================================
@@ -125,7 +144,7 @@ const waitTimeUpdateSchema = Joi.object({
 const queueNotificationSchema = Joi.object({
   tokenId: Joi.string().uuid().required(),
   notificationType: Joi.string().valid('sms', 'email', 'push', 'all').required(),
-  message: Joi.string().min(10).max(160).optional()
+  message: Joi.string().min(10).max(160).optional(),
 });
 
 // ===============================================
@@ -133,10 +152,14 @@ const queueNotificationSchema = Joi.object({
 // ===============================================
 
 const queueExportQuerySchema = Joi.object({
-  startDate: Joi.string().regex(/^\d{4}-\d{2}-\d{2}$/).required(),
-  endDate: Joi.string().regex(/^\d{4}-\d{2}-\d{2}$/).required(),
+  startDate: Joi.string()
+    .regex(/^\d{4}-\d{2}-\d{2}$/)
+    .required(),
+  endDate: Joi.string()
+    .regex(/^\d{4}-\d{2}-\d{2}$/)
+    .required(),
   format: Joi.string().valid('json', 'csv', 'pdf').optional().default('json'),
-  includePatientDetails: Joi.boolean().optional().default(false)
+  includePatientDetails: Joi.boolean().optional().default(false),
 });
 
 // ===============================================

@@ -52,7 +52,7 @@ const ProfileSkeleton = () => (
 );
 
 const ProfileSummary = ({ data, lastVisit, loading, error, onRetry }) => {
-  const { t, i18n } = useTranslation();
+  const { t } = useTranslation();
 
   if (loading) {
     return <ProfileSkeleton />;

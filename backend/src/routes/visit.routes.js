@@ -137,7 +137,9 @@ router.post(
         result: 'success',
         ip: req.ip,
       });
-    } catch (e) {}
+    } catch (e) {
+      // Ignore audit log errors - don't fail the request if logging fails
+    }
 
     res.status(201).json({
       success: true,
@@ -178,7 +180,9 @@ router.put(
         meta: { changed_fields: Object.keys(updateData) },
         ip: req.ip,
       });
-    } catch (e) {}
+    } catch (e) {
+      // Ignore audit log errors - don't fail the request if logging fails
+    }
 
     res.status(200).json({
       success: true,
@@ -267,7 +271,9 @@ router.delete(
         result: 'success',
         ip: req.ip,
       });
-    } catch (e) {}
+    } catch (e) {
+      // Ignore audit log errors - don't fail the request if logging fails
+    }
 
     res.status(200).json({
       success: true,

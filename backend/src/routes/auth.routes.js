@@ -60,7 +60,9 @@ router.post(
           meta: { reason: err.message ? String(err.message).slice(0, 200) : 'unknown' },
           ip: req.ip,
         });
-      } catch (e) {}
+      } catch (e) {
+        // Ignore audit log errors - don't fail the request if logging fails
+      }
 
       throw err; // let asyncHandler handle response
     }
@@ -163,7 +165,9 @@ router.post(
         result: 'success',
         ip: req.ip,
       });
-    } catch (e) {}
+    } catch (e) {
+      // Ignore audit log errors - don't fail the request if logging fails
+    }
 
     res.status(200).json({
       success: true,
@@ -303,7 +307,9 @@ router.put(
         entity_id: req.params.userId,
         new_values: { is_active: false },
       });
-    } catch (e) {}
+    } catch (e) {
+      // Ignore audit log errors - don't fail the request if logging fails
+    }
 
     res.status(200).json({
       success: true,
@@ -334,7 +340,9 @@ router.put(
         entity_id: req.params.userId,
         new_values: { is_active: true },
       });
-    } catch (e) {}
+    } catch (e) {
+      // Ignore audit log errors - don't fail the request if logging fails
+    }
 
     res.status(200).json({
       success: true,
@@ -365,7 +373,9 @@ router.delete(
         entity_id: req.params.userId,
         new_values: { is_active: false },
       });
-    } catch (e) {}
+    } catch (e) {
+      // Ignore audit log errors - don't fail the request if logging fails
+    }
 
     res.status(200).json({
       success: true,

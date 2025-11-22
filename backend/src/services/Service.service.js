@@ -32,7 +32,14 @@ class ServiceService {
    */
   async getServicesByCategory(category) {
     try {
-      const validCategories = ['consultation', 'procedure', 'laboratory', 'imaging', 'pharmacy', 'other'];
+      const validCategories = [
+        'consultation',
+        'procedure',
+        'laboratory',
+        'imaging',
+        'pharmacy',
+        'other',
+      ];
       if (!validCategories.includes(category)) {
         throw new Error(`Invalid category. Must be one of: ${validCategories.join(', ')}`);
       }
@@ -66,7 +73,11 @@ class ServiceService {
   async searchServicesAdvanced(searchTerm, status = 'active', category) {
     try {
       const normalized = ['active', 'inactive', 'all'].includes(status) ? status : 'active';
-      return await ServiceModel.searchServicesWithFilters({ q: searchTerm || '', status: normalized, category });
+      return await ServiceModel.searchServicesWithFilters({
+        q: searchTerm || '',
+        status: normalized,
+        category,
+      });
     } catch (error) {
       throw new Error(`Failed to search services: ${error.message}`);
     }
@@ -95,11 +106,20 @@ class ServiceService {
       // Validate required fields
       const { service_code, service_name, category, default_price } = serviceData;
       if (!service_code || !service_name || !category || default_price === undefined) {
-        throw new Error('Missing required fields: service_code, service_name, category, default_price');
+        throw new Error(
+          'Missing required fields: service_code, service_name, category, default_price'
+        );
       }
 
       // Validate category
-      const validCategories = ['consultation', 'procedure', 'laboratory', 'imaging', 'pharmacy', 'other'];
+      const validCategories = [
+        'consultation',
+        'procedure',
+        'laboratory',
+        'imaging',
+        'pharmacy',
+        'other',
+      ];
       if (!validCategories.includes(category)) {
         throw new Error(`Invalid category. Must be one of: ${validCategories.join(', ')}`);
       }
@@ -123,7 +143,14 @@ class ServiceService {
     try {
       // Validate category if provided
       if (updates.category) {
-        const validCategories = ['consultation', 'procedure', 'laboratory', 'imaging', 'pharmacy', 'other'];
+        const validCategories = [
+          'consultation',
+          'procedure',
+          'laboratory',
+          'imaging',
+          'pharmacy',
+          'other',
+        ];
         if (!validCategories.includes(updates.category)) {
           throw new Error(`Invalid category. Must be one of: ${validCategories.join(', ')}`);
         }

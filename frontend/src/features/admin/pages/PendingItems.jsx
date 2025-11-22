@@ -1,11 +1,5 @@
 import { useEffect, useState, useMemo } from 'react';
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from '@/components/ui/card';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
 import {
@@ -367,9 +361,9 @@ const PendingItems = () => {
                       {row.issue ? (
                         <div className="flex items-start gap-2">
                           {row.issue.includes('Data inconsistency') ? (
-                            <AlertTriangle className="h-4 w-4 text-amber-500 mt-0.5 flex-shrink-0" />
+                            <AlertTriangle className="mt-0.5 h-4 w-4 flex-shrink-0 text-amber-500" />
                           ) : (
-                            <AlertCircle className="h-4 w-4 text-blue-500 mt-0.5 flex-shrink-0" />
+                            <AlertCircle className="mt-0.5 h-4 w-4 flex-shrink-0 text-blue-500" />
                           )}
                           <span className="text-sm text-muted-foreground">{row.issue}</span>
                         </div>

@@ -25,7 +25,7 @@ export async function logAuditEvent({
   patientId = null,
   result = null,
   meta = null,
-  note = null
+  note = null,
 }) {
   try {
     const insert = {
@@ -38,14 +38,14 @@ export async function logAuditEvent({
         ...(result && { result }),
         ...(patientId && { patient_id: patientId }),
         ...(meta && { meta }),
-        ...(note && { note })
+        ...(note && { note }),
       },
       user_id: actor_id || userId,
       actor_role: actor_role || role,
       status: status,
       reason: reason || note,
       ip_address: ip || null,
-      user_agent: userAgent || null
+      user_agent: userAgent || null,
     };
 
     const { error } = await supabase.from('audit_logs').insert(insert);
@@ -64,10 +64,14 @@ export async function seedDummyAuditLogs() {
   const samples = [
     { action: 'LOGIN_SUCCESS', role: 'doctor', note: 'seeded' },
     { action: 'VIEW', entity: 'patients', role: 'nurse', note: 'seeded' },
-    { action: 'CREATE', entity: 'visits', role: 'doctor', note: 'seeded' }
+    { action: 'CREATE', entity: 'visits', role: 'doctor', note: 'seeded' },
   ];
   for (const s of samples) {
-    try { await logAuditEvent(s); } catch (e) { /* ignore */ }
+    try {
+      await logAuditEvent(s);
+    } catch (e) {
+      /* ignore */
+    }
   }
 }
 

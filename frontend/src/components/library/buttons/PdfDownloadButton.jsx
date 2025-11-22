@@ -48,7 +48,6 @@ export function PdfDownloadButton({
       document.body.removeChild(link);
       window.URL.revokeObjectURL(url);
     } catch (error) {
-      // eslint-disable-next-line no-console
       logger.error('Failed to download PDF:', error);
       showError('Failed to download file. Please try again.');
     } finally {
@@ -57,7 +56,13 @@ export function PdfDownloadButton({
   };
 
   return (
-    <Button onClick={handleClick} size={size} variant={variant} className={className} disabled={downloading}>
+    <Button
+      onClick={handleClick}
+      size={size}
+      variant={variant}
+      className={className}
+      disabled={downloading}
+    >
       <Icon className="mr-1 h-4 w-4" />
       {downloading ? 'Downloading…' : label}
     </Button>
@@ -65,5 +70,3 @@ export function PdfDownloadButton({
 }
 
 export default PdfDownloadButton;
-
-

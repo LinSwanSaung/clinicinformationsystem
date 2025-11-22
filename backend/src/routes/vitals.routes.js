@@ -2,7 +2,6 @@ import express from 'express';
 import { authenticate, authorize } from '../middleware/auth.js';
 import { requireActiveVisit } from '../middleware/activeVisitCheck.js';
 import { asyncHandler } from '../middleware/errorHandler.js';
-import { ROLES } from '../constants/roles.js';
 import VitalsService from '../services/Vitals.service.js';
 
 const router = express.Router();

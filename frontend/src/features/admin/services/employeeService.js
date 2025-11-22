@@ -15,7 +15,7 @@ class EmployeeService {
       { value: 'nurse', label: 'Nurse' },
       { value: 'receptionist', label: 'Receptionist' },
       { value: 'cashier', label: 'Cashier' },
-      { value: 'pharmacist', label: 'Pharmacist' }
+      { value: 'pharmacist', label: 'Pharmacist' },
     ];
   }
 
@@ -26,13 +26,13 @@ class EmployeeService {
   async getAllEmployees(options = {}) {
     try {
       const response = await userService.getAllUsers(options);
-      
+
       if (response.success) {
         // Filter out patients - only return staff roles
         const staffRoles = ['admin', 'doctor', 'nurse', 'receptionist', 'cashier', 'pharmacist'];
         const data = response.data;
         if (Array.isArray(data)) {
-          const employeesOnly = data.filter(user => staffRoles.includes(user.role));
+          const employeesOnly = data.filter((user) => staffRoles.includes(user.role));
           return employeesOnly;
         } else {
           console.warn('Expected array but got:', typeof data, data);

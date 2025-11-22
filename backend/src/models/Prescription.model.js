@@ -32,7 +32,8 @@ class PrescriptionModel extends BaseModel {
   async getByPatientId(patientId, includeInactive = false) {
     let query = this.supabase
       .from(this.tableName)
-      .select(`
+      .select(
+        `
         *,
         doctor:users!doctor_id (
           id,
@@ -44,7 +45,8 @@ class PrescriptionModel extends BaseModel {
           visit_date,
           status
         )
-      `)
+      `
+      )
       .eq('patient_id', patientId)
       .order('prescribed_date', { ascending: false });
 
@@ -67,14 +69,16 @@ class PrescriptionModel extends BaseModel {
   async getByVisitId(visitId) {
     const { data, error } = await this.supabase
       .from(this.tableName)
-      .select(`
+      .select(
+        `
         *,
         doctor:users!doctor_id (
           id,
           first_name,
           last_name
         )
-      `)
+      `
+      )
       .eq('visit_id', visitId)
       .order('prescribed_date', { ascending: false });
 

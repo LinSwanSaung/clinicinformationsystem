@@ -20,8 +20,10 @@ class PaymentTransactionModel extends BaseModel {
       .eq('invoice_id', invoiceId)
       .order('received_at', { ascending: false });
 
-    if (error) throw error;
-    
+    if (error) {
+      throw error;
+    }
+
     // If no data, return empty array
     if (!data || data.length === 0) {
       return [];
@@ -38,15 +40,17 @@ class PaymentTransactionModel extends BaseModel {
     ];
 
     // Fetch users separately if we have any user IDs
-    let userMap = {};
+    const userMap = {};
     if (userIds.length > 0) {
       const { data: users, error: usersError } = await this.supabase
         .from('users')
         .select('id, first_name, last_name, role')
         .in('id', userIds);
 
-      if (usersError) throw usersError;
-      
+      if (usersError) {
+        throw usersError;
+      }
+
       // Create a map for quick lookup
       (users || []).forEach((user) => {
         userMap[user.id] = user;
@@ -67,7 +71,7 @@ class PaymentTransactionModel extends BaseModel {
    */
   async getRecentPaymentsByInvoice(invoiceId, timeWindowMs = 5000) {
     const timeWindow = new Date(Date.now() - timeWindowMs);
-    
+
     const { data, error } = await this.supabase
       .from(this.tableName)
       .select('id, amount, payment_method, received_by, received_at')
@@ -86,7 +90,14 @@ class PaymentTransactionModel extends BaseModel {
    * Atomically record payment using database function with advisory locks
    * This prevents race conditions when multiple payments are recorded simultaneously
    */
-  async recordPaymentAtomic(invoiceId, amount, paymentMethod, paymentReference, paymentNotes, receivedBy) {
+  async recordPaymentAtomic(
+    invoiceId,
+    amount,
+    paymentMethod,
+    paymentReference,
+    paymentNotes,
+    receivedBy
+  ) {
     try {
       const { data, error } = await this.supabase.rpc('record_payment_atomic', {
         p_invoice_id: invoiceId,
@@ -106,7 +117,7 @@ class PaymentTransactionModel extends BaseModel {
       }
 
       const result = data[0];
-      
+
       if (!result.success) {
         throw new Error(result.message || 'Failed to record payment');
       }
@@ -114,7 +125,7 @@ class PaymentTransactionModel extends BaseModel {
       // Parse JSONB data back to objects
       const paymentData = result.payment_data;
       const invoiceData = result.invoice_data;
-      
+
       return {
         success: true,
         message: result.message,
@@ -134,7 +145,9 @@ class PaymentTransactionModel extends BaseModel {
       .select()
       .single();
 
-    if (error) throw error;
+    if (error) {
+      throw error;
+    }
     return data;
   }
 
@@ -144,15 +157,19 @@ class PaymentTransactionModel extends BaseModel {
   async getPaymentById(id) {
     const { data, error } = await this.supabase
       .from(this.tableName)
-      .select(`
+      .select(
+        `
         *,
         invoice:invoices(id, invoice_number, patient_id),
         received_by_user:users(id, full_name, role)
-      `)
+      `
+      )
       .eq('id', id)
       .single();
 
-    if (error) throw error;
+    if (error) {
+      throw error;
+    }
     return data;
   }
 
@@ -162,16 +179,20 @@ class PaymentTransactionModel extends BaseModel {
   async getPaymentReport(startDate, endDate) {
     const { data, error } = await this.supabase
       .from(this.tableName)
-      .select(`
+      .select(
+        `
         *,
         invoice:invoices(id, invoice_number, patient_id),
         received_by_user:users(id, full_name, role)
-      `)
+      `
+      )
       .gte('received_at', startDate)
       .lte('received_at', endDate)
       .order('received_at', { ascending: false });
 
-    if (error) throw error;
+    if (error) {
+      throw error;
+    }
     return data;
   }
 
@@ -184,8 +205,10 @@ class PaymentTransactionModel extends BaseModel {
       .select('amount')
       .eq('invoice_id', invoiceId);
 
-    if (error) throw error;
-    
+    if (error) {
+      throw error;
+    }
+
     const total = data.reduce((sum, payment) => sum + parseFloat(payment.amount), 0);
     return total;
   }
@@ -195,10 +218,9 @@ class PaymentTransactionModel extends BaseModel {
    */
   async getAllTransactionsAdmin(filters) {
     const { start_date, end_date, payment_method, received_by, limit, offset } = filters;
-    
-    let query = this.supabase
-      .from(this.tableName)
-      .select(`
+
+    let query = this.supabase.from(this.tableName).select(
+      `
         *,
         invoice:invoices(
           id,
@@ -211,7 +233,9 @@ class PaymentTransactionModel extends BaseModel {
             patient_number
           )
         )
-      `, { count: 'exact' });
+      `,
+      { count: 'exact' }
+    );
 
     // Apply filters
     if (start_date) {
@@ -228,14 +252,14 @@ class PaymentTransactionModel extends BaseModel {
     }
 
     // Pagination
-    query = query
-      .order('received_at', { ascending: false })
-      .range(offset, offset + limit - 1);
+    query = query.order('received_at', { ascending: false }).range(offset, offset + limit - 1);
 
     const { data, error, count } = await query;
 
-    if (error) throw error;
-    
+    if (error) {
+      throw error;
+    }
+
     return { data, total: count };
   }
 }

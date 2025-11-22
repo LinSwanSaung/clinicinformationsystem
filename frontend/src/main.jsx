@@ -5,7 +5,6 @@ import App from './app/App.jsx';
 import ErrorBoundary from './components/layout/ErrorBoundary.jsx';
 import './i18n'; // Initialize i18n
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { useErrorModal } from './contexts/ErrorModalContext.jsx';
 
 // Configure React Query client with Stage 2 defaults
 function createQueryClient() {

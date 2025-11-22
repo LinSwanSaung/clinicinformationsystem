@@ -15,18 +15,16 @@ export class BaseModel {
    * Find all records with optional filtering
    */
   async findAll(options = {}) {
-    const { 
-      select = '*', 
-      filters = {}, 
-      orderBy = 'created_at', 
+    const {
+      select = '*',
+      filters = {},
+      orderBy = 'created_at',
       ascending = false,
       limit = 20,
-      offset = 0 
+      offset = 0,
     } = options;
 
-    let query = this.supabase
-      .from(this.tableName)
-      .select(select);
+    let query = this.supabase.from(this.tableName).select(select);
 
     // Apply filters
     Object.entries(filters).forEach(([key, value]) => {
@@ -73,9 +71,7 @@ export class BaseModel {
    * Find a single record by filters
    */
   async findOne(filters = {}, select = '*') {
-    let query = this.supabase
-      .from(this.tableName)
-      .select(select);
+    let query = this.supabase.from(this.tableName).select(select);
 
     Object.entries(filters).forEach(([key, value]) => {
       query = query.eq(key, value);
@@ -120,7 +116,7 @@ export class BaseModel {
   async updateById(id, data) {
     const updateData = {
       ...data,
-      updated_at: new Date().toISOString()
+      updated_at: new Date().toISOString(),
     };
 
     try {
@@ -152,10 +148,7 @@ export class BaseModel {
    * Delete a record by ID
    */
   async deleteById(id) {
-    const { error } = await this.supabase
-      .from(this.tableName)
-      .delete()
-      .eq('id', id);
+    const { error } = await this.supabase.from(this.tableName).delete().eq('id', id);
 
     if (error) {
       throw error;
@@ -168,9 +161,7 @@ export class BaseModel {
    * Count records with optional filters
    */
   async count(filters = {}) {
-    let query = this.supabase
-      .from(this.tableName)
-      .select('*', { count: 'exact', head: true });
+    let query = this.supabase.from(this.tableName).select('*', { count: 'exact', head: true });
 
     Object.entries(filters).forEach(([key, value]) => {
       if (value !== undefined && value !== null) {

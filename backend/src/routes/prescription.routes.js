@@ -1,7 +1,6 @@
 import express from 'express';
 import PrescriptionService from '../services/Prescription.service.js';
 import { asyncHandler } from '../middleware/errorHandler.js';
-import { ROLES } from '../constants/roles.js';
 import { authenticate, authorize } from '../middleware/auth.js';
 import { requireActiveVisit } from '../middleware/activeVisitCheck.js';
 import { logAuditEvent } from '../utils/auditLogger.js';
@@ -32,7 +31,9 @@ router.post(
         result: 'success',
         ip: req.ip,
       });
-    } catch (e) {}
+    } catch (e) {
+      // Ignore audit log errors - don't fail the request if logging fails
+    }
     res.status(201).json(result);
   })
 );
@@ -97,7 +98,9 @@ router.patch(
         meta: { status },
         ip: req.ip,
       });
-    } catch (e) {}
+    } catch (e) {
+      // Ignore audit log errors - don't fail the request if logging fails
+    }
     res.json(result);
   })
 );
@@ -124,7 +127,9 @@ router.delete(
         result: 'success',
         ip: req.ip,
       });
-    } catch (e) {}
+    } catch (e) {
+      // Ignore audit log errors - don't fail the request if logging fails
+    }
     res.json(result);
   })
 );

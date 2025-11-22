@@ -16,12 +16,11 @@ class VisitModel extends BaseModel {
   async getPatientVisitHistory(patientId, options = {}) {
     const { limit = 50, offset = 0, includeCompleted = true, includeInProgress = false } = options;
 
-    try {
-      // Build query
-      let query = this.supabase
-        .from(this.tableName)
-        .select(
-          `
+    // Build query
+    let query = this.supabase
+      .from(this.tableName)
+      .select(
+        `
           *,
           doctor:users!doctor_id (
             id,
@@ -35,42 +34,39 @@ class VisitModel extends BaseModel {
             reason_for_visit
           )
         `
-        )
-        .eq('patient_id', patientId);
+      )
+      .eq('patient_id', patientId);
 
-      // Filter by status based on options
-      // If includeInProgress is true, show all visits (no status filter)
-      // Otherwise, show only completed or in_progress based on includeCompleted flag
-      if (!includeInProgress) {
-        if (includeCompleted) {
-          // Show only completed visits
-          query = query.eq('status', 'completed');
-        } else {
-          // Show only in_progress visits
-          query = query.eq('status', 'in_progress');
-        }
+    // Filter by status based on options
+    // If includeInProgress is true, show all visits (no status filter)
+    // Otherwise, show only completed or in_progress based on includeCompleted flag
+    if (!includeInProgress) {
+      if (includeCompleted) {
+        // Show only completed visits
+        query = query.eq('status', 'completed');
+      } else {
+        // Show only in_progress visits
+        query = query.eq('status', 'in_progress');
       }
-
-      const { data: visits, error } = await query
-        .order('visit_date', { ascending: false })
-        .range(offset, offset + limit - 1);
-
-      if (error) {
-        logger.error(`[VISIT MODEL] ❌ Error fetching visits:`, error);
-        throw new Error(`Failed to fetch patient visit history: ${error.message}`);
-      }
-
-      // Enhance each visit with related data
-      const enhancedVisits = await Promise.all(
-        (visits || []).map(async (visit) => {
-          return await this.enhanceVisitWithRelatedData(visit);
-        })
-      );
-
-      return enhancedVisits;
-    } catch (error) {
-      throw error;
     }
+
+    const { data: visits, error } = await query
+      .order('visit_date', { ascending: false })
+      .range(offset, offset + limit - 1);
+
+    if (error) {
+      logger.error(`[VISIT MODEL] ❌ Error fetching visits:`, error);
+      throw new Error(`Failed to fetch patient visit history: ${error.message}`);
+    }
+
+    // Enhance each visit with related data
+    const enhancedVisits = await Promise.all(
+      (visits || []).map(async (visit) => {
+        return this.enhanceVisitWithRelatedData(visit);
+      })
+    );
+
+    return enhancedVisits;
   }
 
   /**
@@ -143,7 +139,7 @@ class VisitModel extends BaseModel {
   /**
    * Get allergies recorded during the visit
    */
-  async getVisitAllergies(visitId, visitDate) {
+  async getVisitAllergies(visitId, _visitDate) {
     try {
       const { data, error } = await this.supabase
         .from('patient_allergies')
@@ -176,7 +172,7 @@ class VisitModel extends BaseModel {
   /**
    * Get diagnoses recorded during the visit
    */
-  async getVisitDiagnoses(visitId, visitDate) {
+  async getVisitDiagnoses(visitId, _visitDate) {
     try {
       const { data, error } = await this.supabase
         .from('patient_diagnoses')
@@ -292,21 +288,16 @@ class VisitModel extends BaseModel {
    * Get services provided during the visit
    * Note: This assumes you'll add a visit_services table
    */
-  async getVisitServices(visitId) {
-    try {
-      // This is a placeholder - you may need to create this table
-      // For now, we'll return basic services based on visit type
-      return [
-        {
-          service_name: 'Consultation',
-          description: 'General medical consultation',
-          cost: 50.0,
-        },
-      ];
-    } catch (error) {
-      logger.error('Error in getVisitServices:', error);
-      return [];
-    }
+  async getVisitServices(_visitId) {
+    // This is a placeholder - you may need to create this table
+    // For now, we'll return basic services based on visit type
+    return [
+      {
+        service_name: 'Consultation',
+        description: 'General medical consultation',
+        cost: 50.0,
+      },
+    ];
   }
 
   /**
@@ -331,7 +322,9 @@ class VisitModel extends BaseModel {
    * Calculate total cost of services
    */
   calculateServicesTotal(services) {
-    if (!services || services.length === 0) return 0;
+    if (!services || services.length === 0) {
+      return 0;
+    }
 
     return services.reduce((total, service) => {
       return total + (parseFloat(service.cost) || 0);
@@ -342,11 +335,10 @@ class VisitModel extends BaseModel {
    * Get visit by ID with all related data
    */
   async getVisitWithDetails(visitId) {
-    try {
-      const { data: visit, error } = await this.supabase
-        .from(this.tableName)
-        .select(
-          `
+    const { data: visit, error } = await this.supabase
+      .from(this.tableName)
+      .select(
+        `
           *,
           doctor:users!doctor_id (
             id,
@@ -366,18 +358,15 @@ class VisitModel extends BaseModel {
             reason_for_visit
           )
         `
-        )
-        .eq('id', visitId)
-        .single();
+      )
+      .eq('id', visitId)
+      .single();
 
-      if (error) {
-        throw new Error(`Failed to fetch visit details: ${error.message}`);
-      }
-
-      return await this.enhanceVisitWithRelatedData(visit);
-    } catch (error) {
-      throw error;
+    if (error) {
+      throw new Error(`Failed to fetch visit details: ${error.message}`);
     }
+
+    return this.enhanceVisitWithRelatedData(visit);
   }
 
   /**
@@ -391,60 +380,55 @@ class VisitModel extends BaseModel {
    * @returns {Promise<Object>} Completed visit data
    */
   async completeVisit(visitId, completionData = {}) {
-    try {
-      const visit = await this.getVisitWithDetails(visitId);
+    const visit = await this.getVisitWithDetails(visitId);
 
-      // Idempotency check: if visit is already completed, return it
-      if (visit.status === 'completed') {
-        logger.debug(`[VISIT MODEL] Visit ${visitId} is already completed, returning existing data`);
-        return visit;
-      }
-
-      // Only allow completing visits that are in_progress
-      if (visit.status !== 'in_progress') {
-        throw new Error(
-          `Cannot complete visit with status '${visit.status}'. Only 'in_progress' visits can be completed.`
-        );
-      }
-
-      const consultationFee = this.calculateConsultationFee(visit);
-      const servicesTotal = this.calculateServicesTotal(visit.services);
-      const totalCost = consultationFee + servicesTotal;
-
-      const updateData = {
-        status: 'completed',
-        total_cost: totalCost,
-        payment_status: completionData.payment_status || visit.payment_status || 'pending',
-        ...completionData,
-        updated_at: new Date().toISOString(),
-      };
-
-      const { data, error } = await this.supabase
-        .from(this.tableName)
-        .update(updateData)
-        .eq('id', visitId)
-        .select()
-        .single();
-
-      if (error) {
-        throw new Error(`Failed to complete visit: ${error.message}`);
-      }
-
-      return data;
-    } catch (error) {
-      throw error;
+    // Idempotency check: if visit is already completed, return it
+    if (visit.status === 'completed') {
+      logger.debug(`[VISIT MODEL] Visit ${visitId} is already completed, returning existing data`);
+      return visit;
     }
+
+    // Only allow completing visits that are in_progress
+    if (visit.status !== 'in_progress') {
+      throw new Error(
+        `Cannot complete visit with status '${visit.status}'. Only 'in_progress' visits can be completed.`
+      );
+    }
+
+    const consultationFee = this.calculateConsultationFee(visit);
+    const servicesTotal = this.calculateServicesTotal(visit.services);
+    const totalCost = consultationFee + servicesTotal;
+
+    const updateData = {
+      status: 'completed',
+      total_cost: totalCost,
+      payment_status: completionData.payment_status || visit.payment_status || 'pending',
+      ...completionData,
+      updated_at: new Date().toISOString(),
+    };
+
+    const { data, error } = await this.supabase
+      .from(this.tableName)
+      .update(updateData)
+      .eq('id', visitId)
+      .select()
+      .single();
+
+    if (error) {
+      throw new Error(`Failed to complete visit: ${error.message}`);
+    }
+
+    return data;
   }
 
   /**
    * Find active visits for a patient within a date range
    */
   async getPatientActiveVisits(patientId, startDate, endDate) {
-    try {
-      const { data, error } = await this.supabase
-        .from(this.tableName)
-        .select(
-          `
+    const { data, error } = await this.supabase
+      .from(this.tableName)
+      .select(
+        `
           id,
           patient_id,
           doctor_id,
@@ -452,21 +436,18 @@ class VisitModel extends BaseModel {
           status,
           created_at
         `
-        )
-        .eq('patient_id', patientId)
-        .eq('status', 'in_progress')
-        .gte('visit_date', startDate.toISOString())
-        .lte('visit_date', endDate.toISOString())
-        .order('visit_date', { ascending: false });
+      )
+      .eq('patient_id', patientId)
+      .eq('status', 'in_progress')
+      .gte('visit_date', startDate.toISOString())
+      .lte('visit_date', endDate.toISOString())
+      .order('visit_date', { ascending: false });
 
-      if (error) {
-        throw new Error(`Failed to fetch active visits: ${error.message}`);
-      }
-
-      return data || [];
-    } catch (error) {
-      throw error;
+    if (error) {
+      throw new Error(`Failed to fetch active visits: ${error.message}`);
     }
+
+    return data || [];
   }
 
   /**
@@ -550,12 +531,11 @@ class VisitModel extends BaseModel {
    * Used for getting current visit vitals
    */
   async getPatientActiveVisit(patientId) {
-    try {
-      // Get visits with in_progress status
-      const { data: visits, error } = await this.supabase
-        .from(this.tableName)
-        .select(
-          `
+    // Get visits with in_progress status
+    const { data: visits, error } = await this.supabase
+      .from(this.tableName)
+      .select(
+        `
           id,
           patient_id,
           doctor_id,
@@ -563,50 +543,49 @@ class VisitModel extends BaseModel {
           status,
           created_at
         `
-        )
-        .eq('patient_id', patientId)
-        .eq('status', 'in_progress')
-        .order('visit_date', { ascending: false });
+      )
+      .eq('patient_id', patientId)
+      .eq('status', 'in_progress')
+      .order('visit_date', { ascending: false });
 
-      if (error) {
-        throw new Error(`Failed to fetch active visit: ${error.message}`);
-      }
-
-      if (!visits || visits.length === 0) {
-        return null;
-      }
-
-      // Check if any of these visits have a paid or partial_paid invoice
-      // If invoice is paid or partially paid, the visit MUST be completed
-      for (const visit of visits) {
-        const { data: invoices } = await this.supabase
-          .from('invoices')
-          .select('id, status')
-          .eq('visit_id', visit.id)
-          .in('status', ['paid', 'partial_paid'])
-          .limit(1);
-
-        // If no paid/partial_paid invoice found, this is a truly active visit
-        if (!invoices || invoices.length === 0) {
-          return visit;
-        }
-        
-        // If invoice is paid/partial_paid but visit is still in_progress, this is a data integrity issue
-        // Don't auto-complete - let admin handle via pending items page
-        // But don't block new visits - the invoice is paid, so visit should be considered "done" for blocking purposes
-        const invoiceStatus = invoices[0]?.status;
-        logger.warn(`[VISIT] Data integrity issue: Visit ${visit.id} has ${invoiceStatus} invoice but status is still in_progress. Will show in admin pending items.`);
-        
-        // Skip this visit - don't block new visits, but don't auto-complete either
-        // Admin will see this in pending items and can complete it manually
-        continue;
-      }
-
-      // All visits have paid invoices, so no active visit
-      return null;
-    } catch (error) {
-      throw error;
+    if (error) {
+      throw new Error(`Failed to fetch active visit: ${error.message}`);
     }
+
+    if (!visits || visits.length === 0) {
+      return null;
+    }
+
+    // Check if any of these visits have a paid or partial_paid invoice
+    // If invoice is paid or partially paid, the visit MUST be completed
+    for (const visit of visits) {
+      const { data: invoices } = await this.supabase
+        .from('invoices')
+        .select('id, status')
+        .eq('visit_id', visit.id)
+        .in('status', ['paid', 'partial_paid'])
+        .limit(1);
+
+      // If no paid/partial_paid invoice found, this is a truly active visit
+      if (!invoices || invoices.length === 0) {
+        return visit;
+      }
+
+      // If invoice is paid/partial_paid but visit is still in_progress, this is a data integrity issue
+      // Don't auto-complete - let admin handle via pending items page
+      // But don't block new visits - the invoice is paid, so visit should be considered "done" for blocking purposes
+      const invoiceStatus = invoices[0]?.status;
+      logger.warn(
+        `[VISIT] Data integrity issue: Visit ${visit.id} has ${invoiceStatus} invoice but status is still in_progress. Will show in admin pending items.`
+      );
+
+      // Skip this visit - don't block new visits, but don't auto-complete either
+      // Admin will see this in pending items and can complete it manually
+      continue;
+    }
+
+    // All visits have paid invoices, so no active visit
+    return null;
   }
 
   /**
@@ -614,22 +593,18 @@ class VisitModel extends BaseModel {
    * Used to prevent doctor deletion when they have active consultations
    */
   async getDoctorActiveVisits(doctorId) {
-    try {
-      const { data, error } = await this.supabase
-        .from(this.tableName)
-        .select('id, patient_id, visit_date, status')
-        .eq('doctor_id', doctorId)
-        .eq('status', 'in_progress')
-        .order('visit_date', { ascending: false });
+    const { data, error } = await this.supabase
+      .from(this.tableName)
+      .select('id, patient_id, visit_date, status')
+      .eq('doctor_id', doctorId)
+      .eq('status', 'in_progress')
+      .order('visit_date', { ascending: false });
 
-      if (error) {
-        throw new Error(`Failed to fetch doctor active visits: ${error.message}`);
-      }
-
-      return data || [];
-    } catch (error) {
-      throw error;
+    if (error) {
+      throw new Error(`Failed to fetch doctor active visits: ${error.message}`);
     }
+
+    return data || [];
   }
 }
 

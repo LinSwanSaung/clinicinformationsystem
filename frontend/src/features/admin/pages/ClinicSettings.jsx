@@ -1,16 +1,10 @@
 import { useEffect, useState } from 'react';
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from '@/components/ui/card';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Label } from '@/components/ui/label';
-import { Settings, Upload, Image as ImageIcon, Save } from 'lucide-react';
+import { Settings, Save } from 'lucide-react';
 import PageLayout from '@/components/layout/PageLayout';
 import clinicSettingsService from '@/services/clinicSettingsService';
 import { useFeedback } from '@/contexts/FeedbackContext';
@@ -186,7 +180,10 @@ const ClinicSettings = () => {
 
   if (loading) {
     return (
-      <PageLayout title="Clinic Settings" subtitle="Configure clinic information and operational settings">
+      <PageLayout
+        title="Clinic Settings"
+        subtitle="Configure clinic information and operational settings"
+      >
         <div className="flex items-center justify-center p-8">
           <div className="text-muted-foreground">Loading settings...</div>
         </div>
@@ -195,7 +192,10 @@ const ClinicSettings = () => {
   }
 
   return (
-    <PageLayout title="Clinic Settings" subtitle="Configure clinic information and operational settings">
+    <PageLayout
+      title="Clinic Settings"
+      subtitle="Configure clinic information and operational settings"
+    >
       <div className="space-y-6 p-8">
         <form onSubmit={handleSubmit} className="space-y-6">
           {/* Clinic Information Section */}
@@ -316,7 +316,8 @@ const ClinicSettings = () => {
                       )}
                     </div>
                     <p className="mt-1 text-xs text-muted-foreground">
-                      Upload QR code image for online payments (JPEG, PNG, GIF, or WebP). Max size: 5MB
+                      Upload QR code image for online payments (JPEG, PNG, GIF, or WebP). Max size:
+                      5MB
                     </p>
                   </div>
                   {qrCodePreview && (
@@ -398,7 +399,9 @@ const ClinicSettings = () => {
                 <Settings className="h-5 w-5" />
                 Currency Settings
               </CardTitle>
-              <CardDescription>Configure the currency used for billing and invoices</CardDescription>
+              <CardDescription>
+                Configure the currency used for billing and invoices
+              </CardDescription>
             </CardHeader>
             <CardContent className="space-y-6">
               {/* Currency Code */}
@@ -465,4 +468,3 @@ const ClinicSettings = () => {
 };
 
 export default ClinicSettings;
-

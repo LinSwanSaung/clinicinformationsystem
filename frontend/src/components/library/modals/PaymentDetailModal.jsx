@@ -20,7 +20,7 @@ export function PaymentDetailModal({
   invoice,
   onPay,
   isProcessing,
-  onDownloadReceipt, // reserved for future use; behavior unchanged today
+  onDownloadReceipt: _onDownloadReceipt, // reserved for future use; behavior unchanged today
   children,
 }) {
   // Prevent form auto-submission when invoice updates (e.g., after adding a service)
@@ -28,12 +28,13 @@ export function PaymentDetailModal({
   const handleSubmit = async (e) => {
     e.preventDefault();
     e.stopPropagation();
-    
+
     // Only call onPay if this is an explicit button click (not auto-submit from form changes)
     // Check if the event was triggered by a button click
-    const isButtonClick = e.nativeEvent?.submitter?.type === 'submit' || 
-                         e.target?.querySelector('button[type="submit"]:focus');
-    
+    const isButtonClick =
+      e.nativeEvent?.submitter?.type === 'submit' ||
+      e.target?.querySelector('button[type="submit"]:focus');
+
     if (isButtonClick && typeof onPay === 'function' && invoice?.id) {
       // This is an explicit button click - safe to call onPay
       onPay();
@@ -49,17 +50,13 @@ export function PaymentDetailModal({
       onSubmit={handleSubmit}
       isLoading={!!isProcessing}
       size="xl"
-      className="max-w-[95vw] max-h-[95vh] w-full h-full flex flex-col"
+      className="flex h-full max-h-[95vh] w-full max-w-[95vw] flex-col"
       submitDisabled={true} // Disable submit button - payment handled by button in children
       submitText="" // Hide submit button text
     >
-      <div className="overflow-y-auto flex-1">
-        {children}
-      </div>
+      <div className="flex-1 overflow-y-auto">{children}</div>
     </FormModal>
   );
 }
 
 export default PaymentDetailModal;
-
-

@@ -21,7 +21,10 @@ const upload = multer({
     if (allowedImageTypes.includes(file.mimetype)) {
       cb(null, true);
     } else {
-      cb(new Error('Invalid file type. Only image files (JPEG, PNG, GIF, WebP) are allowed.'), false);
+      cb(
+        new Error('Invalid file type. Only image files (JPEG, PNG, GIF, WebP) are allowed.'),
+        false
+      );
     }
   },
 });
@@ -47,105 +50,112 @@ router.get('/', authenticate, async (req, res) => {
 });
 
 // Update clinic settings (admin only)
-router.put('/', authenticate, authorize('admin'), asyncHandler(async (req, res) => {
-  const {
-    late_threshold_minutes,
-    consult_expected_minutes,
-    clinic_name,
-    clinic_logo_url,
-    clinic_phone,
-    clinic_email,
-    clinic_address,
-    currency_code,
-    currency_symbol,
-    payment_qr_code_url,
-  } = req.body;
+router.put(
+  '/',
+  authenticate,
+  authorize('admin'),
+  asyncHandler(async (req, res) => {
+    const {
+      late_threshold_minutes,
+      consult_expected_minutes,
+      clinic_name,
+      clinic_logo_url,
+      clinic_phone,
+      clinic_email,
+      clinic_address,
+      currency_code,
+      currency_symbol,
+      payment_qr_code_url,
+    } = req.body;
 
-  // Validate operational settings
-  if (
-    late_threshold_minutes !== undefined &&
-    (isNaN(late_threshold_minutes) || late_threshold_minutes < 1 || late_threshold_minutes > 30)
-  ) {
-    return res.status(400).json({
-      success: false,
-      message: 'Late threshold must be between 1 and 30 minutes',
-      timestamp: new Date().toISOString(),
-    });
-  }
-
-  if (
-    consult_expected_minutes !== undefined &&
-    (isNaN(consult_expected_minutes) || consult_expected_minutes < 5 || consult_expected_minutes > 60)
-  ) {
-    return res.status(400).json({
-      success: false,
-      message: 'Consultation duration must be between 5 and 60 minutes',
-      timestamp: new Date().toISOString(),
-    });
-  }
-
-  // Validate clinic name
-  if (clinic_name !== undefined && clinic_name !== null && clinic_name.length > 200) {
-    return res.status(400).json({
-      success: false,
-      message: 'Clinic name must be 200 characters or less',
-      timestamp: new Date().toISOString(),
-    });
-  }
-
-  // Validate email format if provided
-  if (clinic_email !== undefined && clinic_email !== null && clinic_email !== '') {
-    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-    if (!emailRegex.test(clinic_email)) {
+    // Validate operational settings
+    if (
+      late_threshold_minutes !== undefined &&
+      (isNaN(late_threshold_minutes) || late_threshold_minutes < 1 || late_threshold_minutes > 30)
+    ) {
       return res.status(400).json({
         success: false,
-        message: 'Invalid email format',
+        message: 'Late threshold must be between 1 and 30 minutes',
         timestamp: new Date().toISOString(),
       });
     }
-  }
 
-  // Build settings data object
-  const settingsData = {};
-  if (late_threshold_minutes !== undefined) {
-    settingsData.late_threshold_minutes = parseInt(late_threshold_minutes);
-  }
-  if (consult_expected_minutes !== undefined) {
-    settingsData.consult_expected_minutes = parseInt(consult_expected_minutes);
-  }
-  if (clinic_name !== undefined) {
-    settingsData.clinic_name = clinic_name || null;
-  }
-  if (clinic_logo_url !== undefined) {
-    settingsData.clinic_logo_url = clinic_logo_url || null;
-  }
-  if (clinic_phone !== undefined) {
-    settingsData.clinic_phone = clinic_phone || null;
-  }
-  if (clinic_email !== undefined) {
-    settingsData.clinic_email = clinic_email || null;
-  }
-  if (clinic_address !== undefined) {
-    settingsData.clinic_address = clinic_address || null;
-  }
-  if (currency_code !== undefined) {
-    settingsData.currency_code = currency_code || 'USD';
-  }
-  if (currency_symbol !== undefined) {
-    settingsData.currency_symbol = currency_symbol || '$';
-  }
-  if (payment_qr_code_url !== undefined) {
-    settingsData.payment_qr_code_url = payment_qr_code_url || null;
-  }
+    if (
+      consult_expected_minutes !== undefined &&
+      (isNaN(consult_expected_minutes) ||
+        consult_expected_minutes < 5 ||
+        consult_expected_minutes > 60)
+    ) {
+      return res.status(400).json({
+        success: false,
+        message: 'Consultation duration must be between 5 and 60 minutes',
+        timestamp: new Date().toISOString(),
+      });
+    }
 
-  const updatedSettings = await clinicSettingsService.updateSettings(settingsData);
-  res.status(200).json({
-    success: true,
-    message: 'Clinic settings updated successfully',
-    data: updatedSettings,
-    timestamp: new Date().toISOString(),
-  });
-}));
+    // Validate clinic name
+    if (clinic_name !== undefined && clinic_name !== null && clinic_name.length > 200) {
+      return res.status(400).json({
+        success: false,
+        message: 'Clinic name must be 200 characters or less',
+        timestamp: new Date().toISOString(),
+      });
+    }
+
+    // Validate email format if provided
+    if (clinic_email !== undefined && clinic_email !== null && clinic_email !== '') {
+      const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+      if (!emailRegex.test(clinic_email)) {
+        return res.status(400).json({
+          success: false,
+          message: 'Invalid email format',
+          timestamp: new Date().toISOString(),
+        });
+      }
+    }
+
+    // Build settings data object
+    const settingsData = {};
+    if (late_threshold_minutes !== undefined) {
+      settingsData.late_threshold_minutes = parseInt(late_threshold_minutes);
+    }
+    if (consult_expected_minutes !== undefined) {
+      settingsData.consult_expected_minutes = parseInt(consult_expected_minutes);
+    }
+    if (clinic_name !== undefined) {
+      settingsData.clinic_name = clinic_name || null;
+    }
+    if (clinic_logo_url !== undefined) {
+      settingsData.clinic_logo_url = clinic_logo_url || null;
+    }
+    if (clinic_phone !== undefined) {
+      settingsData.clinic_phone = clinic_phone || null;
+    }
+    if (clinic_email !== undefined) {
+      settingsData.clinic_email = clinic_email || null;
+    }
+    if (clinic_address !== undefined) {
+      settingsData.clinic_address = clinic_address || null;
+    }
+    if (currency_code !== undefined) {
+      settingsData.currency_code = currency_code || 'USD';
+    }
+    if (currency_symbol !== undefined) {
+      settingsData.currency_symbol = currency_symbol || '$';
+    }
+    if (payment_qr_code_url !== undefined) {
+      settingsData.payment_qr_code_url = payment_qr_code_url || null;
+    }
+
+    const updatedSettings = await clinicSettingsService.updateSettings(settingsData);
+    res.status(200).json({
+      success: true,
+      message: 'Clinic settings updated successfully',
+      data: updatedSettings,
+      timestamp: new Date().toISOString(),
+    });
+  })
+);
 
 // Get specific consultation duration
 router.get('/consultation-duration', authenticate, async (req, res) => {

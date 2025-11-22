@@ -18,7 +18,9 @@ class NotificationModel extends BaseModel {
       .select()
       .single();
 
-    if (error) throw error;
+    if (error) {
+      throw error;
+    }
     return data;
   }
 
@@ -33,7 +35,9 @@ class NotificationModel extends BaseModel {
       .order('created_at', { ascending: false })
       .limit(limit);
 
-    if (error) throw error;
+    if (error) {
+      throw error;
+    }
     return data;
   }
 
@@ -47,7 +51,9 @@ class NotificationModel extends BaseModel {
       .eq('user_id', userId)
       .eq('is_read', false);
 
-    if (error) throw error;
+    if (error) {
+      throw error;
+    }
     return count;
   }
 
@@ -57,15 +63,17 @@ class NotificationModel extends BaseModel {
   async markAsRead(notificationId) {
     const { data, error } = await this.supabase
       .from(this.tableName)
-      .update({ 
+      .update({
         is_read: true,
-        read_at: new Date().toISOString()
+        read_at: new Date().toISOString(),
       })
       .eq('id', notificationId)
       .select()
       .single();
 
-    if (error) throw error;
+    if (error) {
+      throw error;
+    }
     return data;
   }
 
@@ -75,15 +83,17 @@ class NotificationModel extends BaseModel {
   async markAllAsRead(userId) {
     const { data, error } = await this.supabase
       .from(this.tableName)
-      .update({ 
+      .update({
         is_read: true,
-        read_at: new Date().toISOString()
+        read_at: new Date().toISOString(),
       })
       .eq('user_id', userId)
       .eq('is_read', false)
       .select();
 
-    if (error) throw error;
+    if (error) {
+      throw error;
+    }
     return data;
   }
 
@@ -91,12 +101,11 @@ class NotificationModel extends BaseModel {
    * Delete a notification
    */
   async deleteNotification(notificationId) {
-    const { error } = await this.supabase
-      .from(this.tableName)
-      .delete()
-      .eq('id', notificationId);
+    const { error } = await this.supabase.from(this.tableName).delete().eq('id', notificationId);
 
-    if (error) throw error;
+    if (error) {
+      throw error;
+    }
     return true;
   }
 }

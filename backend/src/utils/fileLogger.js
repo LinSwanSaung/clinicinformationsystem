@@ -1,7 +1,7 @@
 import fs from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
-import logger from '../config/logger.js';
+import mainLogger from '../config/logger.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -31,19 +31,19 @@ export const logToFile = (level, event, context = {}) => {
       timestamp,
       level,
       event,
-      ...context
+      ...context,
     };
 
     // Format as single-line JSON for easy parsing
     const logLine = JSON.stringify(logEntry) + '\n';
-    
+
     // Append to today's log file
     fs.appendFileSync(getLogFilename(), logLine);
-    
+
     // Also log using main logger for consistency
-    logger.info(`[FILE_LOG ${level}] ${event}`, context);
+    mainLogger.info(`[FILE_LOG ${level}] ${event}`, context);
   } catch (error) {
-    logger.error('Failed to write log:', error);
+    mainLogger.error('Failed to write log:', error);
   }
 };
 
@@ -54,7 +54,7 @@ export const logger = {
   info: (event, context) => logToFile('INFO', event, context),
   warn: (event, context) => logToFile('WARN', event, context),
   error: (event, context) => logToFile('ERROR', event, context),
-  debug: (event, context) => logToFile('DEBUG', event, context)
+  debug: (event, context) => logToFile('DEBUG', event, context),
 };
 
 export default logger;

@@ -45,7 +45,9 @@ export const authenticate = asyncHandler(async (req, res, next) => {
       decoded = jwt.verify(token, config.jwt.secret);
     } catch (primaryError) {
       const supabaseSecret = process.env.SUPABASE_JWT_SECRET;
-      if (!supabaseSecret) throw primaryError;
+      if (!supabaseSecret) {
+        throw primaryError;
+      }
       decoded = jwt.verify(token, supabaseSecret);
     }
 
@@ -55,11 +57,11 @@ export const authenticate = asyncHandler(async (req, res, next) => {
     try {
       const result = await executeWithRetry(
         async () => {
-          return await supabase
-      .from('users')
-      .select('id, email, role, first_name, last_name, is_active, patient_id')
-      .eq('id', userId)
-      .single();
+          return supabase
+            .from('users')
+            .select('id, email, role, first_name, last_name, is_active, patient_id')
+            .eq('id', userId)
+            .single();
         },
         2, // 2 retries
         'User authentication lookup'
@@ -69,12 +71,14 @@ export const authenticate = asyncHandler(async (req, res, next) => {
     } catch (networkError) {
       // Handle network connectivity issues (e.g., VPN blocking Supabase)
       const errMsg = networkError?.message?.toLowerCase() || '';
-      if (errMsg.includes('fetch failed') || 
-          errMsg.includes('network') || 
-          errMsg.includes('timeout') ||
-          errMsg.includes('econnrefused') ||
-          errMsg.includes('enotfound') ||
-          errMsg.includes('abort')) {
+      if (
+        errMsg.includes('fetch failed') ||
+        errMsg.includes('network') ||
+        errMsg.includes('timeout') ||
+        errMsg.includes('econnrefused') ||
+        errMsg.includes('enotfound') ||
+        errMsg.includes('abort')
+      ) {
         throw new AppError(
           'Database connection failed. Please check your network connection or try disabling VPN.',
           503

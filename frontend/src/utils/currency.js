@@ -1,5 +1,4 @@
 import clinicSettingsService from '@/services/clinicSettingsService';
-import logger from '@/utils/logger';
 
 // Cache for currency settings
 let currencyCache = {
@@ -64,14 +63,14 @@ export async function formatCurrency(amount, options = {}) {
   }
 
   const { currency_symbol } = await loadCurrencySettings();
-  const { 
-    showSymbol = true, 
-    decimals = 2, 
-    symbolPosition = 'before' // 'before' or 'after'
+  const {
+    showSymbol = true,
+    decimals = 2,
+    symbolPosition = 'before', // 'before' or 'after'
   } = options;
 
   const formattedAmount = parseFloat(amount).toFixed(decimals);
-  
+
   if (showSymbol) {
     if (symbolPosition === 'after') {
       return `${formattedAmount} ${currency_symbol}`;
@@ -96,14 +95,10 @@ export function formatCurrencySync(amount, options = {}) {
   }
 
   const { currency_symbol } = currencyCache;
-  const { 
-    showSymbol = true, 
-    decimals = 2, 
-    symbolPosition = 'before'
-  } = options;
+  const { showSymbol = true, decimals = 2, symbolPosition = 'before' } = options;
 
   const formattedAmount = parseFloat(amount).toFixed(decimals);
-  
+
   if (showSymbol) {
     if (symbolPosition === 'after') {
       return `${formattedAmount} ${currency_symbol}`;
@@ -157,4 +152,3 @@ export async function initCurrencyCache() {
     // Currency will be loaded when first needed
   }
 }
-

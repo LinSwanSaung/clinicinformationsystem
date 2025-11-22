@@ -112,7 +112,7 @@ const corsOptions = {
     if (allowedOrigins.includes(origin)) {
       return callback(null, true);
     }
-    
+
     // Reject if none of the above conditions matched
     callback(new Error('Not allowed by CORS'));
   },

@@ -1,39 +1,39 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { useTranslation } from "react-i18next";
-import { Card } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
-import { Sparkles, RefreshCw, AlertCircle, Heart, PartyPopper } from "lucide-react";
-import ReactMarkdown from "react-markdown";
+import { useTranslation } from 'react-i18next';
+import { Card } from '@/components/ui/card';
+import { Button } from '@/components/ui/button';
+import { Sparkles, RefreshCw, AlertCircle, Heart, PartyPopper } from 'lucide-react';
+import ReactMarkdown from 'react-markdown';
 import api from '@/services/api';
 import logger from '@/utils/logger';
 
 const TYPE_EMOJI = {
-  "diagnosis-based": "🩺",
-  wellness: "🌿",
-  nutrition: "🥗",
-  movement: "🏃",
-  default: "✨"
+  'diagnosis-based': '🩺',
+  wellness: '🌿',
+  nutrition: '🥗',
+  movement: '🏃',
+  default: '✨',
 };
 
 const typeKey = (type) => {
   switch (type) {
-    case "diagnosis-based":
-      return "diagnosis";
-    case "nutrition":
-      return "nutrition";
-    case "movement":
-      return "movement";
-    case "wellness":
-      return "wellness";
+    case 'diagnosis-based':
+      return 'diagnosis';
+    case 'nutrition':
+      return 'nutrition';
+    case 'movement':
+      return 'movement';
+    case 'wellness':
+      return 'wellness';
     default:
-      return "default";
+      return 'default';
   }
 };
 
 const AIHealthBlog = ({ patientId, language }) => {
   const { t, i18n } = useTranslation();
-  const activeLanguage = (language || i18n.language || "en").toLowerCase();
-  const locale = activeLanguage === "my" ? "my-MM" : undefined;
+  const activeLanguage = (language || i18n.language || 'en').toLowerCase();
+  const locale = activeLanguage === 'my' ? 'my-MM' : undefined;
 
   const [healthAdvice, setHealthAdvice] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -53,17 +53,20 @@ const AIHealthBlog = ({ patientId, language }) => {
 
         logger.debug('[AIHealthBlog] Fetching health advice with language:', activeLanguage);
         const result = await api.get(`/ai/health-advice/${patientId}`, {
-          params: { lang: activeLanguage }
+          params: { lang: activeLanguage },
         });
-        logger.debug('[AIHealthBlog] Received health advice:', { type: result?.data?.type, hasContent: !!result?.data?.content });
+        logger.debug('[AIHealthBlog] Received health advice:', {
+          type: result?.data?.type,
+          hasContent: !!result?.data?.content,
+        });
 
         if (!result?.success) {
-          throw new Error(result?.message || "Failed to fetch health advice");
+          throw new Error(result?.message || 'Failed to fetch health advice');
         }
 
         setHealthAdvice(result.data);
       } catch (err) {
-        setError(err.message || "Unable to load health tips right now.");
+        setError(err.message || 'Unable to load health tips right now.');
       } finally {
         setLoading(false);
         setRefreshing(false);
@@ -83,13 +86,13 @@ const AIHealthBlog = ({ patientId, language }) => {
     if (!healthAdvice) {
       return {
         emoji: TYPE_EMOJI.default,
-        label: t("patient.aiHealth.meta.default")
+        label: t('patient.aiHealth.meta.default'),
       };
     }
     const key = typeKey(healthAdvice.type);
     return {
       emoji: TYPE_EMOJI[healthAdvice.type] || TYPE_EMOJI.default,
-      label: t(`patient.aiHealth.meta.${key}`)
+      label: t(`patient.aiHealth.meta.${key}`),
     };
   }, [healthAdvice, t]);
 
@@ -98,33 +101,35 @@ const AIHealthBlog = ({ patientId, language }) => {
   if (loading) {
     return (
       <Card className="p-6">
-        <div className="flex items-center space-x-3 mb-4">
-          <Sparkles className="h-6 w-6 text-purple-500 animate-pulse" />
-          <h2 className="text-xl font-bold">{t("patient.aiHealth.title")}</h2>
+        <div className="mb-4 flex items-center space-x-3">
+          <Sparkles className="h-6 w-6 animate-pulse text-purple-500" />
+          <h2 className="text-xl font-bold">{t('patient.aiHealth.title')}</h2>
         </div>
         <div className="space-y-3">
-          <div className="h-4 bg-gray-200 rounded animate-pulse w-3/4" />
-          <div className="h-4 bg-gray-200 rounded animate-pulse w-full" />
-          <div className="h-4 bg-gray-200 rounded animate-pulse w-5/6" />
-          <div className="h-4 bg-gray-200 rounded animate-pulse w-full" />
-          <div className="h-4 bg-gray-200 rounded animate-pulse w-2/3" />
+          <div className="h-4 w-3/4 animate-pulse rounded bg-gray-200" />
+          <div className="h-4 w-full animate-pulse rounded bg-gray-200" />
+          <div className="h-4 w-5/6 animate-pulse rounded bg-gray-200" />
+          <div className="h-4 w-full animate-pulse rounded bg-gray-200" />
+          <div className="h-4 w-2/3 animate-pulse rounded bg-gray-200" />
         </div>
-        <p className="text-sm text-gray-500 mt-4 text-center">{t("patient.aiHealth.loading")}</p>
+        <p className="mt-4 text-center text-sm text-gray-500">{t('patient.aiHealth.loading')}</p>
       </Card>
     );
   }
 
   if (error) {
     return (
-      <Card className="p-6 border-red-200 bg-red-50">
+      <Card className="border-red-200 bg-red-50 p-6">
         <div className="flex items-start space-x-3">
-          <AlertCircle className="h-6 w-6 text-red-500 flex-shrink-0 mt-1" />
+          <AlertCircle className="mt-1 h-6 w-6 flex-shrink-0 text-red-500" />
           <div className="flex-1">
-            <h2 className="text-xl font-bold text-red-900 mb-2">{t("patient.aiHealth.errorTitle")}</h2>
-            <p className="text-red-700 mb-4">{error}</p>
+            <h2 className="mb-2 text-xl font-bold text-red-900">
+              {t('patient.aiHealth.errorTitle')}
+            </h2>
+            <p className="mb-4 text-red-700">{error}</p>
             <Button onClick={handleRefresh} variant="outline" size="sm">
-              <RefreshCw className="h-4 w-4 mr-2" />
-              {t("patient.aiHealth.errorCta")}
+              <RefreshCw className="mr-2 h-4 w-4" />
+              {t('patient.aiHealth.errorCta')}
             </Button>
           </div>
         </div>
@@ -137,22 +142,23 @@ const AIHealthBlog = ({ patientId, language }) => {
   }
 
   return (
-    <Card className="p-6 bg-gradient-to-br from-purple-50 to-blue-50 border-purple-200">
-      <div className="flex items-start justify-between mb-4">
+    <Card className="border-purple-200 bg-gradient-to-br from-purple-50 to-blue-50 p-6">
+      <div className="mb-4 flex items-start justify-between">
         <div className="flex items-center space-x-3">
-          <div className="p-2 bg-purple-100 rounded-lg">
+          <div className="rounded-lg bg-purple-100 p-2">
             <Sparkles className="h-6 w-6 text-purple-600" />
           </div>
           <div>
-            <h2 className="text-xl font-bold text-gray-900 flex items-center gap-2">
-              {t("patient.aiHealth.title")}
+            <h2 className="flex items-center gap-2 text-xl font-bold text-gray-900">
+              {t('patient.aiHealth.title')}
               <span className="inline-flex items-center gap-1 rounded-full bg-purple-100 px-2.5 py-1 text-xs font-semibold text-purple-700">
                 {meta.emoji} {meta.label}
               </span>
             </h2>
-            {healthAdvice.type === "diagnosis-based" && healthAdvice.diagnosis && (
-              <p className="text-sm text-gray-600 flex flex-wrap items-center gap-1">
-                {t("patient.aiHealth.diagnosisPrefix")} <span className="font-semibold">{healthAdvice.diagnosis}</span>
+            {healthAdvice.type === 'diagnosis-based' && healthAdvice.diagnosis && (
+              <p className="flex flex-wrap items-center gap-1 text-sm text-gray-600">
+                {t('patient.aiHealth.diagnosisPrefix')}{' '}
+                <span className="font-semibold">{healthAdvice.diagnosis}</span>
                 {healthAdvice.diagnosedDate && (
                   <>
                     <span className="text-gray-400">•</span>
@@ -163,9 +169,9 @@ const AIHealthBlog = ({ patientId, language }) => {
                 )}
               </p>
             )}
-            {healthAdvice.type === "wellness" && (
-              <p className="text-sm text-gray-600 flex items-center">
-                <Heart className="h-4 w-4 mr-1 text-pink-500" />
+            {healthAdvice.type === 'wellness' && (
+              <p className="flex items-center text-sm text-gray-600">
+                <Heart className="mr-1 h-4 w-4 text-pink-500" />
                 {meta.label}
               </p>
             )}
@@ -176,37 +182,51 @@ const AIHealthBlog = ({ patientId, language }) => {
           variant="ghost"
           size="sm"
           disabled={refreshing}
-          className="text-purple-600 hover:text-purple-700 hover:bg-purple-100"
+          className="text-purple-600 hover:bg-purple-100 hover:text-purple-700"
         >
-          <RefreshCw className={`h-4 w-4 ${refreshing ? "animate-spin" : ""}`} />
+          <RefreshCw className={`h-4 w-4 ${refreshing ? 'animate-spin' : ''}`} />
         </Button>
       </div>
 
       <div className="prose prose-sm max-w-none">
-        <div className="bg-white rounded-lg p-5 shadow-sm border border-purple-100 space-y-4">
+        <div className="space-y-4 rounded-lg border border-purple-100 bg-white p-5 shadow-sm">
           <div className="flex items-start gap-3">
-            <PartyPopper className="h-5 w-5 text-amber-500 mt-0.5" />
+            <PartyPopper className="mt-0.5 h-5 w-5 text-amber-500" />
             <div>
               <p className="text-sm font-semibold text-gray-800">
-                {t("patient.aiHealth.introTitle")}
+                {t('patient.aiHealth.introTitle')}
               </p>
-              <p className="text-sm text-gray-600">
-                {t("patient.aiHealth.introBody")}
-              </p>
+              <p className="text-sm text-gray-600">{t('patient.aiHealth.introBody')}</p>
             </div>
           </div>
 
           <ReactMarkdown
             components={{
-              h1: (props) => <h1 className="text-lg font-bold text-gray-900 mb-2 mt-4 first:mt-0" {...props} />,
-              h2: (props) => <h2 className="text-base font-semibold text-gray-800 mb-2 mt-3" {...props} />,
-              h3: (props) => <h3 className="text-sm font-semibold text-gray-700 mb-1 mt-2" {...props} />,
-              p: (props) => <p className="text-sm text-gray-700 mb-2 leading-relaxed" {...props} />,
-              ul: (props) => <ul className="list-disc list-inside text-sm text-gray-700 space-y-1 mb-2" {...props} />,
-              ol: (props) => <ol className="list-decimal list-inside text-sm text-gray-700 space-y-1 mb-2" {...props} />,
+              h1: (props) => (
+                <h1 className="mb-2 mt-4 text-lg font-bold text-gray-900 first:mt-0" {...props} />
+              ),
+              h2: (props) => (
+                <h2 className="mb-2 mt-3 text-base font-semibold text-gray-800" {...props} />
+              ),
+              h3: (props) => (
+                <h3 className="mb-1 mt-2 text-sm font-semibold text-gray-700" {...props} />
+              ),
+              p: (props) => <p className="mb-2 text-sm leading-relaxed text-gray-700" {...props} />,
+              ul: (props) => (
+                <ul
+                  className="mb-2 list-inside list-disc space-y-1 text-sm text-gray-700"
+                  {...props}
+                />
+              ),
+              ol: (props) => (
+                <ol
+                  className="mb-2 list-inside list-decimal space-y-1 text-sm text-gray-700"
+                  {...props}
+                />
+              ),
               li: (props) => <li className="ml-2" {...props} />,
               strong: (props) => <strong className="font-semibold text-gray-900" {...props} />,
-              em: (props) => <em className="italic text-gray-600" {...props} />
+              em: (props) => <em className="italic text-gray-600" {...props} />,
             }}
           >
             {healthAdvice.content}
@@ -214,15 +234,16 @@ const AIHealthBlog = ({ patientId, language }) => {
         </div>
       </div>
 
-      <div className="mt-4 p-3 bg-yellow-50 border border-yellow-200 rounded-lg">
-        <p className="text-xs text-yellow-800 leading-relaxed">
-          {t("patient.aiHealth.disclaimer")}
+      <div className="mt-4 rounded-lg border border-yellow-200 bg-yellow-50 p-3">
+        <p className="text-xs leading-relaxed text-yellow-800">
+          {t('patient.aiHealth.disclaimer')}
         </p>
       </div>
 
       {healthAdvice.generatedAt && (
-        <p className="text-xs text-gray-500 mt-3 text-right">
-          {t("patient.aiHealth.generatedAt")}: {new Date(healthAdvice.generatedAt).toLocaleString(locale)}
+        <p className="mt-3 text-right text-xs text-gray-500">
+          {t('patient.aiHealth.generatedAt')}:{' '}
+          {new Date(healthAdvice.generatedAt).toLocaleString(locale)}
         </p>
       )}
     </Card>

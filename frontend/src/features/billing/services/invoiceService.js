@@ -51,7 +51,9 @@ const invoiceService = {
 
   // Add prescriptions to invoice
   addPrescriptionsToInvoice: async (invoiceId, visitId) => {
-    const response = await apiService.post(`/invoices/${invoiceId}/prescriptions`, { visit_id: visitId });
+    const response = await apiService.post(`/invoices/${invoiceId}/prescriptions`, {
+      visit_id: visitId,
+    });
     return response.data;
   },
 
@@ -71,14 +73,16 @@ const invoiceService = {
   updateDiscount: async (invoiceId, discountAmount, discountPercentage = 0) => {
     const response = await apiService.put(`/invoices/${invoiceId}/discount`, {
       discount_amount: discountAmount,
-      discount_percentage: discountPercentage
+      discount_percentage: discountPercentage,
     });
     return response.data;
   },
 
   // Complete invoice
   completeInvoice: async (invoiceId, completedBy) => {
-    const response = await apiService.put(`/invoices/${invoiceId}/complete`, { completed_by: completedBy });
+    const response = await apiService.put(`/invoices/${invoiceId}/complete`, {
+      completed_by: completedBy,
+    });
     return response.data;
   },
 
@@ -88,7 +92,7 @@ const invoiceService = {
       invoice_id: invoiceId,
       amount: paymentData.amount || paymentData.amount_paid,
       payment_method: paymentData.payment_method,
-      payment_notes: paymentData.payment_notes || paymentData.notes
+      payment_notes: paymentData.payment_notes || paymentData.notes,
     });
     return response.data;
   },

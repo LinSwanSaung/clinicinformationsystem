@@ -4,12 +4,12 @@ import { Card } from '@/components/ui/card';
 
 /**
  * AlertModal - Modal dialog for displaying alert messages
- * 
+ *
  * This is a modal-style alert (full-screen overlay), not an inline banner.
  * For inline alerts, use @/components/ui/alert instead.
- * 
+ *
  * Similar to ConfirmDialog but simpler - just displays a message with close/confirm options.
- * 
+ *
  * @param {string} title - Alert title (optional, defaults based on type)
  * @param {string} message - Alert message
  * @param {string} type - Alert type: 'success', 'error', 'warning'
@@ -17,10 +17,18 @@ import { Card } from '@/components/ui/card';
  * @param {Function} onConfirm - Confirm handler (optional)
  * @param {boolean} showConfirm - Show confirm button (optional)
  */
-export function AlertModal({ title, message, type = 'success', onClose, onConfirm, showConfirm = false }) {
+export function AlertModal({
+  title,
+  message,
+  type = 'success',
+  onClose,
+  onConfirm,
+  showConfirm = false,
+}) {
   // If no title provided, use default based on type
-  const defaultTitle = title || (type === 'success' ? 'Success' : type === 'error' ? 'Error' : 'Warning');
-  
+  const defaultTitle =
+    title || (type === 'success' ? 'Success' : type === 'error' ? 'Error' : 'Warning');
+
   const alertStyles = {
     success: {
       icon: <CheckCircle2 className="h-6 w-6 text-green-500" />,
@@ -74,4 +82,3 @@ export function AlertModal({ title, message, type = 'success', onClose, onConfir
 }
 
 export default AlertModal;
-

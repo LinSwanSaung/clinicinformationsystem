@@ -12,7 +12,7 @@ class ClinicSettingsService {
     try {
       // Get the global settings (there should only be one row with key='global')
       const settings = await this.model.findOne({ key: 'global' });
-      
+
       if (!settings) {
         // If no settings exist, create default ones
         const defaultSettings = {
@@ -27,13 +27,13 @@ class ClinicSettingsService {
           currency_code: 'USD',
           currency_symbol: '$',
           payment_qr_code_url: null,
-          updated_at: new Date()
+          updated_at: new Date(),
         };
-        
+
         const created = await this.model.create(defaultSettings);
         return created;
       }
-      
+
       return settings;
     } catch (error) {
       logger.error('Error in ClinicSettingsService.getSettings:', error);
@@ -47,12 +47,12 @@ class ClinicSettingsService {
       const updatedSettings = {
         ...settingsData,
         key: 'global', // Ensure we're always updating the global settings
-        updated_at: new Date().toISOString()
+        updated_at: new Date().toISOString(),
       };
 
       // Check if settings exist
       const existing = await this.model.findOne({ key: 'global' });
-      
+
       if (existing) {
         // Update existing settings using Supabase directly (since primary key is 'key', not 'id')
         const { data: updated, error } = await supabase
@@ -129,7 +129,7 @@ class ClinicSettingsService {
       const uniqueFileName = `logo/${Date.now()}-${crypto.randomUUID()}.${fileExtension}`;
 
       // Upload to Supabase Storage
-      const { data: uploadData, error: uploadError } = await supabase.storage
+      const { data: _data, error: uploadError } = await supabase.storage
         .from('clinic-assets')
         .upload(uniqueFileName, fileBuffer, {
           contentType: mimeType,
@@ -170,7 +170,7 @@ class ClinicSettingsService {
       const uniqueFileName = `qr-codes/${Date.now()}-${crypto.randomUUID()}.${fileExtension}`;
 
       // Upload to Supabase Storage
-      const { data: uploadData, error: uploadError } = await supabase.storage
+      const { data: _data, error: uploadError } = await supabase.storage
         .from('clinic-assets')
         .upload(uniqueFileName, fileBuffer, {
           contentType: mimeType,

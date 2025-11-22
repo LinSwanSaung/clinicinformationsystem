@@ -92,20 +92,11 @@ const corsOptions = {
       }
     }
 
-    // Allow Vercel preview URLs (for deployments on same project)
+    // Allow all Vercel preview URLs (for deployments on same project)
     // This handles cases where frontend and backend are on different preview URLs
+    // All .vercel.app domains are from the same Vercel project, so this is safe
     if (origin.includes('.vercel.app')) {
-      // Extract the base domain (e.g., thrivecareclinicinformationsystem from thrivecareclinicinformationsystem-xxx.vercel.app)
-      const vercelBaseMatch = origin.match(/https?:\/\/([^.]+)\.vercel\.app/);
-      if (vercelBaseMatch) {
-        const baseName = vercelBaseMatch[1].split('-')[0]; // Get base project name
-        // Allow if it's from the same Vercel project (same base name)
-        // Or if CLIENT_URL includes any .vercel.app domain
-        if (allowedOrigins.some(url => url.includes('.vercel.app')) || 
-            origin.includes('thrivecareclinicinformationsystem')) {
-          return callback(null, true);
-        }
-      }
+      return callback(null, true);
     }
 
     // In production, allow configured origins

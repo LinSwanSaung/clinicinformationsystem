@@ -28,6 +28,7 @@ build/
 *.tsbuildinfo
 
 # Root package.json (Vercel should only use frontend/package.json)
-package.json
-package-lock.json
+# Use /package.json to only exclude root, not frontend/package.json
+/package.json
+/package-lock.json
 

@@ -197,26 +197,34 @@ app.use('*', (req, res) => {
 // Global error handler
 app.use(errorHandler);
 
-// Start server
-app.listen(PORT, () => {
-  logger.info(`🚀 ThriveCare API Server running on port ${PORT}`);
-  logger.info(`📋 Environment: ${process.env.NODE_ENV}`);
-  logger.info(`🏥 Health check: http://localhost:${PORT}/health`);
+// Start server only if not running as Vercel serverless function
+// Vercel serverless functions don't need app.listen()
+if (process.env.VERCEL !== '1' && !process.env.VERCEL_ENV) {
+  app.listen(PORT, () => {
+    logger.info(`🚀 ThriveCare API Server running on port ${PORT}`);
+    logger.info(`📋 Environment: ${process.env.NODE_ENV}`);
+    logger.info(`🏥 Health check: http://localhost:${PORT}/health`);
 
-  // Start automatic token scheduler
-  logger.info('⏰ Starting Token Scheduler...');
-  tokenScheduler.start();
-  logger.info('✓ Token Scheduler started - will check for missed tokens every 5 minutes');
+    // Start automatic token scheduler
+    logger.info('⏰ Starting Token Scheduler...');
+    tokenScheduler.start();
+    logger.info('✓ Token Scheduler started - will check for missed tokens every 5 minutes');
 
-  // Start automatic appointment auto-cancel job
-  logger.info('⏰ Starting Appointment Auto-Cancel Job...');
-  appointmentAutoCancel.start();
-  logger.info(
-    `✓ Appointment Auto-Cancel started - ${appointmentAutoCancel.getScheduleDescription()}`
-  );
+    // Start automatic appointment auto-cancel job
+    logger.info('⏰ Starting Appointment Auto-Cancel Job...');
+    appointmentAutoCancel.start();
+    logger.info(
+      `✓ Appointment Auto-Cancel started - ${appointmentAutoCancel.getScheduleDescription()}`
+    );
 
-  // Start appointment reminder job (runs every 5 minutes)
-  startAppointmentReminders();
-});
+    // Start appointment reminder job (runs every 5 minutes)
+    startAppointmentReminders();
+  });
+} else {
+  // Running on Vercel - log that we're in serverless mode
+  logger.info('🚀 ThriveCare API running on Vercel (Serverless Mode)');
+  logger.info('📋 Environment: Production (Vercel)');
+  logger.info('⚠️  Note: Cron jobs need to be configured separately in Vercel');
+}
 
 export default app;

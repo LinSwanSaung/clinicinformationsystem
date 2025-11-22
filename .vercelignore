@@ -1,7 +1,7 @@
-# Backend files (deploy separately)
-backend/
+# Node modules (will be installed)
 node_modules/
-*.log
+
+# Environment files
 .env
 .env.local
 .env.*.local
@@ -13,9 +13,9 @@ docs/
 *.md
 !README.md
 
-# Database files
+# Database files (not needed for deployment)
+backend/database/
 *.sql
-database/
 
 # Test files
 **/__tests__/
@@ -27,8 +27,6 @@ dist/
 build/
 *.tsbuildinfo
 
-# Root package.json (Vercel should only use frontend/package.json)
-# Use /package.json to only exclude root, not frontend/package.json
-/package.json
-/package-lock.json
+# Logs
+*.log
 

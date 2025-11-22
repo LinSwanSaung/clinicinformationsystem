@@ -31,15 +31,15 @@ export const logToFile = (level, event, context = {}) => {
       timestamp,
       level,
       event,
-      ...context
+      ...context,
     };
 
     // Format as single-line JSON for easy parsing
     const logLine = JSON.stringify(logEntry) + '\n';
-    
+
     // Append to today's log file
     fs.appendFileSync(getLogFilename(), logLine);
-    
+
     // Also log using main logger for consistency
     mainLogger.info(`[FILE_LOG ${level}] ${event}`, context);
   } catch (error) {
@@ -54,7 +54,7 @@ export const logger = {
   info: (event, context) => logToFile('INFO', event, context),
   warn: (event, context) => logToFile('WARN', event, context),
   error: (event, context) => logToFile('ERROR', event, context),
-  debug: (event, context) => logToFile('DEBUG', event, context)
+  debug: (event, context) => logToFile('DEBUG', event, context),
 };
 
 export default logger;

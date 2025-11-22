@@ -59,11 +59,13 @@ class AppointmentService {
     const today = new Date(); // Use actual current date
     today.setHours(0, 0, 0, 0);
     appointmentDate.setHours(0, 0, 0, 0);
-    
+
     if (appointmentDate.getTime() === today.getTime()) {
-      throw new Error('Same-day appointments are not allowed. Please schedule for tomorrow or later.');
+      throw new Error(
+        'Same-day appointments are not allowed. Please schedule for tomorrow or later.'
+      );
     }
-    
+
     if (appointmentDate < today) {
       throw new Error('Cannot schedule appointments in the past.');
     }
@@ -71,7 +73,7 @@ class AppointmentService {
     // Check doctor availability using DoctorAvailabilityService
     const DoctorAvailabilityService = (await import('./DoctorAvailability.service.js')).default;
     const doctorAvailabilityService = new DoctorAvailabilityService();
-    
+
     const availability = await doctorAvailabilityService.checkTimeSlotAvailability(
       appointmentData.doctor_id,
       appointmentData.appointment_date,
@@ -87,7 +89,7 @@ class AppointmentService {
       ...appointmentData,
       status: appointmentData.status || 'scheduled',
       duration_minutes: appointmentData.duration_minutes || 30,
-      appointment_type: appointmentData.appointment_type || 'Regular Checkup'
+      appointment_type: appointmentData.appointment_type || 'Regular Checkup',
     };
 
     const newAppointment = await this.appointmentModel.create(appointmentToCreate);
@@ -144,7 +146,16 @@ class AppointmentService {
    */
   async updateAppointmentStatus(id, status) {
     // Validate status - added 'late' for receptionist to manually mark late arrivals
-    const validStatuses = ['scheduled', 'waiting', 'ready_for_doctor', 'consulting', 'completed', 'cancelled', 'no_show', 'late'];
+    const validStatuses = [
+      'scheduled',
+      'waiting',
+      'ready_for_doctor',
+      'consulting',
+      'completed',
+      'cancelled',
+      'no_show',
+      'late',
+    ];
     if (!validStatuses.includes(status)) {
       throw new Error(`Invalid status. Must be one of: ${validStatuses.join(', ')}`);
     }
@@ -155,7 +166,7 @@ class AppointmentService {
     }
 
     const updatedAppointment = await this.appointmentModel.updateStatus(id, status);
-    
+
     return updatedAppointment;
   }
 
@@ -176,11 +187,11 @@ class AppointmentService {
    */
   async getAppointmentsByDateRange(startDate, endDate, doctorId = null) {
     // This would need a custom query - for now, get all and filter
-    const appointments = doctorId 
+    const appointments = doctorId
       ? await this.appointmentModel.getByDoctorId(doctorId)
       : await this.appointmentModel.getAllWithDetails();
 
-    return appointments.filter(apt => {
+    return appointments.filter((apt) => {
       const aptDate = new Date(apt.appointment_date);
       const start = new Date(startDate);
       const end = new Date(endDate);
@@ -206,13 +217,13 @@ class AppointmentService {
     }
 
     const updatedAppointment = await this.appointmentModel.update(appointmentId, {
-      status: 'waiting'
+      status: 'waiting',
     });
 
     return {
       success: true,
       appointment: updatedAppointment,
-      message: 'Appointment checked in successfully'
+      message: 'Appointment checked in successfully',
     };
   }
 
@@ -221,16 +232,13 @@ class AppointmentService {
    */
   async getAppointmentsForQueue(doctorId, date = null) {
     const appointmentDate = date || new Date().toISOString().split('T')[0];
-    
+
     const appointments = await this.appointmentModel.getByDate(appointmentDate);
-    const doctorAppointments = appointments.filter(apt => 
-      apt.doctor_id === doctorId && 
-      ['scheduled', 'waiting'].includes(apt.status)
+    const doctorAppointments = appointments.filter(
+      (apt) => apt.doctor_id === doctorId && ['scheduled', 'waiting'].includes(apt.status)
     );
 
-    return doctorAppointments.sort((a, b) => 
-      a.appointment_time.localeCompare(b.appointment_time)
-    );
+    return doctorAppointments.sort((a, b) => a.appointment_time.localeCompare(b.appointment_time));
   }
 
   /**
@@ -239,16 +247,16 @@ class AppointmentService {
   async getTodayStats(doctorId) {
     const today = new Date().toISOString().split('T')[0];
     const appointments = await this.appointmentModel.getByDate(today);
-    const doctorAppointments = appointments.filter(apt => apt.doctor_id === doctorId);
+    const doctorAppointments = appointments.filter((apt) => apt.doctor_id === doctorId);
 
     const stats = {
       total: doctorAppointments.length,
-      scheduled: doctorAppointments.filter(apt => apt.status === 'scheduled').length,
-      waiting: doctorAppointments.filter(apt => apt.status === 'waiting').length,
-      consulting: doctorAppointments.filter(apt => apt.status === 'consulting').length,
-      completed: doctorAppointments.filter(apt => apt.status === 'completed').length,
-      cancelled: doctorAppointments.filter(apt => apt.status === 'cancelled').length,
-      noShow: doctorAppointments.filter(apt => apt.status === 'no_show').length
+      scheduled: doctorAppointments.filter((apt) => apt.status === 'scheduled').length,
+      waiting: doctorAppointments.filter((apt) => apt.status === 'waiting').length,
+      consulting: doctorAppointments.filter((apt) => apt.status === 'consulting').length,
+      completed: doctorAppointments.filter((apt) => apt.status === 'completed').length,
+      cancelled: doctorAppointments.filter((apt) => apt.status === 'cancelled').length,
+      noShow: doctorAppointments.filter((apt) => apt.status === 'no_show').length,
     };
 
     return stats;
@@ -277,13 +285,13 @@ class AppointmentService {
     const updatedAppointment = await this.appointmentModel.update(appointmentId, {
       appointment_date: newDate,
       appointment_time: newTime,
-      status: 'scheduled' // Reset to scheduled when rescheduled
+      status: 'scheduled', // Reset to scheduled when rescheduled
     });
 
     return {
       success: true,
       appointment: updatedAppointment,
-      message: 'Appointment rescheduled successfully'
+      message: 'Appointment rescheduled successfully',
     };
   }
 }

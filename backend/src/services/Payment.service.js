@@ -1,7 +1,11 @@
 import PaymentTransactionModel from '../models/PaymentTransaction.model.js';
 import InvoiceService from './Invoice.service.js';
 import clinicSettingsService from './ClinicSettings.service.js';
-import { getUsersByIds, getPaymentWithRelations, getPatientRemainingCredit } from './repositories/BillingRepo.js';
+import {
+  getUsersByIds,
+  getPaymentWithRelations,
+  getPatientRemainingCredit,
+} from './repositories/BillingRepo.js';
 import { validatePaymentAmount, sanitizeString } from '../utils/validation.js';
 import PDFDocument from 'pdfkit';
 import logger from '../config/logger.js';
@@ -37,21 +41,31 @@ class PaymentService {
       }
 
       // Sanitize string inputs
-      const sanitizedReference = payment_reference ? sanitizeString(payment_reference, { maxLength: 255 }) : null;
-      const sanitizedNotes = payment_notes ? sanitizeString(payment_notes, { maxLength: 1000 }) : null;
+      const sanitizedReference = payment_reference
+        ? sanitizeString(payment_reference, { maxLength: 255 })
+        : null;
+      const sanitizedNotes = payment_notes
+        ? sanitizeString(payment_notes, { maxLength: 1000 })
+        : null;
 
       // Check for duplicate payment (same amount, same invoice, within last 5 seconds)
       // This prevents accidental double-submission
-      const recentPayments = await PaymentTransactionModel.getRecentPaymentsByInvoice(invoiceId, 5000); // 5 seconds
+      const recentPayments = await PaymentTransactionModel.getRecentPaymentsByInvoice(
+        invoiceId,
+        5000
+      ); // 5 seconds
       const duplicatePayment = recentPayments.find(
-        p => Math.abs(parseFloat(p.amount) - validatedAmount) < 0.01 &&
-             p.payment_method === payment_method &&
-             p.received_by === receivedBy
+        (p) =>
+          Math.abs(parseFloat(p.amount) - validatedAmount) < 0.01 &&
+          p.payment_method === payment_method &&
+          p.received_by === receivedBy
       );
 
       if (duplicatePayment) {
         logger.warn(`Duplicate payment detected for invoice ${invoiceId}: ${duplicatePayment.id}`);
-        throw new Error('Duplicate payment detected. Please wait a moment and check if payment was already processed.');
+        throw new Error(
+          'Duplicate payment detected. Please wait a moment and check if payment was already processed.'
+        );
       }
 
       // Use atomic function with advisory locks to prevent race conditions
@@ -198,7 +212,7 @@ class PaymentService {
 
       // Fetch payment transactions separately to avoid nested query issues
       const paymentTransactions = await PaymentTransactionModel.getPaymentsByInvoice(invoice.id);
-      
+
       // Get cashier info for all payments
       const allCashierIds = [
         ...(paymentTransactions || [])
@@ -206,19 +220,19 @@ class PaymentService {
           .filter(Boolean),
         payment.received_by,
       ].filter(Boolean);
-      
+
       if (allCashierIds.length > 0) {
         const cashiers = await getUsersByIds([...new Set(allCashierIds)]);
         const cashierMap = {};
         (cashiers || []).forEach((c) => {
           cashierMap[c.id] = c;
         });
-        
+
         // Attach cashier info to payment
         if (payment.received_by) {
           payment.received_by_user = cashierMap[payment.received_by] || null;
         }
-        
+
         // Attach cashier info to payment transactions
         invoice.payment_transactions = (paymentTransactions || []).map((pt) => ({
           ...pt,
@@ -234,13 +248,13 @@ class PaymentService {
       const clinicName = clinicSettings.clinic_name || 'ThriveCare';
       const systemName = 'ThriveCare';
       const systemDescription = 'Healthcare System';
-      
+
       // Get currency settings ONCE at the start and use throughout PDF generation
       // This prevents currency from changing mid-generation
       const currencySettings = await clinicSettingsService.getCurrencySettings();
       const currencySymbol = currencySettings.currency_symbol || '$';
       const currencyCode = currencySettings.currency_code || 'USD';
-      
+
       // Store currency settings in a constant to ensure consistency throughout PDF
       const PDF_CURRENCY = {
         symbol: currencySymbol,
@@ -248,10 +262,10 @@ class PaymentService {
       };
 
       // Generate PDF using PDFKit with professional design
-      const doc = new PDFDocument({ 
-        size: 'A4', 
+      const doc = new PDFDocument({
+        size: 'A4',
         margin: 50,
-        bufferPages: true 
+        bufferPages: true,
       });
 
       // Helper function to draw a box
@@ -260,9 +274,12 @@ class PaymentService {
       };
 
       // Professional Header with colored background
-      const headerHeight = clinicSettings.clinic_address || clinicSettings.clinic_phone || clinicSettings.clinic_email ? 140 : 120;
+      const headerHeight =
+        clinicSettings.clinic_address || clinicSettings.clinic_phone || clinicSettings.clinic_email
+          ? 140
+          : 120;
       doc.rect(0, 0, doc.page.width, headerHeight).fillAndStroke('#1e40af', '#1e40af');
-      
+
       // Clinic/System Name
       doc
         .fillColor('#ffffff')
@@ -271,7 +288,7 @@ class PaymentService {
         .text(clinicName, 50, 30)
         .fontSize(12)
         .font('Helvetica');
-      
+
       // Show system name as subtitle if clinic name is different
       if (clinicSettings.clinic_name) {
         doc.text(`${systemName} ${systemDescription}`, 50, 62);
@@ -282,21 +299,15 @@ class PaymentService {
       // Clinic contact information in header (if available)
       let contactY = 85;
       if (clinicSettings.clinic_address) {
-        doc
-          .fontSize(9)
-          .text(clinicSettings.clinic_address, 50, contactY, { width: 300 });
+        doc.fontSize(9).text(clinicSettings.clinic_address, 50, contactY, { width: 300 });
         contactY += 12;
       }
       if (clinicSettings.clinic_phone) {
-        doc
-          .fontSize(9)
-          .text(`Phone: ${clinicSettings.clinic_phone}`, 50, contactY);
+        doc.fontSize(9).text(`Phone: ${clinicSettings.clinic_phone}`, 50, contactY);
         contactY += 12;
       }
       if (clinicSettings.clinic_email) {
-        doc
-          .fontSize(9)
-          .text(`Email: ${clinicSettings.clinic_email}`, 50, contactY);
+        doc.fontSize(9).text(`Email: ${clinicSettings.clinic_email}`, 50, contactY);
       }
 
       doc
@@ -315,45 +326,58 @@ class PaymentService {
         .fontSize(14)
         .font('Helvetica-Bold')
         .text('Invoice Information', 60, yPos + 10);
-      
+
       doc
         .fillColor('#374151')
         .fontSize(10)
         .font('Helvetica')
         .text(`Invoice #: ${invoice.invoice_number || 'N/A'}`, 60, yPos + 30)
         .text(
-          `Date: ${invoice.created_at ? new Date(invoice.created_at).toLocaleDateString('en-US', {
-          year: 'numeric',
-          month: 'long',
-          day: 'numeric',
-          }) : 'N/A'}`,
+          `Date: ${
+            invoice.created_at
+              ? new Date(invoice.created_at).toLocaleDateString('en-US', {
+                  year: 'numeric',
+                  month: 'long',
+                  day: 'numeric',
+                })
+              : 'N/A'
+          }`,
           60,
           yPos + 45
         )
         .text(
-          `Time: ${invoice.created_at ? new Date(invoice.created_at).toLocaleTimeString('en-US', {
-            hour: 'numeric',
-          minute: '2-digit',
-            hour12: true,
-          }) : 'N/A'}`,
+          `Time: ${
+            invoice.created_at
+              ? new Date(invoice.created_at).toLocaleTimeString('en-US', {
+                  hour: 'numeric',
+                  minute: '2-digit',
+                  hour12: true,
+                })
+              : 'N/A'
+          }`,
           doc.page.width - 150,
           yPos + 30
         );
 
       // Display payment methods if payments exist
       if (invoice.payment_transactions && invoice.payment_transactions.length > 0) {
-        const paymentMethods = [...new Set(
-          invoice.payment_transactions
-            .map(pt => pt.payment_method)
-            .filter(Boolean)
-            .map(method => method === 'online_payment' ? 'Online Payment' : method.charAt(0).toUpperCase() + method.slice(1))
-        )];
-        doc
-          .text(
-            `Payment Method${paymentMethods.length > 1 ? 's' : ''}: ${paymentMethods.join(', ') || 'N/A'}`,
-            doc.page.width - 150,
-            yPos + 45
-          );
+        const paymentMethods = [
+          ...new Set(
+            invoice.payment_transactions
+              .map((pt) => pt.payment_method)
+              .filter(Boolean)
+              .map((method) =>
+                method === 'online_payment'
+                  ? 'Online Payment'
+                  : method.charAt(0).toUpperCase() + method.slice(1)
+              )
+          ),
+        ];
+        doc.text(
+          `Payment Method${paymentMethods.length > 1 ? 's' : ''}: ${paymentMethods.join(', ') || 'N/A'}`,
+          doc.page.width - 150,
+          yPos + 45
+        );
       }
 
       yPos += 100;
@@ -365,7 +389,7 @@ class PaymentService {
         .fontSize(14)
         .font('Helvetica-Bold')
         .text('Patient Information', 60, yPos + 10);
-      
+
       const patient = invoice.patient || {};
       doc
         .fillColor('#374151')
@@ -374,16 +398,22 @@ class PaymentService {
         .text(`Name: ${patient.first_name || ''} ${patient.last_name || ''}`, 60, yPos + 30)
         .text(`Patient #: ${patient.patient_number || 'N/A'}`, 60, yPos + 45)
         .text(`Phone: ${patient.phone || 'N/A'}`, 60, yPos + 60)
-        .text(`Email: ${patient.email || 'N/A'}`, doc.page.width - 250, yPos + 30, { align: 'right' });
+        .text(`Email: ${patient.email || 'N/A'}`, doc.page.width - 250, yPos + 30, {
+          align: 'right',
+        });
 
       const visit = invoice.visit || {};
       const doctor = visit.doctor || {};
-      const doctorName = 
-        `${doctor.first_name || ''} ${doctor.last_name || ''}`.trim() || 'N/A';
-      
+      const doctorName = `${doctor.first_name || ''} ${doctor.last_name || ''}`.trim() || 'N/A';
+
       doc
         .text(`Doctor: ${doctorName}`, doc.page.width - 250, yPos + 45, { align: 'right' })
-        .text(`Visit Type: ${visit.visit_type ? visit.visit_type.charAt(0).toUpperCase() + visit.visit_type.slice(1) : 'N/A'}`, doc.page.width - 250, yPos + 60, { align: 'right' });
+        .text(
+          `Visit Type: ${visit.visit_type ? visit.visit_type.charAt(0).toUpperCase() + visit.visit_type.slice(1) : 'N/A'}`,
+          doc.page.width - 250,
+          yPos + 60,
+          { align: 'right' }
+        );
 
       yPos += 120;
 
@@ -403,11 +433,7 @@ class PaymentService {
 
         // Services
         if (services.length > 0) {
-          doc
-            .fillColor('#059669')
-            .fontSize(12)
-            .font('Helvetica-Bold')
-            .text('Services', 60, yPos);
+          doc.fillColor('#059669').fontSize(12).font('Helvetica-Bold').text('Services', 60, yPos);
           yPos += 20;
 
           // Table header
@@ -419,9 +445,12 @@ class PaymentService {
             .text('Quantity', 200, yPos)
             .text('Unit Price', 280, yPos)
             .text('Total', doc.page.width - 150, yPos, { align: 'right' });
-          
+
           yPos += 15;
-          doc.moveTo(60, yPos).lineTo(doc.page.width - 50, yPos).stroke('#e5e7eb');
+          doc
+            .moveTo(60, yPos)
+            .lineTo(doc.page.width - 50, yPos)
+            .stroke('#e5e7eb');
           yPos += 10;
 
           services.forEach((service) => {
@@ -441,13 +470,17 @@ class PaymentService {
               .text(service.item_name || 'Service', 60, yPos, { width: 130 })
               .text(quantity.toString(), 200, yPos)
               .text(`${PDF_CURRENCY.symbol}${unitPrice.toFixed(2)}`, 280, yPos)
-              .text(`${PDF_CURRENCY.symbol}${total.toFixed(2)}`, doc.page.width - 150, yPos, { align: 'right' });
+              .text(`${PDF_CURRENCY.symbol}${total.toFixed(2)}`, doc.page.width - 150, yPos, {
+                align: 'right',
+              });
 
             if (service.notes || service.item_description) {
               doc
                 .fillColor('#6b7280')
                 .fontSize(8)
-                .text(`  ${service.notes || service.item_description || ''}`, 60, yPos + 12, { width: 400 });
+                .text(`  ${service.notes || service.item_description || ''}`, 60, yPos + 12, {
+                  width: 400,
+                });
               yPos += 15;
             }
             yPos += 15;
@@ -481,9 +514,12 @@ class PaymentService {
             .text('Quantity', 200, yPos)
             .text('Unit Price', 280, yPos)
             .text('Total', doc.page.width - 150, yPos, { align: 'right' });
-          
+
           yPos += 15;
-          doc.moveTo(60, yPos).lineTo(doc.page.width - 50, yPos).stroke('#e5e7eb');
+          doc
+            .moveTo(60, yPos)
+            .lineTo(doc.page.width - 50, yPos)
+            .stroke('#e5e7eb');
           yPos += 10;
 
           medications.forEach((med) => {
@@ -503,13 +539,17 @@ class PaymentService {
               .text(med.item_name || 'Medication', 60, yPos, { width: 130 })
               .text(quantity.toString(), 200, yPos)
               .text(`${PDF_CURRENCY.symbol}${unitPrice.toFixed(2)}`, 280, yPos)
-              .text(`${PDF_CURRENCY.symbol}${total.toFixed(2)}`, doc.page.width - 150, yPos, { align: 'right' });
+              .text(`${PDF_CURRENCY.symbol}${total.toFixed(2)}`, doc.page.width - 150, yPos, {
+                align: 'right',
+              });
 
             if (med.notes || med.item_description) {
               doc
                 .fillColor('#6b7280')
                 .fontSize(8)
-                .text(`  ${med.notes || med.item_description || ''}`, 60, yPos + 12, { width: 400 });
+                .text(`  ${med.notes || med.item_description || ''}`, 60, yPos + 12, {
+                  width: 400,
+                });
               yPos += 15;
             }
             yPos += 15;
@@ -526,21 +566,24 @@ class PaymentService {
 
       // Get invoice totals first
       const subtotal = parseFloat(invoice.total_amount || 0);
-      
+
       // Calculate paid amount from payment transactions (matches frontend logic)
       // Use invoice.payment_transactions (already fetched above)
-      const calculatedPaid = (invoice.payment_transactions || []).reduce((sum, p) => sum + parseFloat(p.amount || 0), 0);
+      const calculatedPaid = (invoice.payment_transactions || []).reduce(
+        (sum, p) => sum + parseFloat(p.amount || 0),
+        0
+      );
       const paid = parseFloat(invoice.amount_paid || calculatedPaid || 0);
-      
+
       // Calculate balance manually (matches frontend: total - paid)
       const balance = subtotal - paid;
-      
+
       // Calculate credit amount from payment transactions (matches frontend exactly)
       // Credit can come from:
       // 1. Payments that paid off previous invoices (notes mention "paid with current visit" or "previous invoice")
       // 2. Overpayment (when paid amount > total amount, creating a credit balance)
       let creditFromPrevious = 0;
-      
+
       if (invoice.payment_transactions && invoice.payment_transactions.length > 0) {
         // Calculate credit from payments that paid off previous invoices
         creditFromPrevious = invoice.payment_transactions
@@ -555,11 +598,11 @@ class PaymentService {
           })
           .reduce((sum, pt) => sum + parseFloat(pt.amount || 0), 0);
       }
-      
+
       // Calculate credit from overpayment (when paid > total, negative balance)
       // This matches frontend: balance < 0 ? Math.abs(balance) : 0
       const creditFromOverpayment = balance < 0 ? Math.abs(balance) : 0;
-      
+
       // Total credit amount (matches frontend: creditFromPrevious + creditFromOverpayment)
       const creditAmount = creditFromPrevious + creditFromOverpayment;
 
@@ -579,18 +622,25 @@ class PaymentService {
         .fontSize(10)
         .font('Helvetica')
         .text('Subtotal:', 60, yPos)
-        .text(`${PDF_CURRENCY.symbol}${subtotal.toFixed(2)}`, doc.page.width - 150, yPos, { align: 'right' });
+        .text(`${PDF_CURRENCY.symbol}${subtotal.toFixed(2)}`, doc.page.width - 150, yPos, {
+          align: 'right',
+        });
 
       if (discount > 0) {
         yPos += 15;
         doc
           .fillColor('#059669')
           .text('Discount:', 60, yPos)
-          .text(`-${PDF_CURRENCY.symbol}${discount.toFixed(2)}`, doc.page.width - 150, yPos, { align: 'right' });
+          .text(`-${PDF_CURRENCY.symbol}${discount.toFixed(2)}`, doc.page.width - 150, yPos, {
+            align: 'right',
+          });
       }
 
       yPos += 20;
-      doc.moveTo(60, yPos).lineTo(doc.page.width - 50, yPos).stroke('#d1d5db');
+      doc
+        .moveTo(60, yPos)
+        .lineTo(doc.page.width - 50, yPos)
+        .stroke('#d1d5db');
       yPos += 15;
 
       // Total Amount
@@ -599,7 +649,9 @@ class PaymentService {
         .fontSize(12)
         .font('Helvetica-Bold')
         .text('Total Amount:', 60, yPos)
-        .text(`${PDF_CURRENCY.symbol}${total.toFixed(2)}`, doc.page.width - 150, yPos, { align: 'right' });
+        .text(`${PDF_CURRENCY.symbol}${total.toFixed(2)}`, doc.page.width - 150, yPos, {
+          align: 'right',
+        });
 
       // Credit Amount (from previous invoices or overpayment)
       // Show credit if there's any credit amount (matches frontend: totalCredit > 0)
@@ -610,7 +662,9 @@ class PaymentService {
           .fontSize(11)
           .font('Helvetica-Bold')
           .text('Credit from Previous Invoices:', 60, yPos)
-          .text(`${PDF_CURRENCY.symbol}${creditAmount.toFixed(2)}`, doc.page.width - 150, yPos, { align: 'right' });
+          .text(`${PDF_CURRENCY.symbol}${creditAmount.toFixed(2)}`, doc.page.width - 150, yPos, {
+            align: 'right',
+          });
       }
 
       // Paid Amount
@@ -620,7 +674,9 @@ class PaymentService {
         .fontSize(11)
         .font('Helvetica-Bold')
         .text('Paid Amount:', 60, yPos)
-        .text(`${PDF_CURRENCY.symbol}${paid.toFixed(2)}`, doc.page.width - 150, yPos, { align: 'right' });
+        .text(`${PDF_CURRENCY.symbol}${paid.toFixed(2)}`, doc.page.width - 150, yPos, {
+          align: 'right',
+        });
 
       // Balance Due (if positive)
       if (balance > 0) {
@@ -630,12 +686,9 @@ class PaymentService {
           .fontSize(11)
           .font('Helvetica-Bold')
           .text('Balance Due:', 60, yPos)
-          .text(
-            `${PDF_CURRENCY.symbol}${balance.toFixed(2)}`,
-            doc.page.width - 150,
-            yPos,
-            { align: 'right' }
-          );
+          .text(`${PDF_CURRENCY.symbol}${balance.toFixed(2)}`, doc.page.width - 150, yPos, {
+            align: 'right',
+          });
       }
 
       // Show patient's total remaining credit if there's any credit
@@ -646,7 +699,12 @@ class PaymentService {
           .fontSize(11)
           .font('Helvetica-Bold')
           .text('Credit Remaining:', 60, yPos)
-          .text(`${PDF_CURRENCY.symbol}${patientRemainingCredit.toFixed(2)} (Credit)`, doc.page.width - 150, yPos, { align: 'right' });
+          .text(
+            `${PDF_CURRENCY.symbol}${patientRemainingCredit.toFixed(2)} (Credit)`,
+            doc.page.width - 150,
+            yPos,
+            { align: 'right' }
+          );
       }
 
       yPos += 40;
@@ -688,7 +746,7 @@ class PaymentService {
               })
             : 'N/A';
 
-          const isCredit = 
+          const isCredit =
             parseFloat(pt.amount || 0) < 0 ||
             pt.payment_notes?.toLowerCase().includes('credit') ||
             pt.payment_notes?.toLowerCase().includes('due credit');
@@ -698,23 +756,33 @@ class PaymentService {
           drawBox(50, yPos, doc.page.width - 100, 50, boxColor, borderColor);
 
           const cashierName = pt.received_by_user
-            ? `${pt.received_by_user.first_name || ''} ${pt.received_by_user.last_name || ''}`.trim() || 'Unknown'
+            ? `${pt.received_by_user.first_name || ''} ${pt.received_by_user.last_name || ''}`.trim() ||
+              'Unknown'
             : pt.processed_by_user
-              ? `${pt.processed_by_user.first_name || ''} ${pt.processed_by_user.last_name || ''}`.trim() || 'Unknown'
+              ? `${pt.processed_by_user.first_name || ''} ${pt.processed_by_user.last_name || ''}`.trim() ||
+                'Unknown'
               : 'Unknown';
 
           doc
             .fillColor(isCredit ? '#1e40af' : '#059669')
             .fontSize(11)
             .font('Helvetica-Bold')
-            .text(`${PDF_CURRENCY.symbol}${Math.abs(parseFloat(pt.amount || 0)).toFixed(2)}`, 60, yPos + 8)
+            .text(
+              `${PDF_CURRENCY.symbol}${Math.abs(parseFloat(pt.amount || 0)).toFixed(2)}`,
+              60,
+              yPos + 8
+            )
             .fillColor('#6b7280')
             .fontSize(9)
             .font('Helvetica')
             .text(
-              `${pt.payment_method 
-                ? (pt.payment_method === 'online_payment' ? 'Online Payment' : pt.payment_method.charAt(0).toUpperCase() + pt.payment_method.slice(1))
-                : 'N/A'}`,
+              `${
+                pt.payment_method
+                  ? pt.payment_method === 'online_payment'
+                    ? 'Online Payment'
+                    : pt.payment_method.charAt(0).toUpperCase() + pt.payment_method.slice(1)
+                  : 'N/A'
+              }`,
               60,
               yPos + 22
             );
@@ -769,30 +837,28 @@ class PaymentService {
           yPos + 25,
           { align: 'center' }
         );
-      
+
       if (clinicSettings.clinic_name) {
-        doc
-          .text(
-            `For ${clinicSettings.clinic_name}`,
-            doc.page.width / 2,
-            yPos + 38,
-            { align: 'center' }
-          );
+        doc.text(`For ${clinicSettings.clinic_name}`, doc.page.width / 2, yPos + 38, {
+          align: 'center',
+        });
       }
-      
-      doc
-        .text(
-          `Invoice #: ${invoice.invoice_number || 'N/A'} | Generated on: ${new Date().toLocaleString('en-US', {
+
+      doc.text(
+        `Invoice #: ${invoice.invoice_number || 'N/A'} | Generated on: ${new Date().toLocaleString(
+          'en-US',
+          {
             year: 'numeric',
             month: 'long',
             day: 'numeric',
             hour: '2-digit',
             minute: '2-digit',
-          })}`,
-          doc.page.width / 2,
-          clinicSettings.clinic_name ? yPos + 51 : yPos + 38,
-          { align: 'center' }
-        );
+          }
+        )}`,
+        doc.page.width / 2,
+        clinicSettings.clinic_name ? yPos + 51 : yPos + 38,
+        { align: 'center' }
+      );
 
       return doc;
     } catch (error) {

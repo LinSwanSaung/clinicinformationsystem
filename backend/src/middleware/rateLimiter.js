@@ -10,7 +10,7 @@ export const rateLimiter = rateLimit({
   message: {
     success: false,
     message: 'Too many requests from this IP, please try again later.',
-    retryAfter: Math.ceil(config.rateLimit.windowMs / 1000)
+    retryAfter: Math.ceil(config.rateLimit.windowMs / 1000),
   },
   standardHeaders: true, // Return rate limit info in the `RateLimit-*` headers
   legacyHeaders: false, // Disable the `X-RateLimit-*` headers
@@ -25,7 +25,7 @@ export const authRateLimiter = rateLimit({
   message: {
     success: false,
     message: 'Too many authentication attempts, please try again later.',
-    retryAfter: 900 // 15 minutes in seconds
+    retryAfter: 900, // 15 minutes in seconds
   },
   standardHeaders: true,
   legacyHeaders: false,
@@ -40,7 +40,7 @@ export const uploadRateLimiter = rateLimit({
   message: {
     success: false,
     message: 'Too many upload requests, please try again later.',
-    retryAfter: 900
+    retryAfter: 900,
   },
   standardHeaders: true,
   legacyHeaders: false,

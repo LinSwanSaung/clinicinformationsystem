@@ -56,15 +56,15 @@ export async function formatCurrency(amount, options = {}) {
   }
 
   const { currency_code, currency_symbol } = await getCurrencySettings();
-  const { 
-    showSymbol = true, 
-    decimals = 2, 
+  const {
+    showSymbol = true,
+    decimals = 2,
     useCode = false,
-    symbolPosition = 'before' // 'before' or 'after'
+    symbolPosition = 'before', // 'before' or 'after'
   } = options;
 
   const formattedAmount = parseFloat(amount).toFixed(decimals);
-  
+
   if (useCode) {
     // Use ISO currency code (e.g., "USD 100.00" or "MMK 100.00")
     return `${currency_code} ${formattedAmount}`;
@@ -94,15 +94,10 @@ export function formatCurrencySync(amount, options = {}) {
   }
 
   const { currency_code, currency_symbol } = currencyCache;
-  const { 
-    showSymbol = true, 
-    decimals = 2, 
-    useCode = false,
-    symbolPosition = 'before'
-  } = options;
+  const { showSymbol = true, decimals = 2, useCode = false, symbolPosition = 'before' } = options;
 
   const formattedAmount = parseFloat(amount).toFixed(decimals);
-  
+
   if (useCode) {
     return `${currency_code} ${formattedAmount}`;
   }
@@ -142,4 +137,3 @@ export async function getCurrencyCode() {
 export function clearCurrencyCache() {
   currencyCache.lastUpdated = 0;
 }
-

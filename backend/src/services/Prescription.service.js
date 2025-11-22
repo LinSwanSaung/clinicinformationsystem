@@ -15,8 +15,8 @@ class PrescriptionService {
   async createPrescription(prescriptionData) {
     // Validate required fields
     const requiredFields = ['patient_id', 'doctor_id', 'medication_name', 'dosage', 'frequency'];
-    const missingFields = requiredFields.filter(field => !prescriptionData[field]);
-    
+    const missingFields = requiredFields.filter((field) => !prescriptionData[field]);
+
     if (missingFields.length > 0) {
       throw new Error(`Missing required fields: ${missingFields.join(', ')}`);
     }
@@ -26,15 +26,15 @@ class PrescriptionService {
       ...prescriptionData,
       status: prescriptionData.status || 'active',
       prescribed_date: prescriptionData.prescribed_date || new Date().toISOString(),
-      refills: prescriptionData.refills || 0
+      refills: prescriptionData.refills || 0,
     };
 
     const prescription = await this.prescriptionModel.create(dataToInsert);
-    
+
     return {
       success: true,
       data: prescription,
-      message: 'Prescription created successfully'
+      message: 'Prescription created successfully',
     };
   }
 
@@ -47,11 +47,11 @@ class PrescriptionService {
     }
 
     const prescriptions = await this.prescriptionModel.getByPatientId(patientId, includeInactive);
-    
+
     return {
       success: true,
       data: prescriptions,
-      total: prescriptions.length
+      total: prescriptions.length,
     };
   }
 
@@ -64,11 +64,11 @@ class PrescriptionService {
     }
 
     const prescriptions = await this.prescriptionModel.getByVisitId(visitId);
-    
+
     return {
       success: true,
       data: prescriptions,
-      total: prescriptions.length
+      total: prescriptions.length,
     };
   }
 
@@ -86,11 +86,11 @@ class PrescriptionService {
     }
 
     const prescription = await this.prescriptionModel.updateStatus(prescriptionId, status);
-    
+
     return {
       success: true,
       data: prescription,
-      message: `Prescription status updated to ${status}`
+      message: `Prescription status updated to ${status}`,
     };
   }
 
@@ -103,11 +103,11 @@ class PrescriptionService {
     }
 
     const prescription = await this.prescriptionModel.delete(prescriptionId);
-    
+
     return {
       success: true,
       data: prescription,
-      message: 'Prescription cancelled successfully'
+      message: 'Prescription cancelled successfully',
     };
   }
 }

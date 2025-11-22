@@ -210,7 +210,7 @@ export async function getPortalUserIdByPatientId(patientId) {
  */
 export async function getUserDetailsForEmail(userIds) {
   const ids = Array.isArray(userIds) ? userIds : [userIds];
-  
+
   const { data, error } = await supabase
     .from('users')
     .select('id, email, first_name, last_name')

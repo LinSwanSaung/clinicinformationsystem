@@ -9,7 +9,7 @@
  */
 export const getCurrentDateISO = (timezone = 'UTC') => {
   const now = new Date();
-  
+
   // Convert to specified timezone
   if (timezone !== 'UTC') {
     // Use Intl.DateTimeFormat to get date in specified timezone
@@ -21,7 +21,7 @@ export const getCurrentDateISO = (timezone = 'UTC') => {
     });
     return formatter.format(now);
   }
-  
+
   // Default to UTC
   return now.toISOString().split('T')[0];
 };
@@ -31,7 +31,7 @@ export const getCurrentDateISO = (timezone = 'UTC') => {
  */
 export const getCurrentTimestampISO = (timezone = 'UTC') => {
   const now = new Date();
-  
+
   if (timezone !== 'UTC') {
     // Format with timezone offset
     const offset = now.getTimezoneOffset();
@@ -39,10 +39,10 @@ export const getCurrentTimestampISO = (timezone = 'UTC') => {
     const offsetMinutes = Math.abs(offset) % 60;
     const sign = offset <= 0 ? '+' : '-';
     const offsetString = `${sign}${offsetHours.toString().padStart(2, '0')}:${offsetMinutes.toString().padStart(2, '0')}`;
-    
+
     return now.toISOString().replace('Z', offsetString);
   }
-  
+
   return now.toISOString();
 };
 
@@ -53,7 +53,7 @@ export const toISODateString = (date, timezone = 'UTC') => {
   if (!(date instanceof Date)) {
     date = new Date(date);
   }
-  
+
   if (timezone !== 'UTC') {
     const formatter = new Intl.DateTimeFormat('en-CA', {
       timeZone: timezone,
@@ -63,7 +63,7 @@ export const toISODateString = (date, timezone = 'UTC') => {
     });
     return formatter.format(date);
   }
-  
+
   return date.toISOString().split('T')[0];
 };
 
@@ -74,9 +74,9 @@ export const getDayBounds = (date, timezone = 'UTC') => {
   if (!(date instanceof Date)) {
     date = new Date(date);
   }
-  
+
   const dateStr = toISODateString(date, timezone);
-  
+
   // Create start of day (00:00:00)
   const start = new Date(`${dateStr}T00:00:00`);
   if (timezone !== 'UTC') {
@@ -84,14 +84,14 @@ export const getDayBounds = (date, timezone = 'UTC') => {
     const offset = start.getTimezoneOffset();
     start.setMinutes(start.getMinutes() - offset);
   }
-  
+
   // Create end of day (23:59:59.999)
   const end = new Date(`${dateStr}T23:59:59.999`);
   if (timezone !== 'UTC') {
     const offset = end.getTimezoneOffset();
     end.setMinutes(end.getMinutes() - offset);
   }
-  
+
   return {
     start: start.toISOString(),
     end: end.toISOString(),
@@ -107,4 +107,3 @@ export const isToday = (date, timezone = 'UTC') => {
   const dateStr = toISODateString(date, timezone);
   return today === dateStr;
 };
-

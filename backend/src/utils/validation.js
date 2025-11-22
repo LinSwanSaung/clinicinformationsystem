@@ -11,11 +11,7 @@ export const sanitizeString = (input, options = {}) => {
     return input;
   }
 
-  const {
-    allowSpecialChars = false,
-    maxLength = null,
-    trim = true,
-  } = options;
+  const { allowSpecialChars = false, maxLength = null, trim = true } = options;
 
   let sanitized = input;
 
@@ -46,12 +42,7 @@ export const sanitizeString = (input, options = {}) => {
  * Prevents overflow and invalid values
  */
 export const sanitizeNumber = (input, options = {}) => {
-  const {
-    min = null,
-    max = null,
-    allowDecimals = true,
-    precision = 2,
-  } = options;
+  const { min = null, max = null, allowDecimals = true, precision = 2 } = options;
 
   // Convert to number
   let num = typeof input === 'string' ? parseFloat(input) : Number(input);
@@ -109,7 +100,7 @@ export const sanitizeEmail = (email) => {
   }
 
   const sanitized = email.trim().toLowerCase();
-  
+
   // Basic email validation
   const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
   if (!emailRegex.test(sanitized)) {
@@ -147,4 +138,3 @@ export const sanitizePhone = (phone) => {
 
   return sanitized;
 };
-

@@ -12,7 +12,7 @@ class DoctorNoteService {
       ...noteData,
       note_type: noteData.note_type || 'consultation',
       is_private: noteData.is_private !== undefined ? noteData.is_private : false,
-      created_at: new Date().toISOString()
+      created_at: new Date().toISOString(),
     };
     return DoctorNote.create(noteToCreate);
   }
@@ -39,9 +39,11 @@ class DoctorNoteService {
       content: noteData.content,
       note_type: noteData.note_type,
       is_private: noteData.is_private,
-      updated_at: new Date().toISOString()
+      updated_at: new Date().toISOString(),
     };
-    Object.keys(allowedUpdates).forEach(key => allowedUpdates[key] === undefined && delete allowedUpdates[key]);
+    Object.keys(allowedUpdates).forEach(
+      (key) => allowedUpdates[key] === undefined && delete allowedUpdates[key]
+    );
     return DoctorNote.update(noteId, allowedUpdates);
   }
 

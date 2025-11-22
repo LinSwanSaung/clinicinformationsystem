@@ -282,7 +282,6 @@ router.post(
 
     // CASCADE CANCELLATION: If cancelling/completing, update related records
     if (newStatus === 'cancelled' || newStatus === 'completed') {
-
       try {
         // Get the full record to find related IDs
         const { data: fullRecord } = await supabase
@@ -295,22 +294,19 @@ router.post(
           // If cancelling/completing a VISIT, also cancel/complete its queue token and appointment
           if (entityType === 'visit') {
             const now = new Date().toISOString();
-            
+
             // Update visit with visit_end_time if completing and not already set
             if (newStatus === 'completed' && !fullRecord.visit_end_time) {
-              await supabase
-                .from('visits')
-                .update({ visit_end_time: now })
-                .eq('id', fullRecord.id);
+              await supabase.from('visits').update({ visit_end_time: now }).eq('id', fullRecord.id);
             }
-            
+
             // Update queue token(s) linked to this visit
             if (fullRecord.id) {
               await supabase
                 .from('queue_tokens')
-                .update({ 
+                .update({
                   status: newStatus === 'completed' ? 'completed' : newStatus,
-                  updated_at: now 
+                  updated_at: now,
                 })
                 .eq('visit_id', fullRecord.id);
               logger.debug(`[ADMIN] Updated queue token(s) for visit ${fullRecord.id}`);
@@ -479,9 +475,9 @@ router.post(
   asyncHandler(async (req, res) => {
     const { maxAgeHours } = req.body;
     const queueService = new QueueService();
-    
+
     const result = await queueService.detectAndFixStuckConsultations(maxAgeHours || 24);
-    
+
     // Log audit event
     await logAuditEvent({
       actor_id: req.user.id,
@@ -494,7 +490,7 @@ router.post(
       ip: req.ip,
       userAgent: req.headers['user-agent'],
     });
-    
+
     res.json({
       success: result.success,
       message: result.message,

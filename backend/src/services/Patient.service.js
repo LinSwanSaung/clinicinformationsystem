@@ -14,9 +14,9 @@ class PatientService {
     const defaultOptions = {
       orderBy: 'created_at',
       ascending: false,
-      ...options
+      ...options,
     };
-    
+
     try {
       const { data } = await PatientModel.findAll(defaultOptions);
       return data || [];
@@ -30,7 +30,7 @@ class PatientService {
    */
   async getPatientById(patientId) {
     const patient = await PatientModel.findById(patientId);
-    
+
     if (!patient) {
       throw new AppError('Patient not found', 404);
     }
@@ -45,7 +45,7 @@ class PatientService {
     // Check if patient with same phone number already exists (optional check)
     if (patientData.phone) {
       const existingPatient = await PatientModel.findOne({ phone: patientData.phone });
-      
+
       if (existingPatient) {
         logger.warn('Patient with this phone number already exists:', patientData.phone);
         // Don't throw error, allow duplicate phone numbers for now
@@ -64,7 +64,7 @@ class PatientService {
   async updatePatient(patientId, updateData, updatedBy) {
     // Check if patient exists
     const existingPatient = await PatientModel.findById(patientId);
-    
+
     if (!existingPatient) {
       throw new AppError('Patient not found', 404);
     }
@@ -72,7 +72,7 @@ class PatientService {
     // If updating ID number, check for duplicates
     if (updateData.id_number && updateData.id_number !== existingPatient.id_number) {
       const patientWithSameId = await PatientModel.findByIdNumber(updateData.id_number);
-      
+
       if (patientWithSameId && patientWithSameId.id !== patientId) {
         throw new AppError('Patient with this ID number already exists', 409);
       }
@@ -81,7 +81,7 @@ class PatientService {
     // Update patient
     const updatedPatient = await PatientModel.updateById(patientId, {
       ...updateData,
-      updated_by: updatedBy
+      updated_by: updatedBy,
     });
 
     return updatedPatient;
@@ -93,7 +93,7 @@ class PatientService {
   async deletePatient(patientId) {
     // Check if patient exists
     const patient = await PatientModel.findById(patientId);
-    
+
     if (!patient) {
       throw new AppError('Patient not found', 404);
     }
@@ -146,7 +146,7 @@ class PatientService {
   async getPatientMedicalHistory(patientId) {
     // Verify patient exists
     const patient = await PatientModel.findById(patientId);
-    
+
     if (!patient) {
       throw new AppError('Patient not found', 404);
     }
@@ -158,11 +158,11 @@ class PatientService {
         id: patient.id,
         name: patient.name,
         age: patient.age,
-        gender: patient.gender
+        gender: patient.gender,
       },
       medical_history: patient.medical_history || [],
       allergies: patient.allergies || [],
-      current_medications: patient.medications || ''
+      current_medications: patient.medications || '',
     };
   }
 
@@ -179,7 +179,7 @@ class PatientService {
   async getPatientStatistics() {
     const totalPatients = await PatientModel.count();
     const recentPatients = await PatientModel.getRecentPatients(7);
-    
+
     // Age group statistics
     const children = await PatientModel.getByAgeGroup(0, 17);
     const adults = await PatientModel.getByAgeGroup(18, 64);
@@ -195,12 +195,12 @@ class PatientService {
       age_groups: {
         children: children.length,
         adults: adults.length,
-        seniors: seniors.length
+        seniors: seniors.length,
       },
       gender: {
         male: malePatients.data?.length || 0,
-        female: femalePatients.data?.length || 0
-      }
+        female: femalePatients.data?.length || 0,
+      },
     };
   }
 
@@ -209,13 +209,13 @@ class PatientService {
    */
   async updateLastVisit(patientId, visitDate) {
     const patient = await PatientModel.findById(patientId);
-    
+
     if (!patient) {
       throw new AppError('Patient not found', 404);
     }
 
     await PatientModel.updateLastVisit(patientId, visitDate);
-    
+
     return true;
   }
 
@@ -229,9 +229,9 @@ class PatientService {
       const defaultOptions = {
         orderBy: 'created_at',
         ascending: false,
-        ...options
+        ...options,
       };
-      
+
       const { data } = await PatientModel.findAll(defaultOptions);
       return data || [];
     } catch (error) {

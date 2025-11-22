@@ -1,7 +1,5 @@
 import DoctorAvailabilityModel from '../models/DoctorAvailability.model.js';
-import {
-  getAppointmentsByDoctorAndDate as repoGetAppointmentsByDoctorAndDate,
-} from './repositories/DoctorAvailabilityRepo.js';
+import { getAppointmentsByDoctorAndDate as repoGetAppointmentsByDoctorAndDate } from './repositories/DoctorAvailabilityRepo.js';
 import logger from '../config/logger.js';
 
 class DoctorAvailabilityService {
@@ -570,4 +568,3 @@ class DoctorAvailabilityService {
 }
 
 export default DoctorAvailabilityService;
-

@@ -186,7 +186,13 @@ router.put(
 
     // Remove sensitive fields that shouldn't be updated via this endpoint
     // But allow password updates for admins
-    const { password_hash: _password_hash, id: _bodyId, created_at: _created_at, deleted_at: _deleted_at, ...allowedFields } = updateData;
+    const {
+      password_hash: _password_hash,
+      id: _bodyId,
+      created_at: _created_at,
+      deleted_at: _deleted_at,
+      ...allowedFields
+    } = updateData;
 
     // Handle password separately if provided
     if (updateData.password) {
@@ -402,7 +408,7 @@ router.delete(
         return res.status(409).json({
           success: false,
           message: `Cannot delete doctor. Doctor has ${activeVisits.length} active visit(s). Please complete or cancel the visits first.`,
-          activeVisits: activeVisits.map(v => ({ id: v.id, patient_id: v.patient_id })),
+          activeVisits: activeVisits.map((v) => ({ id: v.id, patient_id: v.patient_id })),
         });
       }
     }

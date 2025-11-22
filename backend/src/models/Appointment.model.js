@@ -11,7 +11,8 @@ class AppointmentModel extends BaseModel {
   async getByDate(date) {
     const { data, error } = await this.supabase
       .from(this.tableName)
-      .select(`
+      .select(
+        `
         *,
         patient:patients!patient_id (
           id,
@@ -28,7 +29,8 @@ class AppointmentModel extends BaseModel {
           email,
           specialty
         )
-      `)
+      `
+      )
       .eq('appointment_date', date)
       .order('appointment_time');
 
@@ -45,7 +47,8 @@ class AppointmentModel extends BaseModel {
   async getByPatientId(patientId) {
     const { data, error } = await this.supabase
       .from(this.tableName)
-      .select(`
+      .select(
+        `
         *,
         doctor:users!doctor_id (
           id,
@@ -54,7 +57,8 @@ class AppointmentModel extends BaseModel {
           email,
           specialty
         )
-      `)
+      `
+      )
       .eq('patient_id', patientId)
       .order('appointment_date', { ascending: false });
 
@@ -71,7 +75,8 @@ class AppointmentModel extends BaseModel {
   async getByDoctorId(doctorId) {
     const { data, error } = await this.supabase
       .from(this.tableName)
-      .select(`
+      .select(
+        `
         *,
         patient:patients!patient_id (
           id,
@@ -81,7 +86,8 @@ class AppointmentModel extends BaseModel {
           phone,
           email
         )
-      `)
+      `
+      )
       .eq('doctor_id', doctorId)
       .order('appointment_date', { ascending: false });
 
@@ -98,7 +104,8 @@ class AppointmentModel extends BaseModel {
   async getAllWithDetails() {
     const { data, error } = await this.supabase
       .from(this.tableName)
-      .select(`
+      .select(
+        `
         *,
         patient:patients!patient_id (
           id,
@@ -115,7 +122,8 @@ class AppointmentModel extends BaseModel {
           email,
           specialty
         )
-      `)
+      `
+      )
       .order('appointment_date', { ascending: false });
 
     if (error) {
@@ -125,16 +133,15 @@ class AppointmentModel extends BaseModel {
     return data;
   }
 
-
   /**
    * Generic update method for appointments
    */
   async update(id, updateData) {
     const { data, error } = await this.supabase
       .from(this.tableName)
-      .update({ 
+      .update({
         ...updateData,
-        updated_at: new Date().toISOString()
+        updated_at: new Date().toISOString(),
       })
       .eq('id', id)
       .select()
@@ -198,8 +205,8 @@ class AppointmentModel extends BaseModel {
     }
 
     // Filter out taken slots
-    const takenSlots = existingAppointments.map(apt => apt.appointment_time);
-    const availableSlots = allSlots.filter(slot => !takenSlots.includes(slot));
+    const takenSlots = existingAppointments.map((apt) => apt.appointment_time);
+    const availableSlots = allSlots.filter((slot) => !takenSlots.includes(slot));
 
     return availableSlots;
   }
@@ -212,7 +219,8 @@ class AppointmentModel extends BaseModel {
       .from(this.tableName)
       .update({ status })
       .eq('id', id)
-      .select(`
+      .select(
+        `
         *,
         patient:patients!patient_id (
           id,
@@ -229,7 +237,8 @@ class AppointmentModel extends BaseModel {
           email,
           specialty
         )
-      `)
+      `
+      )
       .single();
 
     if (error) {
@@ -248,7 +257,8 @@ class AppointmentModel extends BaseModel {
 
     const { data, error } = await this.supabase
       .from(this.tableName)
-      .select(`
+      .select(
+        `
         *,
         doctor:users!doctor_id (
           id,
@@ -257,7 +267,8 @@ class AppointmentModel extends BaseModel {
           email,
           specialty
         )
-      `)
+      `
+      )
       .eq('patient_id', patientId)
       .gte('appointment_date', today)
       .in('status', ['scheduled', 'confirmed', 'pending', 'waiting'])
@@ -278,7 +289,7 @@ class AppointmentModel extends BaseModel {
    */
   async getPatientPendingAppointments(patientId) {
     const today = new Date().toISOString().split('T')[0];
-    
+
     const { data, error } = await this.supabase
       .from(this.tableName)
       .select('id, appointment_date, appointment_time, status')
@@ -300,9 +311,7 @@ class AppointmentModel extends BaseModel {
   async getWithFilters(filters = {}) {
     const { date, patient_id, doctor_id, status } = filters;
 
-    let query = this.supabase
-      .from(this.tableName)
-      .select(`
+    let query = this.supabase.from(this.tableName).select(`
         *,
         patient:patients!patient_id (
           id,
@@ -336,7 +345,7 @@ class AppointmentModel extends BaseModel {
 
     if (status) {
       // Handle multiple statuses separated by comma
-      const statusArray = status.split(',').map(s => s.trim());
+      const statusArray = status.split(',').map((s) => s.trim());
       if (statusArray.length === 1) {
         query = query.eq('status', statusArray[0]);
       } else {

@@ -179,10 +179,7 @@ class DocumentService {
       }
 
       // Delete from database
-      const { error: dbError } = await supabase
-        .from(this.tableName)
-        .delete()
-        .eq('id', documentId);
+      const { error: dbError } = await supabase.from(this.tableName).delete().eq('id', documentId);
 
       if (dbError) {
         throw new Error(`Failed to delete document: ${dbError.message}`);
@@ -195,4 +192,3 @@ class DocumentService {
 }
 
 export default new DocumentService();
-

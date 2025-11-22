@@ -94,10 +94,7 @@ class InvoiceItemModel extends BaseModel {
    * Bulk create invoice items
    */
   async createItems(items) {
-    const { data, error } = await this.supabase
-      .from(this.tableName)
-      .insert(items)
-      .select();
+    const { data, error } = await this.supabase.from(this.tableName).insert(items).select();
 
     if (error) {
       throw error;

@@ -15,12 +15,12 @@ export class PatientModel extends BaseModel {
   async create(patientData) {
     // Generate unique patient number
     const patientNumber = await this.generatePatientNumber();
-    
+
     const newPatient = {
       ...patientData,
       patient_number: patientNumber,
       created_at: new Date().toISOString(),
-      updated_at: new Date().toISOString()
+      updated_at: new Date().toISOString(),
     };
 
     return super.create(newPatient);
@@ -32,7 +32,7 @@ export class PatientModel extends BaseModel {
   async generatePatientNumber() {
     const year = new Date().getFullYear();
     const prefix = `P${year}`;
-    
+
     // Find the highest existing patient number for this year
     const { data, error } = await this.supabase
       .from(this.tableName)
@@ -63,7 +63,9 @@ export class PatientModel extends BaseModel {
     const { data, error } = await this.supabase
       .from(this.tableName)
       .select('*')
-      .or(`first_name.ilike.%${searchTerm}%,last_name.ilike.%${searchTerm}%,patient_number.ilike.%${searchTerm}%,phone.ilike.%${searchTerm}%`)
+      .or(
+        `first_name.ilike.%${searchTerm}%,last_name.ilike.%${searchTerm}%,patient_number.ilike.%${searchTerm}%,phone.ilike.%${searchTerm}%`
+      )
       .order('first_name')
       .limit(options.limit || 20);
 
@@ -107,7 +109,7 @@ export class PatientModel extends BaseModel {
    */
   async updateLastVisit(patientId, visitDate = new Date()) {
     return this.updateById(patientId, {
-      last_visit: visitDate.toISOString().split('T')[0]
+      last_visit: visitDate.toISOString().split('T')[0],
     });
   }
 
@@ -115,8 +117,7 @@ export class PatientModel extends BaseModel {
    * Get patient statistics
    */
   async getStatistics() {
-    const { data, error } = await this.supabase
-      .rpc('get_patient_statistics');
+    const { data, error } = await this.supabase.rpc('get_patient_statistics');
 
     if (error) {
       throw error;
@@ -133,11 +134,11 @@ export class PatientModel extends BaseModel {
     const birthDate = new Date(dateOfBirth);
     let age = today.getFullYear() - birthDate.getFullYear();
     const monthDiff = today.getMonth() - birthDate.getMonth();
-    
+
     if (monthDiff < 0 || (monthDiff === 0 && today.getDate() < birthDate.getDate())) {
       age--;
     }
-    
+
     return age;
   }
 
@@ -147,7 +148,7 @@ export class PatientModel extends BaseModel {
   generateInitials(name) {
     return name
       .split(' ')
-      .map(word => word.charAt(0).toUpperCase())
+      .map((word) => word.charAt(0).toUpperCase())
       .join('')
       .substring(0, 3);
   }
@@ -177,7 +178,7 @@ export class PatientModel extends BaseModel {
   async getByGender(gender, options = {}) {
     return this.findAll({
       ...options,
-      filters: { ...options.filters, gender }
+      filters: { ...options.filters, gender },
     });
   }
 }

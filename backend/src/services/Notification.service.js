@@ -30,7 +30,10 @@ class NotificationService {
   /**
    * Convenience: notify a patient portal user by patientId (no-op if no account).
    */
-  async notifyPatientByPatientId(patientId, { title, message, type = 'info', relatedEntityType, relatedEntityId }) {
+  async notifyPatientByPatientId(
+    patientId,
+    { title, message, type = 'info', relatedEntityType, relatedEntityId }
+  ) {
     const userId = await this.getPortalUserIdByPatientId(patientId);
     if (!userId) {
       return null;
@@ -167,10 +170,13 @@ class NotificationService {
   /**
    * Notify a specific doctor
    */
-  async notifyDoctor(doctorId, { title, message, type = 'info', relatedEntityType, relatedEntityId }) {
+  async notifyDoctor(
+    doctorId,
+    { title, message, type = 'info', relatedEntityType, relatedEntityId }
+  ) {
     try {
       const doctorUserId = await getDoctorId(doctorId);
-      
+
       if (!doctorUserId) {
         logger.warn(`[NotificationService] Doctor ${doctorId} not found or inactive`);
         return null;

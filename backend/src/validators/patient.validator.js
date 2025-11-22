@@ -20,7 +20,7 @@ const createPatientSchema = Joi.object({
   medical_conditions: Joi.string().trim().max(1000).optional(),
   current_medications: Joi.string().trim().max(1000).optional(),
   insurance_provider: Joi.string().trim().max(200).optional(),
-  insurance_number: Joi.string().trim().max(100).optional()
+  insurance_number: Joi.string().trim().max(100).optional(),
 });
 
 /**
@@ -42,7 +42,7 @@ const updatePatientSchema = Joi.object({
   medical_conditions: Joi.string().trim().max(1000).optional(),
   current_medications: Joi.string().trim().max(1000).optional(),
   insurance_provider: Joi.string().trim().max(200).optional(),
-  insurance_number: Joi.string().trim().max(100).optional()
+  insurance_number: Joi.string().trim().max(100).optional(),
 }).min(1); // At least one field must be provided for update
 
 /**
@@ -50,7 +50,7 @@ const updatePatientSchema = Joi.object({
  */
 const searchPatientSchema = Joi.object({
   term: Joi.string().trim().min(2).max(100).required(),
-  limit: Joi.number().integer().min(1).max(50).default(10)
+  limit: Joi.number().integer().min(1).max(50).default(10),
 });
 
 // Export validation middleware

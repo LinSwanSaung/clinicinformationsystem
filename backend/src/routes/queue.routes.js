@@ -259,22 +259,25 @@ router.put('/token/:tokenId/start-consultation', authenticate, async (req, res) 
       stack: error?.stack,
       name: error?.name,
       tokenId: req.params.tokenId,
-      error: error
+      error: error,
     });
-    
+
     // Check for network/database connectivity issues
     const errMsg = error?.message?.toLowerCase() || '';
-    if (errMsg.includes('fetch failed') || 
-        errMsg.includes('network') || 
-        errMsg.includes('timeout') ||
-        errMsg.includes('econnrefused') ||
-        errMsg.includes('enotfound')) {
+    if (
+      errMsg.includes('fetch failed') ||
+      errMsg.includes('network') ||
+      errMsg.includes('timeout') ||
+      errMsg.includes('econnrefused') ||
+      errMsg.includes('enotfound')
+    ) {
       return res.status(503).json({
         success: false,
-        message: 'Database connection failed. Please check your network connection or try disabling VPN.',
+        message:
+          'Database connection failed. Please check your network connection or try disabling VPN.',
       });
     }
-    
+
     res.status(400).json({
       success: false,
       message: error?.message || 'Failed to start consultation',

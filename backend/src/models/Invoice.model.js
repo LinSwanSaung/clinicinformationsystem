@@ -305,7 +305,6 @@ class InvoiceModel extends BaseModel {
     return count || 0;
   }
 
-
   /**
    * Get payment history for an invoice
    */

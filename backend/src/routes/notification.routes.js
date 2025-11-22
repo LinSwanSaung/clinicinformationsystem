@@ -13,10 +13,10 @@ router.get('/', authenticate, async (req, res, next) => {
   try {
     const limit = parseInt(req.query.limit) || 50;
     const notifications = await NotificationService.getUserNotifications(req.user.id, limit);
-    
+
     res.json({
       success: true,
-      data: notifications
+      data: notifications,
     });
   } catch (error) {
     next(error);
@@ -31,10 +31,10 @@ router.get('/', authenticate, async (req, res, next) => {
 router.get('/unread-count', authenticate, async (req, res, next) => {
   try {
     const count = await NotificationService.getUnreadCount(req.user.id);
-    
+
     res.json({
       success: true,
-      data: { count }
+      data: { count },
     });
   } catch (error) {
     next(error);
@@ -49,11 +49,11 @@ router.get('/unread-count', authenticate, async (req, res, next) => {
 router.put('/:id/read', authenticate, async (req, res, next) => {
   try {
     const notification = await NotificationService.markAsRead(req.params.id);
-    
+
     res.json({
       success: true,
       message: 'Notification marked as read',
-      data: notification
+      data: notification,
     });
   } catch (error) {
     next(error);
@@ -68,10 +68,10 @@ router.put('/:id/read', authenticate, async (req, res, next) => {
 router.put('/read-all', authenticate, async (req, res, next) => {
   try {
     await NotificationService.markAllAsRead(req.user.id);
-    
+
     res.json({
       success: true,
-      message: 'All notifications marked as read'
+      message: 'All notifications marked as read',
     });
   } catch (error) {
     next(error);
@@ -86,10 +86,10 @@ router.put('/read-all', authenticate, async (req, res, next) => {
 router.delete('/:id', authenticate, async (req, res, next) => {
   try {
     await NotificationService.deleteNotification(req.params.id);
-    
+
     res.json({
       success: true,
-      message: 'Notification deleted'
+      message: 'Notification deleted',
     });
   } catch (error) {
     next(error);

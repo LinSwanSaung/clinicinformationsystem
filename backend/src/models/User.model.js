@@ -15,15 +15,15 @@ export class UserModel extends BaseModel {
    */
   async create(userData) {
     const { password, ...otherData } = userData;
-    
+
     // Hash password
     const passwordHash = await bcrypt.hash(password, 12);
-    
+
     const newUser = {
       ...otherData,
       password_hash: passwordHash,
       created_at: new Date().toISOString(),
-      updated_at: new Date().toISOString()
+      updated_at: new Date().toISOString(),
     };
 
     return super.create(newUser);
@@ -45,7 +45,7 @@ export class UserModel extends BaseModel {
 
   /**
    * Update user password
-  */
+   */
   async updatePassword(userId, newPassword) {
     const passwordHash = await bcrypt.hash(newPassword, 12);
     // Bypass the user-model override so we can update the hashed password
@@ -59,7 +59,7 @@ export class UserModel extends BaseModel {
   async updateById(id, data) {
     // Remove any fields that shouldn't be directly updated
     const { password: _password, password_hash: _password_hash, ...updateData } = data;
-    
+
     // Call parent updateById method
     return super.updateById(id, updateData);
   }
@@ -70,7 +70,7 @@ export class UserModel extends BaseModel {
   async findByRole(role, options = {}) {
     return this.findAll({
       ...options,
-      filters: { ...options.filters, role }
+      filters: { ...options.filters, role },
     });
   }
 
@@ -80,7 +80,7 @@ export class UserModel extends BaseModel {
   async findActive(options = {}) {
     return this.findAll({
       ...options,
-      filters: { ...options.filters, is_active: true }
+      filters: { ...options.filters, is_active: true },
     });
   }
 
@@ -95,22 +95,22 @@ export class UserModel extends BaseModel {
    * Get user profile (without sensitive data)
    */
   async getProfile(userId) {
-    return this.findById(userId, 'id, email, first_name, last_name, role, phone, specialty, is_active, created_at');
+    return this.findById(
+      userId,
+      'id, email, first_name, last_name, role, phone, specialty, is_active, created_at'
+    );
   }
 
   /**
    * Get patient portal accounts with optional search/filter
    */
   async getPatientAccounts(options = {}) {
-    const {
-      search = '',
-      limit = 50,
-      offset = 0
-    } = options;
+    const { search = '', limit = 50, offset = 0 } = options;
 
     let query = this.supabase
       .from(this.tableName)
-      .select(`
+      .select(
+        `
         id,
         email,
         first_name,
@@ -131,14 +131,18 @@ export class UserModel extends BaseModel {
           gender,
           phone
         )
-      `, { count: 'exact' })
+      `,
+        { count: 'exact' }
+      )
       .eq('role', 'patient')
       .order('created_at', { ascending: false })
       .range(offset, offset + limit - 1);
 
     if (search && search.trim().length > 0) {
       const term = search.trim();
-      query = query.or(`email.ilike.%${term}%,first_name.ilike.%${term}%,last_name.ilike.%${term}%`);
+      query = query.or(
+        `email.ilike.%${term}%,first_name.ilike.%${term}%,last_name.ilike.%${term}%`
+      );
     }
 
     const { data, error, count } = await query;
@@ -149,7 +153,7 @@ export class UserModel extends BaseModel {
 
     return {
       accounts: data || [],
-      total: count ?? (data ? data.length : 0)
+      total: count ?? (data ? data.length : 0),
     };
   }
 
@@ -159,7 +163,8 @@ export class UserModel extends BaseModel {
   async getPatientAccountById(userId) {
     const { data, error } = await this.supabase
       .from(this.tableName)
-      .select(`
+      .select(
+        `
         id,
         email,
         first_name,
@@ -180,7 +185,8 @@ export class UserModel extends BaseModel {
           gender,
           phone
         )
-      `)
+      `
+      )
       .eq('id', userId)
       .maybeSingle();
 
@@ -206,7 +212,7 @@ export class UserModel extends BaseModel {
    */
   async linkPatientAccount(userId, patientId) {
     return this.updateById(userId, {
-      patient_id: patientId
+      patient_id: patientId,
     });
   }
 
@@ -215,7 +221,7 @@ export class UserModel extends BaseModel {
    */
   async unlinkPatientAccount(userId) {
     return this.updateById(userId, {
-      patient_id: null
+      patient_id: null,
     });
   }
 
@@ -226,7 +232,9 @@ export class UserModel extends BaseModel {
     const { data, error } = await this.supabase
       .from(this.tableName)
       .select('id, email, first_name, last_name, role, phone, specialty, is_active')
-      .or(`first_name.ilike.%${searchTerm}%,last_name.ilike.%${searchTerm}%,email.ilike.%${searchTerm}%`)
+      .or(
+        `first_name.ilike.%${searchTerm}%,last_name.ilike.%${searchTerm}%,email.ilike.%${searchTerm}%`
+      )
       .order('first_name')
       .limit(options.limit || 20);
 
@@ -243,9 +251,9 @@ export class UserModel extends BaseModel {
   async updateLastLogin(userId) {
     const { error } = await this.supabase
       .from(this.tableName)
-      .update({ 
+      .update({
         last_login: new Date().toISOString(),
-        updated_at: new Date().toISOString()
+        updated_at: new Date().toISOString(),
       })
       .eq('id', userId);
 

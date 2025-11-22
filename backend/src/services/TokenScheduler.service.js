@@ -23,7 +23,7 @@ class TokenSchedulerService {
     this.scheduledTask = cron.schedule('*/5 * * * *', async () => {
       try {
         const result = await this.doctorAvailabilityService.checkAndMarkMissedTokens();
-        
+
         if (result.count > 0) {
           logger.info(`Marked ${result.count} tokens as missed`);
         }
@@ -54,7 +54,8 @@ class TokenSchedulerService {
     return {
       isRunning: this.isRunning,
       schedule: '*/5 * * * * (Every 5 minutes)',
-      description: 'Automatically marks tokens as missed during doctor breaks and after working hours'
+      description:
+        'Automatically marks tokens as missed during doctor breaks and after working hours',
     };
   }
 

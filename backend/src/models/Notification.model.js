@@ -63,9 +63,9 @@ class NotificationModel extends BaseModel {
   async markAsRead(notificationId) {
     const { data, error } = await this.supabase
       .from(this.tableName)
-      .update({ 
+      .update({
         is_read: true,
-        read_at: new Date().toISOString()
+        read_at: new Date().toISOString(),
       })
       .eq('id', notificationId)
       .select()
@@ -83,9 +83,9 @@ class NotificationModel extends BaseModel {
   async markAllAsRead(userId) {
     const { data, error } = await this.supabase
       .from(this.tableName)
-      .update({ 
+      .update({
         is_read: true,
-        read_at: new Date().toISOString()
+        read_at: new Date().toISOString(),
       })
       .eq('user_id', userId)
       .eq('is_read', false)
@@ -101,10 +101,7 @@ class NotificationModel extends BaseModel {
    * Delete a notification
    */
   async deleteNotification(notificationId) {
-    const { error } = await this.supabase
-      .from(this.tableName)
-      .delete()
-      .eq('id', notificationId);
+    const { error } = await this.supabase.from(this.tableName).delete().eq('id', notificationId);
 
     if (error) {
       throw error;

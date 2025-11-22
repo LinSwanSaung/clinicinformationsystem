@@ -56,5 +56,3 @@ export function startAppointmentReminders() {
   logger.info('⏰ Appointment reminder job scheduled (every 5 minutes)');
   return task;
 }
-
-

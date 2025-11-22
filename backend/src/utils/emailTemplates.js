@@ -79,5 +79,3 @@ export function renderWelcomeEmail({ firstName, linkUrl = portalUrl }) {
     html: baseTemplate({ title: 'Welcome to the Patient Portal', bodyHtml }),
   };
 }
-
-

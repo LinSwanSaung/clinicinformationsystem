@@ -49,11 +49,7 @@ class PatientDiagnosisModel extends BaseModel {
    * Create new diagnosis
    */
   async create(diagnosisData) {
-    const { data, error } = await supabase
-      .from(this.table)
-      .insert(diagnosisData)
-      .select()
-      .single();
+    const { data, error } = await supabase.from(this.table).insert(diagnosisData).select().single();
 
     if (error) {
       throw error;
@@ -82,11 +78,11 @@ class PatientDiagnosisModel extends BaseModel {
    * Update diagnosis status
    */
   async updateStatus(id, status, resolvedDate = null) {
-    const updateData = { 
-      status, 
-      updated_at: new Date() 
+    const updateData = {
+      status,
+      updated_at: new Date(),
     };
-    
+
     if (status === 'resolved' && resolvedDate) {
       updateData.resolved_date = resolvedDate;
     }
@@ -108,9 +104,7 @@ class PatientDiagnosisModel extends BaseModel {
    * Get active diagnoses
    */
   async getActiveDiagnoses() {
-    const { data, error } = await supabase
-      .from('active_patient_diagnoses')
-      .select('*');
+    const { data, error } = await supabase.from('active_patient_diagnoses').select('*');
 
     if (error) {
       throw error;
@@ -122,11 +116,7 @@ class PatientDiagnosisModel extends BaseModel {
    * Find diagnosis by ID
    */
   async findById(id) {
-    const { data, error } = await supabase
-      .from(this.table)
-      .select('*')
-      .eq('id', id)
-      .single();
+    const { data, error } = await supabase.from(this.table).select('*').eq('id', id).single();
 
     if (error) {
       throw error;
@@ -140,9 +130,9 @@ class PatientDiagnosisModel extends BaseModel {
   async softDelete(id) {
     const { data, error } = await supabase
       .from(this.table)
-      .update({ 
+      .update({
         deleted_at: new Date(),
-        updated_at: new Date() 
+        updated_at: new Date(),
       })
       .eq('id', id)
       .select()

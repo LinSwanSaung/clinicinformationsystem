@@ -1,0 +1,29 @@
+# Backend files (deploy separately)
+backend/
+node_modules/
+*.log
+.env
+.env.local
+.env.*.local
+
+# Development files
+.git/
+.github/
+docs/
+*.md
+!README.md
+
+# Database files
+*.sql
+database/
+
+# Test files
+**/__tests__/
+**/*.test.js
+**/*.spec.js
+
+# Build artifacts
+dist/
+build/
+*.tsbuildinfo
+

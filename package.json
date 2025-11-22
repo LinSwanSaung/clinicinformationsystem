@@ -1,5 +1,5 @@
 {
-  "name": "realcis-clinic-information-system",
+  "name": "thrivecare-clinic-information-system",
   "version": "1.0.0",
   "description": "A modern React-based Clinic Information System for low-resource healthcare settings",
   "scripts": {
@@ -34,7 +34,7 @@
     "react",
     "supabase"
   ],
-  "author": "RealCIS Team",
+  "author": "ThriveCare Team",
   "license": "MIT",
   "devDependencies": {
     "concurrently": "^7.0.0",

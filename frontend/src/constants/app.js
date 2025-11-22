@@ -5,7 +5,7 @@
 
 export const APP_CONFIG = Object.freeze({
   // System Information
-  SYSTEM_NAME: 'RealCIS',
+  SYSTEM_NAME: 'ThriveCare',
   SYSTEM_DESCRIPTION: 'Healthcare System',
   SYSTEM_VERSION: '1.0.0',
   

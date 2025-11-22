@@ -1,7 +1,7 @@
 {
-  "name": "realcis-server",
+  "name": "thrivecare-server",
   "version": "1.0.0",
-  "description": "RealCIS Clinic Information System - Backend API",
+  "description": "ThriveCare Clinic Information System - Backend API",
   "main": "src/app.js",
   "type": "module",
   "imports": {
@@ -41,7 +41,7 @@
     "supabase",
     "nodejs"
   ],
-  "author": "RealCIS Team",
+  "author": "ThriveCare Team",
   "license": "MIT",
   "dependencies": {
     "@supabase/supabase-js": "^2.39.7",

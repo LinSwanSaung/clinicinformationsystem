@@ -759,7 +759,7 @@ class VisitService {
         .fillColor('#ffffff')
         .fontSize(28)
         .font('Helvetica-Bold')
-        .text('RealCIS', 50, 30)
+        .text('ThriveCare', 50, 30)
         .fontSize(12)
         .font('Helvetica')
         .text('Healthcare System', 50, 62);
@@ -1314,7 +1314,7 @@ class VisitService {
           footerY + 25,
           { align: 'center' }
         )
-        .text('RealCIS Healthcare System | Confidential Patient Information', 50, footerY + 40, {
+        .text('ThriveCare Healthcare System | Confidential Patient Information', 50, footerY + 40, {
           align: 'center',
         });
 
@@ -1412,8 +1412,23 @@ class VisitService {
       // Collect PDF data into buffer
       doc.on('data', (chunk) => chunks.push(chunk));
 
-      // PDF Header
-      doc.fontSize(20).text('Patient Visit History', { align: 'center' });
+      // PDF Header with system branding
+      doc
+        .fillColor('#1e40af')
+        .fontSize(24)
+        .font('Helvetica-Bold')
+        .text('ThriveCare', { align: 'center' })
+        .fontSize(10)
+        .font('Helvetica')
+        .fillColor('#6b7280')
+        .text('Healthcare System', { align: 'center' })
+        .moveDown(1);
+      
+      doc
+        .fillColor('#000000')
+        .fontSize(20)
+        .font('Helvetica-Bold')
+        .text('Patient Visit History', { align: 'center' });
       doc.moveDown();
       doc.fontSize(10).text(`Generated: ${new Date().toLocaleString()}`, { align: 'center' });
       doc.moveDown(2);
@@ -1498,6 +1513,34 @@ class VisitService {
         doc.moveTo(50, doc.y).lineTo(550, doc.y).stroke();
         doc.moveDown(1);
       });
+
+      // Footer with system branding
+      const footerY = doc.page.height - 60;
+      doc
+        .fillColor('#9ca3af')
+        .fontSize(8)
+        .font('Helvetica')
+        .text(
+          'This is a computer-generated document. No signature is required.',
+          50,
+          footerY,
+          { align: 'center' }
+        )
+        .text(
+          `Generated on ${new Date().toLocaleDateString('en-US', {
+            year: 'numeric',
+            month: 'long',
+            day: 'numeric',
+            hour: '2-digit',
+            minute: '2-digit',
+          })}`,
+          50,
+          footerY + 15,
+          { align: 'center' }
+        )
+        .text('ThriveCare Healthcare System | Confidential Patient Information', 50, footerY + 30, {
+          align: 'center',
+        });
 
       // Finalize PDF
       doc.end();

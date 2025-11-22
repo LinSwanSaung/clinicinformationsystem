@@ -148,7 +148,7 @@ app.get('/health', async (req, res) => {
   const dbConnected = await testConnection();
   res.status(200).json({
     status: 'OK',
-    message: 'RealCIS API is running',
+    message: 'ThriveCare API is running',
     timestamp: new Date().toISOString(),
     environment: process.env.NODE_ENV,
     db: {
@@ -199,7 +199,7 @@ app.use(errorHandler);
 
 // Start server
 app.listen(PORT, () => {
-  logger.info(`🚀 RealCIS API Server running on port ${PORT}`);
+  logger.info(`🚀 ThriveCare API Server running on port ${PORT}`);
   logger.info(`📋 Environment: ${process.env.NODE_ENV}`);
   logger.info(`🏥 Health check: http://localhost:${PORT}/health`);
 

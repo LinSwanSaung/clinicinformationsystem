@@ -1,6 +1,6 @@
 # Backend Documentation
 
-This directory contains production-ready documentation for the RealCIS backend.
+This directory contains production-ready documentation for the ThriveCare backend.
 
 ## 📚 Documentation
 

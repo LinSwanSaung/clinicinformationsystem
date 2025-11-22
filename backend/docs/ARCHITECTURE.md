@@ -1,6 +1,6 @@
 # Backend Architecture
 
-This document describes the architecture, design patterns, and implementation details of the RealCIS backend API.
+This document describes the architecture, design patterns, and implementation details of the ThriveCare backend API.
 
 ## 🏗️ Architecture Overview
 

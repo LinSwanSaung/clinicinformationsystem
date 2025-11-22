@@ -1,6 +1,6 @@
 # Setup and Operations Guide
 
-This document covers setup, configuration, deployment, and operational procedures for the RealCIS backend.
+This document covers setup, configuration, deployment, and operational procedures for the ThriveCare backend.
 
 ## 🚀 Getting Started
 
@@ -65,7 +65,7 @@ This document covers setup, configuration, deployment, and operational procedure
    - Visit: https://supabase.com
    - Click "Start your project"
    - Sign up with GitHub or email
-   - Create new project: `realcis-clinic`
+   - Create new project: `thrivecare-clinic`
    - Choose region and plan (Free tier available)
 
 2. **Get API Keys:**
@@ -191,7 +191,7 @@ LOG_LEVEL=debug  # Logs all levels
 3. **Use process manager (PM2 recommended):**
    ```bash
    npm install -g pm2
-   pm2 start src/app.js --name realcis-backend
+   pm2 start src/app.js --name thrivecare-backend
    pm2 save
    pm2 startup
    ```

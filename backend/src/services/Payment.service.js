@@ -232,8 +232,8 @@ class PaymentService {
 
       // Get clinic settings for header and footer (capture at start to prevent changes during PDF generation)
       const clinicSettings = await clinicSettingsService.getSettings();
-      const clinicName = clinicSettings.clinic_name || 'RealCIS';
-      const systemName = 'RealCIS';
+      const clinicName = clinicSettings.clinic_name || 'ThriveCare';
+      const systemName = 'ThriveCare';
       const systemDescription = 'Healthcare System';
       
       // Get currency settings ONCE at the start and use throughout PDF generation

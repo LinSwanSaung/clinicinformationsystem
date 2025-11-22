@@ -2,7 +2,7 @@
 
 ## Overview
 
-The RealCIS frontend is built with React 19, Vite, and Tailwind CSS, following a feature-based architecture pattern.
+The ThriveCare frontend is built with React 19, Vite, and Tailwind CSS, following a feature-based architecture pattern.
 
 ## Directory Structure
 

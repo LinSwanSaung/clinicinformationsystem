@@ -1,6 +1,6 @@
-# RealCIS Backend API
+# ThriveCare Backend API
 
-A robust, scalable backend API for the RealCIS Clinic Information System built with Node.js, Express, and Supabase.
+A robust, scalable backend API for the ThriveCare Clinic Information System built with Node.js, Express, and Supabase.
 
 ## 🚀 Quick Start
 

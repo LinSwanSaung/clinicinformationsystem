@@ -1,4 +1,4 @@
-# RealCIS - Clinic Information System
+# ThriveCare - Clinic Information System
 
 A modern, responsive Clinic Information System designed for low-resource healthcare settings. Built with React, TailwindCSS, and shadcn/ui components.
 
@@ -45,7 +45,7 @@ A modern, responsive Clinic Information System designed for low-resource healthc
 1. **Clone the repository**
    ```bash
    git clone <repository-url>
-   cd realcis
+   cd thrivecare
    ```
 
 2. **Install dependencies**
@@ -98,7 +98,7 @@ This application follows the Supabase design system for:
 ## 📁 Project Structure
 
 ```
-realcis/
+thrivecare/
 ├── src/
 │   ├── components/
 │   │   ├── ui/               # shadcn/ui components
@@ -188,4 +188,4 @@ For questions or support, please contact the development team or create an issue
 
 ---
 
-**RealCIS** - Empowering healthcare in low-resource settings through modern technology.
+**ThriveCare** - Empowering healthcare in low-resource settings through modern technology.

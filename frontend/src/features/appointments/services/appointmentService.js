@@ -43,7 +43,9 @@ class AppointmentService {
     // 'waiting' = patient is in queue waiting to be seen
     // 'in-progress' = patient is currently being seen
     // We exclude 'scheduled' because those might be future appointments
-    const response = await apiService.get(`/appointments?patient_id=${patientId}&date=${today}&status=waiting,in-progress`);
+    const response = await apiService.get(
+      `/appointments?patient_id=${patientId}&date=${today}&status=waiting,in-progress`
+    );
     return response;
   }
 }

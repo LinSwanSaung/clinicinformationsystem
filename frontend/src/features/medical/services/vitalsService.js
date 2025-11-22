@@ -12,9 +12,9 @@ class VitalsService {
     try {
       const payload = {
         ...vitalsData,
-        patient_id: patientId  // Ensure patient_id is set correctly
+        patient_id: patientId, // Ensure patient_id is set correctly
       };
-      
+
       const response = await apiService.post('/vitals', payload);
       return response;
     } catch (error) {
@@ -71,7 +71,7 @@ class VitalsService {
         // User is logged out, silently return empty result
         return { success: true, data: [] };
       }
-      
+
       const response = await apiService.get(`/vitals/visit/${visitId}`);
       return response;
     } catch (error) {

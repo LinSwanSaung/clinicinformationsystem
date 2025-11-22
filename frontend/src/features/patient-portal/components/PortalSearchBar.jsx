@@ -22,7 +22,7 @@ const PortalSearchBar = ({ initialQuery = '', onSubmit, t }) => {
       initial={{ opacity: 0, y: -8 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.3, ease: 'easeOut' }}
-      className="mx-auto flex w-full max-w-2xl items-center gap-2 rounded-full border border-border/70 bg-background px-4 py-2 shadow-sm focus-within:ring-2 focus-within:ring-primary focus-within:ring-offset-2"
+      className="border-border/70 mx-auto flex w-full max-w-2xl items-center gap-2 rounded-full border bg-background px-4 py-2 shadow-sm focus-within:ring-2 focus-within:ring-primary focus-within:ring-offset-2"
       role="search"
       aria-label={t('search.ariaLabel')}
     >

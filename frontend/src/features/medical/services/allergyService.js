@@ -21,7 +21,7 @@ class AllergyService {
    * Check if cached data is still valid
    */
   isCacheValid(cacheEntry) {
-    return cacheEntry && (Date.now() - cacheEntry.timestamp) < this.cacheTimeout;
+    return cacheEntry && Date.now() - cacheEntry.timestamp < this.cacheTimeout;
   }
 
   /**
@@ -43,7 +43,7 @@ class AllergyService {
       // Cache the results
       this.cache.set(cacheKey, {
         data: allergies,
-        timestamp: Date.now()
+        timestamp: Date.now(),
       });
 
       return allergies;
@@ -72,12 +72,12 @@ class AllergyService {
   async createAllergy(allergyData) {
     try {
       const response = await api.post('/patient-allergies', allergyData);
-      
+
       // Invalidate cache for this patient
       if (allergyData.patient_id) {
         this.clearPatientCache(allergyData.patient_id);
       }
-      
+
       return response.data.data;
     } catch (error) {
       logger.error('Error creating allergy:', error);
@@ -91,12 +91,12 @@ class AllergyService {
   async updateAllergy(id, allergyData) {
     try {
       const response = await api.put(`/patient-allergies/${id}`, allergyData);
-      
+
       // Invalidate cache for this patient
       if (allergyData.patient_id) {
         this.clearPatientCache(allergyData.patient_id);
       }
-      
+
       return response.data.data;
     } catch (error) {
       logger.error('Error updating allergy:', error);
@@ -110,12 +110,12 @@ class AllergyService {
   async deleteAllergy(id, patientId = null) {
     try {
       const response = await api.delete(`/patient-allergies/${id}`);
-      
+
       // Invalidate cache for this patient if provided
       if (patientId) {
         this.clearPatientCache(patientId);
       }
-      
+
       return response.data;
     } catch (error) {
       logger.error('Error deleting allergy:', error);

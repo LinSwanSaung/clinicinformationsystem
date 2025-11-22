@@ -139,7 +139,6 @@ const _searchVariants = {
 };
 
 const CashierDashboard = () => {
-
   // Use feedback system instead of inline state
   const { showSuccess, showError, showWarning } = useFeedback();
 
@@ -223,7 +222,7 @@ const CashierDashboard = () => {
       try {
         // Refresh currency cache first
         await refreshCurrencyCache();
-        
+
         const result = await clinicSettingsService.getSettings();
         if (result.success && result.data) {
           const data = result.data.data || result.data;
@@ -281,51 +280,49 @@ const CashierDashboard = () => {
     try {
       setHistoryLoading(true);
       setHistoryError(null);
-      
+
       // If force refresh, refetch from API first
       if (forceRefresh) {
         await refetchCompleted();
       }
-      
+
       const response = Array.isArray(completedInvoicesData) ? completedInvoicesData : [];
-      
+
       // Show each invoice separately - each invoice is tied to its visit
       // Don't consolidate invoices - each visit should have its own invoice entry
       const invoiceHistory = [];
-      
+
       response.forEach((invoice) => {
         // Calculate total paid amount for THIS invoice only
         // Only count payments that were made directly to this invoice
-        const totalPaid = invoice.payment_transactions?.reduce(
-          (sum, payment) => {
+        const totalPaid =
+          invoice.payment_transactions?.reduce((sum, payment) => {
             // Only count payments made to this invoice (not payments that went to other invoices)
             // Payments to other invoices have notes like "Paid with current visit invoice #..."
             const paymentNotes = (payment.payment_notes || '').toLowerCase();
-            const isPaymentToOtherInvoice = paymentNotes.includes('paid with current visit') || 
-                                           paymentNotes.includes('previous invoice');
-            
+            const isPaymentToOtherInvoice =
+              paymentNotes.includes('paid with current visit') ||
+              paymentNotes.includes('previous invoice');
+
             // If this payment was made to another invoice, don't count it here
             if (isPaymentToOtherInvoice) {
               return sum;
             }
-            
+
             return sum + parseFloat(payment.amount || 0);
-          },
-          0
-        ) || 0;
-        
+          }, 0) || 0;
+
         // Calculate balance due for this invoice
         const balanceDue = parseFloat(invoice.balance_due || 0);
-        
+
         // Check if this invoice has payments that mention paying off previous invoices
         // This happens when outstanding balance is paid from a later visit
-        const _hasOutstandingBalancePayment = invoice.payment_transactions?.some(
-          (payment) => {
+        const _hasOutstandingBalancePayment =
+          invoice.payment_transactions?.some((payment) => {
             const notes = (payment.payment_notes || '').toLowerCase();
             return notes.includes('paid with current visit') || notes.includes('previous invoice');
-          }
-        ) || false;
-        
+          }) || false;
+
         // Find payments on OTHER invoices that mention this invoice's number
         // This happens when this invoice's outstanding balance was paid from a later visit
         // The payment note will say "Paid with current visit invoice #THIS_INVOICE_NUMBER"
@@ -336,15 +333,17 @@ const CashierDashboard = () => {
             otherInvoice.payment_transactions.forEach((payment) => {
               const notes = (payment.payment_notes || '').toLowerCase();
               // Check if payment note mentions this invoice number
-              if (notes.includes(`invoice #${thisInvoiceNumber.toLowerCase()}`) || 
-                  notes.includes(`invoice ${thisInvoiceNumber.toLowerCase()}`) ||
-                  notes.includes(`invoice#${thisInvoiceNumber.toLowerCase()}`)) {
+              if (
+                notes.includes(`invoice #${thisInvoiceNumber.toLowerCase()}`) ||
+                notes.includes(`invoice ${thisInvoiceNumber.toLowerCase()}`) ||
+                notes.includes(`invoice#${thisInvoiceNumber.toLowerCase()}`)
+              ) {
                 outstandingBalancePaidFromLater += parseFloat(payment.amount || 0);
               }
             });
           }
         });
-        
+
         invoiceHistory.push({
           id: invoice.invoice_number || invoice.id,
           invoiceId: invoice.id,
@@ -364,18 +363,18 @@ const CashierDashboard = () => {
                 day: 'numeric',
               })
             : invoice.visits?.visit_date
-            ? new Date(invoice.visits.visit_date).toLocaleDateString('en-US', {
-                year: 'numeric',
-                month: 'short',
-                day: 'numeric',
-              })
-            : invoice.created_at
-            ? new Date(invoice.created_at).toLocaleDateString('en-US', {
-                year: 'numeric',
-                month: 'short',
-                day: 'numeric',
-              })
-            : 'N/A',
+              ? new Date(invoice.visits.visit_date).toLocaleDateString('en-US', {
+                  year: 'numeric',
+                  month: 'short',
+                  day: 'numeric',
+                })
+              : invoice.created_at
+                ? new Date(invoice.created_at).toLocaleDateString('en-US', {
+                    year: 'numeric',
+                    month: 'short',
+                    day: 'numeric',
+                  })
+                : 'N/A',
           time: invoice.completed_at
             ? new Date(invoice.completed_at).toLocaleTimeString('en-US', {
                 hour: 'numeric',
@@ -383,31 +382,37 @@ const CashierDashboard = () => {
                 hour12: true,
               })
             : invoice.created_at
-            ? new Date(invoice.created_at).toLocaleTimeString('en-US', {
-                hour: 'numeric',
-                minute: '2-digit',
-                hour12: true,
-              })
-            : 'N/A',
+              ? new Date(invoice.created_at).toLocaleTimeString('en-US', {
+                  hour: 'numeric',
+                  minute: '2-digit',
+                  hour12: true,
+                })
+              : 'N/A',
           totalAmount: parseFloat(invoice.total_amount || 0),
           amountPaid: totalPaid,
           balanceDue: balanceDue > 0 ? balanceDue : 0,
           status: invoice.status,
-          paymentMethod: invoice.payment_transactions?.find(p => {
-            const notes = (p.payment_notes || '').toLowerCase();
-            return !notes.includes('paid with current visit') && !notes.includes('previous invoice');
-          })?.payment_method || invoice.payment_transactions?.[0]?.payment_method || 'N/A',
+          paymentMethod:
+            invoice.payment_transactions?.find((p) => {
+              const notes = (p.payment_notes || '').toLowerCase();
+              return (
+                !notes.includes('paid with current visit') && !notes.includes('previous invoice')
+              );
+            })?.payment_method ||
+            invoice.payment_transactions?.[0]?.payment_method ||
+            'N/A',
           processedBy:
             invoice.completed_by_user?.full_name ||
             `${invoice.completed_by_user?.first_name || ''} ${invoice.completed_by_user?.last_name || ''}`.trim() ||
             'Unknown',
-          outstandingBalancePaidFromLater: outstandingBalancePaidFromLater > 0 ? outstandingBalancePaidFromLater : null,
+          outstandingBalancePaidFromLater:
+            outstandingBalancePaidFromLater > 0 ? outstandingBalancePaidFromLater : null,
           rawData: invoice,
         });
       });
-      
+
       const consolidatedInvoices = invoiceHistory;
-      
+
       // Sort by date (newest first)
       consolidatedInvoices.sort((a, b) => {
         const dateA = new Date(a.rawData?.completed_at || a.rawData?.created_at || 0);
@@ -434,7 +439,7 @@ const CashierDashboard = () => {
         invoiceDetails: response,
       });
       setInvoiceModalOpen(true);
-      
+
       // Fetch patient's total remaining credit
       const patientId = response.patient?.id || historyItem.rawData.patient_id;
       if (patientId) {
@@ -923,7 +928,7 @@ const CashierDashboard = () => {
         try {
           const paymentData = JSON.parse(pendingPayment);
           const { invoiceId, timestamp } = paymentData;
-          
+
           // Check if payment is still pending (within last 5 minutes)
           const fiveMinutesAgo = Date.now() - 5 * 60 * 1000;
           if (timestamp > fiveMinutesAgo) {
@@ -938,7 +943,9 @@ const CashierDashboard = () => {
                 await refetchCompleted();
               } else {
                 // Payment might have failed, show warning
-                showError('Payment processing was interrupted. Please verify payment status and retry if needed.');
+                showError(
+                  'Payment processing was interrupted. Please verify payment status and retry if needed.'
+                );
                 sessionStorage.removeItem('pendingPayment');
               }
             } catch (error) {
@@ -961,7 +968,7 @@ const CashierDashboard = () => {
 
   const handleProcessPayment = async () => {
     setIsProcessing(true);
-    
+
     // Save payment state to sessionStorage for browser refresh recovery
     const paymentState = {
       invoiceId: selectedInvoice?.id,
@@ -970,7 +977,7 @@ const CashierDashboard = () => {
       paymentMethod,
     };
     sessionStorage.setItem('pendingPayment', JSON.stringify(paymentState));
-    
+
     try {
       const totals = calculateTotals();
 
@@ -1421,7 +1428,10 @@ const CashierDashboard = () => {
                                   <div className="flex items-center gap-2">
                                     {formatCurrencySync(parseFloat(invoice.total_amount || 0))}
                                     {parseFloat(invoice.total_amount || 0) === 0 && (
-                                      <Badge variant="outline" className="border-amber-300 bg-amber-50 text-amber-800 text-xs">
+                                      <Badge
+                                        variant="outline"
+                                        className="border-amber-300 bg-amber-50 text-xs text-amber-800"
+                                      >
                                         No Services
                                       </Badge>
                                     )}
@@ -1437,7 +1447,10 @@ const CashierDashboard = () => {
                                     onClick={(e) => {
                                       e.stopPropagation();
                                       e.preventDefault();
-                                      logger.debug('Process button clicked for invoice:', invoice.id);
+                                      logger.debug(
+                                        'Process button clicked for invoice:',
+                                        invoice.id
+                                      );
                                       try {
                                         handleViewInvoice(invoice);
                                       } catch (error) {
@@ -1513,7 +1526,10 @@ const CashierDashboard = () => {
                                 <div className="flex items-center gap-2">
                                   <p className="font-medium">{invoice.id}</p>
                                   {invoice.hasCreditPayment && (
-                                    <Badge variant="outline" className="bg-blue-100 text-blue-800 border-blue-300 text-xs">
+                                    <Badge
+                                      variant="outline"
+                                      className="border-blue-300 bg-blue-100 text-xs text-blue-800"
+                                    >
                                       Credit Payment
                                     </Badge>
                                   )}
@@ -1522,8 +1538,9 @@ const CashierDashboard = () => {
                                   {invoice.patientName}
                                 </p>
                                 {invoice.creditAmount && (
-                                  <p className="text-xs text-blue-700 mt-1 font-medium">
-                                    Includes {formatCurrencySync(invoice.creditAmount)} credit from previous invoices
+                                  <p className="mt-1 text-xs font-medium text-blue-700">
+                                    Includes {formatCurrencySync(invoice.creditAmount)} credit from
+                                    previous invoices
                                   </p>
                                 )}
                               </div>
@@ -1537,33 +1554,37 @@ const CashierDashboard = () => {
                           </div>
                           <div className="flex items-center gap-4">
                             <div className="text-right">
-                              <p className="font-medium">{formatCurrencySync(invoice.totalAmount)}</p>
+                              <p className="font-medium">
+                                {formatCurrencySync(invoice.totalAmount)}
+                              </p>
                               {invoice.amountPaid > 0 && (
                                 <p className="text-xs text-muted-foreground">
                                   Paid: {formatCurrencySync(invoice.amountPaid)}
                                   {invoice.status === 'partial_paid' && invoice.balanceDue > 0 && (
-                                    <span className="text-amber-700 ml-1">(partial)</span>
+                                    <span className="ml-1 text-amber-700">(partial)</span>
                                   )}
                                 </p>
                               )}
                               {invoice.outstandingBalancePaidFromLater > 0 && (
-                                <p className="text-xs text-blue-700 font-medium">
-                                  Outstanding paid: {formatCurrencySync(invoice.outstandingBalancePaidFromLater)} (from later visit)
+                                <p className="text-xs font-medium text-blue-700">
+                                  Outstanding paid:{' '}
+                                  {formatCurrencySync(invoice.outstandingBalancePaidFromLater)}{' '}
+                                  (from later visit)
                                 </p>
                               )}
                               {invoice.balanceDue > 0 && (
-                                <p className="text-xs text-amber-700 font-medium">
+                                <p className="text-xs font-medium text-amber-700">
                                   Balance: {formatCurrencySync(invoice.balanceDue)}
                                 </p>
                               )}
-                              <p className="text-sm capitalize text-muted-foreground mt-1">
+                              <p className="mt-1 text-sm capitalize text-muted-foreground">
                                 {invoice.paymentMethod}
                               </p>
                             </div>
-                            <Badge 
+                            <Badge
                               className={
-                                invoice.status === 'partial_paid' 
-                                  ? 'bg-amber-100 text-amber-800' 
+                                invoice.status === 'partial_paid'
+                                  ? 'bg-amber-100 text-amber-800'
                                   : 'bg-green-100 text-green-800'
                               }
                             >
@@ -1624,830 +1645,827 @@ const CashierDashboard = () => {
         >
           {selectedInvoice && (
             <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
-                {/* Main Content */}
-                <div className="space-y-6 lg:col-span-2">
-                  {/* Patient Information */}
-                  <Card>
-                    <CardHeader className="pb-3">
-                      <CardTitle className="flex items-center gap-2 text-base">
-                        <User className="h-4 w-4" />
-                        Patient Information
-                      </CardTitle>
-                    </CardHeader>
-                    <CardContent className="space-y-3 pt-0">
-                      <div className="grid grid-cols-2 gap-3 text-sm">
-                        <div>
-                          <Label className="text-xs font-medium text-muted-foreground">Patient Name</Label>
-                          <p className="text-sm font-medium mt-0.5">
-                            {selectedInvoice.patient?.first_name}{' '}
-                            {selectedInvoice.patient?.last_name}
-                          </p>
-                        </div>
-                        <div>
-                          <Label className="text-xs font-medium text-muted-foreground">Visit Type</Label>
-                          <p className="text-sm mt-0.5">{selectedInvoice.visit?.visit_type || 'N/A'}</p>
-                        </div>
-                        <div>
-                          <Label className="text-xs font-medium text-muted-foreground">Date & Time</Label>
-                          <p className="flex items-center gap-1.5 text-sm mt-0.5">
-                            <Calendar className="h-3 w-3" />
-                            {new Date(selectedInvoice.created_at).toLocaleDateString()} at{' '}
-                            {new Date(selectedInvoice.created_at).toLocaleTimeString()}
-                          </p>
-                        </div>
-                        <div>
-                          <Label className="text-xs font-medium text-muted-foreground">Contact</Label>
-                          <p className="text-xs mt-0.5">{selectedInvoice.patient?.phone || 'N/A'}</p>
-                          <p className="text-xs mt-0.5">{selectedInvoice.patient?.email || 'N/A'}</p>
-                        </div>
+              {/* Main Content */}
+              <div className="space-y-6 lg:col-span-2">
+                {/* Patient Information */}
+                <Card>
+                  <CardHeader className="pb-3">
+                    <CardTitle className="flex items-center gap-2 text-base">
+                      <User className="h-4 w-4" />
+                      Patient Information
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent className="space-y-3 pt-0">
+                    <div className="grid grid-cols-2 gap-3 text-sm">
+                      <div>
+                        <Label className="text-xs font-medium text-muted-foreground">
+                          Patient Name
+                        </Label>
+                        <p className="mt-0.5 text-sm font-medium">
+                          {selectedInvoice.patient?.first_name} {selectedInvoice.patient?.last_name}
+                        </p>
                       </div>
-                    </CardContent>
-                  </Card>
+                      <div>
+                        <Label className="text-xs font-medium text-muted-foreground">
+                          Visit Type
+                        </Label>
+                        <p className="mt-0.5 text-sm">
+                          {selectedInvoice.visit?.visit_type || 'N/A'}
+                        </p>
+                      </div>
+                      <div>
+                        <Label className="text-xs font-medium text-muted-foreground">
+                          Date & Time
+                        </Label>
+                        <p className="mt-0.5 flex items-center gap-1.5 text-sm">
+                          <Calendar className="h-3 w-3" />
+                          {new Date(selectedInvoice.created_at).toLocaleDateString()} at{' '}
+                          {new Date(selectedInvoice.created_at).toLocaleTimeString()}
+                        </p>
+                      </div>
+                      <div>
+                        <Label className="text-xs font-medium text-muted-foreground">Contact</Label>
+                        <p className="mt-0.5 text-xs">{selectedInvoice.patient?.phone || 'N/A'}</p>
+                        <p className="mt-0.5 text-xs">{selectedInvoice.patient?.email || 'N/A'}</p>
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
 
-                  {/* Outstanding Balance Alert */}
-                  {outstandingBalance && outstandingBalance.totalBalance > 0 && (
-                    <Card
-                      className={
-                        invoiceLimitReached
-                          ? 'border-red-300 bg-red-50'
-                          : 'border-amber-200 bg-amber-50'
-                      }
-                    >
-                      <CardHeader>
-                        <CardTitle
-                          className={`flex items-center gap-2 ${invoiceLimitReached ? 'text-red-900' : 'text-amber-900'}`}
-                        >
-                          <AlertCircle className="h-5 w-5" />
-                          {invoiceLimitReached ? '⚠️ Invoice Limit Reached' : 'Outstanding Balance'}
-                        </CardTitle>
-                      </CardHeader>
-                      <CardContent className="space-y-4">
-                        <div className="flex items-start justify-between">
-                          <div className="space-y-2">
-                            <p
-                              className={`text-sm ${invoiceLimitReached ? 'text-red-800' : 'text-amber-800'}`}
-                            >
-                              This patient has {outstandingBalance.invoiceCount} unpaid invoice
-                              {outstandingBalance.invoiceCount > 1 ? 's' : ''} with a total balance
-                              of:
-                            </p>
-                            <p
-                              className={`text-3xl font-bold ${invoiceLimitReached ? 'text-red-900' : 'text-amber-900'}`}
-                            >
-                              {formatCurrencySync(outstandingBalance.totalBalance)}
-                            </p>
-
-                            {/* 2-Invoice Limit Warning */}
-                            {invoiceLimitReached && (
-                              <div className="mt-3 rounded-lg border-2 border-red-400 bg-red-100 p-3">
-                                <p className="flex items-center gap-2 text-sm font-bold text-red-900">
-                                  <XCircle className="h-5 w-5" />
-                                  MAXIMUM OUTSTANDING INVOICES REACHED (2/2)
-                                </p>
-                                <p className="mt-1 text-xs text-red-800">
-                                  Patient cannot leave with another unpaid invoice. They must
-                                  either:
-                                </p>
-                                <ul className="ml-4 mt-1 list-disc space-y-1 text-xs text-red-800">
-                                  <li>Pay the full amount including previous balance</li>
-                                  <li>
-                                    Pay off at least one previous invoice to reduce outstanding
-                                    count
-                                  </li>
-                                </ul>
-                              </div>
-                            )}
-
-                            {/* List of outstanding invoices */}
-                            <div className="mt-3 space-y-1">
-                              {outstandingBalance.invoices.map((inv) => (
-                                <div
-                                  key={inv.id}
-                                  className={`flex items-center gap-2 text-xs ${invoiceLimitReached ? 'text-red-700' : 'text-amber-700'}`}
-                                >
-                                  <Receipt className="h-3 w-3" />
-                                  Invoice #{inv.invoice_number || inv.id.slice(0, 8)} - {formatCurrencySync(parseFloat(inv.balance_due))} due
-                                  {inv.payment_due_date && (
-                                    <span
-                                      className={
-                                        invoiceLimitReached ? 'text-red-600' : 'text-amber-600'
-                                      }
-                                    >
-                                      (Due: {new Date(inv.payment_due_date).toLocaleDateString()})
-                                    </span>
-                                  )}
-                                </div>
-                              ))}
-                            </div>
-                          </div>
-                        </div>
-
-                        {/* Action: Add to current invoice */}
-                        <div
-                          className={`flex items-center gap-3 rounded-lg border bg-white p-3 ${invoiceLimitReached ? 'border-red-300' : 'border-amber-200'}`}
-                        >
-                          <input
-                            type="checkbox"
-                            id="addOutstanding"
-                            checked={addOutstandingToInvoice}
-                            onChange={(e) => setAddOutstandingToInvoice(e.target.checked)}
-                            className={`h-4 w-4 rounded border focus:ring-2 ${invoiceLimitReached ? 'border-red-400 text-red-600 focus:ring-red-500' : 'border-amber-300 text-amber-600 focus:ring-amber-500'}`}
-                          />
-                          <label
-                            htmlFor="addOutstanding"
-                            className={`flex-1 cursor-pointer text-sm font-medium ${invoiceLimitReached ? 'text-red-900' : 'text-amber-900'}`}
-                          >
-                            {invoiceLimitReached
-                              ? `⚠️ Must add outstanding balance (${formatCurrencySync(outstandingBalance.totalBalance)}) - cannot create another unpaid invoice`
-                              : `Add outstanding balance (${formatCurrencySync(outstandingBalance.totalBalance)}) to current invoice`}
-                          </label>
-                        </div>
-
-                        {addOutstandingToInvoice && !invoiceLimitReached && (
-                          <div className="rounded-lg border border-green-200 bg-green-50 p-3">
-                            <p className="flex items-center gap-2 text-sm text-green-800">
-                              <CheckCircle className="h-4 w-4" />
-                              Outstanding balance will be added to the total. Patient can pay full
-                              amount or make partial payment.
-                            </p>
-                          </div>
-                        )}
-
-                        {addOutstandingToInvoice && invoiceLimitReached && (
-                          <div className="rounded-lg border border-green-200 bg-green-50 p-3">
-                            <p className="flex items-center gap-2 text-sm text-green-800">
-                              <CheckCircle className="h-4 w-4" />
-                              Good! Outstanding balance added. Patient must pay full amount to
-                              proceed.
-                            </p>
-                          </div>
-                        )}
-                      </CardContent>
-                    </Card>
-                  )}
-
-                  {/* Services and Medications */}
-                  <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
-                    {/* Services */}
-                    <Card>
-                      <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-3">
-                        <CardTitle className="text-base">Services Provided</CardTitle>
-                        <Button
-                          size="sm"
-                          variant="outline"
-                          onClick={() => setShowAddServiceDialog(true)}
-                          className="gap-2"
-                        >
-                          <Plus className="h-4 w-4" />
-                          Add Service
-                        </Button>
-                      </CardHeader>
-                      <CardContent>
-                        {services.length === 0 ? (
-                          <div className="py-8 text-center text-muted-foreground">
-                            <FileText className="mx-auto mb-2 h-12 w-12 opacity-50" />
-                            <p>No services added yet</p>
-                            <p className="mt-1 text-sm">
-                              Click &quot;Add Service&quot; to add a service
-                            </p>
-                          </div>
-                        ) : (
-                          <div className="space-y-3">
-                            {services.map((service) => (
-                              <div
-                                key={service.id}
-                                className="space-y-3 rounded-lg bg-green-50 p-3"
-                              >
-                                {isEditingService === service.id ? (
-                                  // Edit Mode
-                                  <div className="space-y-3">
-                                    <div>
-                                      <Label className="text-xs">Service Name</Label>
-                                      <Input
-                                        value={service.name}
-                                        onChange={(e) =>
-                                          handleServiceNameChange(service.id, e.target.value)
-                                        }
-                                        className="h-8"
-                                      />
-                                    </div>
-                                    <div>
-                                      <Label className="text-xs">Price ({getCurrencySymbol()})</Label>
-                                      <Input
-                                        type="number"
-                                        step="0.01"
-                                        value={service.price}
-                                        onChange={(e) =>
-                                          handleServicePriceChange(service.id, e.target.value)
-                                        }
-                                        className="h-8"
-                                      />
-                                    </div>
-                                    <div>
-                                      <Label className="text-xs">Description</Label>
-                                      <textarea
-                                        value={service.description || ''}
-                                        onChange={(e) =>
-                                          handleServiceDescriptionChange(service.id, e.target.value)
-                                        }
-                                        className="w-full resize-none rounded-md border px-3 py-2 text-sm"
-                                        rows={2}
-                                      />
-                                    </div>
-                                    <div className="flex gap-2">
-                                      <Button
-                                        size="sm"
-                                        onClick={() => handleUpdateService(service.id)}
-                                        disabled={isProcessing}
-                                        className="flex-1"
-                                      >
-                                        <Save className="mr-1 h-3 w-3" />
-                                        Save
-                                      </Button>
-                                      <Button
-                                        size="sm"
-                                        variant="outline"
-                                        onClick={() => setIsEditingService(null)}
-                                        disabled={isProcessing}
-                                        className="flex-1"
-                                      >
-                                        Cancel
-                                      </Button>
-                                    </div>
-                                  </div>
-                                ) : (
-                                  // View Mode
-                                  <>
-                                    <div className="flex items-start justify-between">
-                                      <div className="flex-1">
-                                        <p className="font-medium">{service.name}</p>
-                                        <p className="text-sm text-muted-foreground">
-                                          {service.description || 'No description'}
-                                        </p>
-                                      </div>
-                                      <div className="text-right">
-                                        <p className="font-medium">
-                                          {formatCurrencySync(parseFloat(service.price || 0))}
-                                        </p>
-                                        <Badge
-                                          variant="outline"
-                                          className="border-green-200 text-green-800"
-                                        >
-                                          <CheckCircle className="mr-1 h-3 w-3" />
-                                          Completed
-                                        </Badge>
-                                      </div>
-                                    </div>
-                                    <div className="flex gap-2 border-t pt-2">
-                                      <Button
-                                        size="sm"
-                                        variant="ghost"
-                                        onClick={() => setIsEditingService(service.id)}
-                                        disabled={isProcessing}
-                                        className="flex-1 text-xs"
-                                      >
-                                        <Edit2 className="mr-1 h-3 w-3" />
-                                        Edit
-                                      </Button>
-                                      <Button
-                                        size="sm"
-                                        variant="ghost"
-                                        onClick={() => {
-                                          if (
-                                            window.confirm(`Remove "${service.name}" from invoice?`)
-                                          ) {
-                                            handleRemoveService(service.id);
-                                          }
-                                        }}
-                                        disabled={isProcessing}
-                                        className="flex-1 text-xs text-red-600 hover:bg-red-50 hover:text-red-700"
-                                      >
-                                        <Trash2 className="mr-1 h-3 w-3" />
-                                        Remove
-                                      </Button>
-                                    </div>
-                                  </>
-                                )}
-                              </div>
-                            ))}
-                          </div>
-                        )}
-                      </CardContent>
-                    </Card>
-
-                    {/* Medications */}
-                    <Card>
-                      <CardHeader>
-                        <div className="flex items-center justify-between">
-                          <CardTitle className="text-base">Prescribed Medications</CardTitle>
-                          <Button
-                            size="sm"
-                            variant="outline"
-                            onClick={handleLoadPrescriptions}
-                            disabled={isProcessing}
-                            className="gap-2"
-                          >
-                            <Pill className="h-4 w-4" />
-                            {medications.length > 0 ? 'Refresh Prescriptions' : 'Load Prescriptions'}
-                          </Button>
-                        </div>
-                      </CardHeader>
-                      <CardContent>
-                        {medications.length === 0 ? (
-                          <div className="py-8 text-center text-muted-foreground">
-                            <Pill className="mx-auto mb-2 h-12 w-12 opacity-50" />
-                            <p>No medications added yet</p>
-                            <p className="mt-1 text-sm">
-                              Click &quot;Load Prescriptions&quot; to add prescribed medications
-                            </p>
-                          </div>
-                        ) : (
-                          <div className="space-y-4">
-                            {medications.map((med) => (
-                              <div key={med.id} className="space-y-3 rounded-lg border p-3">
-                                <div className="flex items-start justify-between">
-                                  <div className="space-y-1">
-                                    <h5 className="font-medium">{med.name}</h5>
-                                    <p className="text-sm text-muted-foreground">{med.dosage}</p>
-                                    <p className="text-xs text-muted-foreground">
-                                      Quantity: {med.quantity}
-                                    </p>
-                                  </div>
-                                  <Badge
-                                    className={
-                                      med.action === 'dispense'
-                                        ? 'bg-green-100 text-green-800'
-                                        : med.action === 'write-out'
-                                          ? 'bg-blue-100 text-blue-800'
-                                          : 'bg-gray-100 text-gray-800'
-                                    }
-                                  >
-                                    {med.action}
-                                  </Badge>
-                                </div>
-
-                                {/* Action Buttons */}
-                                <div className="flex gap-2">
-                                  <Button
-                                    size="sm"
-                                    variant={med.action === 'dispense' ? 'default' : 'outline'}
-                                    onClick={() => handleMedicationAction(med.id, 'dispense')}
-                                    className="gap-2"
-                                  >
-                                    <Package className="h-4 w-4" />
-                                    Dispense
-                                  </Button>
-                                  <Button
-                                    size="sm"
-                                    variant={med.action === 'write-out' ? 'default' : 'outline'}
-                                    onClick={() => handleMedicationAction(med.id, 'write-out')}
-                                    className="gap-2"
-                                  >
-                                    <FileText className="h-4 w-4" />
-                                    Write Out
-                                  </Button>
-                                </div>
-
-                                {/* Quantity Controls for Dispensing */}
-                                {med.action === 'dispense' && (
-                                  <motion.div
-                                    initial={{ opacity: 0, height: 0 }}
-                                    animate={{ opacity: 1, height: 'auto' }}
-                                    className="space-y-3 rounded-lg bg-green-50 p-3"
-                                  >
-                                    {/* Price Input */}
-                                    <div className="flex items-center gap-2">
-                                      <Label className="w-24 text-sm font-medium">
-                                        Unit Price:
-                                      </Label>
-                                      <div className="relative flex-1">
-                                        <span className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground">
-                                          {getCurrencySymbol()}
-                                        </span>
-                                        <Input
-                                          type="number"
-                                          value={(med.price / med.quantity)}
-                                          onChange={(e) =>
-                                            handlePriceChange(
-                                              med.id,
-                                              parseFloat(e.target.value || 0) * med.quantity
-                                            )
-                                          }
-                                          className="pl-7"
-                                          min="0"
-                                          step="0.01"
-                                          placeholder="0.00"
-                                        />
-                                      </div>
-                                      <span className="text-xs text-muted-foreground">
-                                        per unit
-                                      </span>
-                                    </div>
-
-                                    {/* Quantity Selector */}
-                                    <div className="space-y-2">
-                                      <div className="flex items-center justify-between">
-                                        <Label className="text-sm font-medium">
-                                          Dispense Quantity:
-                                        </Label>
-                                        <span className="text-xs text-muted-foreground">
-                                          Max: {med.quantity}
-                                        </span>
-                                      </div>
-                                      <div className="flex items-center gap-2">
-                                        <Button
-                                          size="sm"
-                                          variant="outline"
-                                          onClick={() =>
-                                            handleQuantityChange(med.id, med.dispensedQuantity - 1)
-                                          }
-                                          disabled={med.dispensedQuantity <= 0}
-                                        >
-                                          <Minus className="h-4 w-4" />
-                                        </Button>
-                                        <Input
-                                          type="number"
-                                          value={med.dispensedQuantity}
-                                          onChange={(e) =>
-                                            handleQuantityChange(
-                                              med.id,
-                                              parseInt(e.target.value) || 0
-                                            )
-                                          }
-                                          className="w-20 text-center"
-                                          min="0"
-                                          max={med.quantity}
-                                        />
-                                        <Button
-                                          size="sm"
-                                          variant="outline"
-                                          onClick={() =>
-                                            handleQuantityChange(med.id, med.dispensedQuantity + 1)
-                                          }
-                                          disabled={med.dispensedQuantity >= med.quantity}
-                                        >
-                                          <Plus className="h-4 w-4" />
-                                        </Button>
-                                        <div className="ml-auto text-right">
-                                          <div className="text-sm font-medium">
-                                            {formatCurrencySync(
-                                              (med.price / med.quantity) *
-                                              med.dispensedQuantity
-                                            )}
-                                          </div>
-                                          <div className="text-xs text-muted-foreground">
-                                            Charge
-                                          </div>
-                                        </div>
-                                      </div>
-                                    </div>
-
-                                    {/* Auto Write-out Warning */}
-                                    {med.dispensedQuantity < med.quantity &&
-                                      med.dispensedQuantity > 0 && (
-                                        <div className="flex items-start gap-2 rounded border border-blue-200 bg-blue-50 p-2 text-xs">
-                                          <AlertCircle className="mt-0.5 h-4 w-4 text-blue-600" />
-                                          <div>
-                                            <p className="font-medium text-blue-900">
-                                              {med.quantity - med.dispensedQuantity} units will be
-                                              written out
-                                            </p>
-                                            <p className="text-blue-700">
-                                              Remaining quantity not dispensed will be marked as
-                                              write-out (not charged)
-                                            </p>
-                                          </div>
-                                        </div>
-                                      )}
-                                  </motion.div>
-                                )}
-                              </div>
-                            ))}
-                          </div>
-                        )}
-                      </CardContent>
-                    </Card>
-                  </div>
-                </div>
-
-                {/* Billing Summary Sidebar */}
-                <div className="space-y-6">
-                  <Card className="sticky top-0">
+                {/* Outstanding Balance Alert */}
+                {outstandingBalance && outstandingBalance.totalBalance > 0 && (
+                  <Card
+                    className={
+                      invoiceLimitReached
+                        ? 'border-red-300 bg-red-50'
+                        : 'border-amber-200 bg-amber-50'
+                    }
+                  >
                     <CardHeader>
-                      <CardTitle className="flex items-center gap-2">
-                        <Calculator className="h-5 w-5" />
-                        Billing Summary
+                      <CardTitle
+                        className={`flex items-center gap-2 ${invoiceLimitReached ? 'text-red-900' : 'text-amber-900'}`}
+                      >
+                        <AlertCircle className="h-5 w-5" />
+                        {invoiceLimitReached ? '⚠️ Invoice Limit Reached' : 'Outstanding Balance'}
                       </CardTitle>
                     </CardHeader>
                     <CardContent className="space-y-4">
-                      {/* Cost Breakdown */}
-                      <div className="space-y-3">
-                        <div className="flex justify-between">
-                          <span>Services</span>
-                          <span>{formatCurrencySync(totals.servicesTotal)}</span>
-                        </div>
-                        <div className="flex justify-between">
-                          <span>Medications</span>
-                          <span>{formatCurrencySync(totals.medicationsTotal)}</span>
-                        </div>
-
-                        {/* Outstanding Balance Line Item */}
-                        {totals.outstandingBalance > 0 && (
-                          <div className="flex justify-between font-medium text-amber-700">
-                            <span className="flex items-center gap-1">
-                              <AlertCircle className="h-4 w-4" />
-                              Previous Balance
-                            </span>
-                            <span>{formatCurrencySync(totals.outstandingBalance)}</span>
-                          </div>
-                        )}
-
-                        <Separator />
-                        <div className="flex justify-between font-medium">
-                          <span>Subtotal</span>
-                          <span>{formatCurrencySync(totals.subtotal)}</span>
-                        </div>
-
-                        {/* Discount Section */}
+                      <div className="flex items-start justify-between">
                         <div className="space-y-2">
-                          <Label className="text-sm font-medium">Apply Discount</Label>
-                          <div className="grid grid-cols-2 gap-2">
-                            <div>
-                              <Label className="text-xs">Percentage</Label>
-                              <div className="flex">
-                                <Input
-                                  type="number"
-                                  value={discountPercent}
-                                  onChange={(e) =>
-                                    handleDiscountPercentChange(parseFloat(e.target.value) || 0)
-                                  }
-                                  placeholder="0"
-                                  className="rounded-r-none"
-                                  min="0"
-                                  max="100"
-                                />
-                                <div className="flex items-center rounded-r-md border border-l-0 bg-muted px-3 py-2">
-                                  <Percent className="h-4 w-4" />
-                                </div>
-                              </div>
-                            </div>
-                            <div>
-                              <Label className="text-xs">Amount</Label>
-                              <div className="flex">
-                                <div className="flex items-center rounded-l-md border border-r-0 bg-muted px-3 py-2">
-                                  <DollarSign className="h-4 w-4" />
-                                </div>
-                                <Input
-                                  type="number"
-                                  value={discountAmount}
-                                  onChange={(e) =>
-                                    handleDiscountAmountChange(parseFloat(e.target.value) || 0)
-                                  }
-                                  placeholder="0.00"
-                                  className="rounded-l-none"
-                                  min="0"
-                                  step="0.01"
-                                />
-                              </div>
-                            </div>
-                          </div>
-                        </div>
-
-                        {totals.discountAmount > 0 && (
-                          <div className="flex justify-between text-red-600">
-                            <span>Discount</span>
-                            <span>-{formatCurrencySync(totals.discountAmount)}</span>
-                          </div>
-                        )}
-
-                        <Separator />
-                        <div className="flex justify-between text-lg font-bold">
-                          <span>Total</span>
-                          <span>{formatCurrencySync(totals.total)}</span>
-                        </div>
-                      </div>
-
-                      {/* Payment Method */}
-                      <div className="space-y-2">
-                        <Label className="text-sm font-medium">Payment Method</Label>
-                        <Select 
-                          value={paymentMethod} 
-                          onValueChange={(value) => {
-                            setPaymentMethod(value);
-                            // Reset QR code state when payment method changes
-                            if (value !== 'online_payment') {
-                              setShowQRCode(false);
-                              setQrScannedConfirmed(false);
-                            }
-                          }}
-                        >
-                          <SelectTrigger>
-                            <SelectValue />
-                          </SelectTrigger>
-                          <SelectContent>
-                            <SelectItem value="cash">Cash</SelectItem>
-                            <SelectItem value="online_payment">Online Payment</SelectItem>
-                          </SelectContent>
-                        </Select>
-                        {paymentMethod === 'online_payment' && (
-                          <Button
-                            type="button"
-                            variant="outline"
-                            size="sm"
-                            className="w-full"
-                            onClick={() => {
-                              if (!clinicSettings?.payment_qr_code_url) {
-                                showError('QR code is not configured. Please contact admin.');
-                                return;
-                              }
-                              setShowQRCode(true);
-                            }}
+                          <p
+                            className={`text-sm ${invoiceLimitReached ? 'text-red-800' : 'text-amber-800'}`}
                           >
-                            <Receipt className="mr-2 h-4 w-4" />
-                            Show QR Code
-                          </Button>
-                        )}
+                            This patient has {outstandingBalance.invoiceCount} unpaid invoice
+                            {outstandingBalance.invoiceCount > 1 ? 's' : ''} with a total balance
+                            of:
+                          </p>
+                          <p
+                            className={`text-3xl font-bold ${invoiceLimitReached ? 'text-red-900' : 'text-amber-900'}`}
+                          >
+                            {formatCurrencySync(outstandingBalance.totalBalance)}
+                          </p>
+
+                          {/* 2-Invoice Limit Warning */}
+                          {invoiceLimitReached && (
+                            <div className="mt-3 rounded-lg border-2 border-red-400 bg-red-100 p-3">
+                              <p className="flex items-center gap-2 text-sm font-bold text-red-900">
+                                <XCircle className="h-5 w-5" />
+                                MAXIMUM OUTSTANDING INVOICES REACHED (2/2)
+                              </p>
+                              <p className="mt-1 text-xs text-red-800">
+                                Patient cannot leave with another unpaid invoice. They must either:
+                              </p>
+                              <ul className="ml-4 mt-1 list-disc space-y-1 text-xs text-red-800">
+                                <li>Pay the full amount including previous balance</li>
+                                <li>
+                                  Pay off at least one previous invoice to reduce outstanding count
+                                </li>
+                              </ul>
+                            </div>
+                          )}
+
+                          {/* List of outstanding invoices */}
+                          <div className="mt-3 space-y-1">
+                            {outstandingBalance.invoices.map((inv) => (
+                              <div
+                                key={inv.id}
+                                className={`flex items-center gap-2 text-xs ${invoiceLimitReached ? 'text-red-700' : 'text-amber-700'}`}
+                              >
+                                <Receipt className="h-3 w-3" />
+                                Invoice #{inv.invoice_number || inv.id.slice(0, 8)} -{' '}
+                                {formatCurrencySync(parseFloat(inv.balance_due))} due
+                                {inv.payment_due_date && (
+                                  <span
+                                    className={
+                                      invoiceLimitReached ? 'text-red-600' : 'text-amber-600'
+                                    }
+                                  >
+                                    (Due: {new Date(inv.payment_due_date).toLocaleDateString()})
+                                  </span>
+                                )}
+                              </div>
+                            ))}
+                          </div>
+                        </div>
                       </div>
 
-                      {/* Notes */}
-                      <div className="space-y-2">
-                        <Label className="text-sm font-medium">Notes (Optional)</Label>
-                        <Textarea
-                          value={notes}
-                          onChange={(e) => setNotes(e.target.value)}
-                          placeholder="Add any notes about this transaction..."
-                          rows={3}
+                      {/* Action: Add to current invoice */}
+                      <div
+                        className={`flex items-center gap-3 rounded-lg border bg-white p-3 ${invoiceLimitReached ? 'border-red-300' : 'border-amber-200'}`}
+                      >
+                        <input
+                          type="checkbox"
+                          id="addOutstanding"
+                          checked={addOutstandingToInvoice}
+                          onChange={(e) => setAddOutstandingToInvoice(e.target.checked)}
+                          className={`h-4 w-4 rounded border focus:ring-2 ${invoiceLimitReached ? 'border-red-400 text-red-600 focus:ring-red-500' : 'border-amber-300 text-amber-600 focus:ring-amber-500'}`}
                         />
+                        <label
+                          htmlFor="addOutstanding"
+                          className={`flex-1 cursor-pointer text-sm font-medium ${invoiceLimitReached ? 'text-red-900' : 'text-amber-900'}`}
+                        >
+                          {invoiceLimitReached
+                            ? `⚠️ Must add outstanding balance (${formatCurrencySync(outstandingBalance.totalBalance)}) - cannot create another unpaid invoice`
+                            : `Add outstanding balance (${formatCurrencySync(outstandingBalance.totalBalance)}) to current invoice`}
+                        </label>
                       </div>
 
-                      {/* Quick Discounts */}
-                      <div className="space-y-2">
-                        <Label className="text-sm font-medium">Quick Discounts</Label>
-                        <div className="grid grid-cols-2 gap-2">
-                          <Button
-                            type="button"
-                            variant="outline"
-                            size="sm"
-                            onClick={(e) => {
-                              e.preventDefault();
-                              e.stopPropagation();
-                              handleDiscountPercentChange(10);
-                            }}
-                          >
-                            <Tag className="mr-1 h-4 w-4" />
-                            10% Senior
-                          </Button>
-                          <Button
-                            type="button"
-                            variant="outline"
-                            size="sm"
-                            onClick={(e) => {
-                              e.preventDefault();
-                              e.stopPropagation();
-                              handleDiscountPercentChange(20);
-                            }}
-                          >
-                            <Tag className="mr-1 h-4 w-4" />
-                            20% Staff
-                          </Button>
+                      {addOutstandingToInvoice && !invoiceLimitReached && (
+                        <div className="rounded-lg border border-green-200 bg-green-50 p-3">
+                          <p className="flex items-center gap-2 text-sm text-green-800">
+                            <CheckCircle className="h-4 w-4" />
+                            Outstanding balance will be added to the total. Patient can pay full
+                            amount or make partial payment.
+                          </p>
                         </div>
-                      </div>
+                      )}
 
-                      {/* Partial Payment Toggle */}
-                      <div className="space-y-3 border-t pt-4">
-                        <div className="flex items-center justify-between">
-                          <Label className="text-sm font-medium">Partial Payment</Label>
-                          <Button
-                            type="button"
-                            variant={isPartialPayment ? 'default' : 'outline'}
-                            size="sm"
-                            onClick={(e) => {
-                              e.preventDefault();
-                              e.stopPropagation();
-                              const newPartialPaymentState = !isPartialPayment;
-                              setIsPartialPayment(newPartialPaymentState);
-                              if (newPartialPaymentState) {
-                                // Pre-fill with total amount when enabling partial payment
-                                const totals = calculateTotals();
-                                setPartialAmount(totals.total.toFixed(2));
-                                setHoldReason('');
-                              } else {
-                                setPartialAmount('');
-                                setHoldReason('');
-                              }
-                            }}
-                            disabled={invoiceLimitReached && !addOutstandingToInvoice}
-                          >
-                            {isPartialPayment ? 'Enabled' : 'Enable'}
-                          </Button>
+                      {addOutstandingToInvoice && invoiceLimitReached && (
+                        <div className="rounded-lg border border-green-200 bg-green-50 p-3">
+                          <p className="flex items-center gap-2 text-sm text-green-800">
+                            <CheckCircle className="h-4 w-4" />
+                            Good! Outstanding balance added. Patient must pay full amount to
+                            proceed.
+                          </p>
                         </div>
+                      )}
+                    </CardContent>
+                  </Card>
+                )}
 
-                        {/* Warning when limit reached */}
-                        {invoiceLimitReached && !addOutstandingToInvoice && (
-                          <div className="rounded border border-red-200 bg-red-50 p-2 text-xs text-red-800">
-                            <AlertCircle className="mr-1 inline h-4 w-4" />
-                            Partial payment disabled: Patient has reached maximum outstanding
-                            invoices (2). Must pay full amount or add previous balance.
-                          </div>
-                        )}
-
-                        {isPartialPayment && (
-                          <div className="space-y-3 rounded-lg border border-amber-200 bg-amber-50 p-3">
-                            {invoiceLimitReached && addOutstandingToInvoice && (
-                              <div className="mb-2 rounded border border-red-300 bg-red-100 p-2 text-xs text-red-900">
-                                <AlertCircle className="mr-1 inline h-4 w-4" />
-                                <strong>Warning:</strong> Patient already has 2 unpaid invoices.
-                                Cannot create another partial payment unless previous invoices are
-                                paid.
-                              </div>
-                            )}
-                            <div className="space-y-2">
-                              <Label className="text-sm">Amount to Pay Now</Label>
-                              <div className="flex">
-                                <div className="flex items-center rounded-l-md border border-r-0 bg-white px-3 py-2">
-                                  <DollarSign className="h-4 w-4" />
+                {/* Services and Medications */}
+                <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+                  {/* Services */}
+                  <Card>
+                    <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-3">
+                      <CardTitle className="text-base">Services Provided</CardTitle>
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        onClick={() => setShowAddServiceDialog(true)}
+                        className="gap-2"
+                      >
+                        <Plus className="h-4 w-4" />
+                        Add Service
+                      </Button>
+                    </CardHeader>
+                    <CardContent>
+                      {services.length === 0 ? (
+                        <div className="py-8 text-center text-muted-foreground">
+                          <FileText className="mx-auto mb-2 h-12 w-12 opacity-50" />
+                          <p>No services added yet</p>
+                          <p className="mt-1 text-sm">
+                            Click &quot;Add Service&quot; to add a service
+                          </p>
+                        </div>
+                      ) : (
+                        <div className="space-y-3">
+                          {services.map((service) => (
+                            <div key={service.id} className="space-y-3 rounded-lg bg-green-50 p-3">
+                              {isEditingService === service.id ? (
+                                // Edit Mode
+                                <div className="space-y-3">
+                                  <div>
+                                    <Label className="text-xs">Service Name</Label>
+                                    <Input
+                                      value={service.name}
+                                      onChange={(e) =>
+                                        handleServiceNameChange(service.id, e.target.value)
+                                      }
+                                      className="h-8"
+                                    />
+                                  </div>
+                                  <div>
+                                    <Label className="text-xs">Price ({getCurrencySymbol()})</Label>
+                                    <Input
+                                      type="number"
+                                      step="0.01"
+                                      value={service.price}
+                                      onChange={(e) =>
+                                        handleServicePriceChange(service.id, e.target.value)
+                                      }
+                                      className="h-8"
+                                    />
+                                  </div>
+                                  <div>
+                                    <Label className="text-xs">Description</Label>
+                                    <textarea
+                                      value={service.description || ''}
+                                      onChange={(e) =>
+                                        handleServiceDescriptionChange(service.id, e.target.value)
+                                      }
+                                      className="w-full resize-none rounded-md border px-3 py-2 text-sm"
+                                      rows={2}
+                                    />
+                                  </div>
+                                  <div className="flex gap-2">
+                                    <Button
+                                      size="sm"
+                                      onClick={() => handleUpdateService(service.id)}
+                                      disabled={isProcessing}
+                                      className="flex-1"
+                                    >
+                                      <Save className="mr-1 h-3 w-3" />
+                                      Save
+                                    </Button>
+                                    <Button
+                                      size="sm"
+                                      variant="outline"
+                                      onClick={() => setIsEditingService(null)}
+                                      disabled={isProcessing}
+                                      className="flex-1"
+                                    >
+                                      Cancel
+                                    </Button>
+                                  </div>
                                 </div>
-                                <Input
-                                  type="number"
-                                  value={partialAmount}
-                                  onChange={(e) => setPartialAmount(e.target.value)}
-                                  placeholder="0.00"
-                                  className="rounded-l-none bg-white"
-                                  min="0"
-                                  max={totals.total}
-                                  step="0.01"
-                                />
-                              </div>
-                              {partialAmount && parseFloat(partialAmount) < totals.total && (
-                                <p className="text-xs text-amber-700">
-                                  Balance Due: {formatCurrencySync(totals.total - parseFloat(partialAmount || 0))}
-                                </p>
+                              ) : (
+                                // View Mode
+                                <>
+                                  <div className="flex items-start justify-between">
+                                    <div className="flex-1">
+                                      <p className="font-medium">{service.name}</p>
+                                      <p className="text-sm text-muted-foreground">
+                                        {service.description || 'No description'}
+                                      </p>
+                                    </div>
+                                    <div className="text-right">
+                                      <p className="font-medium">
+                                        {formatCurrencySync(parseFloat(service.price || 0))}
+                                      </p>
+                                      <Badge
+                                        variant="outline"
+                                        className="border-green-200 text-green-800"
+                                      >
+                                        <CheckCircle className="mr-1 h-3 w-3" />
+                                        Completed
+                                      </Badge>
+                                    </div>
+                                  </div>
+                                  <div className="flex gap-2 border-t pt-2">
+                                    <Button
+                                      size="sm"
+                                      variant="ghost"
+                                      onClick={() => setIsEditingService(service.id)}
+                                      disabled={isProcessing}
+                                      className="flex-1 text-xs"
+                                    >
+                                      <Edit2 className="mr-1 h-3 w-3" />
+                                      Edit
+                                    </Button>
+                                    <Button
+                                      size="sm"
+                                      variant="ghost"
+                                      onClick={() => {
+                                        if (
+                                          window.confirm(`Remove "${service.name}" from invoice?`)
+                                        ) {
+                                          handleRemoveService(service.id);
+                                        }
+                                      }}
+                                      disabled={isProcessing}
+                                      className="flex-1 text-xs text-red-600 hover:bg-red-50 hover:text-red-700"
+                                    >
+                                      <Trash2 className="mr-1 h-3 w-3" />
+                                      Remove
+                                    </Button>
+                                  </div>
+                                </>
                               )}
                             </div>
+                          ))}
+                        </div>
+                      )}
+                    </CardContent>
+                  </Card>
 
-                            <div className="space-y-2">
-                              <Label className="text-sm">Hold Reason</Label>
-                              <Textarea
-                                value={holdReason}
-                                onChange={(e) => setHoldReason(e.target.value)}
-                                placeholder="Why is this payment being held? (e.g., Patient will pay remaining balance next visit)"
-                                rows={2}
-                                className="bg-white"
-                              />
-                            </div>
-
-                            <div className="space-y-2">
-                              <Label className="text-sm">Payment Due Date (Optional)</Label>
-                              <Input
-                                type="date"
-                                value={paymentDueDate}
-                                onChange={(e) => setPaymentDueDate(e.target.value)}
-                                className="bg-white"
-                                min={new Date().toISOString().split('T')[0]}
-                              />
-                            </div>
-                          </div>
-                        )}
-                      </div>
-
-                      {/* Action Buttons */}
-                      <div className="space-y-2 pt-4">
-                        {/* Warning when trying to create partial payment at limit */}
-                        {invoiceLimitReached && isPartialPayment && (
-                          <div className="mb-2 rounded-lg border-2 border-red-400 bg-red-100 p-3">
-                            <p className="flex items-center gap-2 text-xs font-bold text-red-900">
-                              <XCircle className="h-4 w-4" />
-                              Cannot process partial payment
-                            </p>
-                            <p className="mt-1 text-xs text-red-800">
-                              Patient has 2 outstanding invoices. Must pay full amount.
-                            </p>
-                          </div>
-                        )}
-
+                  {/* Medications */}
+                  <Card>
+                    <CardHeader>
+                      <div className="flex items-center justify-between">
+                        <CardTitle className="text-base">Prescribed Medications</CardTitle>
                         <Button
-                          onClick={handleApproveInvoice}
-                          className="w-full gap-2"
-                          disabled={
-                            totals.total < 0 || // Only disable if negative (invalid state)
-                            (isPartialPayment &&
-                              (!partialAmount || parseFloat(partialAmount) <= 0 || !holdReason)) ||
-                            (invoiceLimitReached && isPartialPayment) // Disable partial payment when limit reached
-                          }
+                          size="sm"
+                          variant="outline"
+                          onClick={handleLoadPrescriptions}
+                          disabled={isProcessing}
+                          className="gap-2"
                         >
-                          <Check className="h-4 w-4" />
-                          {totals.total === 0
-                            ? 'Complete Visit (No Charge)'
-                            : isPartialPayment
-                            ? 'Process Partial Payment'
-                            : 'Approve & Process Full Payment'}
+                          <Pill className="h-4 w-4" />
+                          {medications.length > 0 ? 'Refresh Prescriptions' : 'Load Prescriptions'}
                         </Button>
                       </div>
+                    </CardHeader>
+                    <CardContent>
+                      {medications.length === 0 ? (
+                        <div className="py-8 text-center text-muted-foreground">
+                          <Pill className="mx-auto mb-2 h-12 w-12 opacity-50" />
+                          <p>No medications added yet</p>
+                          <p className="mt-1 text-sm">
+                            Click &quot;Load Prescriptions&quot; to add prescribed medications
+                          </p>
+                        </div>
+                      ) : (
+                        <div className="space-y-4">
+                          {medications.map((med) => (
+                            <div key={med.id} className="space-y-3 rounded-lg border p-3">
+                              <div className="flex items-start justify-between">
+                                <div className="space-y-1">
+                                  <h5 className="font-medium">{med.name}</h5>
+                                  <p className="text-sm text-muted-foreground">{med.dosage}</p>
+                                  <p className="text-xs text-muted-foreground">
+                                    Quantity: {med.quantity}
+                                  </p>
+                                </div>
+                                <Badge
+                                  className={
+                                    med.action === 'dispense'
+                                      ? 'bg-green-100 text-green-800'
+                                      : med.action === 'write-out'
+                                        ? 'bg-blue-100 text-blue-800'
+                                        : 'bg-gray-100 text-gray-800'
+                                  }
+                                >
+                                  {med.action}
+                                </Badge>
+                              </div>
+
+                              {/* Action Buttons */}
+                              <div className="flex gap-2">
+                                <Button
+                                  size="sm"
+                                  variant={med.action === 'dispense' ? 'default' : 'outline'}
+                                  onClick={() => handleMedicationAction(med.id, 'dispense')}
+                                  className="gap-2"
+                                >
+                                  <Package className="h-4 w-4" />
+                                  Dispense
+                                </Button>
+                                <Button
+                                  size="sm"
+                                  variant={med.action === 'write-out' ? 'default' : 'outline'}
+                                  onClick={() => handleMedicationAction(med.id, 'write-out')}
+                                  className="gap-2"
+                                >
+                                  <FileText className="h-4 w-4" />
+                                  Write Out
+                                </Button>
+                              </div>
+
+                              {/* Quantity Controls for Dispensing */}
+                              {med.action === 'dispense' && (
+                                <motion.div
+                                  initial={{ opacity: 0, height: 0 }}
+                                  animate={{ opacity: 1, height: 'auto' }}
+                                  className="space-y-3 rounded-lg bg-green-50 p-3"
+                                >
+                                  {/* Price Input */}
+                                  <div className="flex items-center gap-2">
+                                    <Label className="w-24 text-sm font-medium">Unit Price:</Label>
+                                    <div className="relative flex-1">
+                                      <span className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground">
+                                        {getCurrencySymbol()}
+                                      </span>
+                                      <Input
+                                        type="number"
+                                        value={med.price / med.quantity}
+                                        onChange={(e) =>
+                                          handlePriceChange(
+                                            med.id,
+                                            parseFloat(e.target.value || 0) * med.quantity
+                                          )
+                                        }
+                                        className="pl-7"
+                                        min="0"
+                                        step="0.01"
+                                        placeholder="0.00"
+                                      />
+                                    </div>
+                                    <span className="text-xs text-muted-foreground">per unit</span>
+                                  </div>
+
+                                  {/* Quantity Selector */}
+                                  <div className="space-y-2">
+                                    <div className="flex items-center justify-between">
+                                      <Label className="text-sm font-medium">
+                                        Dispense Quantity:
+                                      </Label>
+                                      <span className="text-xs text-muted-foreground">
+                                        Max: {med.quantity}
+                                      </span>
+                                    </div>
+                                    <div className="flex items-center gap-2">
+                                      <Button
+                                        size="sm"
+                                        variant="outline"
+                                        onClick={() =>
+                                          handleQuantityChange(med.id, med.dispensedQuantity - 1)
+                                        }
+                                        disabled={med.dispensedQuantity <= 0}
+                                      >
+                                        <Minus className="h-4 w-4" />
+                                      </Button>
+                                      <Input
+                                        type="number"
+                                        value={med.dispensedQuantity}
+                                        onChange={(e) =>
+                                          handleQuantityChange(
+                                            med.id,
+                                            parseInt(e.target.value) || 0
+                                          )
+                                        }
+                                        className="w-20 text-center"
+                                        min="0"
+                                        max={med.quantity}
+                                      />
+                                      <Button
+                                        size="sm"
+                                        variant="outline"
+                                        onClick={() =>
+                                          handleQuantityChange(med.id, med.dispensedQuantity + 1)
+                                        }
+                                        disabled={med.dispensedQuantity >= med.quantity}
+                                      >
+                                        <Plus className="h-4 w-4" />
+                                      </Button>
+                                      <div className="ml-auto text-right">
+                                        <div className="text-sm font-medium">
+                                          {formatCurrencySync(
+                                            (med.price / med.quantity) * med.dispensedQuantity
+                                          )}
+                                        </div>
+                                        <div className="text-xs text-muted-foreground">Charge</div>
+                                      </div>
+                                    </div>
+                                  </div>
+
+                                  {/* Auto Write-out Warning */}
+                                  {med.dispensedQuantity < med.quantity &&
+                                    med.dispensedQuantity > 0 && (
+                                      <div className="flex items-start gap-2 rounded border border-blue-200 bg-blue-50 p-2 text-xs">
+                                        <AlertCircle className="mt-0.5 h-4 w-4 text-blue-600" />
+                                        <div>
+                                          <p className="font-medium text-blue-900">
+                                            {med.quantity - med.dispensedQuantity} units will be
+                                            written out
+                                          </p>
+                                          <p className="text-blue-700">
+                                            Remaining quantity not dispensed will be marked as
+                                            write-out (not charged)
+                                          </p>
+                                        </div>
+                                      </div>
+                                    )}
+                                </motion.div>
+                              )}
+                            </div>
+                          ))}
+                        </div>
+                      )}
                     </CardContent>
                   </Card>
                 </div>
               </div>
-            )}
+
+              {/* Billing Summary Sidebar */}
+              <div className="space-y-6">
+                <Card className="sticky top-0">
+                  <CardHeader>
+                    <CardTitle className="flex items-center gap-2">
+                      <Calculator className="h-5 w-5" />
+                      Billing Summary
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent className="space-y-4">
+                    {/* Cost Breakdown */}
+                    <div className="space-y-3">
+                      <div className="flex justify-between">
+                        <span>Services</span>
+                        <span>{formatCurrencySync(totals.servicesTotal)}</span>
+                      </div>
+                      <div className="flex justify-between">
+                        <span>Medications</span>
+                        <span>{formatCurrencySync(totals.medicationsTotal)}</span>
+                      </div>
+
+                      {/* Outstanding Balance Line Item */}
+                      {totals.outstandingBalance > 0 && (
+                        <div className="flex justify-between font-medium text-amber-700">
+                          <span className="flex items-center gap-1">
+                            <AlertCircle className="h-4 w-4" />
+                            Previous Balance
+                          </span>
+                          <span>{formatCurrencySync(totals.outstandingBalance)}</span>
+                        </div>
+                      )}
+
+                      <Separator />
+                      <div className="flex justify-between font-medium">
+                        <span>Subtotal</span>
+                        <span>{formatCurrencySync(totals.subtotal)}</span>
+                      </div>
+
+                      {/* Discount Section */}
+                      <div className="space-y-2">
+                        <Label className="text-sm font-medium">Apply Discount</Label>
+                        <div className="grid grid-cols-2 gap-2">
+                          <div>
+                            <Label className="text-xs">Percentage</Label>
+                            <div className="flex">
+                              <Input
+                                type="number"
+                                value={discountPercent}
+                                onChange={(e) =>
+                                  handleDiscountPercentChange(parseFloat(e.target.value) || 0)
+                                }
+                                placeholder="0"
+                                className="rounded-r-none"
+                                min="0"
+                                max="100"
+                              />
+                              <div className="flex items-center rounded-r-md border border-l-0 bg-muted px-3 py-2">
+                                <Percent className="h-4 w-4" />
+                              </div>
+                            </div>
+                          </div>
+                          <div>
+                            <Label className="text-xs">Amount</Label>
+                            <div className="flex">
+                              <div className="flex items-center rounded-l-md border border-r-0 bg-muted px-3 py-2">
+                                <DollarSign className="h-4 w-4" />
+                              </div>
+                              <Input
+                                type="number"
+                                value={discountAmount}
+                                onChange={(e) =>
+                                  handleDiscountAmountChange(parseFloat(e.target.value) || 0)
+                                }
+                                placeholder="0.00"
+                                className="rounded-l-none"
+                                min="0"
+                                step="0.01"
+                              />
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+
+                      {totals.discountAmount > 0 && (
+                        <div className="flex justify-between text-red-600">
+                          <span>Discount</span>
+                          <span>-{formatCurrencySync(totals.discountAmount)}</span>
+                        </div>
+                      )}
+
+                      <Separator />
+                      <div className="flex justify-between text-lg font-bold">
+                        <span>Total</span>
+                        <span>{formatCurrencySync(totals.total)}</span>
+                      </div>
+                    </div>
+
+                    {/* Payment Method */}
+                    <div className="space-y-2">
+                      <Label className="text-sm font-medium">Payment Method</Label>
+                      <Select
+                        value={paymentMethod}
+                        onValueChange={(value) => {
+                          setPaymentMethod(value);
+                          // Reset QR code state when payment method changes
+                          if (value !== 'online_payment') {
+                            setShowQRCode(false);
+                            setQrScannedConfirmed(false);
+                          }
+                        }}
+                      >
+                        <SelectTrigger>
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="cash">Cash</SelectItem>
+                          <SelectItem value="online_payment">Online Payment</SelectItem>
+                        </SelectContent>
+                      </Select>
+                      {paymentMethod === 'online_payment' && (
+                        <Button
+                          type="button"
+                          variant="outline"
+                          size="sm"
+                          className="w-full"
+                          onClick={() => {
+                            if (!clinicSettings?.payment_qr_code_url) {
+                              showError('QR code is not configured. Please contact admin.');
+                              return;
+                            }
+                            setShowQRCode(true);
+                          }}
+                        >
+                          <Receipt className="mr-2 h-4 w-4" />
+                          Show QR Code
+                        </Button>
+                      )}
+                    </div>
+
+                    {/* Notes */}
+                    <div className="space-y-2">
+                      <Label className="text-sm font-medium">Notes (Optional)</Label>
+                      <Textarea
+                        value={notes}
+                        onChange={(e) => setNotes(e.target.value)}
+                        placeholder="Add any notes about this transaction..."
+                        rows={3}
+                      />
+                    </div>
+
+                    {/* Quick Discounts */}
+                    <div className="space-y-2">
+                      <Label className="text-sm font-medium">Quick Discounts</Label>
+                      <div className="grid grid-cols-2 gap-2">
+                        <Button
+                          type="button"
+                          variant="outline"
+                          size="sm"
+                          onClick={(e) => {
+                            e.preventDefault();
+                            e.stopPropagation();
+                            handleDiscountPercentChange(10);
+                          }}
+                        >
+                          <Tag className="mr-1 h-4 w-4" />
+                          10% Senior
+                        </Button>
+                        <Button
+                          type="button"
+                          variant="outline"
+                          size="sm"
+                          onClick={(e) => {
+                            e.preventDefault();
+                            e.stopPropagation();
+                            handleDiscountPercentChange(20);
+                          }}
+                        >
+                          <Tag className="mr-1 h-4 w-4" />
+                          20% Staff
+                        </Button>
+                      </div>
+                    </div>
+
+                    {/* Partial Payment Toggle */}
+                    <div className="space-y-3 border-t pt-4">
+                      <div className="flex items-center justify-between">
+                        <Label className="text-sm font-medium">Partial Payment</Label>
+                        <Button
+                          type="button"
+                          variant={isPartialPayment ? 'default' : 'outline'}
+                          size="sm"
+                          onClick={(e) => {
+                            e.preventDefault();
+                            e.stopPropagation();
+                            const newPartialPaymentState = !isPartialPayment;
+                            setIsPartialPayment(newPartialPaymentState);
+                            if (newPartialPaymentState) {
+                              // Pre-fill with total amount when enabling partial payment
+                              const totals = calculateTotals();
+                              setPartialAmount(totals.total.toFixed(2));
+                              setHoldReason('');
+                            } else {
+                              setPartialAmount('');
+                              setHoldReason('');
+                            }
+                          }}
+                          disabled={invoiceLimitReached && !addOutstandingToInvoice}
+                        >
+                          {isPartialPayment ? 'Enabled' : 'Enable'}
+                        </Button>
+                      </div>
+
+                      {/* Warning when limit reached */}
+                      {invoiceLimitReached && !addOutstandingToInvoice && (
+                        <div className="rounded border border-red-200 bg-red-50 p-2 text-xs text-red-800">
+                          <AlertCircle className="mr-1 inline h-4 w-4" />
+                          Partial payment disabled: Patient has reached maximum outstanding invoices
+                          (2). Must pay full amount or add previous balance.
+                        </div>
+                      )}
+
+                      {isPartialPayment && (
+                        <div className="space-y-3 rounded-lg border border-amber-200 bg-amber-50 p-3">
+                          {invoiceLimitReached && addOutstandingToInvoice && (
+                            <div className="mb-2 rounded border border-red-300 bg-red-100 p-2 text-xs text-red-900">
+                              <AlertCircle className="mr-1 inline h-4 w-4" />
+                              <strong>Warning:</strong> Patient already has 2 unpaid invoices.
+                              Cannot create another partial payment unless previous invoices are
+                              paid.
+                            </div>
+                          )}
+                          <div className="space-y-2">
+                            <Label className="text-sm">Amount to Pay Now</Label>
+                            <div className="flex">
+                              <div className="flex items-center rounded-l-md border border-r-0 bg-white px-3 py-2">
+                                <DollarSign className="h-4 w-4" />
+                              </div>
+                              <Input
+                                type="number"
+                                value={partialAmount}
+                                onChange={(e) => setPartialAmount(e.target.value)}
+                                placeholder="0.00"
+                                className="rounded-l-none bg-white"
+                                min="0"
+                                max={totals.total}
+                                step="0.01"
+                              />
+                            </div>
+                            {partialAmount && parseFloat(partialAmount) < totals.total && (
+                              <p className="text-xs text-amber-700">
+                                Balance Due:{' '}
+                                {formatCurrencySync(totals.total - parseFloat(partialAmount || 0))}
+                              </p>
+                            )}
+                          </div>
+
+                          <div className="space-y-2">
+                            <Label className="text-sm">Hold Reason</Label>
+                            <Textarea
+                              value={holdReason}
+                              onChange={(e) => setHoldReason(e.target.value)}
+                              placeholder="Why is this payment being held? (e.g., Patient will pay remaining balance next visit)"
+                              rows={2}
+                              className="bg-white"
+                            />
+                          </div>
+
+                          <div className="space-y-2">
+                            <Label className="text-sm">Payment Due Date (Optional)</Label>
+                            <Input
+                              type="date"
+                              value={paymentDueDate}
+                              onChange={(e) => setPaymentDueDate(e.target.value)}
+                              className="bg-white"
+                              min={new Date().toISOString().split('T')[0]}
+                            />
+                          </div>
+                        </div>
+                      )}
+                    </div>
+
+                    {/* Action Buttons */}
+                    <div className="space-y-2 pt-4">
+                      {/* Warning when trying to create partial payment at limit */}
+                      {invoiceLimitReached && isPartialPayment && (
+                        <div className="mb-2 rounded-lg border-2 border-red-400 bg-red-100 p-3">
+                          <p className="flex items-center gap-2 text-xs font-bold text-red-900">
+                            <XCircle className="h-4 w-4" />
+                            Cannot process partial payment
+                          </p>
+                          <p className="mt-1 text-xs text-red-800">
+                            Patient has 2 outstanding invoices. Must pay full amount.
+                          </p>
+                        </div>
+                      )}
+
+                      <Button
+                        onClick={handleApproveInvoice}
+                        className="w-full gap-2"
+                        disabled={
+                          totals.total < 0 || // Only disable if negative (invalid state)
+                          (isPartialPayment &&
+                            (!partialAmount || parseFloat(partialAmount) <= 0 || !holdReason)) ||
+                          (invoiceLimitReached && isPartialPayment) // Disable partial payment when limit reached
+                        }
+                      >
+                        <Check className="h-4 w-4" />
+                        {totals.total === 0
+                          ? 'Complete Visit (No Charge)'
+                          : isPartialPayment
+                            ? 'Process Partial Payment'
+                            : 'Approve & Process Full Payment'}
+                      </Button>
+                    </div>
+                  </CardContent>
+                </Card>
+              </div>
+            </div>
+          )}
         </PaymentDetailModal>
 
         {/* QR Code Display Dialog */}
@@ -2455,9 +2473,7 @@ const CashierDashboard = () => {
           <DialogContent className="max-w-md">
             <DialogHeader>
               <DialogTitle>Payment QR Code</DialogTitle>
-              <DialogDescription>
-                Please scan the QR code to complete the payment
-              </DialogDescription>
+              <DialogDescription>Please scan the QR code to complete the payment</DialogDescription>
             </DialogHeader>
             <div className="space-y-4">
               {clinicSettings?.payment_qr_code_url ? (
@@ -2483,7 +2499,7 @@ const CashierDashboard = () => {
                       onChange={(e) => setQrScannedConfirmed(e.target.checked)}
                       className="h-4 w-4 rounded border-gray-300"
                     />
-                    <Label htmlFor="qrScanned" className="text-sm font-normal cursor-pointer">
+                    <Label htmlFor="qrScanned" className="cursor-pointer text-sm font-normal">
                       I have scanned and paid
                     </Label>
                   </div>
@@ -2691,7 +2707,8 @@ const CashierDashboard = () => {
             <DialogHeader>
               <DialogTitle className="text-2xl">Invoice Receipt</DialogTitle>
               <DialogDescription className="text-base">
-                Invoice #{selectedPayment?.invoice?.invoice_number ||
+                Invoice #
+                {selectedPayment?.invoice?.invoice_number ||
                   selectedPayment?.invoiceDetails?.invoice_number ||
                   selectedPayment?.rawData?.invoice_number}
               </DialogDescription>
@@ -2734,114 +2751,120 @@ const CashierDashboard = () => {
                 {selectedPayment.invoiceDetails?.payment_transactions?.length > 0 ||
                 selectedPayment.rawData?.payment_transactions?.length > 0 ? (
                   <div className="border-b pb-4">
-                    <h4 className="mb-3 text-base font-semibold flex items-center gap-2">
+                    <h4 className="mb-3 flex items-center gap-2 text-base font-semibold">
                       <CreditCard className="h-4 w-4" />
                       Payment History
                     </h4>
                     <div className="space-y-2">
-                      {(selectedPayment.invoiceDetails?.payment_transactions ||
+                      {(
+                        selectedPayment.invoiceDetails?.payment_transactions ||
                         selectedPayment.rawData?.payment_transactions ||
-                        [])
-                        .map((payment, idx) => {
-                          // Try multiple date fields with fallbacks
-                          const paymentDate = 
-                            payment.payment_date || 
-                            payment.created_at || 
-                            payment.received_at ||
-                            payment.paymentDate ||
-                            null;
-                          
-                          // Validate date
-                          let formattedDate = 'N/A';
-                          let formattedTime = 'N/A';
-                          if (paymentDate) {
-                            try {
-                              const dateObj = new Date(paymentDate);
-                              if (!isNaN(dateObj.getTime())) {
-                                formattedDate = dateObj.toLocaleDateString('en-US', {
-                                  year: 'numeric',
-                                  month: 'short',
-                                  day: 'numeric',
-                                });
-                                formattedTime = dateObj.toLocaleTimeString('en-US', {
-                                  hour: 'numeric',
-                                  minute: '2-digit',
-                                  hour12: true,
-                                });
-                              }
-                            } catch (e) {
-                              logger.debug('Date parsing error:', e);
+                        []
+                      ).map((payment, idx) => {
+                        // Try multiple date fields with fallbacks
+                        const paymentDate =
+                          payment.payment_date ||
+                          payment.created_at ||
+                          payment.received_at ||
+                          payment.paymentDate ||
+                          null;
+
+                        // Validate date
+                        let formattedDate = 'N/A';
+                        let formattedTime = 'N/A';
+                        if (paymentDate) {
+                          try {
+                            const dateObj = new Date(paymentDate);
+                            if (!isNaN(dateObj.getTime())) {
+                              formattedDate = dateObj.toLocaleDateString('en-US', {
+                                year: 'numeric',
+                                month: 'short',
+                                day: 'numeric',
+                              });
+                              formattedTime = dateObj.toLocaleTimeString('en-US', {
+                                hour: 'numeric',
+                                minute: '2-digit',
+                                hour12: true,
+                              });
                             }
+                          } catch (e) {
+                            logger.debug('Date parsing error:', e);
                           }
-                          
-                          const isCreditPayment = 
-                            payment.payment_notes?.toLowerCase().includes('credit') ||
-                            payment.notes?.toLowerCase().includes('credit') ||
-                            payment.payment_notes?.toLowerCase().includes('due credit') ||
-                            payment.notes?.toLowerCase().includes('due credit') ||
-                            parseFloat(payment.amount || 0) < 0;
-                          
-                          // Get payment notes from either field
-                          const paymentNotes = payment.payment_notes || payment.notes || '';
-                          
-                          return (
-                            <div
-                              key={idx}
-                              className={`flex items-center justify-between rounded p-3 text-sm ${
-                                isCreditPayment
-                                  ? 'bg-blue-50 border border-blue-200'
-                                  : 'bg-green-50 border border-green-200'
-                              }`}
-                            >
-                              <div className="flex-1">
-                                <div className="flex items-center gap-2">
-                                  <p className="font-semibold">
-                                    {formatCurrencySync(Math.abs(parseFloat(payment.amount || 0)))}
-                                  </p>
-                                  {isCreditPayment && (
-                                    <Badge variant="outline" className="bg-blue-100 text-blue-800 border-blue-300">
-                                      Credit Payment
-                                    </Badge>
-                                  )}
-                                </div>
-                                <p className="text-xs capitalize text-muted-foreground mt-1">
-                                  {payment.payment_method || 'N/A'}
+                        }
+
+                        const isCreditPayment =
+                          payment.payment_notes?.toLowerCase().includes('credit') ||
+                          payment.notes?.toLowerCase().includes('credit') ||
+                          payment.payment_notes?.toLowerCase().includes('due credit') ||
+                          payment.notes?.toLowerCase().includes('due credit') ||
+                          parseFloat(payment.amount || 0) < 0;
+
+                        // Get payment notes from either field
+                        const paymentNotes = payment.payment_notes || payment.notes || '';
+
+                        return (
+                          <div
+                            key={idx}
+                            className={`flex items-center justify-between rounded p-3 text-sm ${
+                              isCreditPayment
+                                ? 'border border-blue-200 bg-blue-50'
+                                : 'border border-green-200 bg-green-50'
+                            }`}
+                          >
+                            <div className="flex-1">
+                              <div className="flex items-center gap-2">
+                                <p className="font-semibold">
+                                  {formatCurrencySync(Math.abs(parseFloat(payment.amount || 0)))}
                                 </p>
-                                {paymentNotes && (
-                                  <p className="text-xs text-muted-foreground mt-1">{paymentNotes}</p>
+                                {isCreditPayment && (
+                                  <Badge
+                                    variant="outline"
+                                    className="border-blue-300 bg-blue-100 text-blue-800"
+                                  >
+                                    Credit Payment
+                                  </Badge>
                                 )}
                               </div>
-                              <div className="text-right">
-                                <p className="text-xs font-medium">
-                                  {formattedDate}
-                                </p>
-                                <p className="text-xs text-muted-foreground">
-                                  {formattedTime}
-                                </p>
-                                <p className="text-xs text-muted-foreground mt-1">
-                                  {payment.received_by_user
-                                    ? `${payment.received_by_user.first_name || ''} ${payment.received_by_user.last_name || ''}`.trim() || 
-                                      payment.received_by_user.full_name || 'Unknown'
-                                    : payment.processed_by_user
-                                      ? `${payment.processed_by_user.first_name || ''} ${payment.processed_by_user.last_name || ''}`.trim() ||
-                                        payment.processed_by_user.full_name || 'Unknown'
-                                      : payment.received_by
-                                        ? 'Processed'
-                                        : 'Unknown'}
-                                </p>
-                              </div>
+                              <p className="mt-1 text-xs capitalize text-muted-foreground">
+                                {payment.payment_method || 'N/A'}
+                              </p>
+                              {paymentNotes && (
+                                <p className="mt-1 text-xs text-muted-foreground">{paymentNotes}</p>
+                              )}
                             </div>
-                          );
-                        })}
+                            <div className="text-right">
+                              <p className="text-xs font-medium">{formattedDate}</p>
+                              <p className="text-xs text-muted-foreground">{formattedTime}</p>
+                              <p className="mt-1 text-xs text-muted-foreground">
+                                {payment.received_by_user
+                                  ? `${payment.received_by_user.first_name || ''} ${payment.received_by_user.last_name || ''}`.trim() ||
+                                    payment.received_by_user.full_name ||
+                                    'Unknown'
+                                  : payment.processed_by_user
+                                    ? `${payment.processed_by_user.first_name || ''} ${payment.processed_by_user.last_name || ''}`.trim() ||
+                                      payment.processed_by_user.full_name ||
+                                      'Unknown'
+                                    : payment.received_by
+                                      ? 'Processed'
+                                      : 'Unknown'}
+                              </p>
+                            </div>
+                          </div>
+                        );
+                      })}
                     </div>
                   </div>
                 ) : null}
 
                 {/* Actions */}
-                <div className="flex justify-end gap-2 pt-4 border-t">
+                <div className="flex justify-end gap-2 border-t pt-4">
                   <Button
                     variant="outline"
-                    onClick={() => handleDownloadReceipt({ rawData: selectedPayment.invoice || selectedPayment.rawData })}
+                    onClick={() =>
+                      handleDownloadReceipt({
+                        rawData: selectedPayment.invoice || selectedPayment.rawData,
+                      })
+                    }
                     className="gap-2"
                   >
                     <Download className="h-4 w-4" />

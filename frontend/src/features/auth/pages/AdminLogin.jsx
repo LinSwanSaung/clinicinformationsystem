@@ -17,7 +17,7 @@ const AdminLogin = () => {
     e.preventDefault();
     setIsLoading(true);
     setError('');
-    
+
     try {
       const result = await login(email, password);
       if (!result.success) {
@@ -32,39 +32,33 @@ const AdminLogin = () => {
   };
 
   return (
-    <div className="min-h-screen bg-background flex items-center justify-center p-4">
+    <div className="flex min-h-screen items-center justify-center bg-background p-4">
       <div className="w-full max-w-md">
         {/* Header */}
-        <div className="text-center mb-8">
-          <div className="flex justify-center mb-4">
-            <div className="bg-primary p-3 rounded-full">
+        <div className="mb-8 text-center">
+          <div className="mb-4 flex justify-center">
+            <div className="rounded-full bg-primary p-3">
               <Stethoscope className="h-8 w-8 text-white" />
             </div>
           </div>
-          <h1 className="text-3xl font-bold text-gray-900 mb-2">
-            ThriveCare
-          </h1>
-          <p className="text-gray-600">
-            Clinic Information System
-          </p>
+          <h1 className="mb-2 text-3xl font-bold text-gray-900">ThriveCare</h1>
+          <p className="text-gray-600">Clinic Information System</p>
         </div>
 
         {/* Login Card */}
         <Card className="shadow-lg">
           <CardHeader className="text-center">
             <CardTitle className="text-2xl">Login</CardTitle>
-            <CardDescription>
-              Enter your credentials to access the system
-            </CardDescription>
+            <CardDescription>Enter your credentials to access the system</CardDescription>
           </CardHeader>
           <CardContent>
             <form onSubmit={handleLogin} className="space-y-4">
               {error && (
-                <div className="bg-red-50 border border-red-200 text-red-600 px-4 py-3 rounded-md text-sm">
+                <div className="rounded-md border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-600">
                   {error}
                 </div>
               )}
-              
+
               <div className="space-y-2">
                 <label htmlFor="email" className="text-sm font-medium text-gray-700">
                   Email Address
@@ -83,7 +77,7 @@ const AdminLogin = () => {
                   />
                 </div>
               </div>
-              
+
               <div className="space-y-2">
                 <label htmlFor="password" className="text-sm font-medium text-gray-700">
                   Password
@@ -103,14 +97,10 @@ const AdminLogin = () => {
                 </div>
               </div>
 
-              <Button 
-                type="submit" 
-                className="w-full"
-                disabled={isLoading}
-              >
+              <Button type="submit" className="w-full" disabled={isLoading}>
                 {isLoading ? (
                   <span className="flex items-center justify-center">
-                    <span className="animate-spin h-4 w-4 mr-2 border-2 border-b-transparent rounded-full"></span>
+                    <span className="mr-2 h-4 w-4 animate-spin rounded-full border-2 border-b-transparent"></span>
                     Logging in...
                   </span>
                 ) : (
@@ -118,17 +108,29 @@ const AdminLogin = () => {
                 )}
               </Button>
             </form>
-            
+
             {/* Development helper */}
-            <div className="mt-6 p-4 bg-gray-50 rounded-md border">
-              <p className="text-sm font-medium text-gray-700 mb-2">Test Credentials:</p>
-              <div className="text-xs text-gray-600 space-y-1">
-                <div><strong>Admin:</strong> admin@clinic.com / admin123</div>
-                <div><strong>Doctor:</strong> dr.smith@clinic.com / doctor123</div>
-                <div><strong>Nurse:</strong> nurse.williams@clinic.com / nurse123</div>
-                <div><strong>Receptionist:</strong> reception@clinic.com / reception123</div>
-                <div><strong>Cashier:</strong> cashier@clinic.com / cashier123</div>
-                <div><strong>Pharmacist:</strong> pharmacy@clinic.com / pharmacy123</div>
+            <div className="mt-6 rounded-md border bg-gray-50 p-4">
+              <p className="mb-2 text-sm font-medium text-gray-700">Test Credentials:</p>
+              <div className="space-y-1 text-xs text-gray-600">
+                <div>
+                  <strong>Admin:</strong> admin@clinic.com / admin123
+                </div>
+                <div>
+                  <strong>Doctor:</strong> dr.smith@clinic.com / doctor123
+                </div>
+                <div>
+                  <strong>Nurse:</strong> nurse.williams@clinic.com / nurse123
+                </div>
+                <div>
+                  <strong>Receptionist:</strong> reception@clinic.com / reception123
+                </div>
+                <div>
+                  <strong>Cashier:</strong> cashier@clinic.com / cashier123
+                </div>
+                <div>
+                  <strong>Pharmacist:</strong> pharmacy@clinic.com / pharmacy123
+                </div>
               </div>
             </div>
           </CardContent>

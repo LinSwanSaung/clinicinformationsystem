@@ -10,23 +10,23 @@
  */
 export const convert12HrTo24Hr = (time12) => {
   if (!time12) return '';
-  
+
   // Extract time and period
   const [timePart, period] = time12.trim().split(' ');
   if (!timePart || !period) return '';
-  
+
   const [hours, minutes] = timePart.split(':');
   if (!hours || !minutes) return '';
-  
+
   let hour24 = parseInt(hours);
-  
+
   // Convert to 24-hour format
   if (period.toUpperCase() === 'AM' && hour24 === 12) {
     hour24 = 0;
   } else if (period.toUpperCase() === 'PM' && hour24 !== 12) {
     hour24 += 12;
   }
-  
+
   return `${hour24.toString().padStart(2, '0')}:${minutes}`;
 };
 
@@ -37,13 +37,13 @@ export const convert12HrTo24Hr = (time12) => {
  */
 export const convert24HrTo12Hr = (time24) => {
   if (!time24) return '';
-  
+
   const [hours, minutes] = time24.split(':');
   if (!hours || !minutes) return '';
-  
+
   let hour = parseInt(hours);
   let period = 'AM';
-  
+
   // Convert to 12-hour format
   if (hour === 0) {
     hour = 12;
@@ -53,7 +53,7 @@ export const convert24HrTo12Hr = (time24) => {
   } else if (hour === 12) {
     period = 'PM';
   }
-  
+
   return `${hour}:${minutes} ${period}`;
 };
 
@@ -77,7 +77,7 @@ export const validateTimeFormat = (time) => {
 export const compareTimes12Hr = (time1, time2) => {
   const time1_24 = convert12HrTo24Hr(time1);
   const time2_24 = convert12HrTo24Hr(time2);
-  
+
   if (time1_24 < time2_24) return -1;
   if (time1_24 > time2_24) return 1;
   return 0;
@@ -91,10 +91,10 @@ export const compareTimes12Hr = (time1, time2) => {
  */
 export const formatTimeForDisplay = (time, format = '12hr') => {
   if (!time) return '';
-  
+
   // Detect if input is 12hr or 24hr format
   const is12Hr = time.includes('AM') || time.includes('PM');
-  
+
   if (format === '12hr') {
     return is12Hr ? time : convert24HrTo12Hr(time);
   } else {
@@ -112,8 +112,8 @@ export const formatTimeForDisplay = (time, format = '12hr') => {
 export const formatTimeRange = (startTime, endTime, format = '12hr') => {
   const formattedStart = formatTimeForDisplay(startTime, format);
   const formattedEnd = formatTimeForDisplay(endTime, format);
-  
+
   if (!formattedStart || !formattedEnd) return '';
-  
+
   return `${formattedStart} - ${formattedEnd}`;
 };

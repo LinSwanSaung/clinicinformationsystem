@@ -10,7 +10,7 @@ import {
   RefreshCw,
   Phone,
   Home,
-  ChevronRight
+  ChevronRight,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -21,8 +21,8 @@ import { queueService } from '@/features/queue';
 // Animation variants (reserved for future use)
 const _pageVariants = {
   initial: { opacity: 0, y: 20 },
-  animate: { opacity: 1, y: 0, transition: { duration: 0.4, ease: "easeOut" } },
-  exit: { opacity: 0, y: -20, transition: { duration: 0.3 } }
+  animate: { opacity: 1, y: 0, transition: { duration: 0.4, ease: 'easeOut' } },
+  exit: { opacity: 0, y: -20, transition: { duration: 0.3 } },
 };
 
 const _containerVariants = {
@@ -31,52 +31,52 @@ const _containerVariants = {
     opacity: 1,
     transition: {
       staggerChildren: 0.1,
-      delayChildren: 0.2
-    }
-  }
+      delayChildren: 0.2,
+    },
+  },
 };
 
 const _itemVariants = {
   hidden: { opacity: 0, y: 20, scale: 0.95 },
-  visible: { 
-    opacity: 1, 
-    y: 0, 
+  visible: {
+    opacity: 1,
+    y: 0,
     scale: 1,
-    transition: { 
-      duration: 0.3, 
-      ease: "easeOut" 
-    }
-  }
+    transition: {
+      duration: 0.3,
+      ease: 'easeOut',
+    },
+  },
 };
 
 const _cardVariants = {
   hidden: { opacity: 0, y: 20, scale: 0.9 },
-  visible: { 
-    opacity: 1, 
-    y: 0, 
+  visible: {
+    opacity: 1,
+    y: 0,
     scale: 1,
-    transition: { 
-      duration: 0.4, 
-      ease: "easeOut",
-      type: "spring",
-      stiffness: 100
-    }
+    transition: {
+      duration: 0.4,
+      ease: 'easeOut',
+      type: 'spring',
+      stiffness: 100,
+    },
   },
-  hover: { 
+  hover: {
     y: -4,
     scale: 1.02,
-    transition: { 
+    transition: {
       duration: 0.2,
-      ease: "easeOut"
-    }
+      ease: 'easeOut',
+    },
   },
-  tap: { scale: 0.98 }
+  tap: { scale: 0.98 },
 };
 
 const DoctorQueueDetailPage = () => {
   const navigate = useNavigate();
   const { doctorId } = useParams();
-  
+
   const [doctor, setDoctor] = useState(null);
   const [queueData, setQueueData] = useState(null);
   const [isLoading, setIsLoading] = useState(true);
@@ -93,10 +93,10 @@ const DoctorQueueDetailPage = () => {
 
       // Get all doctors to find the specific doctor info
       const doctorsResponse = await queueService.getAllDoctorsQueueStatus();
-      
+
       if (doctorsResponse && doctorsResponse.data) {
-        const foundDoctor = doctorsResponse.data.find(d => d.id === doctorId);
-        
+        const foundDoctor = doctorsResponse.data.find((d) => d.id === doctorId);
+
         if (foundDoctor) {
           setDoctor(foundDoctor);
         } else {
@@ -105,7 +105,6 @@ const DoctorQueueDetailPage = () => {
       } else {
         setError('Unable to load doctor information');
       }
-
     } catch (err) {
       setError(err.message || 'Failed to load queue data');
     } finally {
@@ -119,35 +118,54 @@ const DoctorQueueDetailPage = () => {
 
   const getStatusColor = (status) => {
     switch (status) {
-      case 'waiting': return 'bg-yellow-100 text-yellow-800';
-      case 'called': return 'bg-green-100 text-green-800'; // Changed to green for "Waiting for Doctor"
-      case 'serving': return 'bg-blue-100 text-blue-800'; // Changed to blue for "In Consultation"
-      case 'completed': return 'bg-gray-100 text-gray-800';
-      case 'missed': return 'bg-red-100 text-red-800';
-      default: return 'bg-gray-100 text-gray-800';
+      case 'waiting':
+        return 'bg-yellow-100 text-yellow-800';
+      case 'called':
+        return 'bg-green-100 text-green-800'; // Changed to green for "Waiting for Doctor"
+      case 'serving':
+        return 'bg-blue-100 text-blue-800'; // Changed to blue for "In Consultation"
+      case 'completed':
+        return 'bg-gray-100 text-gray-800';
+      case 'missed':
+        return 'bg-red-100 text-red-800';
+      default:
+        return 'bg-gray-100 text-gray-800';
     }
   };
 
   const getStatusText = (status) => {
     switch (status) {
-      case 'waiting': return 'Waiting';
-      case 'called': return 'Waiting for Doctor';
-      case 'serving': return 'In Consultation';
-      case 'completed': return 'Completed';
-      case 'missed': return 'Missed';
-      case 'cancelled': return 'Cancelled';
-      default: return 'Unknown';
+      case 'waiting':
+        return 'Waiting';
+      case 'called':
+        return 'Waiting for Doctor';
+      case 'serving':
+        return 'In Consultation';
+      case 'completed':
+        return 'Completed';
+      case 'missed':
+        return 'Missed';
+      case 'cancelled':
+        return 'Cancelled';
+      default:
+        return 'Unknown';
     }
   };
 
   const getStatusIcon = (status) => {
     switch (status) {
-      case 'waiting': return <Clock className="h-4 w-4" />;
-      case 'called': return <Phone className="h-4 w-4" />;
-      case 'serving': return <Activity className="h-4 w-4" />;
-      case 'completed': return <CheckCircle className="h-4 w-4" />;
-      case 'missed': return <AlertTriangle className="h-4 w-4" />;
-      default: return <AlertTriangle className="h-4 w-4" />;
+      case 'waiting':
+        return <Clock className="h-4 w-4" />;
+      case 'called':
+        return <Phone className="h-4 w-4" />;
+      case 'serving':
+        return <Activity className="h-4 w-4" />;
+      case 'completed':
+        return <CheckCircle className="h-4 w-4" />;
+      case 'missed':
+        return <AlertTriangle className="h-4 w-4" />;
+      default:
+        return <AlertTriangle className="h-4 w-4" />;
     }
   };
 
@@ -156,10 +174,10 @@ const DoctorQueueDetailPage = () => {
       <PageLayout title="Doctor Queue Detail" subtitle="Loading queue information...">
         <div className="space-y-4">
           <div className="animate-pulse">
-            <div className="h-6 bg-gray-200 rounded w-1/4 mb-4"></div>
+            <div className="mb-4 h-6 w-1/4 rounded bg-gray-200"></div>
             <div className="space-y-3">
               {Array.from({ length: 5 }, (_, i) => (
-                <div key={i} className="h-16 bg-gray-200 rounded"></div>
+                <div key={i} className="h-16 rounded bg-gray-200"></div>
               ))}
             </div>
           </div>
@@ -171,16 +189,16 @@ const DoctorQueueDetailPage = () => {
   if (error) {
     return (
       <PageLayout title="Doctor Queue Detail" subtitle="Error loading queue data">
-        <div className="text-center py-8">
-          <AlertTriangle className="h-12 w-12 text-red-500 mx-auto mb-4" />
-          <p className="text-red-600 mb-4">{error}</p>
+        <div className="py-8 text-center">
+          <AlertTriangle className="mx-auto mb-4 h-12 w-12 text-red-500" />
+          <p className="mb-4 text-red-600">{error}</p>
           <div className="space-x-2">
             <Button onClick={loadQueueData}>
-              <RefreshCw className="h-4 w-4 mr-2" />
+              <RefreshCw className="mr-2 h-4 w-4" />
               Try Again
             </Button>
             <Button variant="outline" onClick={() => navigate('/receptionist/live-queue')}>
-              <ArrowLeft className="h-4 w-4 mr-2" />
+              <ArrowLeft className="mr-2 h-4 w-4" />
               Back to Live Queue
             </Button>
           </div>
@@ -195,7 +213,7 @@ const DoctorQueueDetailPage = () => {
         <div className="p-8 text-center">
           <div className="text-xl text-muted-foreground">Doctor not found</div>
           <Button onClick={() => navigate('/receptionist/live-queue')} className="mt-4">
-            <ArrowLeft className="h-4 w-4 mr-2" />
+            <ArrowLeft className="mr-2 h-4 w-4" />
             Back to Live Queue
           </Button>
         </div>
@@ -204,9 +222,9 @@ const DoctorQueueDetailPage = () => {
   }
 
   const tokens = queueData?.data?.tokens || [];
-  const waitingTokens = tokens.filter(t => t.status === 'waiting');
-  const servingTokens = tokens.filter(t => t.status === 'serving');
-  const completedTokens = tokens.filter(t => t.status === 'completed');
+  const waitingTokens = tokens.filter((t) => t.status === 'waiting');
+  const servingTokens = tokens.filter((t) => t.status === 'serving');
+  const completedTokens = tokens.filter((t) => t.status === 'completed');
   const currentConsultation = servingTokens[0];
 
   // Custom breadcrumb component
@@ -214,95 +232,87 @@ const DoctorQueueDetailPage = () => {
     <motion.nav
       initial={{ opacity: 0, y: -10 }}
       animate={{ opacity: 1, y: 0 }}
-      className="flex items-center space-x-2 text-sm text-muted-foreground mb-6"
+      className="mb-6 flex items-center space-x-2 text-sm text-muted-foreground"
       role="navigation"
       aria-label="Breadcrumb"
     >
       <motion.button
         onClick={() => navigate('/receptionist/dashboard')}
-        className="flex items-center gap-1 transition-colors duration-200 hover:text-foreground cursor-pointer"
+        className="flex cursor-pointer items-center gap-1 transition-colors duration-200 hover:text-foreground"
         whileHover={{ scale: 1.05 }}
         whileTap={{ scale: 0.95 }}
       >
         <Home className="h-4 w-4" />
         <span>Dashboard</span>
       </motion.button>
-      
-      <ChevronRight className="h-4 w-4 text-muted-foreground/50" />
-      
+
+      <ChevronRight className="text-muted-foreground/50 h-4 w-4" />
+
       <motion.button
         onClick={() => navigate('/receptionist/live-queue')}
-        className="flex items-center gap-1 transition-colors duration-200 hover:text-foreground cursor-pointer"
+        className="flex cursor-pointer items-center gap-1 transition-colors duration-200 hover:text-foreground"
         whileHover={{ scale: 1.05 }}
         whileTap={{ scale: 0.95 }}
       >
         <span>Queue</span>
       </motion.button>
-      
-      <ChevronRight className="h-4 w-4 text-muted-foreground/50" />
-      
-      <span className="text-foreground font-medium">
+
+      <ChevronRight className="text-muted-foreground/50 h-4 w-4" />
+
+      <span className="font-medium text-foreground">
         {doctor ? `Dr. ${doctor.first_name} ${doctor.last_name}` : 'Doctor Queue'}
       </span>
     </motion.nav>
   );
 
   return (
-    <PageLayout 
+    <PageLayout
       title={doctor ? `Dr. ${doctor.first_name} ${doctor.last_name} - Queue` : 'Doctor Queue'}
       subtitle={`${tokens.length} patients in queue today`}
       customBreadcrumbs={<CustomBreadcrumbs />}
     >
       <div className="space-y-6">
         <div className="flex items-center justify-between">
-          <Button 
-            variant="outline" 
+          <Button
+            variant="outline"
             onClick={() => navigate('/receptionist/live-queue')}
             className="gap-2"
           >
             <ArrowLeft className="h-4 w-4" />
             Back to Live Queue
           </Button>
-          
+
           <Button onClick={loadQueueData} variant="outline" className="gap-2">
             <RefreshCw className="h-4 w-4" />
             Refresh
           </Button>
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+        <div className="grid grid-cols-1 gap-4 md:grid-cols-4">
           <Card>
             <CardContent className="p-6">
-              <div className="text-2xl font-bold text-blue-600">
-                {tokens.length}
-              </div>
+              <div className="text-2xl font-bold text-blue-600">{tokens.length}</div>
               <p className="text-sm text-muted-foreground">Total Patients</p>
             </CardContent>
           </Card>
-          
+
           <Card>
             <CardContent className="p-6">
-              <div className="text-2xl font-bold text-yellow-600">
-                {waitingTokens.length}
-              </div>
+              <div className="text-2xl font-bold text-yellow-600">{waitingTokens.length}</div>
               <p className="text-sm text-muted-foreground">Waiting</p>
             </CardContent>
           </Card>
-          
+
           <Card>
             <CardContent className="p-6">
-              <div className="text-2xl font-bold text-green-600">
-                {servingTokens.length}
-              </div>
+              <div className="text-2xl font-bold text-green-600">{servingTokens.length}</div>
               <p className="text-sm text-muted-foreground">In Consultation</p>
             </CardContent>
           </Card>
-          
+
           <Card>
             <CardContent className="p-6">
-              <div className="text-2xl font-bold text-gray-600">
-                {completedTokens.length}
-              </div>
+              <div className="text-2xl font-bold text-gray-600">{completedTokens.length}</div>
               <p className="text-sm text-muted-foreground">Completed</p>
             </CardContent>
           </Card>
@@ -314,42 +324,56 @@ const DoctorQueueDetailPage = () => {
               <CardTitle className="flex items-center gap-2">
                 <Activity className="h-5 w-5 text-green-600" />
                 Currently Consulting
-                {currentConsultation.priority >= 4 && (
-                  <span className="text-xl">⭐</span>
-                )}
+                {currentConsultation.priority >= 4 && <span className="text-xl">⭐</span>}
               </CardTitle>
             </CardHeader>
             <CardContent>
-              <div className={`flex items-center justify-between p-4 rounded-lg ${
-                currentConsultation.priority >= 4 ? 'bg-red-50' : 'bg-green-50'
-              }`}>
+              <div
+                className={`flex items-center justify-between rounded-lg p-4 ${
+                  currentConsultation.priority >= 4 ? 'bg-red-50' : 'bg-green-50'
+                }`}
+              >
                 <div className="flex items-center gap-4">
-                  <div className={`w-12 h-12 rounded-full flex items-center justify-center font-bold ${
-                    currentConsultation.priority >= 4 
-                      ? 'bg-red-100 text-red-600' 
-                      : 'bg-green-100 text-green-600'
-                  }`}>
-                    {currentConsultation.priority >= 4 && <span className="text-xs mr-1">⭐</span>}
+                  <div
+                    className={`flex h-12 w-12 items-center justify-center rounded-full font-bold ${
+                      currentConsultation.priority >= 4
+                        ? 'bg-red-100 text-red-600'
+                        : 'bg-green-100 text-green-600'
+                    }`}
+                  >
+                    {currentConsultation.priority >= 4 && <span className="mr-1 text-xs">⭐</span>}
                     {currentConsultation.token_number}
                   </div>
                   <div>
                     <h3 className="font-medium">
                       {currentConsultation.priority >= 4 && <span className="mr-1">⭐</span>}
-                      {currentConsultation.patient?.first_name} {currentConsultation.patient?.last_name}
+                      {currentConsultation.patient?.first_name}{' '}
+                      {currentConsultation.patient?.last_name}
                       {currentConsultation.priority >= 4 && (
-                        <Badge variant="destructive" className="ml-2 text-xs">PRIORITY</Badge>
+                        <Badge variant="destructive" className="ml-2 text-xs">
+                          PRIORITY
+                        </Badge>
                       )}
                     </h3>
                     <p className="text-sm text-muted-foreground">
                       Patient ID: {currentConsultation.patient?.patient_number}
                     </p>
                     <p className="text-xs text-muted-foreground">
-                      Started: {currentConsultation.served_at ? new Date(currentConsultation.served_at).toLocaleTimeString() : 'N/A'}
+                      Started:{' '}
+                      {currentConsultation.served_at
+                        ? new Date(currentConsultation.served_at).toLocaleTimeString()
+                        : 'N/A'}
                     </p>
                   </div>
                 </div>
-                <Badge className={currentConsultation.priority >= 4 ? 'bg-red-100 text-red-800' : 'bg-green-100 text-green-800'}>
-                  <Activity className="h-4 w-4 mr-1" />
+                <Badge
+                  className={
+                    currentConsultation.priority >= 4
+                      ? 'bg-red-100 text-red-800'
+                      : 'bg-green-100 text-green-800'
+                  }
+                >
+                  <Activity className="mr-1 h-4 w-4" />
                   In Progress
                 </Badge>
               </div>
@@ -363,7 +387,7 @@ const DoctorQueueDetailPage = () => {
           </CardHeader>
           <CardContent>
             {tokens.length === 0 ? (
-              <div className="text-center py-8 text-muted-foreground">
+              <div className="py-8 text-center text-muted-foreground">
                 No patients in queue today
               </div>
             ) : (
@@ -374,24 +398,30 @@ const DoctorQueueDetailPage = () => {
                     initial={{ opacity: 0, y: 20 }}
                     animate={{ opacity: 1, y: 0 }}
                     transition={{ delay: index * 0.1 }}
-                    className={`flex items-center justify-between p-4 border rounded-lg hover:bg-gray-50 ${
-                      token.priority >= 4 ? 'bg-red-50 border-red-300 border-2' : ''
+                    className={`flex items-center justify-between rounded-lg border p-4 hover:bg-gray-50 ${
+                      token.priority >= 4 ? 'border-2 border-red-300 bg-red-50' : ''
                     }`}
                   >
                     <div className="flex items-center gap-4">
-                      <div className={`w-10 h-10 rounded-full flex items-center justify-center font-bold ${
-                        token.priority >= 4 ? 'bg-red-100 text-red-600' : 'bg-blue-100 text-blue-600'
-                      }`}>
-                        {token.priority >= 4 && <span className="text-sm mr-1">⭐</span>}
+                      <div
+                        className={`flex h-10 w-10 items-center justify-center rounded-full font-bold ${
+                          token.priority >= 4
+                            ? 'bg-red-100 text-red-600'
+                            : 'bg-blue-100 text-blue-600'
+                        }`}
+                      >
+                        {token.priority >= 4 && <span className="mr-1 text-sm">⭐</span>}
                         {token.token_number}
                       </div>
-                      
+
                       <div>
-                        <h3 className="font-medium flex items-center gap-2">
+                        <h3 className="flex items-center gap-2 font-medium">
                           {token.priority >= 4 && <span className="text-lg">⭐</span>}
                           {token.patient?.first_name} {token.patient?.last_name}
                           {token.priority >= 4 && (
-                            <Badge className="bg-red-100 text-red-700 border-red-300">PRIORITY</Badge>
+                            <Badge className="border-red-300 bg-red-100 text-red-700">
+                              PRIORITY
+                            </Badge>
                           )}
                         </h3>
                         <p className="text-sm text-muted-foreground">
@@ -402,7 +432,7 @@ const DoctorQueueDetailPage = () => {
                         </p>
                       </div>
                     </div>
-                    
+
                     <div className="flex items-center gap-3">
                       <Badge className={getStatusColor(token.status)}>
                         {getStatusIcon(token.status)}

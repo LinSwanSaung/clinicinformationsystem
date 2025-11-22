@@ -22,7 +22,7 @@ class VisitService {
    * Check if cached data is still valid
    */
   isCacheValid(cacheEntry) {
-    return cacheEntry && (Date.now() - cacheEntry.timestamp) < this.cacheTimeout;
+    return cacheEntry && Date.now() - cacheEntry.timestamp < this.cacheTimeout;
   }
 
   /**
@@ -38,23 +38,23 @@ class VisitService {
     }
 
     try {
-      const { 
-        limit = 50, 
-        offset = 0, 
+      const {
+        limit = 50,
+        offset = 0,
         includeCompleted = true,
-        includeInProgress = false
+        includeInProgress = false,
       } = options;
 
       const params = new URLSearchParams({
         limit: limit.toString(),
         offset: offset.toString(),
         includeCompleted: includeCompleted.toString(),
-        includeInProgress: includeInProgress.toString()
+        includeInProgress: includeInProgress.toString(),
       });
 
       const url = `/visits/patient/${patientId}/history?${params}`;
       const response = await api.get(url);
-      
+
       // Handle different response structures
       let visitHistory;
       if (response.data && response.data.data) {
@@ -74,7 +74,7 @@ class VisitService {
       // Cache the results
       this.cache.set(cacheKey, {
         data: visitHistory,
-        timestamp: Date.now()
+        timestamp: Date.now(),
       });
 
       return visitHistory;
@@ -103,12 +103,12 @@ class VisitService {
   async createVisit(visitData) {
     try {
       const response = await api.post('/visits', visitData);
-      
+
       // Invalidate cache for this patient
       if (visitData.patient_id) {
         this.clearPatientCache(visitData.patient_id);
       }
-      
+
       return response.data.data;
     } catch (error) {
       logger.error('Error creating visit:', error);
@@ -122,12 +122,12 @@ class VisitService {
   async updateVisit(visitId, updateData) {
     try {
       const response = await api.put(`/visits/${visitId}`, updateData);
-      
+
       // Invalidate cache for this patient
       if (updateData.patient_id) {
         this.clearPatientCache(updateData.patient_id);
       }
-      
+
       return response.data.data;
     } catch (error) {
       logger.error('Error updating visit:', error);
@@ -141,12 +141,12 @@ class VisitService {
   async completeVisit(visitId, completionData = {}) {
     try {
       const response = await api.post(`/visits/${visitId}/complete`, completionData);
-      
+
       // Invalidate cache if patient ID is available
       if (completionData.patient_id) {
         this.clearPatientCache(completionData.patient_id);
       }
-      
+
       return response.data.data;
     } catch (error) {
       logger.error('Error completing visit:', error);
@@ -159,18 +159,11 @@ class VisitService {
    */
   async getAllVisits(options = {}) {
     try {
-      const { 
-        limit = 50, 
-        offset = 0, 
-        status, 
-        doctor_id, 
-        start_date, 
-        end_date 
-      } = options;
+      const { limit = 50, offset = 0, status, doctor_id, start_date, end_date } = options;
 
       const params = new URLSearchParams({
         limit: limit.toString(),
-        offset: offset.toString()
+        offset: offset.toString(),
       });
 
       if (status) params.append('status', status);
@@ -213,12 +206,12 @@ class VisitService {
   async deleteVisit(visitId, patientId = null) {
     try {
       const response = await api.delete(`/visits/${visitId}`);
-      
+
       // Invalidate cache for this patient if provided
       if (patientId) {
         this.clearPatientCache(patientId);
       }
-      
+
       return response.data;
     } catch (error) {
       logger.error('Error deleting visit:', error);
@@ -235,7 +228,7 @@ class VisitService {
       formatted_date: this.formatDate(visit.visit_date),
       formatted_cost: this.formatCurrency(visit.total_cost),
       status_color: this.getStatusColor(visit.status),
-      payment_status_color: this.getPaymentStatusColor(visit.payment_status)
+      payment_status_color: this.getPaymentStatusColor(visit.payment_status),
     };
   }
 
@@ -249,7 +242,7 @@ class VisitService {
       month: 'short',
       day: 'numeric',
       hour: '2-digit',
-      minute: '2-digit'
+      minute: '2-digit',
     });
   }
 
@@ -260,7 +253,7 @@ class VisitService {
     if (!amount) return 'N/A';
     return new Intl.NumberFormat('en-US', {
       style: 'currency',
-      currency: 'USD'
+      currency: 'USD',
     }).format(amount);
   }
 
@@ -308,7 +301,7 @@ class VisitService {
         keysToDelete.push(key);
       }
     }
-    keysToDelete.forEach(key => this.cache.delete(key));
+    keysToDelete.forEach((key) => this.cache.delete(key));
   }
 
   /**

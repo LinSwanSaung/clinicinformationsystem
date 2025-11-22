@@ -2,7 +2,16 @@ import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Users, Calendar, Settings, Stethoscope, AlertTriangle, DollarSign, ClipboardList, Building2 } from 'lucide-react';
+import {
+  Users,
+  Calendar,
+  Settings,
+  Stethoscope,
+  AlertTriangle,
+  DollarSign,
+  ClipboardList,
+  Building2,
+} from 'lucide-react';
 import PageLayout from '@/components/layout/PageLayout';
 import api from '@/services/api';
 import { userService } from '@/features/admin';

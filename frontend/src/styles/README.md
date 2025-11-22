@@ -5,7 +5,9 @@ This directory contains all global stylesheets and design tokens for the RealCIS
 ## Files
 
 ### `theme.css`
+
 The main design system file containing:
+
 - **Design Tokens**: Colors, typography, spacing, shadows, and border radius
 - **Theme Support**: Light and dark mode variants
 - **Tailwind Integration**: Maps CSS variables to Tailwind utilities

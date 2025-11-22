@@ -4,8 +4,20 @@ import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from '@/components/ui/select';
-import { SearchBar, LoadingSpinner, EmptyState, FormModal, ConfirmDialog } from '@/components/library';
+import {
+  Select,
+  SelectTrigger,
+  SelectValue,
+  SelectContent,
+  SelectItem,
+} from '@/components/ui/select';
+import {
+  SearchBar,
+  LoadingSpinner,
+  EmptyState,
+  FormModal,
+  ConfirmDialog,
+} from '@/components/library';
 import DataTable from '@/components/library/DataTable/DataTable';
 import { useServices, useServiceMutations } from '../hooks/useServices';
 
@@ -113,7 +125,12 @@ export default function ServiceCatalog() {
         </div>
         <div>
           <Label htmlFor="service_name">Service Name</Label>
-          <Input id="service_name" name="service_name" required placeholder="e.g., General Consultation" />
+          <Input
+            id="service_name"
+            name="service_name"
+            required
+            placeholder="e.g., General Consultation"
+          />
         </div>
       </div>
       <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
@@ -135,7 +152,14 @@ export default function ServiceCatalog() {
         </div>
         <div>
           <Label htmlFor="default_price">Default Price</Label>
-          <Input id="default_price" name="default_price" type="number" min="0" step="0.01" required />
+          <Input
+            id="default_price"
+            name="default_price"
+            type="number"
+            min="0"
+            step="0.01"
+            required
+          />
         </div>
       </div>
       <div>
@@ -155,11 +179,20 @@ export default function ServiceCatalog() {
       <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
         <div>
           <Label htmlFor="service_name">Service Name</Label>
-          <Input id="service_name" name="service_name" defaultValue={selected.service_name} required />
+          <Input
+            id="service_name"
+            name="service_name"
+            defaultValue={selected.service_name}
+            required
+          />
         </div>
         <div>
           <Label>Category</Label>
-          <Select value={editCategory || selected.category} onValueChange={setEditCategory} required>
+          <Select
+            value={editCategory || selected.category}
+            onValueChange={setEditCategory}
+            required
+          >
             <SelectTrigger>
               <SelectValue placeholder="Select category" />
             </SelectTrigger>
@@ -197,7 +230,12 @@ export default function ServiceCatalog() {
         <Input id="description" name="description" defaultValue={selected.description || ''} />
       </div>
       <div className="flex items-center gap-2">
-        <input id="is_active" name="is_active" type="checkbox" defaultChecked={!!selected.is_active} />
+        <input
+          id="is_active"
+          name="is_active"
+          type="checkbox"
+          defaultChecked={!!selected.is_active}
+        />
         <Label htmlFor="is_active">Active</Label>
       </div>
     </div>
@@ -255,7 +293,7 @@ export default function ServiceCatalog() {
   return (
     <div className="min-h-screen bg-background">
       <PageLayout title="Services" subtitle="Manage billable services" fullWidth>
-        <div className="p-8 space-y-6">
+        <div className="space-y-6 p-8">
           <Card>
             <CardHeader>
               <CardTitle>Service Catalog</CardTitle>
@@ -300,7 +338,8 @@ export default function ServiceCatalog() {
         title="New Service"
         description="Add a ready-made service for doctors to select."
         onSubmit={async (e) => {
-          const formEl = e?.currentTarget?.form || e?.target?.form || document.querySelector('form');
+          const formEl =
+            e?.currentTarget?.form || e?.target?.form || document.querySelector('form');
           if (!formEl) return;
           if (typeof formEl.reportValidity === 'function' && !formEl.reportValidity()) {
             return;
@@ -333,7 +372,8 @@ export default function ServiceCatalog() {
         title="Edit Service"
         description="Update service details."
         onSubmit={async (e) => {
-          const formEl = e?.currentTarget?.form || e?.target?.form || document.querySelector('form');
+          const formEl =
+            e?.currentTarget?.form || e?.target?.form || document.querySelector('form');
           if (!formEl) return;
           if (typeof formEl.reportValidity === 'function' && !formEl.reportValidity()) {
             return;
@@ -376,5 +416,3 @@ export default function ServiceCatalog() {
     </div>
   );
 }
-
-

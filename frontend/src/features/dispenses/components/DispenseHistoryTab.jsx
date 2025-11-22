@@ -51,7 +51,11 @@ export default function DispenseHistoryTab() {
       label: 'Dispensed By',
       render: (_, row) => row.dispensedBy?.name || '-',
     },
-    { key: 'totalPrice', label: 'Amount', render: (v) => (v != null ? Number(v).toFixed(2) : '0.00') },
+    {
+      key: 'totalPrice',
+      label: 'Amount',
+      render: (v) => (v != null ? Number(v).toFixed(2) : '0.00'),
+    },
   ];
 
   const onExport = async () => {
@@ -78,8 +82,8 @@ export default function DispenseHistoryTab() {
   };
 
   const toolbar = (
-    <div className="w-full flex flex-col gap-3 md:flex-row md:items-center">
-      <div className="flex-1 min-w-[200px]">
+    <div className="flex w-full flex-col gap-3 md:flex-row md:items-center">
+      <div className="min-w-[200px] flex-1">
         <SearchBar
           value={search}
           onChange={(e) => {
@@ -158,5 +162,3 @@ export default function DispenseHistoryTab() {
     </Card>
   );
 }
-
-

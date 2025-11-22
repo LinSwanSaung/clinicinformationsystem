@@ -8,10 +8,9 @@ export const APP_CONFIG = Object.freeze({
   SYSTEM_NAME: 'ThriveCare',
   SYSTEM_DESCRIPTION: 'Healthcare System',
   SYSTEM_VERSION: '1.0.0',
-  
+
   // Display Options
   SHOW_SYSTEM_NAME_IN_NAVBAR: true, // Whether to show system name alongside clinic name
 });
 
 export default APP_CONFIG;
-

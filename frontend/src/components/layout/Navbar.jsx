@@ -1,4 +1,3 @@
- 
 import { useState, useEffect } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
@@ -87,9 +86,9 @@ const Navbar = () => {
         const result = await clinicSettingsService.getSettings();
         if (result.success && result.data) {
           const data = result.data.data || result.data;
-          logger.debug('Loaded clinic settings:', { 
-            clinic_name: data.clinic_name, 
-            clinic_logo_url: data.clinic_logo_url 
+          logger.debug('Loaded clinic settings:', {
+            clinic_name: data.clinic_name,
+            clinic_logo_url: data.clinic_logo_url,
           });
           setClinicSettings({
             clinic_name: data.clinic_name || null,
@@ -279,7 +278,7 @@ const Navbar = () => {
           whileTap={{ scale: 0.95 }}
         >
           <motion.div
-            className="shrink-0 rounded-lg bg-primary p-2 transition-all hover:shadow-lg sm:rounded-xl sm:p-3 flex items-center justify-center"
+            className="flex shrink-0 items-center justify-center rounded-lg bg-primary p-2 transition-all hover:shadow-lg sm:rounded-xl sm:p-3"
             whileHover={{ rotate: 5, scale: 1.1 }}
             transition={{ type: 'spring', stiffness: 400, damping: 10 }}
           >
@@ -287,7 +286,7 @@ const Navbar = () => {
               <img
                 src={clinicSettings.clinic_logo_url}
                 alt="Clinic Logo"
-                className="h-5 w-5 object-contain sm:h-6 sm:w-6 md:h-7 md:w-7 max-w-full max-h-full"
+                className="h-5 max-h-full w-5 max-w-full object-contain sm:h-6 sm:w-6 md:h-7 md:w-7"
                 style={{ display: 'block' }}
                 onError={(e) => {
                   // Log error for debugging

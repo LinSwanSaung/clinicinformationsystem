@@ -1,11 +1,11 @@
- import apiService from '@/services/api';
+import apiService from '@/services/api';
 
 const paymentService = {
   // Record payment
   recordPayment: async (invoiceId, paymentData) => {
     const response = await apiService.post('/payments', {
       invoice_id: invoiceId,
-      ...paymentData
+      ...paymentData,
     });
     return response.data;
   },
@@ -27,8 +27,8 @@ const paymentService = {
     const response = await apiService.get('/payments/report', {
       params: {
         start_date: startDate,
-        end_date: endDate
-      }
+        end_date: endDate,
+      },
     });
     return response.data;
   },

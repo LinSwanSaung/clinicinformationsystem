@@ -19,4 +19,3 @@ export { usePatient } from './hooks/usePatient';
 export { default as patientService } from './services/patientService';
 export { default as patientAccountService } from './services/patientAccountService';
 export { default as patientPortalService } from './services/patientPortalService';
-

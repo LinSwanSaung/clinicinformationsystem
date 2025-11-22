@@ -11,7 +11,7 @@ class PatientPortalService {
 
   async getVisits(limit = 10, offset = 0) {
     return api.get('/me/visits', {
-      params: { limit, offset }
+      params: { limit, offset },
     });
   }
 
@@ -21,13 +21,13 @@ class PatientPortalService {
 
   async getPrescriptions(includeInactive = false) {
     return api.get('/me/prescriptions', {
-      params: { includeInactive }
+      params: { includeInactive },
     });
   }
 
   async getUpcomingAppointments(limit = 2) {
     return api.get('/me/appointments/upcoming', {
-      params: { limit }
+      params: { limit },
     });
   }
 

@@ -24,5 +24,3 @@ export function LinkedPatientBadge({ linked, patientNumber, className }) {
 }
 
 export default LinkedPatientBadge;
-
-

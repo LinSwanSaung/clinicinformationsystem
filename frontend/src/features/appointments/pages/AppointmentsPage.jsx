@@ -290,7 +290,7 @@ const AppointmentsPage = () => {
     // Appointment slots use 30-minute intervals for buffer time
     // (separate from consultation duration which is used for wait time calculations)
     const APPOINTMENT_SLOT_INTERVAL = 30;
-    
+
     // If no doctor selected or no availability data, show default slots
     if (!selectedDoctor || !doctorAvailability.length || !selectedDate) {
       const slots = [];
@@ -575,7 +575,6 @@ const AppointmentsPage = () => {
         notes: newAppointment.notes,
         status: 'scheduled',
       };
-
 
       const result = await createAppointmentMutation.mutateAsync(appointmentData);
 

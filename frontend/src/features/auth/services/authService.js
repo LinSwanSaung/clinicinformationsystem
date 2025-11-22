@@ -11,26 +11,26 @@ class AuthService {
     try {
       // Use real API authentication (both development and production)
       const response = await apiService.post('/auth/login', credentials);
-      
+
       if (response.success) {
         const { token, user } = response.data;
-        
+
         // Store token and user data
         localStorage.setItem('authToken', token);
         localStorage.setItem('user', JSON.stringify(user));
-        
+
         return {
           success: true,
-          data: { ...user, token }
+          data: { ...user, token },
         };
       }
-      
+
       throw new Error(response.message || 'Login failed');
     } catch (error) {
       logger.error('Login error:', error);
       return {
         success: false,
-        message: error.message || 'Login failed'
+        message: error.message || 'Login failed',
       };
     }
   }
@@ -83,7 +83,7 @@ class AuthService {
     try {
       const response = await apiService.put('/auth/change-password', {
         currentPassword,
-        newPassword
+        newPassword,
       });
       return response;
     } catch (error) {
@@ -132,7 +132,7 @@ class AuthService {
 
         return {
           success: true,
-          data: { ...user, token }
+          data: { ...user, token },
         };
       }
 
@@ -141,7 +141,7 @@ class AuthService {
       logger.error('Patient registration error:', error);
       return {
         success: false,
-        message: error.message || 'Registration failed'
+        message: error.message || 'Registration failed',
       };
     }
   }
@@ -151,7 +151,7 @@ class AuthService {
     try {
       const response = await apiService.post('/auth/bind-patient', {
         patient_number: patientNumber,
-        date_of_birth: dateOfBirth
+        date_of_birth: dateOfBirth,
       });
 
       if (response.success) {
@@ -167,7 +167,7 @@ class AuthService {
 
         return {
           success: true,
-          data: { user, patient, token }
+          data: { user, patient, token },
         };
       }
 
@@ -176,7 +176,7 @@ class AuthService {
       logger.error('Bind patient error:', error);
       return {
         success: false,
-        message: error.message || 'Failed to link patient record'
+        message: error.message || 'Failed to link patient record',
       };
     }
   }

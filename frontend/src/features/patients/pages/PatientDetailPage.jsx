@@ -6,12 +6,12 @@ import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
-import { 
-  ArrowLeft, 
-  UserCircle, 
-  Phone, 
-  Mail, 
-  MapPin, 
+import {
+  ArrowLeft,
+  UserCircle,
+  Phone,
+  Mail,
+  MapPin,
   Calendar,
   Heart,
   AlertTriangle,
@@ -19,7 +19,7 @@ import {
   Shield,
   ClipboardList,
   AlertCircle,
-  Edit
+  Edit,
 } from 'lucide-react';
 import { patientService } from '@/features/patients';
 import { allergyService, diagnosisService } from '@/features/medical';
@@ -55,7 +55,7 @@ const PatientDetailPage = () => {
     medical_conditions: '',
     current_medications: '',
     insurance_provider: '',
-    insurance_number: ''
+    insurance_number: '',
   });
 
   // Handle opening edit modal
@@ -76,16 +76,16 @@ const PatientDetailPage = () => {
       medical_conditions: patient.medical_conditions || '',
       current_medications: patient.current_medications || '',
       insurance_provider: patient.insurance_provider || '',
-      insurance_number: patient.insurance_number || ''
+      insurance_number: patient.insurance_number || '',
     });
     setIsEditModalOpen(true);
   };
 
   // Handle input change in edit form
   const handleEditInputChange = (field, value) => {
-    setEditFormData(prev => ({
+    setEditFormData((prev) => ({
       ...prev,
-      [field]: value
+      [field]: value,
     }));
   };
 
@@ -94,19 +94,19 @@ const PatientDetailPage = () => {
     try {
       // Validate required fields
       if (!editFormData.first_name || !editFormData.last_name) {
-      showError('Please fill in all required fields (First Name, Last Name)');
+        showError('Please fill in all required fields (First Name, Last Name)');
         return;
       }
 
       setIsSaving(true);
       const response = await patientService.updatePatient(id, editFormData);
-      
+
       if (response.success) {
         setPatient(response.data);
         setIsEditModalOpen(false);
-      showSuccess('Patient information updated successfully!');
+        showSuccess('Patient information updated successfully!');
       } else {
-      showError('Failed to update patient information');
+        showError('Failed to update patient information');
       }
     } catch (error) {
       logger.error('Error updating patient:', error);
@@ -123,7 +123,7 @@ const PatientDetailPage = () => {
         const response = await patientService.getPatientById(id);
         if (response.success) {
           setPatient(response.data);
-          
+
           // Load allergies and diagnoses
           try {
             const allergiesData = await allergyService.getAllergiesByPatient(id);
@@ -132,7 +132,7 @@ const PatientDetailPage = () => {
             logger.error('Error loading allergies:', allergyError);
             setAllergies([]);
           }
-          
+
           try {
             const diagnosesData = await diagnosisService.getDiagnosesByPatient(id, true);
             setDiagnoses(Array.isArray(diagnosesData) ? diagnosesData : []);
@@ -160,7 +160,7 @@ const PatientDetailPage = () => {
     return (
       <div className="min-h-screen bg-background">
         <PageLayout title="Loading..." subtitle="Please wait">
-          <div className="flex justify-center items-center h-64">
+          <div className="flex h-64 items-center justify-center">
             <p className="text-lg text-muted-foreground">Loading patient details...</p>
           </div>
         </PageLayout>
@@ -172,7 +172,7 @@ const PatientDetailPage = () => {
     return (
       <div className="min-h-screen bg-background">
         <PageLayout title="Error" subtitle="Patient not found">
-          <div className="flex flex-col items-center justify-center h-64 space-y-4">
+          <div className="flex h-64 flex-col items-center justify-center space-y-4">
             <p className="text-lg text-muted-foreground">{error}</p>
             <Button onClick={() => navigate('/receptionist/patients')}>
               <ArrowLeft className="mr-2 h-4 w-4" />
@@ -186,15 +186,15 @@ const PatientDetailPage = () => {
 
   return (
     <div className="min-h-screen bg-background">
-      <PageLayout 
+      <PageLayout
         title={`${patient.first_name} ${patient.last_name}`}
         subtitle={`Patient #${patient.patient_number}`}
         titleIcon={<UserCircle className="h-8 w-8" />}
       >
-        <div className="max-w-6xl mx-auto p-6 space-y-6">
+        <div className="mx-auto max-w-6xl space-y-6 p-6">
           {/* Back Button */}
-          <Button 
-            variant="outline" 
+          <Button
+            variant="outline"
             onClick={() => navigate('/receptionist/patients')}
             className="mb-4"
           >
@@ -210,8 +210,8 @@ const PatientDetailPage = () => {
                   <UserCircle className="h-6 w-6" />
                   Patient Information
                 </CardTitle>
-                <Button 
-                  variant="outline" 
+                <Button
+                  variant="outline"
                   size="sm"
                   onClick={handleEditClick}
                   className="flex items-center gap-2"
@@ -222,10 +222,12 @@ const PatientDetailPage = () => {
               </div>
             </CardHeader>
             <CardContent>
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+              <div className="grid grid-cols-1 gap-6 md:grid-cols-2 lg:grid-cols-3">
                 <div className="space-y-2">
                   <p className="text-sm font-medium text-muted-foreground">Full Name</p>
-                  <p className="text-lg">{patient.first_name} {patient.last_name}</p>
+                  <p className="text-lg">
+                    {patient.first_name} {patient.last_name}
+                  </p>
                 </div>
                 <div className="space-y-2">
                   <p className="text-sm font-medium text-muted-foreground">Patient Number</p>
@@ -233,7 +235,11 @@ const PatientDetailPage = () => {
                 </div>
                 <div className="space-y-2">
                   <p className="text-sm font-medium text-muted-foreground">Date of Birth</p>
-                  <p className="text-lg">{patient.date_of_birth ? new Date(patient.date_of_birth).toLocaleDateString() : 'N/A'}</p>
+                  <p className="text-lg">
+                    {patient.date_of_birth
+                      ? new Date(patient.date_of_birth).toLocaleDateString()
+                      : 'N/A'}
+                  </p>
                 </div>
                 <div className="space-y-2">
                   <p className="text-sm font-medium text-muted-foreground">Gender</p>
@@ -251,7 +257,9 @@ const PatientDetailPage = () => {
                 </div>
                 <div className="space-y-2">
                   <p className="text-sm font-medium text-muted-foreground">Registration Date</p>
-                  <p className="text-lg">{patient.created_at ? new Date(patient.created_at).toLocaleDateString() : 'N/A'}</p>
+                  <p className="text-lg">
+                    {patient.created_at ? new Date(patient.created_at).toLocaleDateString() : 'N/A'}
+                  </p>
                 </div>
               </div>
             </CardContent>
@@ -266,7 +274,7 @@ const PatientDetailPage = () => {
               </CardTitle>
             </CardHeader>
             <CardContent>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              <div className="grid grid-cols-1 gap-6 md:grid-cols-2">
                 <div className="space-y-4">
                   <div className="flex items-center gap-3">
                     <Phone className="h-5 w-5 text-muted-foreground" />
@@ -277,18 +285,25 @@ const PatientDetailPage = () => {
                     <span>{patient.email || 'No email address'}</span>
                   </div>
                   <div className="flex items-start gap-3">
-                    <MapPin className="h-5 w-5 text-muted-foreground mt-1" />
+                    <MapPin className="mt-1 h-5 w-5 text-muted-foreground" />
                     <span>{patient.address || 'No address provided'}</span>
                   </div>
                 </div>
-                
+
                 {/* Emergency Contact */}
                 <div className="space-y-2">
                   <h4 className="font-medium text-foreground">Emergency Contact</h4>
                   <div className="space-y-2 text-sm">
-                    <p><strong>Name:</strong> {patient.emergency_contact_name || 'Not provided'}</p>
-                    <p><strong>Phone:</strong> {patient.emergency_contact_phone || 'Not provided'}</p>
-                    <p><strong>Relationship:</strong> {patient.emergency_contact_relationship || 'Not provided'}</p>
+                    <p>
+                      <strong>Name:</strong> {patient.emergency_contact_name || 'Not provided'}
+                    </p>
+                    <p>
+                      <strong>Phone:</strong> {patient.emergency_contact_phone || 'Not provided'}
+                    </p>
+                    <p>
+                      <strong>Relationship:</strong>{' '}
+                      {patient.emergency_contact_relationship || 'Not provided'}
+                    </p>
                   </div>
                 </div>
               </div>
@@ -307,41 +322,55 @@ const PatientDetailPage = () => {
               <div className="space-y-6">
                 {/* Known Allergies */}
                 <div>
-                  <div className="flex items-center gap-2 mb-3">
+                  <div className="mb-3 flex items-center gap-2">
                     <AlertCircle className="h-5 w-5 text-amber-500" />
                     <h4 className="font-semibold">Known Allergies</h4>
                   </div>
-                  <div className="bg-amber-50 p-4 rounded-lg border border-amber-200">
+                  <div className="rounded-lg border border-amber-200 bg-amber-50 p-4">
                     {allergies && allergies.length > 0 ? (
                       <div className="space-y-3">
                         {allergies.map((allergy, index) => (
-                          <div key={allergy.id || index} className="flex items-start justify-between border-b border-amber-200 last:border-0 pb-3 last:pb-0">
+                          <div
+                            key={allergy.id || index}
+                            className="flex items-start justify-between border-b border-amber-200 pb-3 last:border-0 last:pb-0"
+                          >
                             <div className="flex-1">
-                              <div className="flex items-center gap-2 mb-1">
-                                <Badge variant="destructive" className="bg-red-100 text-red-800 border-red-300">
+                              <div className="mb-1 flex items-center gap-2">
+                                <Badge
+                                  variant="destructive"
+                                  className="border-red-300 bg-red-100 text-red-800"
+                                >
                                   {allergy.allergy_name}
                                 </Badge>
                                 {allergy.severity && (
-                                  <Badge variant="outline" className={
-                                    allergy.severity === 'life-threatening' ? 'border-red-600 text-red-600' :
-                                    allergy.severity === 'severe' ? 'border-orange-600 text-orange-600' :
-                                    allergy.severity === 'moderate' ? 'border-yellow-600 text-yellow-600' :
-                                    'border-gray-600 text-gray-600'
-                                  }>
+                                  <Badge
+                                    variant="outline"
+                                    className={
+                                      allergy.severity === 'life-threatening'
+                                        ? 'border-red-600 text-red-600'
+                                        : allergy.severity === 'severe'
+                                          ? 'border-orange-600 text-orange-600'
+                                          : allergy.severity === 'moderate'
+                                            ? 'border-yellow-600 text-yellow-600'
+                                            : 'border-gray-600 text-gray-600'
+                                    }
+                                  >
                                     {allergy.severity}
                                   </Badge>
                                 )}
                                 {allergy.allergen_type && (
-                                  <span className="text-xs text-gray-500 capitalize">({allergy.allergen_type})</span>
+                                  <span className="text-xs capitalize text-gray-500">
+                                    ({allergy.allergen_type})
+                                  </span>
                                 )}
                               </div>
                               {allergy.reaction && (
-                                <p className="text-sm text-gray-600 mt-1">
+                                <p className="mt-1 text-sm text-gray-600">
                                   <strong>Reaction:</strong> {allergy.reaction}
                                 </p>
                               )}
                               {allergy.notes && (
-                                <p className="text-sm text-gray-600 mt-1">
+                                <p className="mt-1 text-sm text-gray-600">
                                   <strong>Notes:</strong> {allergy.notes}
                                 </p>
                               )}
@@ -357,43 +386,61 @@ const PatientDetailPage = () => {
 
                 {/* Diagnosis History */}
                 <div>
-                  <div className="flex items-center gap-2 mb-3">
+                  <div className="mb-3 flex items-center gap-2">
                     <ClipboardList className="h-5 w-5 text-blue-500" />
                     <h4 className="font-semibold">Diagnosis History</h4>
                   </div>
-                  <div className="bg-blue-50 p-4 rounded-lg border border-blue-200">
+                  <div className="rounded-lg border border-blue-200 bg-blue-50 p-4">
                     {diagnoses && diagnoses.length > 0 ? (
                       <div className="space-y-3">
                         {diagnoses.map((diagnosis, index) => (
-                          <div key={diagnosis.id || index} className="border-b border-blue-200 last:border-0 pb-3 last:pb-0">
-                            <div className="flex items-start justify-between mb-1">
+                          <div
+                            key={diagnosis.id || index}
+                            className="border-b border-blue-200 pb-3 last:border-0 last:pb-0"
+                          >
+                            <div className="mb-1 flex items-start justify-between">
                               <div className="flex-1">
-                                <div className="flex items-center gap-2 mb-1">
-                                  <span className="font-medium text-gray-900">{diagnosis.diagnosis_name}</span>
+                                <div className="mb-1 flex items-center gap-2">
+                                  <span className="font-medium text-gray-900">
+                                    {diagnosis.diagnosis_name}
+                                  </span>
                                   {diagnosis.diagnosis_code && (
-                                    <Badge variant="outline" className="text-xs">{diagnosis.diagnosis_code}</Badge>
+                                    <Badge variant="outline" className="text-xs">
+                                      {diagnosis.diagnosis_code}
+                                    </Badge>
                                   )}
                                   {diagnosis.status && (
-                                    <Badge variant="outline" className={
-                                      diagnosis.status === 'active' ? 'border-green-600 text-green-600' :
-                                      diagnosis.status === 'resolved' ? 'border-blue-600 text-blue-600' :
-                                      diagnosis.status === 'chronic' ? 'border-purple-600 text-purple-600' :
-                                      'border-gray-600 text-gray-600'
-                                    }>
+                                    <Badge
+                                      variant="outline"
+                                      className={
+                                        diagnosis.status === 'active'
+                                          ? 'border-green-600 text-green-600'
+                                          : diagnosis.status === 'resolved'
+                                            ? 'border-blue-600 text-blue-600'
+                                            : diagnosis.status === 'chronic'
+                                              ? 'border-purple-600 text-purple-600'
+                                              : 'border-gray-600 text-gray-600'
+                                      }
+                                    >
                                       {diagnosis.status}
                                     </Badge>
                                   )}
                                 </div>
                                 <div className="flex flex-wrap gap-3 text-sm text-gray-600">
                                   {diagnosis.diagnosed_date && (
-                                    <span>Diagnosed: {new Date(diagnosis.diagnosed_date).toLocaleDateString()}</span>
+                                    <span>
+                                      Diagnosed:{' '}
+                                      {new Date(diagnosis.diagnosed_date).toLocaleDateString()}
+                                    </span>
                                   )}
                                   {diagnosis.severity && (
-                                    <span className="capitalize">Severity: {diagnosis.severity}</span>
+                                    <span className="capitalize">
+                                      Severity: {diagnosis.severity}
+                                    </span>
                                   )}
                                 </div>
                                 {diagnosis.notes && (
-                                  <p className="text-sm text-gray-600 mt-2">
+                                  <p className="mt-2 text-sm text-gray-600">
                                     <strong>Notes:</strong> {diagnosis.notes}
                                   </p>
                                 )}
@@ -409,9 +456,9 @@ const PatientDetailPage = () => {
                 </div>
 
                 {/* Old text fields - keep for reference if not in separate tables */}
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <div className="grid grid-cols-1 gap-6 md:grid-cols-2">
                   <div>
-                    <div className="flex items-center gap-2 mb-2">
+                    <div className="mb-2 flex items-center gap-2">
                       <Heart className="h-5 w-5 text-primary" />
                       <h4 className="font-medium">Medical Conditions (from patient record)</h4>
                     </div>
@@ -419,9 +466,9 @@ const PatientDetailPage = () => {
                       {patient.medical_conditions || 'No known medical conditions'}
                     </p>
                   </div>
-                  
+
                   <div>
-                    <div className="flex items-center gap-2 mb-2">
+                    <div className="mb-2 flex items-center gap-2">
                       <Pill className="h-5 w-5 text-blue-500" />
                       <h4 className="font-medium">Current Medications</h4>
                     </div>
@@ -443,7 +490,7 @@ const PatientDetailPage = () => {
               </CardTitle>
             </CardHeader>
             <CardContent>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              <div className="grid grid-cols-1 gap-6 md:grid-cols-2">
                 <div className="space-y-2">
                   <p className="text-sm font-medium text-muted-foreground">Insurance Provider</p>
                   <p className="text-lg">{patient.insurance_provider || 'No insurance'}</p>
@@ -477,14 +524,14 @@ const PatientDetailPage = () => {
           isLoading={isSaving}
           submitDisabled={!editFormData.first_name || !editFormData.last_name}
         >
-          <div className="space-y-6 max-h-[60vh] overflow-y-auto px-2">
+          <div className="max-h-[60vh] space-y-6 overflow-y-auto px-2">
             {/* Personal Information */}
             <div>
-              <h4 className="text-sm font-semibold text-gray-900 mb-4 flex items-center gap-2">
+              <h4 className="mb-4 flex items-center gap-2 text-sm font-semibold text-gray-900">
                 <UserCircle className="h-4 w-4" />
                 Personal Information
               </h4>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
                 <div>
                   <Label htmlFor="edit-first-name">First Name *</Label>
                   <Input
@@ -518,7 +565,7 @@ const PatientDetailPage = () => {
                     id="edit-gender"
                     value={editFormData.gender}
                     onChange={(e) => handleEditInputChange('gender', e.target.value)}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary"
+                    className="w-full rounded-md border border-gray-300 px-3 py-2 focus:outline-none focus:ring-2 focus:ring-primary"
                   >
                     <option value="">Select gender</option>
                     <option value="male">Male</option>
@@ -532,7 +579,7 @@ const PatientDetailPage = () => {
                     id="edit-blood-group"
                     value={editFormData.blood_group}
                     onChange={(e) => handleEditInputChange('blood_group', e.target.value)}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary"
+                    className="w-full rounded-md border border-gray-300 px-3 py-2 focus:outline-none focus:ring-2 focus:ring-primary"
                   >
                     <option value="">Select blood group</option>
                     <option value="A+">A+</option>
@@ -550,11 +597,11 @@ const PatientDetailPage = () => {
 
             {/* Contact Information */}
             <div>
-              <h4 className="text-sm font-semibold text-gray-900 mb-4 flex items-center gap-2">
+              <h4 className="mb-4 flex items-center gap-2 text-sm font-semibold text-gray-900">
                 <Phone className="h-4 w-4" />
                 Contact Information
               </h4>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
                 <div>
                   <Label htmlFor="edit-phone">Phone</Label>
                   <Input
@@ -589,17 +636,19 @@ const PatientDetailPage = () => {
 
             {/* Emergency Contact */}
             <div>
-              <h4 className="text-sm font-semibold text-gray-900 mb-4 flex items-center gap-2">
+              <h4 className="mb-4 flex items-center gap-2 text-sm font-semibold text-gray-900">
                 <AlertTriangle className="h-4 w-4" />
                 Emergency Contact
               </h4>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
                 <div>
                   <Label htmlFor="edit-emergency-name">Contact Name</Label>
                   <Input
                     id="edit-emergency-name"
                     value={editFormData.emergency_contact_name}
-                    onChange={(e) => handleEditInputChange('emergency_contact_name', e.target.value)}
+                    onChange={(e) =>
+                      handleEditInputChange('emergency_contact_name', e.target.value)
+                    }
                     placeholder="Enter emergency contact name"
                   />
                 </div>
@@ -608,7 +657,9 @@ const PatientDetailPage = () => {
                   <Input
                     id="edit-emergency-phone"
                     value={editFormData.emergency_contact_phone}
-                    onChange={(e) => handleEditInputChange('emergency_contact_phone', e.target.value)}
+                    onChange={(e) =>
+                      handleEditInputChange('emergency_contact_phone', e.target.value)
+                    }
                     placeholder="Enter emergency contact phone"
                   />
                 </div>
@@ -617,7 +668,9 @@ const PatientDetailPage = () => {
                   <Input
                     id="edit-emergency-relationship"
                     value={editFormData.emergency_contact_relationship}
-                    onChange={(e) => handleEditInputChange('emergency_contact_relationship', e.target.value)}
+                    onChange={(e) =>
+                      handleEditInputChange('emergency_contact_relationship', e.target.value)
+                    }
                     placeholder="e.g., Spouse, Parent, Sibling"
                   />
                 </div>
@@ -626,7 +679,7 @@ const PatientDetailPage = () => {
 
             {/* Medical Information */}
             <div>
-              <h4 className="text-sm font-semibold text-gray-900 mb-4 flex items-center gap-2">
+              <h4 className="mb-4 flex items-center gap-2 text-sm font-semibold text-gray-900">
                 <Heart className="h-4 w-4" />
                 Medical Information (Basic)
               </h4>
@@ -666,11 +719,11 @@ const PatientDetailPage = () => {
 
             {/* Insurance Information */}
             <div>
-              <h4 className="text-sm font-semibold text-gray-900 mb-4 flex items-center gap-2">
+              <h4 className="mb-4 flex items-center gap-2 text-sm font-semibold text-gray-900">
                 <Shield className="h-4 w-4" />
                 Insurance Information
               </h4>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
                 <div>
                   <Label htmlFor="edit-insurance-provider">Insurance Provider</Label>
                   <Input
@@ -692,8 +745,9 @@ const PatientDetailPage = () => {
               </div>
             </div>
 
-            <p className="text-xs text-gray-500 mt-4">
-              * Required fields. Note: Detailed allergies and diagnoses are managed separately in the medical records section.
+            <p className="mt-4 text-xs text-gray-500">
+              * Required fields. Note: Detailed allergies and diagnoses are managed separately in
+              the medical records section.
             </p>
           </div>
         </FormModal>

@@ -26,7 +26,7 @@ export default function InvoiceDetails({ invoice, fallback, payment, showPayment
       try {
         // Refresh currency cache to ensure latest settings are used
         await refreshCurrencyCache();
-        
+
         const result = await clinicSettingsService.getSettings();
         if (result.success && result.data) {
           const data = result.data.data || result.data;
@@ -59,15 +59,9 @@ export default function InvoiceDetails({ invoice, fallback, payment, showPayment
   const createdAt = inv.created_at;
   const invoiceNumber = inv.invoice_number;
 
-  const totalAmount = Number(
-    get(inv, 'total_amount', 'subtotal', 'total') || 0
-  );
-  const paidAmount = Number(
-    get(inv, 'amount_paid', 'paid_amount') || 0
-  );
-  const balanceAmount = Number(
-    get(inv, 'balance_due', 'balance') || 0
-  );
+  const totalAmount = Number(get(inv, 'total_amount', 'subtotal', 'total') || 0);
+  const paidAmount = Number(get(inv, 'amount_paid', 'paid_amount') || 0);
+  const balanceAmount = Number(get(inv, 'balance_due', 'balance') || 0);
   const discountAmount = Number(inv.discount_amount || 0);
 
   return (
@@ -76,7 +70,7 @@ export default function InvoiceDetails({ invoice, fallback, payment, showPayment
       <div className="border-b-2 pb-4">
         <div className="flex items-start justify-between">
           <div className="flex-1">
-            <div className="flex items-center gap-3 mb-2">
+            <div className="mb-2 flex items-center gap-3">
               {clinicSettings.clinic_logo_url && (
                 <img
                   src={clinicSettings.clinic_logo_url}
@@ -100,10 +94,14 @@ export default function InvoiceDetails({ invoice, fallback, payment, showPayment
               )}
               <div className="flex flex-wrap gap-x-4 gap-y-1">
                 {clinicSettings.clinic_phone && (
-                  <p className="text-xs text-muted-foreground">Phone: {clinicSettings.clinic_phone}</p>
+                  <p className="text-xs text-muted-foreground">
+                    Phone: {clinicSettings.clinic_phone}
+                  </p>
                 )}
                 {clinicSettings.clinic_email && (
-                  <p className="text-xs text-muted-foreground">Email: {clinicSettings.clinic_email}</p>
+                  <p className="text-xs text-muted-foreground">
+                    Email: {clinicSettings.clinic_email}
+                  </p>
                 )}
               </div>
             </div>
@@ -189,18 +187,24 @@ export default function InvoiceDetails({ invoice, fallback, payment, showPayment
               .map((item, idx) => (
                 <div
                   key={`svc-${idx}`}
-                  className="flex items-start justify-between rounded-lg bg-muted/50 p-3"
+                  className="bg-muted/50 flex items-start justify-between rounded-lg p-3"
                 >
                   <div className="flex-1">
                     <p className="font-medium">{item.item_name}</p>
-                    {item.notes && <p className="mt-1 text-xs text-muted-foreground">{item.notes}</p>}
-                    <p className="mt-1 text-xs text-muted-foreground">Quantity: {item.quantity || 1}</p>
+                    {item.notes && (
+                      <p className="mt-1 text-xs text-muted-foreground">{item.notes}</p>
+                    )}
+                    <p className="mt-1 text-xs text-muted-foreground">
+                      Quantity: {item.quantity || 1}
+                    </p>
                   </div>
                   <div className="text-right">
                     <p className="font-semibold">
                       ${(Number(item.unit_price || 0) * (item.quantity || 1)).toFixed(2)}
                     </p>
-                    <p className="text-xs text-muted-foreground">${Number(item.unit_price || 0).toFixed(2)} each</p>
+                    <p className="text-xs text-muted-foreground">
+                      ${Number(item.unit_price || 0).toFixed(2)} each
+                    </p>
                   </div>
                 </div>
               ))}
@@ -217,14 +221,20 @@ export default function InvoiceDetails({ invoice, fallback, payment, showPayment
                       <Pill className="h-4 w-4 text-blue-600" />
                       <p className="font-medium">{item.item_name}</p>
                     </div>
-                    {item.notes && <p className="mt-1 text-xs text-muted-foreground">{item.notes}</p>}
-                    <p className="mt-1 text-xs text-muted-foreground">Quantity: {item.quantity || 1}</p>
+                    {item.notes && (
+                      <p className="mt-1 text-xs text-muted-foreground">{item.notes}</p>
+                    )}
+                    <p className="mt-1 text-xs text-muted-foreground">
+                      Quantity: {item.quantity || 1}
+                    </p>
                   </div>
                   <div className="text-right">
                     <p className="font-semibold">
-                      {formatCurrencySync((Number(item.unit_price || 0) * (item.quantity || 1)))}
+                      {formatCurrencySync(Number(item.unit_price || 0) * (item.quantity || 1))}
                     </p>
-                    <p className="text-xs text-muted-foreground">{formatCurrencySync(Number(item.unit_price || 0))} each</p>
+                    <p className="text-xs text-muted-foreground">
+                      {formatCurrencySync(Number(item.unit_price || 0))} each
+                    </p>
                   </div>
                 </div>
               ))}
@@ -269,12 +279,16 @@ export default function InvoiceDetails({ invoice, fallback, payment, showPayment
           <div className="space-y-2 text-sm">
             <div className="flex justify-between">
               <span className="text-gray-600">Amount:</span>
-              <span className="font-bold text-green-700">{formatCurrencySync(Number(payment.amount || 0))}</span>
+              <span className="font-bold text-green-700">
+                {formatCurrencySync(Number(payment.amount || 0))}
+              </span>
             </div>
             <div className="flex justify-between">
               <span className="text-gray-600">Method:</span>
               <span className="font-medium capitalize">
-                {String(payment.payment_method || '').replace('online_payment', 'Online Payment').replace('_', ' ')}
+                {String(payment.payment_method || '')
+                  .replace('online_payment', 'Online Payment')
+                  .replace('_', ' ')}
               </span>
             </div>
             <div className="flex justify-between">
@@ -298,9 +312,7 @@ export default function InvoiceDetails({ invoice, fallback, payment, showPayment
             This invoice was generated by {APP_CONFIG.SYSTEM_NAME} {APP_CONFIG.SYSTEM_DESCRIPTION}
           </p>
           {clinicSettings.clinic_name && (
-            <p className="text-xs text-muted-foreground">
-              For {clinicSettings.clinic_name}
-            </p>
+            <p className="text-xs text-muted-foreground">For {clinicSettings.clinic_name}</p>
           )}
           <p className="text-xs text-muted-foreground">
             Invoice #: {invoiceNumber || 'N/A'} | Generated on{' '}
@@ -319,5 +331,3 @@ export default function InvoiceDetails({ invoice, fallback, payment, showPayment
     </div>
   );
 }
-
-

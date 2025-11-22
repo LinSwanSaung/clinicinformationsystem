@@ -9,10 +9,16 @@ export function useServices(params = {}) {
     queryKey,
     queryFn: async () => {
       if (q && q.trim()) {
-        const res = await serviceService.searchServices(q.trim(), { status, category: category || undefined });
+        const res = await serviceService.searchServices(q.trim(), {
+          status,
+          category: category || undefined,
+        });
         return Array.isArray(res?.data) ? res.data : Array.isArray(res) ? res : [];
       }
-      const res = await serviceService.getActiveServices({ status, category: category || undefined });
+      const res = await serviceService.getActiveServices({
+        status,
+        category: category || undefined,
+      });
       return Array.isArray(res?.data) ? res.data : Array.isArray(res) ? res : [];
     },
     staleTime: 30_000,
@@ -46,5 +52,3 @@ export function useServiceMutations() {
 
   return { create, update, remove };
 }
-
-

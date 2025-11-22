@@ -7,7 +7,7 @@ import { Card } from '@/components/ui/card';
 
 /**
  * SearchableSelect - Searchable dropdown select component
- * 
+ *
  * Application-level component that provides a searchable dropdown select.
  * Uses UI primitives (Button, Input, Popover, Card) to build a complex input component.
  */
@@ -174,4 +174,3 @@ const SearchableSelect = ({
 };
 
 export { SearchableSelect };
-

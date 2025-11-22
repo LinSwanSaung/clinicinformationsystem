@@ -8,11 +8,11 @@ import translationMY from './locales/my.json';
 
 const resources = {
   en: {
-    translation: translationEN
+    translation: translationEN,
   },
   my: {
-    translation: translationMY
-  }
+    translation: translationMY,
+  },
 };
 
 i18n
@@ -22,21 +22,21 @@ i18n
     resources,
     fallbackLng: 'en', // Default language
     lng: localStorage.getItem('language') || 'en', // Get saved language or default to English
-    
+
     interpolation: {
       escapeValue: false, // React already escapes values
       prefix: '{',
-      suffix: '}'
+      suffix: '}',
     },
-    
+
     detection: {
       order: ['localStorage', 'navigator'],
-      caches: ['localStorage']
+      caches: ['localStorage'],
     },
-    
+
     react: {
-      useSuspense: false
-    }
+      useSuspense: false,
+    },
   });
 
 export default i18n;

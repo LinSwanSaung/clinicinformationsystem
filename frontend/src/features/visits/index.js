@@ -12,4 +12,3 @@ export { useVisits } from './hooks/useVisits';
 
 // Services
 export { visitService } from './services/visitService';
-

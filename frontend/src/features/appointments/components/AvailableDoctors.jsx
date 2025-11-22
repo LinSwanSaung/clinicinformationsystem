@@ -28,11 +28,14 @@ export default function AvailableDoctors({ onAppointDoctor }) {
   }
 
   return (
-    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 p-4">
+    <div className="grid grid-cols-1 gap-4 p-4 md:grid-cols-2 lg:grid-cols-3">
       {availableDoctors.map((doctor) => (
-        <div key={doctor.id} className="bg-card text-card-foreground rounded-lg shadow-lg p-6 space-y-4">
+        <div
+          key={doctor.id}
+          className="space-y-4 rounded-lg bg-card p-6 text-card-foreground shadow-lg"
+        >
           <div className="flex items-center space-x-4">
-            <div className="relative w-16 h-16">
+            <div className="relative h-16 w-16">
               <img
                 src={doctor.image}
                 alt={doctor.name}
@@ -41,7 +44,7 @@ export default function AvailableDoctors({ onAppointDoctor }) {
                   e.target.src = 'https://via.placeholder.com/64x64';
                 }}
               />
-              <span className="absolute bottom-0 right-0 w-3 h-3 bg-green-500 border-2 border-white rounded-full"></span>
+              <span className="absolute bottom-0 right-0 h-3 w-3 rounded-full border-2 border-white bg-green-500"></span>
             </div>
             <div>
               <h3 className="text-lg font-semibold">{doctor.name}</h3>
@@ -51,22 +54,22 @@ export default function AvailableDoctors({ onAppointDoctor }) {
 
           <div className="space-y-2">
             <div className="flex items-center text-muted-foreground">
-              <Star className="w-4 h-4 mr-2 text-yellow-400" />
+              <Star className="mr-2 h-4 w-4 text-yellow-400" />
               <span>{doctor.rating} Rating</span>
             </div>
             <div className="flex items-center text-muted-foreground">
-              <Users className="w-4 h-4 mr-2" />
+              <Users className="mr-2 h-4 w-4" />
               <span>{doctor.patients}+ Patients</span>
             </div>
             <div className="flex items-center text-muted-foreground">
-              <Clock className="w-4 h-4 mr-2" />
+              <Clock className="mr-2 h-4 w-4" />
               <span>{doctor.availability}</span>
             </div>
           </div>
 
           <button
             onClick={() => onAppointDoctor(doctor)}
-            className="w-full bg-primary text-primary-foreground hover:bg-primary/90 py-2 px-4 rounded-md transition-colors"
+            className="hover:bg-primary/90 w-full rounded-md bg-primary px-4 py-2 text-primary-foreground transition-colors"
           >
             Appoint Doctor
           </button>

@@ -65,7 +65,7 @@ const doctorNotesService = {
       logger.error('Error deleting doctor note:', error);
       throw error;
     }
-  }
+  },
 };
 
 export default doctorNotesService;

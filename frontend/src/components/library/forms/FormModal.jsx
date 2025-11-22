@@ -109,7 +109,7 @@ export function FormModal({
           type="button"
           variant="ghost"
           size="icon"
-          className="absolute right-4 top-4 rounded-sm opacity-70 ring-offset-background transition-opacity hover:opacity-100 focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 disabled:pointer-events-none z-10"
+          className="absolute right-4 top-4 z-10 rounded-sm opacity-70 ring-offset-background transition-opacity hover:opacity-100 focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 disabled:pointer-events-none"
           onClick={() => onOpenChange?.(false)}
           disabled={isLoading}
         >
@@ -121,7 +121,12 @@ export function FormModal({
           {description && <DialogDescription>{description}</DialogDescription>}
         </DialogHeader>
 
-        <form id={formId} onSubmit={handleSubmit} className="space-y-4 flex flex-col h-full" noValidate>
+        <form
+          id={formId}
+          onSubmit={handleSubmit}
+          className="flex h-full flex-col space-y-4"
+          noValidate
+        >
           <div className="flex-1 overflow-y-auto py-4">{children}</div>
 
           <DialogFooter>
@@ -135,16 +140,16 @@ export function FormModal({
               {cancelText}
             </Button>
             {submitText && (
-              <Button 
+              <Button
                 type="button"
                 onClick={(e) => {
                   e.preventDefault();
                   handleSubmit(e);
                 }}
-                disabled={submitDisabled || isLoading} 
+                disabled={submitDisabled || isLoading}
                 ref={lastFocusableRef}
               >
-                {isLoading ? (confirmLoadingText || 'Submitting...') : submitText}
+                {isLoading ? confirmLoadingText || 'Submitting...' : submitText}
               </Button>
             )}
           </DialogFooter>

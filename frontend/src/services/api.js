@@ -5,12 +5,12 @@ import { getAbortSignal, handleUnauthorized } from '@/features/auth';
 // Use absolute URL only if explicitly set (for separate backend deployments)
 const getApiBaseUrl = () => {
   const envUrl = import.meta.env.VITE_API_URL;
-  
+
   // If VITE_API_URL is explicitly set and is an absolute URL, use it
   if (envUrl && envUrl.trim() && (envUrl.startsWith('http://') || envUrl.startsWith('https://'))) {
     return envUrl;
   }
-  
+
   // Runtime check: if we're on localhost, use localhost API
   // Otherwise, use relative path /api (works for Vercel and production)
   if (typeof window !== 'undefined') {
@@ -19,7 +19,7 @@ const getApiBaseUrl = () => {
       return 'http://localhost:3001/api';
     }
   }
-  
+
   // Default: use relative path (works for Vercel and any same-origin setup)
   return '/api';
 };
@@ -82,7 +82,7 @@ class ApiService {
       }
     }
 
-    const method = (rest.method ? rest.method.toUpperCase() : 'GET');
+    const method = rest.method ? rest.method.toUpperCase() : 'GET';
     const { method: _ignored, ...restWithoutMethod } = rest;
     const fetchOptions = { ...restWithoutMethod, method };
 
@@ -90,19 +90,19 @@ class ApiService {
       const cacheBuster = `_=${Date.now()}`;
       url += (url.includes('?') ? '&' : '?') + cacheBuster;
     }
-    
+
     // Build headers - don't set Content-Type for FormData (browser will set it with boundary)
     const headers = {
       'Cache-Control': 'no-cache',
       Pragma: 'no-cache',
       ...customHeaders,
     };
-    
+
     // Only set Content-Type to application/json if body is not FormData
     if (fetchOptions.body && !(fetchOptions.body instanceof FormData)) {
       headers['Content-Type'] = 'application/json';
     }
-    
+
     const config = {
       cache: 'no-store',
       headers,
@@ -123,7 +123,7 @@ class ApiService {
     }
 
     const response = await fetch(url, config);
-    
+
     // Handle 204 No Content gracefully
     if (response.status === 204) {
       return { success: true };
@@ -141,7 +141,7 @@ class ApiService {
       // Only redirect if user is already authenticated (has token) or on non-login endpoints
       const isLoginEndpoint = endpoint.includes('/auth/login');
       const hasAuthToken = !!localStorage.getItem('authToken');
-      
+
       // If there's no token, user is already logged out - silently ignore this error
       // This prevents error logs when components make requests after logout
       if (!hasAuthToken && !isLoginEndpoint) {
@@ -149,14 +149,17 @@ class ApiService {
         // Silently ignore this error to avoid noise in logs
         throw new Error('Unauthorized - user logged out');
       }
-      
+
       if (!isLoginEndpoint || hasAuthToken) {
         // Global 401 handler: sign out and redirect (for authenticated requests)
         await handleUnauthorized();
         throw new Error('Unauthorized');
       } else {
         // Login failed - extract error message from response (friendly)
-        const raw = data.message || data.error || 'Invalid credentials. Please check your email and password.';
+        const raw =
+          data.message ||
+          data.error ||
+          'Invalid credentials. Please check your email and password.';
         const errorMessage = toFriendlyMessage(raw, { endpoint, status: response.status, data });
         // Also surface via global error in case login pages want to show modal
         window.dispatchEvent(
@@ -171,19 +174,22 @@ class ApiService {
     if (!response.ok) {
       const raw = data.message || `HTTP error! status: ${response.status}`;
       let message = toFriendlyMessage(raw, { endpoint, status: response.status, data });
-      
+
       // Handle specific error codes with user-friendly messages
       if (data.code === 'ORPHAN_TOKEN') {
-        message = `Cannot complete consultation: Token is missing visit information. ` +
+        message =
+          `Cannot complete consultation: Token is missing visit information. ` +
           `This is a data integrity issue. Please contact support. Token #${data.tokenNumber || 'unknown'}`;
       } else if (data.code === 'INVOICE_MISSING_VISIT') {
-        message = `Cannot complete invoice: Invoice is missing visit information. ` +
+        message =
+          `Cannot complete invoice: Invoice is missing visit information. ` +
           `This is a data integrity issue. Please contact support. Invoice #${data.invoiceNumber || 'unknown'}`;
       } else if (data.code === 'VISIT_UPDATE_FAILED') {
-        message = `Consultation completed but failed to update visit. ` +
+        message =
+          `Consultation completed but failed to update visit. ` +
           `The consultation may need to be reviewed. Please refresh and check the status.`;
       }
-      
+
       // Dispatch global error for non-401 failures
       if (response.status !== 401) {
         window.dispatchEvent(

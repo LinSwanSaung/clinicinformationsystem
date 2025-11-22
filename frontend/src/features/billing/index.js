@@ -8,4 +8,3 @@ export { useInvoices } from './hooks/useInvoices';
 // Services
 export { default as invoiceService } from './services/invoiceService';
 export { default as paymentService } from './services/paymentService';
-

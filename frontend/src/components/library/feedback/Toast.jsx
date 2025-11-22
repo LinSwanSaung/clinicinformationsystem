@@ -5,7 +5,7 @@ import { cn } from '@/lib/utils';
 
 /**
  * Toast - Non-blocking notification component following HCI principles
- * 
+ *
  * Features:
  * - Auto-dismiss for success/info (3-5s)
  * - Manual dismiss for errors (stays until dismissed)
@@ -13,22 +13,14 @@ import { cn } from '@/lib/utils';
  * - Smooth animations
  * - Accessible (ARIA labels)
  */
-export function Toast({ 
-  id,
-  type = 'info', 
-  title, 
-  message, 
-  duration = 5000,
-  onClose,
-  action 
-}) {
+export function Toast({ id, type = 'info', title, message, duration = 5000, onClose, action }) {
   const [isVisible, setIsVisible] = useState(true);
   const [isExiting, setIsExiting] = useState(false);
 
   // Auto-dismiss for success, info, warning (not errors)
   useEffect(() => {
     if (type === 'error') return; // Errors stay until manually dismissed
-    
+
     const timer = setTimeout(() => {
       handleClose();
     }, duration);
@@ -87,24 +79,16 @@ export function Toast({
         'relative flex items-start gap-3 rounded-lg border p-4 shadow-lg transition-all duration-300',
         style.bg,
         style.border,
-        isExiting ? 'opacity-0 translate-x-full' : 'opacity-100 translate-x-0'
+        isExiting ? 'translate-x-full opacity-0' : 'translate-x-0 opacity-100'
       )}
     >
       <div className="flex-shrink-0">{style.icon}</div>
-      
-      <div className="flex-1 min-w-0">
-        {title && (
-          <h4 className={cn('mb-1 font-semibold', style.titleText)}>
-            {title}
-          </h4>
-        )}
+
+      <div className="min-w-0 flex-1">
+        {title && <h4 className={cn('mb-1 font-semibold', style.titleText)}>{title}</h4>}
         <p className={cn('text-sm', style.text)}>{message}</p>
-        
-        {action && (
-          <div className="mt-3">
-            {action}
-          </div>
-        )}
+
+        {action && <div className="mt-3">{action}</div>}
       </div>
 
       <Button
@@ -128,7 +112,7 @@ export function ToastContainer({ toasts, onRemove }) {
 
   return (
     <div
-      className="fixed top-4 right-4 z-[100] flex flex-col gap-2 max-w-md w-full"
+      className="fixed right-4 top-4 z-[100] flex w-full max-w-md flex-col gap-2"
       aria-live="polite"
       aria-label="Notifications"
     >
@@ -138,4 +122,3 @@ export function ToastContainer({ toasts, onRemove }) {
     </div>
   );
 }
-

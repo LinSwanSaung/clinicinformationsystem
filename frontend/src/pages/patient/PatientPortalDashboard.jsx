@@ -1,7 +1,12 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import PageLayout from '@/components/layout/PageLayout';
-import { ProfileSummary, UpcomingAppointments, VitalsSnapshot, AIHealthBlog } from '@/features/patient-portal';
+import {
+  ProfileSummary,
+  UpcomingAppointments,
+  VitalsSnapshot,
+  AIHealthBlog,
+} from '@/features/patient-portal';
 import { LatestVisitSummary } from '@/features/visits';
 import { patientPortalService } from '@/features/patients';
 import logger from '@/utils/logger';
@@ -12,7 +17,11 @@ const PatientPortalDashboard = () => {
   const { t, i18n } = useTranslation();
   const [profileState, setProfileState] = useState({ data: null, loading: true, error: null });
   const [visitsState, setVisitsState] = useState({ data: [], loading: true, error: null });
-  const [appointmentsState, setAppointmentsState] = useState({ data: [], loading: true, error: null });
+  const [appointmentsState, setAppointmentsState] = useState({
+    data: [],
+    loading: true,
+    error: null,
+  });
   const [creditState, setCreditState] = useState({ value: 0, loading: false, error: null });
   const isMounted = useRef(false);
 
@@ -88,20 +97,20 @@ const PatientPortalDashboard = () => {
       logger.debug('[lastVisit] No visits data available');
       return null;
     }
-    
+
     logger.debug('[lastVisit] All visits:', visitsState.data);
-    
+
     // Include both completed and in-progress visits
     // This allows patients to see their ongoing visit and measured vitals
-    const relevantVisits = visitsState.data.filter(v => {
+    const relevantVisits = visitsState.data.filter((v) => {
       logger.debug('[lastVisit] Visit status:', v.status, 'for visit:', v);
       return v.status === 'completed' || v.status === 'in-progress' || v.status === 'in_progress';
     });
-    
+
     logger.debug('[lastVisit] Relevant visits:', relevantVisits);
-    
+
     if (relevantVisits.length === 0) return null;
-    
+
     // Sort by date, most recent first
     const sorted = relevantVisits.sort((a, b) => new Date(b.visit_date) - new Date(a.visit_date));
     logger.debug('[lastVisit] Selected visit:', sorted[0]);
@@ -110,7 +119,7 @@ const PatientPortalDashboard = () => {
 
   const vitalsVisits = useMemo(() => {
     if (!Array.isArray(visitsState.data)) return [];
-    return visitsState.data.filter(v => v.vitals && Object.keys(v.vitals).length > 0);
+    return visitsState.data.filter((v) => v.vitals && Object.keys(v.vitals).length > 0);
   }, [visitsState.data]);
 
   const profileData = profileState.data?.data ?? profileState.data;
@@ -128,7 +137,12 @@ const PatientPortalDashboard = () => {
         const value = Number(res?.data?.totalBalance ?? res?.totalBalance ?? 0);
         if (mounted) setCreditState({ value, loading: false, error: null });
       } catch (e) {
-        if (mounted) setCreditState({ value: 0, loading: false, error: e.message || 'Failed to load outstanding balance' });
+        if (mounted)
+          setCreditState({
+            value: 0,
+            loading: false,
+            error: e.message || 'Failed to load outstanding balance',
+          });
       }
     })();
     return () => {
@@ -187,12 +201,18 @@ const PatientPortalDashboard = () => {
             error={visitsState.error}
             onRetry={loadVisits}
           />
-          
+
           {/* AI Health Blog - based on last diagnosis */}
-          {logger.debug('[PatientPortalDashboard] Rendering AIHealthBlog check:', { hasProfileData: !!profileData, patientId: profileData?.patient?.id })}
+          {logger.debug('[PatientPortalDashboard] Rendering AIHealthBlog check:', {
+            hasProfileData: !!profileData,
+            patientId: profileData?.patient?.id,
+          })}
           {profileData?.patient?.id && (
             <>
-              {logger.debug('[PatientPortalDashboard] Rendering AIHealthBlog with patientId:', profileData.patient.id)}
+              {logger.debug(
+                '[PatientPortalDashboard] Rendering AIHealthBlog with patientId:',
+                profileData.patient.id
+              )}
               <AIHealthBlog patientId={profileData.patient.id} language={i18n.language} />
             </>
           )}

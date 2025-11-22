@@ -8,4 +8,3 @@ export { default as QueueDoctorCard } from './components/QueueDoctorCard';
 
 // Services
 export { default as queueService } from './services/queueService';
-

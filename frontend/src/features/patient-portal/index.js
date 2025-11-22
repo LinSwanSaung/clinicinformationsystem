@@ -6,4 +6,3 @@ export { default as ProfileSummary } from './components/ProfileSummary';
 export { default as UpcomingAppointments } from './components/UpcomingAppointments';
 export { default as VitalsSnapshot } from './components/VitalsSnapshot';
 export { default as AIHealthBlog } from './components/AIHealthBlog';
-

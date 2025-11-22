@@ -5,9 +5,22 @@ import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { VisitHistoryCard, visitService } from '@/features/visits';
 import { LoadingSpinner } from '@/components/library/feedback/LoadingSpinner';
-import { PatientInformationHeader, PatientSearchInterface, patientService } from '@/features/patients';
+import {
+  PatientInformationHeader,
+  PatientSearchInterface,
+  patientService,
+} from '@/features/patients';
 import { NavigationTabs } from '@/components/library';
-import { PatientVitalsDisplay, MedicalInformationPanel, ClinicalNotesDisplay, PatientDocumentManager, allergyService, diagnosisService, prescriptionService, doctorNotesService } from '@/features/medical';
+import {
+  PatientVitalsDisplay,
+  MedicalInformationPanel,
+  ClinicalNotesDisplay,
+  PatientDocumentManager,
+  allergyService,
+  diagnosisService,
+  prescriptionService,
+  doctorNotesService,
+} from '@/features/medical';
 import { User, Activity, Calendar, FileText, ArrowLeft, AlertCircle } from 'lucide-react';
 import logger from '@/utils/logger';
 import { useFeedback } from '@/contexts/FeedbackContext';

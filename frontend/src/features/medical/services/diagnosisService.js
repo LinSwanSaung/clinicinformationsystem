@@ -21,7 +21,7 @@ class DiagnosisService {
    * Check if cached data is still valid
    */
   isCacheValid(cacheEntry) {
-    return cacheEntry && (Date.now() - cacheEntry.timestamp) < this.cacheTimeout;
+    return cacheEntry && Date.now() - cacheEntry.timestamp < this.cacheTimeout;
   }
 
   /**
@@ -38,14 +38,14 @@ class DiagnosisService {
 
     try {
       const response = await api.get(`/patient-diagnoses/patient/${patientId}`, {
-        params: { includeResolved }
+        params: { includeResolved },
       });
       const diagnoses = response.data.data || response.data;
 
       // Cache the results
       this.cache.set(cacheKey, {
         data: diagnoses,
-        timestamp: Date.now()
+        timestamp: Date.now(),
       });
 
       return diagnoses;
@@ -87,12 +87,12 @@ class DiagnosisService {
   async createDiagnosis(diagnosisData) {
     try {
       const response = await api.post('/patient-diagnoses', diagnosisData);
-      
+
       // Invalidate cache for this patient
       if (diagnosisData.patient_id) {
         this.clearPatientCache(diagnosisData.patient_id);
       }
-      
+
       return response.data.data;
     } catch (error) {
       logger.error('Error creating diagnosis:', error);
@@ -106,12 +106,12 @@ class DiagnosisService {
   async updateDiagnosis(id, diagnosisData) {
     try {
       const response = await api.put(`/patient-diagnoses/${id}`, diagnosisData);
-      
+
       // Invalidate cache for this patient
       if (diagnosisData.patient_id) {
         this.clearPatientCache(diagnosisData.patient_id);
       }
-      
+
       return response.data.data;
     } catch (error) {
       logger.error('Error updating diagnosis:', error);
@@ -126,14 +126,14 @@ class DiagnosisService {
     try {
       const response = await api.patch(`/patient-diagnoses/${id}/status`, {
         status,
-        resolved_date: resolvedDate
+        resolved_date: resolvedDate,
       });
-      
+
       // Invalidate cache for this patient if provided
       if (patientId) {
         this.clearPatientCache(patientId);
       }
-      
+
       return response.data.data;
     } catch (error) {
       logger.error('Error updating diagnosis status:', error);
@@ -147,12 +147,12 @@ class DiagnosisService {
   async deleteDiagnosis(id, patientId = null) {
     try {
       const response = await api.delete(`/patient-diagnoses/${id}`);
-      
+
       // Invalidate cache for this patient if provided
       if (patientId) {
         this.clearPatientCache(patientId);
       }
-      
+
       return response.data;
     } catch (error) {
       logger.error('Error deleting diagnosis:', error);

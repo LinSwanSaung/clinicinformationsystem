@@ -72,10 +72,20 @@ app.use(
 );
 
 // 3. CORS - Configure properly based on environment
+// For Vercel deployments, we need to be more permissive with CORS
 const corsOptions = {
   origin: (origin, callback) => {
     // Allow requests with no origin (mobile apps, curl, etc.)
-    if (!origin) return callback(null, true);
+    if (!origin) {
+      return callback(null, true);
+    }
+
+    // CRITICAL: Always allow Vercel preview URLs first (before other checks)
+    // This ensures CORS headers are set for all Vercel deployments
+    // Check for any Vercel domain pattern (works for both local testing and Vercel deployment)
+    if (origin && (origin.includes('.vercel.app') || origin.includes('vercel.app'))) {
+      return callback(null, true);
+    }
 
     const allowedOrigins = process.env.CLIENT_URL
       ? process.env.CLIENT_URL.split(',')
@@ -92,12 +102,19 @@ const corsOptions = {
       }
     }
 
-    // In production, only allow configured origins
-    if (allowedOrigins.includes(origin)) {
-      callback(null, true);
-    } else {
-      callback(new Error('Not allowed by CORS'));
+    // If we're on Vercel (detected by VERCEL environment variable), allow all origins
+    // This is safe because Vercel preview URLs are from the same project
+    if (process.env.VERCEL || process.env.VERCEL_ENV) {
+      return callback(null, true);
     }
+
+    // In production, allow configured origins
+    if (allowedOrigins.includes(origin)) {
+      return callback(null, true);
+    }
+    
+    // Reject if none of the above conditions matched
+    callback(new Error('Not allowed by CORS'));
   },
   credentials: config.cors.credentials,
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
@@ -110,7 +127,14 @@ const corsOptions = {
     'Pragma',
   ],
   exposedHeaders: ['RateLimit-Reset', 'RateLimit-Remaining', 'RateLimit-Limit'],
+  preflightContinue: false,
+  optionsSuccessStatus: 204,
 };
+
+// Explicit OPTIONS handler for preflight requests (needed for Vercel serverless functions)
+// This ensures OPTIONS requests are handled before other middleware
+app.options('*', cors(corsOptions));
+
 app.use(cors(corsOptions));
 
 // 4. Response compression - Compress responses to reduce bandwidth

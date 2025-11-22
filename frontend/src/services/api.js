@@ -1,7 +1,28 @@
 import { getAbortSignal, handleUnauthorized } from '@/features/auth';
 
 // API Base Configuration
-const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:3001/api';
+// Use relative path for same-origin requests (when frontend and backend are in same Vercel project)
+// Use absolute URL only if explicitly set (for separate backend deployments)
+const getApiBaseUrl = () => {
+  const envUrl = import.meta.env.VITE_API_URL;
+  
+  // If VITE_API_URL is explicitly set and is an absolute URL, use it
+  if (envUrl && envUrl.trim() && (envUrl.startsWith('http://') || envUrl.startsWith('https://'))) {
+    return envUrl;
+  }
+  
+  // Runtime check: if we're on localhost, use localhost API
+  // Otherwise, use relative path /api (works for Vercel and production)
+  if (typeof window !== 'undefined') {
+    const hostname = window.location.hostname;
+    if (hostname === 'localhost' || hostname === '127.0.0.1') {
+      return 'http://localhost:3001/api';
+    }
+  }
+  
+  // Default: use relative path (works for Vercel and any same-origin setup)
+  return '/api';
+};
 
 function toFriendlyMessage(message = '', { endpoint, status, data } = {}) {
   const lower = String(message || '').toLowerCase();
@@ -28,7 +49,8 @@ function toFriendlyMessage(message = '', { endpoint, status, data } = {}) {
 
 class ApiService {
   constructor() {
-    this.baseURL = API_BASE_URL;
+    // Evaluate API base URL at runtime (not build time) to check current hostname
+    this.baseURL = getApiBaseUrl();
   }
 
   // Health check against server root /health

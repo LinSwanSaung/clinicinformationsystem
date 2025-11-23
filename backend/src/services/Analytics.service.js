@@ -7,7 +7,6 @@ import clinicSettingsService from './ClinicSettings.service.js';
  * Provides analytics data for admin dashboard
  */
 class AnalyticsService {
-
   /**
    * Get revenue trends for a date range
    * @param {Object} options - { startDate, endDate }
@@ -16,7 +15,7 @@ class AnalyticsService {
   async getRevenueTrends(options = {}) {
     try {
       const { startDate, endDate } = options;
-      
+
       let query = supabase
         .from('invoices')
         .select('completed_at, total_amount')
@@ -31,7 +30,9 @@ class AnalyticsService {
 
       const { data, error } = await query.order('completed_at', { ascending: true });
 
-      if (error) throw error;
+      if (error) {
+        throw error;
+      }
 
       // Group by date
       const revenueByDate = {};
@@ -64,10 +65,8 @@ class AnalyticsService {
   async getVisitStatusBreakdown(options = {}) {
     try {
       const { startDate, endDate } = options;
-      
-      let query = supabase
-        .from('visits')
-        .select('status');
+
+      let query = supabase.from('visits').select('status');
 
       if (startDate && endDate) {
         const startDateTime = new Date(startDate).toISOString();
@@ -77,7 +76,9 @@ class AnalyticsService {
 
       const { data, error } = await query;
 
-      if (error) throw error;
+      if (error) {
+        throw error;
+      }
 
       // Count by status
       const breakdown = {
@@ -131,11 +132,13 @@ class AnalyticsService {
 
       const { data: visits, error: visitsError } = await visitsQuery;
 
-      if (visitsError) throw visitsError;
+      if (visitsError) {
+        throw visitsError;
+      }
 
       // Get invoices for revenue calculation
       const visitIds = (visits || []).map((v) => v.id);
-      
+
       let invoices = [];
       if (visitIds.length > 0) {
         let invoicesQuery = supabase
@@ -147,12 +150,16 @@ class AnalyticsService {
         if (startDate && endDate) {
           const startDateTime = new Date(startDate).toISOString();
           const endDateTime = new Date(endDate + 'T23:59:59.999Z').toISOString();
-          invoicesQuery = invoicesQuery.gte('completed_at', startDateTime).lte('completed_at', endDateTime);
+          invoicesQuery = invoicesQuery
+            .gte('completed_at', startDateTime)
+            .lte('completed_at', endDateTime);
         }
 
         const { data: invoicesData, error: invoicesError } = await invoicesQuery;
 
-        if (invoicesError) throw invoicesError;
+        if (invoicesError) {
+          throw invoicesError;
+        }
         invoices = invoicesData || [];
       }
 
@@ -214,9 +221,7 @@ class AnalyticsService {
     try {
       const { startDate, endDate } = options;
 
-      let query = supabase
-        .from('payment_transactions')
-        .select('payment_method, amount');
+      let query = supabase.from('payment_transactions').select('payment_method, amount');
 
       if (startDate && endDate) {
         const startDateTime = new Date(startDate).toISOString();
@@ -227,7 +232,9 @@ class AnalyticsService {
 
       const { data, error } = await query;
 
-      if (error) throw error;
+      if (error) {
+        throw error;
+      }
 
       // Aggregate by payment method
       const breakdown = {};
@@ -239,7 +246,8 @@ class AnalyticsService {
 
       // Convert to array format for charts
       const chartData = Object.entries(breakdown).map(([method, amount]) => ({
-        method: method === 'cash' ? 'Cash' : method === 'online_payment' ? 'Online Payment' : method,
+        method:
+          method === 'cash' ? 'Cash' : method === 'online_payment' ? 'Online Payment' : method,
         amount: parseFloat(amount.toFixed(2)),
       }));
 
@@ -278,7 +286,7 @@ class AnalyticsService {
 
       const startDateISO = startDate.toISOString();
       const endDateISO = endDate.toISOString();
-      
+
       // For date-only queries (diagnosed_date), use date strings
       const startDateStr = startDate.toISOString().split('T')[0];
       const endDateStr = endDate.toISOString().split('T')[0];
@@ -290,7 +298,9 @@ class AnalyticsService {
         .gte('visit_date', startDateISO)
         .lte('visit_date', endDateISO);
 
-      if (visitsError) throw visitsError;
+      if (visitsError) {
+        throw visitsError;
+      }
 
       const totalVisits = (visits || []).length;
 
@@ -301,7 +311,9 @@ class AnalyticsService {
         .gte('registration_date', startDateISO)
         .lte('registration_date', endDateISO);
 
-      if (newPatientsError) throw newPatientsError;
+      if (newPatientsError) {
+        throw newPatientsError;
+      }
 
       // 3. Female Patients (visits in month)
       const femalePatients = (visits || []).filter(
@@ -310,7 +322,9 @@ class AnalyticsService {
 
       // 4. Under 5 Patients (visits in month)
       const under5Patients = (visits || []).filter((v) => {
-        if (!v.patients || !v.patients.date_of_birth) return false;
+        if (!v.patients || !v.patients.date_of_birth) {
+          return false;
+        }
         const birthDate = new Date(v.patients.date_of_birth);
         const ageInYears = (new Date() - birthDate) / (1000 * 60 * 60 * 24 * 365);
         return ageInYears < 5;
@@ -323,7 +337,9 @@ class AnalyticsService {
         .gte('diagnosed_date', startDateStr)
         .lte('diagnosed_date', endDateStr);
 
-      if (diagnosesError) throw diagnosesError;
+      if (diagnosesError) {
+        throw diagnosesError;
+      }
 
       // 6. Drugs Dispensed (from invoice_items where item_type = 'medicine')
       const { count: drugsDispensedCount, error: drugsError } = await supabase
@@ -333,7 +349,9 @@ class AnalyticsService {
         .gte('added_at', startDateISO)
         .lte('added_at', endDateISO);
 
-      if (drugsError) throw drugsError;
+      if (drugsError) {
+        throw drugsError;
+      }
 
       // Format reporting month as YYYY-MM
       const reportingMonth = `${year}-${String(month).padStart(2, '0')}`;
@@ -366,4 +384,3 @@ class AnalyticsService {
 }
 
 export default AnalyticsService;
-

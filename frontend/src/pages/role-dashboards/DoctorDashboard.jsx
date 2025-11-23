@@ -85,11 +85,7 @@ const transformTokenToPatientData = (token) => {
     status: token.status,
     priority: token.priority || 3, // Include priority for visual highlighting
     visit_id: token.visit_id, // Include visit_id from token
-    chief_complaint:
-      token.chief_complaint ||
-      token.visit?.chief_complaint ||
-      token.appointment?.reason_for_visit ||
-      null, // Get from token, visit, or appointment
+    chief_complaint: token.chief_complaint || token.visit?.chief_complaint || token.appointment?.reason_for_visit || null, // Get from token, visit, or appointment
     // Structure vitals data as expected by PatientCard
     vitals: {
       heartRate: token.patient?.vitals?.heart_rate || null,
@@ -481,9 +477,7 @@ const DoctorDashboard = () => {
     .sort((a, b) => {
       // Sort by priority first (higher priority = lower number, so descending)
       const priorityDiff = (b.priority || 3) - (a.priority || 3);
-      if (priorityDiff !== 0) {
-        return priorityDiff;
-      }
+      if (priorityDiff !== 0) return priorityDiff;
 
       // If same priority, sort by token number (ascending)
       return a.token_number - b.token_number;
@@ -506,183 +500,160 @@ const DoctorDashboard = () => {
     return matchesSearch && matchesTab && matchesTime;
   });
 
-  const handleStartConsultation = useCallback(
-    async (patientId) => {
-      try {
-        setRefreshing(true);
-        const response = await patientService.startConsultation(patientId);
+  const handleStartConsultation = useCallback(async (patientId) => {
+    try {
+      setRefreshing(true);
+      const response = await patientService.startConsultation(patientId);
 
-        // Save active consultation to session storage for recovery
-        if (response?.tokenId) {
-          sessionStorage.setItem(
-            'activeConsultation',
-            JSON.stringify({
-              tokenId: response.tokenId,
-              patientId: patientId,
-              timestamp: Date.now(),
-            })
-          );
-        }
-
-        // Refresh queue data to get latest status from server
-        await refreshQueue(false);
-
-        // Update local patients state as fallback
-        setPatients(
-          patients.map((p) => (p.id === patientId ? { ...p, status: 'seeing_doctor' } : p))
+      // Save active consultation to session storage for recovery
+      if (response?.tokenId) {
+        sessionStorage.setItem(
+          'activeConsultation',
+          JSON.stringify({
+            tokenId: response.tokenId,
+            patientId: patientId,
+            timestamp: Date.now(),
+          })
         );
-      } catch (error) {
-        logger.error('Failed to start consultation:', error);
-        showNotification('error', `Failed to start consultation: ${error.message}`);
-      } finally {
-        setRefreshing(false);
       }
-    },
-    [patients, refreshQueue, showNotification]
-  );
 
-  const handleCompleteVisit = useCallback(
-    async (patientId) => {
+      // Refresh queue data to get latest status from server
+      await refreshQueue(false);
+
+      // Update local patients state as fallback
+      setPatients(
+        patients.map((p) => (p.id === patientId ? { ...p, status: 'seeing_doctor' } : p))
+      );
+    } catch (error) {
+      logger.error('Failed to start consultation:', error);
+      showNotification('error', `Failed to start consultation: ${error.message}`);
+    } finally {
+      setRefreshing(false);
+    }
+  }, [patients, refreshQueue, showNotification]);
+
+  const handleCompleteVisit = useCallback(async (patientId) => {
+    try {
+      setRefreshing(true);
+
+      // Find the patient to get their visit_id
+      const patient = patients.find((p) => p.id === patientId);
+      if (!patient) {
+        throw new Error('Patient not found');
+      }
+
+      // Get visit_id from patient data (could be visit_id, current_visit_id, or active_visit_id)
+      const visitId = patient.visit_id || patient.current_visit_id || patient.active_visit_id;
+
+      if (!visitId) {
+        // If no visit_id, this patient doesn't have an active visit
+        // This shouldn't happen in normal flow, but handle gracefully
+        showNotification(
+          'error',
+          'No active visit found for this patient. Please use the queue system.'
+        );
+        return;
+      }
+
+      // Validate visit status before completion
       try {
-        setRefreshing(true);
-
-        // Find the patient to get their visit_id
-        const patient = patients.find((p) => p.id === patientId);
-        if (!patient) {
-          throw new Error('Patient not found');
+        const visitDetails = await visitService.getVisitDetails(visitId);
+        if (!visitDetails) {
+          throw new Error('Visit not found');
         }
 
-        // Get visit_id from patient data (could be visit_id, current_visit_id, or active_visit_id)
-        const visitId = patient.visit_id || patient.current_visit_id || patient.active_visit_id;
-
-        if (!visitId) {
-          // If no visit_id, this patient doesn't have an active visit
-          // This shouldn't happen in normal flow, but handle gracefully
-          showNotification(
-            'error',
-            'No active visit found for this patient. Please use the queue system.'
-          );
+        // Check if visit is already completed
+        if (visitDetails.status === 'completed') {
+          showNotification('warning', 'This visit is already completed.');
+          await refreshQueue(false);
           return;
         }
 
-        // Validate visit status before completion
-        try {
-          const visitDetails = await visitService.getVisitDetails(visitId);
-          if (!visitDetails) {
-            throw new Error('Visit not found');
-          }
+        // Check if visit is cancelled
+        if (visitDetails.status === 'cancelled') {
+          showNotification('error', 'Cannot complete a cancelled visit.');
+          return;
+        }
 
-          // Check if visit is already completed
-          if (visitDetails.status === 'completed') {
-            showNotification('warning', 'This visit is already completed.');
-            await refreshQueue(false);
-            return;
-          }
-
-          // Check if visit is cancelled
-          if (visitDetails.status === 'cancelled') {
-            showNotification('error', 'Cannot complete a cancelled visit.');
-            return;
-          }
-
-          // Check if visit has an invoice and its status
-          // Note: Visits should be completed through invoice payment, not directly
-          // This is a fallback for edge cases
-          if (visitDetails.invoice_id) {
-            try {
-              const { invoiceService } = await import('@/features/billing');
-              const invoice = await invoiceService.getInvoiceById(visitDetails.invoice_id);
-              if (invoice && invoice.status === 'paid') {
-                // Invoice is paid, visit should be completed through invoice flow
-                showNotification(
-                  'info',
-                  'Visit should be completed through invoice payment. Checking status...'
-                );
-                await refreshQueue(false);
-                return;
-              }
-            } catch (invoiceError) {
-              logger.warn('Could not check invoice status:', invoiceError);
-              // Continue with visit completion if invoice check fails
+        // Check if visit has an invoice and its status
+        // Note: Visits should be completed through invoice payment, not directly
+        // This is a fallback for edge cases
+        if (visitDetails.invoice_id) {
+          try {
+            const { invoiceService } = await import('@/features/billing');
+            const invoice = await invoiceService.getInvoiceById(visitDetails.invoice_id);
+            if (invoice && invoice.status === 'paid') {
+              // Invoice is paid, visit should be completed through invoice flow
+              showNotification(
+                'info',
+                'Visit should be completed through invoice payment. Checking status...'
+              );
+              await refreshQueue(false);
+              return;
             }
+          } catch (invoiceError) {
+            logger.warn('Could not check invoice status:', invoiceError);
+            // Continue with visit completion if invoice check fails
           }
-        } catch (validationError) {
-          logger.error('Error validating visit status:', validationError);
-          showNotification('error', `Failed to validate visit: ${validationError.message}`);
-          return;
         }
-
-        // Complete the visit using visitService
-        await visitService.completeVisit(visitId, {
-          completed_by: currentDoctorId,
-        });
-
-        // Refresh queue data to get latest status from server
-        await refreshQueue(false);
-
-        // Update local patients state as fallback
-        setPatients(patients.map((p) => (p.id === patientId ? { ...p, status: 'completed' } : p)));
-
-        showNotification('success', 'Visit completed successfully');
-      } catch (error) {
-        logger.error('Failed to complete visit:', error);
-        showNotification('error', `Failed to complete visit: ${error.message}`);
-      } finally {
-        setRefreshing(false);
+      } catch (validationError) {
+        logger.error('Error validating visit status:', validationError);
+        showNotification('error', `Failed to validate visit: ${validationError.message}`);
+        return;
       }
-    },
-    [patients, refreshQueue, showNotification, currentDoctorId]
-  );
+
+      // Complete the visit using visitService
+      await visitService.completeVisit(visitId, {
+        completed_by: currentDoctorId,
+      });
+
+      // Refresh queue data to get latest status from server
+      await refreshQueue(false);
+
+      // Update local patients state as fallback
+      setPatients(patients.map((p) => (p.id === patientId ? { ...p, status: 'completed' } : p)));
+
+      showNotification('success', 'Visit completed successfully');
+    } catch (error) {
+      logger.error('Failed to complete visit:', error);
+      showNotification('error', `Failed to complete visit: ${error.message}`);
+    } finally {
+      setRefreshing(false);
+    }
+  }, [patients, refreshQueue, showNotification, currentDoctorId]);
 
   // Complete token consultation (for queue-based patients)
-  const handleCompleteTokenConsultation = useCallback(
-    async (tokenId) => {
-      try {
-        setRefreshing(true);
+  const handleCompleteTokenConsultation = useCallback(async (tokenId) => {
+    try {
+      setRefreshing(true);
+      
+      // Optimistically update local state IMMEDIATELY (before API call)
+      setQueueData((prevQueueData) => {
+        const updated = prevQueueData.map((token) =>
+          token.id === tokenId ? { ...token, status: 'completed' } : token
+        );
+        return updated;
+      });
 
-        // Optimistically update local state IMMEDIATELY (before API call)
-        setQueueData((prevQueueData) => {
-          const updated = prevQueueData.map((token) =>
-            token.id === tokenId ? { ...token, status: 'completed' } : token
-          );
-          return updated;
+      // Immediately switch to completed tab
+      setSelectedTab('completed');
+      showNotification('success', 'Consultation completed successfully!');
+
+      // Then make API call
+      const response = await queueService.completeConsultation(tokenId);
+      
+      // Handle response - check for success property or assume success if response exists
+      const isSuccess = response?.success !== false && response !== null && response !== undefined;
+      
+      if (isSuccess) {
+        // Refresh queue data to get latest status from server (but preserve optimistic update)
+        // Don't let refresh errors affect the success of the operation
+        refreshQueue(true).catch((refreshError) => {
+          logger.error('Failed to refresh after complete consultation (non-critical):', refreshError);
+          // Don't show error - the operation succeeded, refresh is just for sync
         });
-
-        // Immediately switch to completed tab
-        setSelectedTab('completed');
-        showNotification('success', 'Consultation completed successfully!');
-
-        // Then make API call
-        const response = await queueService.completeConsultation(tokenId);
-
-        // Handle response - check for success property or assume success if response exists
-        const isSuccess =
-          response?.success !== false && response !== null && response !== undefined;
-
-        if (isSuccess) {
-          // Refresh queue data to get latest status from server (but preserve optimistic update)
-          // Don't let refresh errors affect the success of the operation
-          refreshQueue(true).catch((refreshError) => {
-            logger.error(
-              'Failed to refresh after complete consultation (non-critical):',
-              refreshError
-            );
-            // Don't show error - the operation succeeded, refresh is just for sync
-          });
-        } else {
-          // Revert optimistic update on failure
-          setQueueData((prevQueueData) => {
-            const reverted = prevQueueData.map((token) =>
-              token.id === tokenId ? { ...token, status: 'serving' } : token
-            );
-            return reverted;
-          });
-          setSelectedTab('consulting');
-          showNotification('error', response?.message || 'Failed to complete consultation');
-        }
-      } catch (error) {
-        logger.error('Failed to complete consultation:', error);
-        // Revert optimistic update on error
+      } else {
+        // Revert optimistic update on failure
         setQueueData((prevQueueData) => {
           const reverted = prevQueueData.map((token) =>
             token.id === tokenId ? { ...token, status: 'serving' } : token
@@ -690,13 +661,23 @@ const DoctorDashboard = () => {
           return reverted;
         });
         setSelectedTab('consulting');
-        showNotification('error', `Failed to complete consultation: ${error.message}`);
-      } finally {
-        setRefreshing(false);
+        showNotification('error', response?.message || 'Failed to complete consultation');
       }
-    },
-    [refreshQueue, showNotification]
-  );
+    } catch (error) {
+      logger.error('Failed to complete consultation:', error);
+      // Revert optimistic update on error
+      setQueueData((prevQueueData) => {
+        const reverted = prevQueueData.map((token) =>
+          token.id === tokenId ? { ...token, status: 'serving' } : token
+        );
+        return reverted;
+      });
+      setSelectedTab('consulting');
+      showNotification('error', `Failed to complete consultation: ${error.message}`);
+    } finally {
+      setRefreshing(false);
+    }
+  }, [refreshQueue, showNotification]);
 
   // Queue-specific action handlers
   const handleCallNextPatient = async () => {
@@ -807,54 +788,38 @@ const DoctorDashboard = () => {
     }
   };
 
-  const handleStartTokenConsultation = useCallback(
-    async (tokenId) => {
-      try {
-        setRefreshing(true);
+  const handleStartTokenConsultation = useCallback(async (tokenId) => {
+    try {
+      setRefreshing(true);
+      
+      // Optimistically update local state IMMEDIATELY (before API call)
+      setQueueData((prevQueueData) => {
+        const updated = prevQueueData.map((token) =>
+          token.id === tokenId ? { ...token, status: 'serving' } : token
+        );
+        return updated;
+      });
 
-        // Optimistically update local state IMMEDIATELY (before API call)
-        setQueueData((prevQueueData) => {
-          const updated = prevQueueData.map((token) =>
-            token.id === tokenId ? { ...token, status: 'serving' } : token
-          );
-          return updated;
+      // Immediately switch to consulting tab
+      setSelectedTab('consulting');
+
+      // Then make API call
+      const response = await queueService.startConsultation(tokenId);
+      
+      // Handle response - check for success property or assume success if response exists
+      const isSuccess = response?.success !== false && response !== null && response !== undefined;
+      
+      if (isSuccess) {
+        showNotification('success', response?.message || 'Consultation started successfully!');
+        
+        // Refresh queue data to get latest status from server (but preserve optimistic update)
+        // Don't let refresh errors affect the success of the operation
+        refreshQueue(true).catch((refreshError) => {
+          logger.error('Failed to refresh after start consultation (non-critical):', refreshError);
+          // Don't show error - the operation succeeded, refresh is just for sync
         });
-
-        // Immediately switch to consulting tab
-        setSelectedTab('consulting');
-
-        // Then make API call
-        const response = await queueService.startConsultation(tokenId);
-
-        // Handle response - check for success property or assume success if response exists
-        const isSuccess =
-          response?.success !== false && response !== null && response !== undefined;
-
-        if (isSuccess) {
-          showNotification('success', response?.message || 'Consultation started successfully!');
-
-          // Refresh queue data to get latest status from server (but preserve optimistic update)
-          // Don't let refresh errors affect the success of the operation
-          refreshQueue(true).catch((refreshError) => {
-            logger.error(
-              'Failed to refresh after start consultation (non-critical):',
-              refreshError
-            );
-            // Don't show error - the operation succeeded, refresh is just for sync
-          });
-        } else {
-          // Revert optimistic update on failure
-          setQueueData((prevQueueData) => {
-            const reverted = prevQueueData.map((token) =>
-              token.id === tokenId ? { ...token, status: 'called' } : token
-            );
-            return reverted;
-          });
-          setSelectedTab('ready');
-          showNotification('error', response?.message || 'Failed to start consultation');
-        }
-      } catch (error) {
-        // Revert optimistic update on error
+      } else {
+        // Revert optimistic update on failure
         setQueueData((prevQueueData) => {
           const reverted = prevQueueData.map((token) =>
             token.id === tokenId ? { ...token, status: 'called' } : token
@@ -862,35 +827,44 @@ const DoctorDashboard = () => {
           return reverted;
         });
         setSelectedTab('ready');
-
-        // Handle different error types
-        if (error.message && error.message.includes('currently in consultation')) {
-          const message = error.message;
-          const confirmAction = window.confirm(
-            `${message}\n\nClick "OK" to go to "In Consultation" tab to see active consultations.`
-          );
-          if (confirmAction) {
-            // Switch to the "In Consultation" tab and refresh
-            setSelectedTab('consulting');
-            await refreshQueue(false);
-          }
-        } else if (error.message && error.message.includes("should be 'called'")) {
-          const confirmAction = window.confirm(
-            `Cannot start consultation: ${error.message}\n\n` +
-              `The patient needs to be called first. Click "OK" to call next patient.`
-          );
-          if (confirmAction) {
-            await handleCallNextPatient();
-          }
-        } else {
-          showNotification('error', `Failed to start consultation: ${error.message}`);
-        }
-      } finally {
-        setRefreshing(false);
+        showNotification('error', response?.message || 'Failed to start consultation');
       }
-    },
-    [refreshQueue, showNotification, handleCallNextPatient]
-  );
+    } catch (error) {
+      // Revert optimistic update on error
+      setQueueData((prevQueueData) => {
+        const reverted = prevQueueData.map((token) =>
+          token.id === tokenId ? { ...token, status: 'called' } : token
+        );
+        return reverted;
+      });
+      setSelectedTab('ready');
+
+      // Handle different error types
+      if (error.message && error.message.includes('currently in consultation')) {
+        const message = error.message;
+        const confirmAction = window.confirm(
+          `${message}\n\nClick "OK" to go to "In Consultation" tab to see active consultations.`
+        );
+        if (confirmAction) {
+          // Switch to the "In Consultation" tab and refresh
+          setSelectedTab('consulting');
+          await refreshQueue(false);
+        }
+      } else if (error.message && error.message.includes("should be 'called'")) {
+        const confirmAction = window.confirm(
+          `Cannot start consultation: ${error.message}\n\n` +
+            `The patient needs to be called first. Click "OK" to call next patient.`
+        );
+        if (confirmAction) {
+          await handleCallNextPatient();
+        }
+      } else {
+        showNotification('error', `Failed to start consultation: ${error.message}`);
+      }
+    } finally {
+      setRefreshing(false);
+    }
+  }, [refreshQueue, showNotification, handleCallNextPatient]);
 
   return (
     <PageLayout
@@ -923,7 +897,7 @@ const DoctorDashboard = () => {
               </div>
               <div className="min-w-[200px]">
                 <select
-                  className="h-12 w-full rounded-md border border-gray-200 px-4 py-2 text-base focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  className="h-12 w-full rounded-md border border-input bg-background px-4 py-2 text-base text-foreground focus:outline-none focus:ring-2 focus:ring-primary"
                   value={timeFilter}
                   onChange={(e) => setTimeFilter(e.target.value)}
                 >
@@ -982,7 +956,7 @@ const DoctorDashboard = () => {
                   <TabsTrigger value="ready" className="py-3 text-base">
                     <UserCheck className="mr-2 h-5 w-5" />
                     Ready
-                    <span className="ml-2 rounded-full bg-blue-100 px-2 py-1 text-xs text-blue-600">
+                    <span className="ml-2 rounded-full bg-blue-100 dark:bg-blue-900/30 px-2 py-1 text-xs text-blue-600 dark:text-blue-200">
                       {
                         queueData.filter((t) => ['ready', 'called', 'waiting'].includes(t.status))
                           .length
@@ -992,14 +966,14 @@ const DoctorDashboard = () => {
                   <TabsTrigger value="consulting" className="py-3 text-base">
                     <UserCog className="mr-2 h-5 w-5" />
                     In Consultation
-                    <span className="ml-2 rounded-full bg-orange-100 px-2 py-1 text-xs text-orange-600">
+                    <span className="ml-2 rounded-full bg-orange-100 dark:bg-orange-900/30 px-2 py-1 text-xs text-orange-600 dark:text-orange-200">
                       {queueData.filter((t) => t.status === 'serving').length}
                     </span>
                   </TabsTrigger>
                   <TabsTrigger value="completed" className="py-3 text-base">
                     <CheckCircle className="mr-2 h-5 w-5" />
                     Completed
-                    <span className="ml-2 rounded-full bg-green-100 px-2 py-1 text-xs text-green-600">
+                    <span className="ml-2 rounded-full bg-green-100 dark:bg-green-900/30 px-2 py-1 text-xs text-green-600 dark:text-green-200">
                       {
                         queueData.filter((t) => ['completed', 'cancelled'].includes(t.status))
                           .length
@@ -1150,3 +1124,4 @@ const DoctorDashboard = () => {
 };
 
 export default DoctorDashboard;
+

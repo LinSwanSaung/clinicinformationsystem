@@ -85,42 +85,39 @@ const DoctorQueueDetailPage = () => {
   const [isUserActive, setIsUserActive] = useState(true);
   const isInitialLoad = useRef(true);
 
-  const loadQueueData = useCallback(
-    async (silent = false) => {
-      try {
-        if (!silent) {
-          setIsLoading(true);
-        }
-        setError(null);
-
-        // Get queue status from our backend
-        const queueStatus = await queueService.getDoctorQueueStatus(doctorId);
-        setQueueData(queueStatus);
-
-        // Get all doctors to find the specific doctor info
-        const doctorsResponse = await queueService.getAllDoctorsQueueStatus();
-
-        if (doctorsResponse && doctorsResponse.data) {
-          const foundDoctor = doctorsResponse.data.find((d) => d.id === doctorId);
-
-          if (foundDoctor) {
-            setDoctor(foundDoctor);
-          } else {
-            setError('Doctor not found');
-          }
-        } else {
-          setError('Unable to load doctor information');
-        }
-      } catch (err) {
-        setError(err.message || 'Failed to load queue data');
-      } finally {
-        if (!silent) {
-          setIsLoading(false);
-        }
+  const loadQueueData = useCallback(async (silent = false) => {
+    try {
+      if (!silent) {
+      setIsLoading(true);
       }
-    },
-    [doctorId]
-  );
+      setError(null);
+
+      // Get queue status from our backend
+      const queueStatus = await queueService.getDoctorQueueStatus(doctorId);
+      setQueueData(queueStatus);
+
+      // Get all doctors to find the specific doctor info
+      const doctorsResponse = await queueService.getAllDoctorsQueueStatus();
+
+      if (doctorsResponse && doctorsResponse.data) {
+        const foundDoctor = doctorsResponse.data.find((d) => d.id === doctorId);
+
+        if (foundDoctor) {
+          setDoctor(foundDoctor);
+        } else {
+          setError('Doctor not found');
+        }
+      } else {
+        setError('Unable to load doctor information');
+      }
+    } catch (err) {
+      setError(err.message || 'Failed to load queue data');
+    } finally {
+      if (!silent) {
+      setIsLoading(false);
+      }
+    }
+  }, [doctorId]);
 
   // Initial load
   useEffect(() => {
@@ -163,11 +160,11 @@ const DoctorQueueDetailPage = () => {
       case 'serving':
         return 'bg-blue-100 text-blue-800'; // Changed to blue for "In Consultation"
       case 'completed':
-        return 'bg-gray-100 text-gray-800';
+        return 'bg-muted text-muted-foreground';
       case 'missed':
         return 'bg-red-100 text-red-800';
       default:
-        return 'bg-gray-100 text-gray-800';
+        return 'bg-muted text-muted-foreground';
     }
   };
 
@@ -212,10 +209,10 @@ const DoctorQueueDetailPage = () => {
       <PageLayout title="Doctor Queue Detail" subtitle="Loading queue information...">
         <div className="space-y-4">
           <div className="animate-pulse">
-            <div className="mb-4 h-6 w-1/4 rounded bg-gray-200"></div>
+            <div className="mb-4 h-6 w-1/4 rounded bg-muted"></div>
             <div className="space-y-3">
               {Array.from({ length: 5 }, (_, i) => (
-                <div key={i} className="h-16 rounded bg-gray-200"></div>
+                <div key={i} className="h-16 rounded bg-muted"></div>
               ))}
             </div>
           </div>
@@ -350,7 +347,7 @@ const DoctorQueueDetailPage = () => {
 
           <Card>
             <CardContent className="p-6">
-              <div className="text-2xl font-bold text-gray-600">{completedTokens.length}</div>
+              <div className="text-2xl font-bold text-muted-foreground">{completedTokens.length}</div>
               <p className="text-sm text-muted-foreground">Completed</p>
             </CardContent>
           </Card>
@@ -436,7 +433,7 @@ const DoctorQueueDetailPage = () => {
                     initial={{ opacity: 0, y: 20 }}
                     animate={{ opacity: 1, y: 0 }}
                     transition={{ delay: index * 0.1 }}
-                    className={`flex items-center justify-between rounded-lg border p-4 hover:bg-gray-50 ${
+                    className={`flex items-center justify-between rounded-lg border p-4 hover:bg-accent ${
                       token.priority >= 4 ? 'border-2 border-red-300 bg-red-50' : ''
                     }`}
                   >

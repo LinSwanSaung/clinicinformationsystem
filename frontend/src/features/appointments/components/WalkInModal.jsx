@@ -218,17 +218,17 @@ const WalkInModal = ({ isOpen, onClose, onSubmit }) => {
   const getStatusColor = (status) => {
     switch (status) {
       case 'available':
-        return 'bg-green-100 text-green-800 border-green-200';
+        return 'bg-green-100 dark:bg-green-900/30 text-green-800 dark:text-green-200 border-green-200 dark:border-green-800';
       case 'consulting':
-        return 'bg-blue-100 text-blue-800 border-blue-200';
+        return 'bg-blue-100 dark:bg-blue-900/30 text-blue-800 dark:text-blue-200 border-blue-200 dark:border-blue-800';
       case 'busy':
-        return 'bg-yellow-100 text-yellow-800 border-yellow-200';
+        return 'bg-yellow-100 dark:bg-yellow-900/30 text-yellow-800 dark:text-yellow-200 border-yellow-200 dark:border-yellow-800';
       case 'full':
-        return 'bg-red-100 text-red-800 border-red-200';
+        return 'bg-red-100 dark:bg-red-900/30 text-red-800 dark:text-red-200 border-red-200 dark:border-red-800';
       case 'unavailable':
-        return 'bg-gray-100 text-gray-600 border-gray-200';
+        return 'bg-gray-100 dark:bg-muted/50 text-gray-600 dark:text-muted-foreground border-gray-200 dark:border-border';
       default:
-        return 'bg-gray-100 text-gray-600 border-gray-200';
+        return 'bg-gray-100 dark:bg-muted/50 text-gray-600 dark:text-muted-foreground border-gray-200 dark:border-border';
     }
   };
 
@@ -454,10 +454,7 @@ const WalkInModal = ({ isOpen, onClose, onSubmit }) => {
       // Get error code and details from the error object
       const errorCode = error.code || error.response?.data?.code;
       const errorDetails = error.details || error.response?.data?.details;
-      const errorMessage =
-        error.message ||
-        error.response?.data?.message ||
-        'Failed to create walk-in appointment. Please try again.';
+      const errorMessage = error.message || error.response?.data?.message || 'Failed to create walk-in appointment. Please try again.';
 
       // Handle specific error codes with appropriate UI feedback
       if (errorCode === 'PATIENT_IN_CONSULTATION') {
@@ -469,18 +466,14 @@ const WalkInModal = ({ isOpen, onClose, onSubmit }) => {
         if (errorDetails?.tokenNumber) {
           additionalInfo = `\n\nToken #${errorDetails.tokenNumber} is ${errorDetails.tokenStatus || 'active'}.`;
         }
-        showWarning(
-          `${errorMessage}${additionalInfo}\n\nPlease complete or cancel the current visit before creating a new one.`
-        );
+        showWarning(`${errorMessage}${additionalInfo}\n\nPlease complete or cancel the current visit before creating a new one.`);
       } else if (errorCode === 'INVOICE_NOT_COMPLETED') {
         // Patient has unpaid invoice
         let additionalInfo = '';
         if (errorDetails?.invoiceNumber) {
           additionalInfo = `\n\nInvoice #${errorDetails.invoiceNumber} (Status: ${errorDetails.invoiceStatus || 'pending'})`;
         }
-        showWarning(
-          `${errorMessage}${additionalInfo}\n\nPlease direct the patient to the cashier counter to complete payment.`
-        );
+        showWarning(`${errorMessage}${additionalInfo}\n\nPlease direct the patient to the cashier counter to complete payment.`);
       } else if (errorCode === 'ACTIVE_VISIT_EXISTS') {
         // Generic active visit error
         showWarning(errorMessage);
@@ -794,8 +787,7 @@ const WalkInModal = ({ isOpen, onClose, onSubmit }) => {
                   </div>
 
                   <p className="text-sm font-medium">
-                    Available Doctors Today
-                    {doctors.length !== allDoctors.length ? ` (${doctors.length} found)` : ''}:
+                    Available Doctors Today{doctors.length !== allDoctors.length ? ` (${doctors.length} found)` : ''}:
                   </p>
 
                   {isLoadingDoctors ? (

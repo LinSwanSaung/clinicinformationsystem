@@ -109,7 +109,7 @@ const PaymentTransactions = () => {
       insurance: 'bg-purple-100 text-purple-700',
       mobile_payment: 'bg-orange-100 text-orange-700',
     };
-    return colors[method] || 'bg-gray-100 text-gray-700';
+    return colors[method] || 'bg-muted text-muted-foreground';
   };
 
   return (
@@ -122,8 +122,8 @@ const PaymentTransactions = () => {
         {/* Header */}
         <div className="flex items-center justify-between">
           <div>
-            <h1 className="text-2xl font-bold text-gray-900">Payment Transactions</h1>
-            <p className="mt-1 text-gray-500">View all payment transactions system-wide</p>
+            <h1 className="text-2xl font-bold text-foreground">Payment Transactions</h1>
+            <p className="mt-1 text-muted-foreground">View all payment transactions system-wide</p>
           </div>
           <div className="flex items-center space-x-2">
             <DollarSign className="h-8 w-8 text-green-600" />
@@ -133,12 +133,12 @@ const PaymentTransactions = () => {
         {/* Filters */}
         <Card className="p-4">
           <div className="mb-4 flex items-center space-x-2">
-            <Filter className="h-5 w-5 text-gray-500" />
-            <h3 className="font-semibold text-gray-900">Filters</h3>
+            <Filter className="h-5 w-5 text-muted-foreground" />
+            <h3 className="font-semibold text-foreground">Filters</h3>
           </div>
           <div className="grid grid-cols-1 gap-4 md:grid-cols-4">
             <div>
-              <label className="mb-1 block text-sm font-medium text-gray-700">Start Date</label>
+              <label className="mb-1 block text-sm font-medium text-foreground">Start Date</label>
               <Input
                 type="date"
                 value={filters.start_date}
@@ -146,7 +146,7 @@ const PaymentTransactions = () => {
               />
             </div>
             <div>
-              <label className="mb-1 block text-sm font-medium text-gray-700">End Date</label>
+              <label className="mb-1 block text-sm font-medium text-foreground">End Date</label>
               <Input
                 type="date"
                 value={filters.end_date}
@@ -154,9 +154,9 @@ const PaymentTransactions = () => {
               />
             </div>
             <div>
-              <label className="mb-1 block text-sm font-medium text-gray-700">Payment Method</label>
+              <label className="mb-1 block text-sm font-medium text-foreground">Payment Method</label>
               <select
-                className="w-full rounded-md border border-gray-300 px-3 py-2"
+                className="w-full rounded-md border border-input bg-background px-3 py-2 text-foreground"
                 value={filters.payment_method}
                 onChange={(e) => handleFilterChange('payment_method', e.target.value)}
               >
@@ -214,10 +214,10 @@ const PaymentTransactions = () => {
                 label: 'Patient',
                 render: (_, row) => (
                   <div>
-                    <p className="font-medium text-gray-900">
+                    <p className="font-medium text-foreground">
                       {row.invoice?.patient?.first_name} {row.invoice?.patient?.last_name}
                     </p>
-                    <p className="text-xs text-gray-500">{row.invoice?.patient?.patient_number}</p>
+                    <p className="text-xs text-muted-foreground">{row.invoice?.patient?.patient_number}</p>
                   </div>
                 ),
               },
@@ -225,7 +225,7 @@ const PaymentTransactions = () => {
                 key: 'invoice',
                 label: 'Invoice #',
                 render: (_, row) => (
-                  <span className="font-mono text-sm text-gray-700">
+                  <span className="font-mono text-sm text-foreground">
                     {row.invoice?.invoice_number || '—'}
                   </span>
                 ),
@@ -234,7 +234,7 @@ const PaymentTransactions = () => {
                 key: 'amount',
                 label: 'Amount',
                 render: (_, row) => (
-                  <span className="font-semibold text-gray-900">
+                  <span className="font-semibold text-foreground">
                     {formatCurrencySync(parseFloat(row.amount))}
                   </span>
                 ),
@@ -257,10 +257,10 @@ const PaymentTransactions = () => {
                 label: 'Received By',
                 render: (_, row) => (
                   <div>
-                    <p className="font-medium text-gray-900">
+                    <p className="font-medium text-foreground">
                       {row.received_by_user?.first_name} {row.received_by_user?.last_name}
                     </p>
-                    <p className="text-xs capitalize text-gray-500">{row.received_by_user?.role}</p>
+                    <p className="text-xs capitalize text-muted-foreground">{row.received_by_user?.role}</p>
                   </div>
                 ),
               },

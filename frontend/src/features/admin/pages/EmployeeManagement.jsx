@@ -239,7 +239,7 @@ const EmployeeManagement = () => {
 
             <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
               <div>
-                <label className="mb-1 block text-sm font-medium text-gray-700">First Name</label>
+                <label className="mb-1 block text-sm font-medium text-foreground">First Name</label>
                 <Input
                   placeholder="Enter first name"
                   value={formData.first_name}
@@ -249,7 +249,7 @@ const EmployeeManagement = () => {
                 />
               </div>
               <div>
-                <label className="mb-1 block text-sm font-medium text-gray-700">Last Name</label>
+                <label className="mb-1 block text-sm font-medium text-foreground">Last Name</label>
                 <Input
                   placeholder="Enter last name"
                   value={formData.last_name}
@@ -259,7 +259,7 @@ const EmployeeManagement = () => {
                 />
               </div>
               <div>
-                <label className="mb-1 block text-sm font-medium text-gray-700">
+                <label className="mb-1 block text-sm font-medium text-foreground">
                   Email Address
                 </label>
                 <Input
@@ -272,7 +272,7 @@ const EmployeeManagement = () => {
                 />
               </div>
               <div>
-                <label className="mb-1 block text-sm font-medium text-gray-700">Password</label>
+                <label className="mb-1 block text-sm font-medium text-foreground">Password</label>
                 <Input
                   type="password"
                   placeholder="Enter password"
@@ -284,7 +284,7 @@ const EmployeeManagement = () => {
                 />
               </div>
               <div>
-                <label className="mb-1 block text-sm font-medium text-gray-700">Role</label>
+                <label className="mb-1 block text-sm font-medium text-foreground">Role</label>
                 <select
                   className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
                   value={formData.role}
@@ -301,7 +301,7 @@ const EmployeeManagement = () => {
                 </select>
               </div>
               <div>
-                <label className="mb-1 block text-sm font-medium text-gray-700">Specialty</label>
+                <label className="mb-1 block text-sm font-medium text-foreground">Specialty</label>
                 <Input
                   placeholder="Enter specialty (optional)"
                   value={formData.specialty}
@@ -310,7 +310,7 @@ const EmployeeManagement = () => {
                 />
               </div>
               <div>
-                <label className="mb-1 block text-sm font-medium text-gray-700">Phone Number</label>
+                <label className="mb-1 block text-sm font-medium text-foreground">Phone Number</label>
                 <Input
                   placeholder="Enter phone number"
                   value={formData.phone}
@@ -320,7 +320,7 @@ const EmployeeManagement = () => {
                 />
               </div>
               <div>
-                <label className="mb-1 block text-sm font-medium text-gray-700">
+                <label className="mb-1 block text-sm font-medium text-foreground">
                   License Number
                 </label>
                 <Input
@@ -424,7 +424,7 @@ const EmployeeManagement = () => {
           <form onSubmit={handleSubmit} className="space-y-4">
             <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
               <div>
-                <label className="mb-1 block text-sm font-medium text-gray-700">First Name</label>
+                <label className="mb-1 block text-sm font-medium text-foreground">First Name</label>
                 <Input
                   required
                   placeholder="Enter first name"
@@ -434,7 +434,7 @@ const EmployeeManagement = () => {
                 />
               </div>
               <div>
-                <label className="mb-1 block text-sm font-medium text-gray-700">Last Name</label>
+                <label className="mb-1 block text-sm font-medium text-foreground">Last Name</label>
                 <Input
                   required
                   placeholder="Enter last name"
@@ -444,7 +444,7 @@ const EmployeeManagement = () => {
                 />
               </div>
               <div>
-                <label className="mb-1 block text-sm font-medium text-gray-700">
+                <label className="mb-1 block text-sm font-medium text-foreground">
                   Email Address
                 </label>
                 <Input
@@ -457,10 +457,10 @@ const EmployeeManagement = () => {
                 />
               </div>
               <div>
-                <label className="mb-1 block text-sm font-medium text-gray-700">Role</label>
+                <label className="mb-1 block text-sm font-medium text-foreground">Role</label>
                 <select
                   required
-                  className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm"
+                  className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm text-foreground"
                   value={formData.role}
                   onChange={(e) => setFormData({ ...formData, role: e.target.value })}
                   disabled={isSubmitting}
@@ -474,7 +474,7 @@ const EmployeeManagement = () => {
                 </select>
               </div>
               <div>
-                <label className="mb-1 block text-sm font-medium text-gray-700">Specialty</label>
+                <label className="mb-1 block text-sm font-medium text-foreground">Specialty</label>
                 <Input
                   placeholder="Enter specialty (optional)"
                   value={formData.specialty}
@@ -483,7 +483,7 @@ const EmployeeManagement = () => {
                 />
               </div>
               <div>
-                <label className="mb-1 block text-sm font-medium text-gray-700">Phone Number</label>
+                <label className="mb-1 block text-sm font-medium text-foreground">Phone Number</label>
                 <Input
                   placeholder="Enter phone number"
                   value={formData.phone}
@@ -492,7 +492,7 @@ const EmployeeManagement = () => {
                 />
               </div>
               <div>
-                <label className="mb-1 block text-sm font-medium text-gray-700">
+                <label className="mb-1 block text-sm font-medium text-foreground">
                   License Number
                 </label>
                 <Input
@@ -504,9 +504,9 @@ const EmployeeManagement = () => {
               </div>
             </div>
 
-            <div className="bg-muted/30 space-y-3 rounded-md border border-dashed border-gray-200 p-4">
+            <div className="bg-muted/30 space-y-3 rounded-md border border-dashed border-border p-4">
               <div>
-                <h4 className="text-sm font-semibold text-gray-800">Reset Password</h4>
+                <h4 className="text-sm font-semibold text-foreground">Reset Password</h4>
                 <p className="text-xs text-muted-foreground">
                   Leave the fields below blank to keep the current password. Passwords must be at
                   least 6 characters long.
@@ -514,7 +514,7 @@ const EmployeeManagement = () => {
               </div>
               <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
                 <div>
-                  <label className="mb-1 block text-sm font-medium text-gray-700">
+                  <label className="mb-1 block text-sm font-medium text-foreground">
                     New Password
                   </label>
                   <Input
@@ -527,7 +527,7 @@ const EmployeeManagement = () => {
                   />
                 </div>
                 <div>
-                  <label className="mb-1 block text-sm font-medium text-gray-700">
+                  <label className="mb-1 block text-sm font-medium text-foreground">
                     Confirm New Password
                   </label>
                   <Input
@@ -612,7 +612,7 @@ const EmployeeManagement = () => {
               ))}
             </select>,
             <div key="status-filter" className="flex items-center gap-2">
-              <label className="select-none text-sm text-gray-700">Status</label>
+              <label className="select-none text-sm text-foreground">Status</label>
               <select
                 className="flex h-10 rounded-md border border-input bg-background px-3 py-2 text-sm"
                 value={selectedStatus}
@@ -667,7 +667,7 @@ const EmployeeManagement = () => {
                           {employee.first_name} {employee.last_name}
                           {employee.deleted_at && <StatusBadge status="deleted" />}
                         </CardTitle>
-                        <p className="text-sm capitalize text-gray-600">{employee.role}</p>
+                        <p className="text-sm capitalize text-muted-foreground">{employee.role}</p>
                       </div>
                     </div>
                     <div className="flex items-center gap-1">
@@ -681,19 +681,19 @@ const EmployeeManagement = () => {
                 </CardHeader>
                 <CardContent className="space-y-3">
                   <div className="space-y-2">
-                    <div className="flex items-center gap-2 text-sm text-gray-600">
+                    <div className="flex items-center gap-2 text-sm text-muted-foreground">
                       <Mail className="h-4 w-4" />
                       <span>{employee.email}</span>
                     </div>
-                    <div className="flex items-center gap-2 text-sm text-gray-600">
+                    <div className="flex items-center gap-2 text-sm text-muted-foreground">
                       <Phone className="h-4 w-4" />
                       <span>{employee.phone || 'N/A'}</span>
                     </div>
-                    <div className="flex items-center gap-2 text-sm text-gray-600">
+                    <div className="flex items-center gap-2 text-sm text-muted-foreground">
                       <Calendar className="h-4 w-4" />
                       <span>Joined: {new Date(employee.created_at).toLocaleDateString()}</span>
                     </div>
-                    <div className="flex items-center gap-2 text-sm text-gray-600">
+                    <div className="flex items-center gap-2 text-sm text-muted-foreground">
                       <Clock className="h-4 w-4" />
                       <span>
                         Last login:{' '}
@@ -706,7 +706,7 @@ const EmployeeManagement = () => {
 
                   <div className="border-t pt-3">
                     <div className="flex items-center justify-between">
-                      <span className="text-sm font-medium text-gray-700">
+                      <span className="text-sm font-medium text-foreground">
                         {employee.specialty || 'General'}
                       </span>
                       <span
@@ -760,8 +760,8 @@ const EmployeeManagement = () => {
           <Card>
             <CardContent className="p-8 text-center">
               <Users className="mx-auto mb-4 h-12 w-12 text-gray-400" />
-              <h3 className="mb-2 text-lg font-medium text-gray-900">No employees found</h3>
-              <p className="mb-4 text-gray-600">
+              <h3 className="mb-2 text-lg font-medium text-card-foreground">No employees found</h3>
+              <p className="mb-4 text-muted-foreground">
                 {searchTerm || selectedRole !== 'all'
                   ? 'Try adjusting your search criteria'
                   : 'Get started by adding your first employee'}

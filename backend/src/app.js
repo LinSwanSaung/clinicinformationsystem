@@ -37,6 +37,7 @@ import auditLogRoutes from './routes/auditLog.routes.js';
 import adminRoutes from './routes/admin.routes.js';
 import aiRoutes from './routes/ai.routes.js';
 import dispenseRoutes from './routes/dispense.routes.js';
+import analyticsRoutes from './routes/analytics.routes.js';
 import { testConnection } from './config/database.js';
 import tokenScheduler from './services/TokenScheduler.service.js';
 import appointmentAutoCancel from './jobs/autoCancelAppointments.js';
@@ -207,6 +208,7 @@ app.use('/api/notifications', notificationRoutes);
 app.use('/api/me', patientPortalRoutes);
 app.use('/api/audit-logs', auditLogRoutes);
 app.use('/api/admin', adminRoutes);
+app.use('/api/analytics', analyticsRoutes);
 app.use('/api/ai', aiRoutes);
 
 // 404 handler

@@ -553,9 +553,9 @@ const PatientMedicalRecordManagement = () => {
         </div>
       ) : (
         <div className="py-12 text-center">
-          <Activity size={48} className="mx-auto mb-4 text-gray-300" />
-          <p className="text-base text-gray-500">No visit history available</p>
-          <p className="mt-2 text-sm text-gray-400">
+          <Activity size={48} className="mx-auto mb-4 text-muted-foreground" />
+          <p className="text-base text-muted-foreground">No visit history available</p>
+          <p className="mt-2 text-sm text-muted-foreground">
             Visit history will appear here once the patient completes visits
           </p>
         </div>
@@ -567,11 +567,11 @@ const PatientMedicalRecordManagement = () => {
   const EmptyState = () => (
     <Card className="p-12 text-center">
       <div className="space-y-6">
-        <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-full bg-gray-100">
-          <FileText size={32} className="text-gray-400" />
+        <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-full bg-muted">
+          <FileText size={32} className="text-muted-foreground" />
         </div>
-        <h3 className="text-lg font-medium text-gray-900">No Patient Selected</h3>
-        <p className="mx-auto max-w-md text-sm text-gray-500">
+        <h3 className="text-lg font-medium text-foreground">No Patient Selected</h3>
+        <p className="mx-auto max-w-md text-sm text-muted-foreground">
           Use the search bar above to find a patient and view their complete electronic medical
           record.
         </p>
@@ -624,8 +624,8 @@ const PatientMedicalRecordManagement = () => {
               {activeTab === 'overview' && (
                 <>
                   {!hasActiveVisit && (
-                    <Card className="mb-4 border-amber-300 bg-amber-50 p-4">
-                      <div className="flex items-center space-x-3 text-amber-800">
+                    <Card className="mb-4 border-amber-300 dark:border-amber-700 bg-amber-50 dark:bg-amber-950/30 p-4">
+                      <div className="flex items-center space-x-3 text-amber-800 dark:text-amber-200">
                         <AlertCircle size={20} />
                         <div>
                           <p className="font-semibold">No Active Consultation</p>

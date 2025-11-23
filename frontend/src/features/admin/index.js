@@ -7,6 +7,7 @@ export { default as AuditLogs } from './pages/AuditLogs';
 export { default as PendingItems } from './pages/PendingItems';
 export { default as PaymentTransactions } from './pages/PaymentTransactions';
 export { default as ClinicSettings } from './pages/ClinicSettings';
+export { default as AnalyticsDashboard } from './pages/AnalyticsDashboard';
 
 // Components
 export { default as EmployeeCard } from './components/EmployeeCard';

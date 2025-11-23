@@ -423,10 +423,9 @@ const ReceptionistDashboard = () => {
       }
     } catch (error) {
       logger.error('[ReceptionistDashboard] Error creating walk-in:', error);
-
+      
       // Display the detailed error message from backend
-      const errorMessage =
-        error.message || 'Failed to create walk-in appointment. Please try again.';
+      const errorMessage = error.message || 'Failed to create walk-in appointment. Please try again.';
       showError(errorMessage);
       throw error; // Re-throw to let WalkInModal handle it if needed
     }

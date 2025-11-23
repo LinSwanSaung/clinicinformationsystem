@@ -24,7 +24,7 @@ const MedicalInformationPanel = ({
         {/* Known Allergies */}
         <div>
           <div className="mb-4 flex items-center justify-between">
-            <h4 className="flex items-center text-sm font-bold text-gray-800">
+            <h4 className="flex items-center text-sm font-bold text-foreground">
               <AlertCircle size={18} className="mr-2 text-amber-500" />
               {t('patient.medicalRecords.knownAllergies')}
             </h4>
@@ -39,21 +39,21 @@ const MedicalInformationPanel = ({
               </Button>
             )}
           </div>
-          <div className="rounded-lg border border-amber-200 bg-amber-50 p-4">
+          <div className="rounded-lg border border-amber-200 dark:border-amber-800 bg-amber-50 dark:bg-amber-950/30 p-4">
             {patient.allergies && patient.allergies.length > 0 ? (
               <div className="flex flex-wrap gap-2">
                 {patient.allergies.map((allergy, index) => (
                   <Badge
                     key={index}
                     variant="destructive"
-                    className="border-red-300 bg-red-100 px-3 py-1 text-sm text-red-800"
+                    className="border-red-300 dark:border-red-800 bg-red-100 dark:bg-red-900/30 px-3 py-1 text-sm text-red-800 dark:text-red-200"
                   >
                     {allergy}
                   </Badge>
                 ))}
               </div>
             ) : (
-              <p className="text-base text-amber-700">
+              <p className="text-base text-amber-700 dark:text-amber-300">
                 {t('patient.medicalRecords.noKnownAllergies')}
               </p>
             )}
@@ -63,7 +63,7 @@ const MedicalInformationPanel = ({
         {/* Diagnosis History */}
         <div>
           <div className="mb-4 flex items-center justify-between">
-            <h4 className="flex items-center text-sm font-bold text-gray-800">
+            <h4 className="flex items-center text-sm font-bold text-foreground">
               <ClipboardList size={18} className="mr-2 text-blue-500" />
               {t('patient.medicalRecords.diagnosisHistory')}
             </h4>
@@ -78,18 +78,18 @@ const MedicalInformationPanel = ({
               </Button>
             )}
           </div>
-          <div className="rounded-lg border border-blue-200 bg-blue-50 p-4">
+          <div className="rounded-lg border border-blue-200 dark:border-blue-800 bg-blue-50 dark:bg-blue-950/30 p-4">
             {patient.diagnosisHistory && patient.diagnosisHistory.length > 0 ? (
               <div className="space-y-2">
                 {patient.diagnosisHistory.map((diagnosis, index) => (
                   <div key={index} className="flex items-center justify-between">
                     <span className="text-base">{diagnosis.condition}</span>
-                    <span className="text-sm text-gray-500">{diagnosis.date}</span>
+                    <span className="text-sm text-muted-foreground">{diagnosis.date}</span>
                   </div>
                 ))}
               </div>
             ) : (
-              <p className="text-base text-blue-700">
+              <p className="text-base text-blue-700 dark:text-blue-300">
                 {t('patient.medicalRecords.noDiagnosisHistory')}
               </p>
             )}
@@ -99,26 +99,26 @@ const MedicalInformationPanel = ({
         {/* Current Medications */}
         <div>
           <div className="mb-4 flex items-center justify-between">
-            <h4 className="flex items-center text-sm font-bold text-gray-800">
+            <h4 className="flex items-center text-sm font-bold text-foreground">
               <Pill size={18} className="mr-2 text-green-500" />
               {t('patient.medicalRecords.currentMedications')}
             </h4>
           </div>
-          <div className="rounded-lg border border-green-200 bg-green-50 p-4">
+          <div className="rounded-lg border border-green-200 dark:border-green-800 bg-green-50 dark:bg-green-950/30 p-4">
             {patient.currentMedications && patient.currentMedications.length > 0 ? (
               <div className="space-y-2">
                 {patient.currentMedications.map((medication, index) => (
                   <div key={index} className="flex items-center justify-between">
                     <div>
                       <span className="text-base font-medium">{medication.name}</span>
-                      <span className="ml-2 text-sm text-gray-600">({medication.dosage})</span>
+                      <span className="ml-2 text-sm text-muted-foreground">({medication.dosage})</span>
                     </div>
-                    <span className="text-sm text-gray-500">{medication.frequency}</span>
+                    <span className="text-sm text-muted-foreground">{medication.frequency}</span>
                   </div>
                 ))}
               </div>
             ) : (
-              <p className="text-base text-green-700">
+              <p className="text-base text-green-700 dark:text-green-300">
                 {t('patient.medicalRecords.noCurrentMedications')}
               </p>
             )}

@@ -68,11 +68,11 @@ const PatientSearchInterface = ({
           />
           <Search
             size={16}
-            className="absolute left-4 top-1/2 -translate-y-1/2 transform text-gray-400"
+            className="absolute left-4 top-1/2 -translate-y-1/2 transform text-muted-foreground"
           />
 
           {showResults && searchResults.length > 0 && (
-            <div className="absolute left-0 right-0 top-full z-10 mt-1 max-h-96 overflow-y-auto rounded-md border border-gray-200 bg-white shadow-lg">
+            <div className="absolute left-0 right-0 top-full z-10 mt-1 max-h-96 overflow-y-auto rounded-md border border-border bg-popover shadow-lg">
               {searchResults.map((patient) => {
                 const fullName = `${patient.first_name || ''} ${patient.last_name || ''}`.trim();
                 const initials =
@@ -87,7 +87,7 @@ const PatientSearchInterface = ({
                 return (
                   <div
                     key={patient.id}
-                    className="cursor-pointer border-b border-gray-100 p-4 transition-colors last:border-b-0 hover:bg-gray-50"
+                    className="cursor-pointer border-b border-border p-4 transition-colors last:border-b-0 hover:bg-accent"
                     onClick={() => selectPatient(patient)}
                   >
                     <div className="flex items-center space-x-3">
@@ -97,8 +97,8 @@ const PatientSearchInterface = ({
                         {initials}
                       </div>
                       <div className="flex-1">
-                        <p className="text-sm font-medium text-gray-900">{fullName}</p>
-                        <p className="text-xs text-gray-500">
+                        <p className="text-sm font-medium text-popover-foreground">{fullName}</p>
+                        <p className="text-xs text-muted-foreground">
                           {patient.patient_number && `ID: ${patient.patient_number}`}
                           {patient.patient_number && age !== 'N/A' && ' • '}
                           {age !== 'N/A' && `${age} years`}
@@ -106,7 +106,7 @@ const PatientSearchInterface = ({
                           {patient.gender && patient.gender}
                         </p>
                         {patient.phone && (
-                          <p className="mt-0.5 text-xs text-gray-400">📞 {patient.phone}</p>
+                          <p className="mt-0.5 text-xs text-muted-foreground">📞 {patient.phone}</p>
                         )}
                       </div>
                     </div>
@@ -117,8 +117,8 @@ const PatientSearchInterface = ({
           )}
 
           {showResults && searchResults.length === 0 && searchTerm.length >= minSearchLength && (
-            <div className="absolute left-0 right-0 top-full z-10 mt-1 rounded-md border border-gray-200 bg-white p-3 shadow-lg">
-              <p className="text-center text-sm text-gray-500">
+            <div className="absolute left-0 right-0 top-full z-10 mt-1 rounded-md border border-border bg-popover p-3 shadow-lg">
+              <p className="text-center text-sm text-popover-foreground">
                 No patients found matching your search.
               </p>
             </div>

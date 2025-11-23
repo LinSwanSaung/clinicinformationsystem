@@ -1,15 +1,12 @@
 import { supabase } from '../config/database.js';
 import logger from '../config/logger.js';
-import ClinicSettingsService from './ClinicSettings.service.js';
+import clinicSettingsService from './ClinicSettings.service.js';
 
 /**
  * Analytics Service
  * Provides analytics data for admin dashboard
  */
 class AnalyticsService {
-  constructor() {
-    this.clinicSettingsService = new ClinicSettingsService();
-  }
 
   /**
    * Get revenue trends for a date range
@@ -19,22 +16,22 @@ class AnalyticsService {
   async getRevenueTrends(options = {}) {
     try {
       const { startDate, endDate } = options;
-
-      if (!startDate || !endDate) {
-        throw new Error('Start date and end date are required');
-      }
-
-      const { data, error } = await supabase
+      
+      let query = supabase
         .from('invoices')
         .select('completed_at, total_amount')
-        .eq('status', 'paid')
-        .gte('completed_at', startDate)
-        .lte('completed_at', endDate)
-        .order('completed_at', { ascending: true });
+        .eq('status', 'paid');
 
-      if (error) {
-        throw error;
+      if (startDate && endDate) {
+        // Ensure dates are in ISO format with time
+        const startDateTime = new Date(startDate).toISOString();
+        const endDateTime = new Date(endDate + 'T23:59:59.999Z').toISOString();
+        query = query.gte('completed_at', startDateTime).lte('completed_at', endDateTime);
       }
+
+      const { data, error } = await query.order('completed_at', { ascending: true });
+
+      if (error) throw error;
 
       // Group by date
       const revenueByDate = {};
@@ -67,18 +64,20 @@ class AnalyticsService {
   async getVisitStatusBreakdown(options = {}) {
     try {
       const { startDate, endDate } = options;
-
-      let query = supabase.from('visits').select('status');
+      
+      let query = supabase
+        .from('visits')
+        .select('status');
 
       if (startDate && endDate) {
-        query = query.gte('visit_date', startDate).lte('visit_date', endDate);
+        const startDateTime = new Date(startDate).toISOString();
+        const endDateTime = new Date(endDate + 'T23:59:59.999Z').toISOString();
+        query = query.gte('visit_date', startDateTime).lte('visit_date', endDateTime);
       }
 
       const { data, error } = await query;
 
-      if (error) {
-        throw error;
-      }
+      if (error) throw error;
 
       // Count by status
       const breakdown = {
@@ -122,34 +121,39 @@ class AnalyticsService {
 
       let visitsQuery = supabase
         .from('visits')
-        .select('doctor_id, id, users!doctor_id(first_name, last_name)');
+        .select('doctor_id, id, doctor:users!visits_doctor_id_fkey(first_name, last_name)');
 
       if (startDate && endDate) {
-        visitsQuery = visitsQuery.gte('visit_date', startDate).lte('visit_date', endDate);
+        const startDateTime = new Date(startDate).toISOString();
+        const endDateTime = new Date(endDate + 'T23:59:59.999Z').toISOString();
+        visitsQuery = visitsQuery.gte('visit_date', startDateTime).lte('visit_date', endDateTime);
       }
 
       const { data: visits, error: visitsError } = await visitsQuery;
 
-      if (visitsError) {
-        throw visitsError;
-      }
+      if (visitsError) throw visitsError;
 
       // Get invoices for revenue calculation
       const visitIds = (visits || []).map((v) => v.id);
-      let invoicesQuery = supabase
-        .from('invoices')
-        .select('visit_id, total_amount')
-        .in('visit_id', visitIds)
-        .eq('status', 'paid');
+      
+      let invoices = [];
+      if (visitIds.length > 0) {
+        let invoicesQuery = supabase
+          .from('invoices')
+          .select('visit_id, total_amount')
+          .in('visit_id', visitIds)
+          .eq('status', 'paid');
 
-      if (startDate && endDate) {
-        invoicesQuery = invoicesQuery.gte('completed_at', startDate).lte('completed_at', endDate);
-      }
+        if (startDate && endDate) {
+          const startDateTime = new Date(startDate).toISOString();
+          const endDateTime = new Date(endDate + 'T23:59:59.999Z').toISOString();
+          invoicesQuery = invoicesQuery.gte('completed_at', startDateTime).lte('completed_at', endDateTime);
+        }
 
-      const { data: invoices, error: invoicesError } = await invoicesQuery;
+        const { data: invoicesData, error: invoicesError } = await invoicesQuery;
 
-      if (invoicesError) {
-        throw invoicesError;
+        if (invoicesError) throw invoicesError;
+        invoices = invoicesData || [];
       }
 
       // Aggregate by doctor
@@ -160,8 +164,8 @@ class AnalyticsService {
         if (!doctorStats[doctorId]) {
           doctorStats[doctorId] = {
             doctorId,
-            doctorName: visit.users
-              ? `${visit.users.first_name || ''} ${visit.users.last_name || ''}`.trim()
+            doctorName: visit.doctor
+              ? `${visit.doctor.first_name || ''} ${visit.doctor.last_name || ''}`.trim()
               : 'Unknown',
             visits: 0,
             revenue: 0,
@@ -210,17 +214,20 @@ class AnalyticsService {
     try {
       const { startDate, endDate } = options;
 
-      let query = supabase.from('payment_transactions').select('payment_method, amount');
+      let query = supabase
+        .from('payment_transactions')
+        .select('payment_method, amount');
 
       if (startDate && endDate) {
-        query = query.gte('payment_date', startDate).lte('payment_date', endDate);
+        const startDateTime = new Date(startDate).toISOString();
+        const endDateTime = new Date(endDate + 'T23:59:59.999Z').toISOString();
+        // Use received_at which is confirmed to exist in the database
+        query = query.gte('received_at', startDateTime).lte('received_at', endDateTime);
       }
 
       const { data, error } = await query;
 
-      if (error) {
-        throw error;
-      }
+      if (error) throw error;
 
       // Aggregate by payment method
       const breakdown = {};
@@ -232,8 +239,7 @@ class AnalyticsService {
 
       // Convert to array format for charts
       const chartData = Object.entries(breakdown).map(([method, amount]) => ({
-        method:
-          method === 'cash' ? 'Cash' : method === 'online_payment' ? 'Online Payment' : method,
+        method: method === 'cash' ? 'Cash' : method === 'online_payment' ? 'Online Payment' : method,
         amount: parseFloat(amount.toFixed(2)),
       }));
 
@@ -262,16 +268,20 @@ class AnalyticsService {
       }
 
       // Get clinic settings
-      const settings = await this.clinicSettingsService.getSettings();
+      const settings = await clinicSettingsService.getSettings();
       const clinicName = settings?.data?.clinic_name || settings?.clinic_name || 'Clinic';
       const clinicId = 'CLINIC001'; // Can be configured in settings later
 
       // Calculate date range for the month
       const startDate = new Date(year, month - 1, 1);
-      const endDate = new Date(year, month, 0, 23, 59, 59);
+      const endDate = new Date(year, month, 0, 23, 59, 59, 999);
 
       const startDateISO = startDate.toISOString();
       const endDateISO = endDate.toISOString();
+      
+      // For date-only queries (diagnosed_date), use date strings
+      const startDateStr = startDate.toISOString().split('T')[0];
+      const endDateStr = endDate.toISOString().split('T')[0];
 
       // 1. Total Visits
       const { data: visits, error: visitsError } = await supabase
@@ -280,9 +290,7 @@ class AnalyticsService {
         .gte('visit_date', startDateISO)
         .lte('visit_date', endDateISO);
 
-      if (visitsError) {
-        throw visitsError;
-      }
+      if (visitsError) throw visitsError;
 
       const totalVisits = (visits || []).length;
 
@@ -293,9 +301,7 @@ class AnalyticsService {
         .gte('registration_date', startDateISO)
         .lte('registration_date', endDateISO);
 
-      if (newPatientsError) {
-        throw newPatientsError;
-      }
+      if (newPatientsError) throw newPatientsError;
 
       // 3. Female Patients (visits in month)
       const femalePatients = (visits || []).filter(
@@ -304,9 +310,7 @@ class AnalyticsService {
 
       // 4. Under 5 Patients (visits in month)
       const under5Patients = (visits || []).filter((v) => {
-        if (!v.patients || !v.patients.date_of_birth) {
-          return false;
-        }
+        if (!v.patients || !v.patients.date_of_birth) return false;
         const birthDate = new Date(v.patients.date_of_birth);
         const ageInYears = (new Date() - birthDate) / (1000 * 60 * 60 * 24 * 365);
         return ageInYears < 5;
@@ -316,12 +320,10 @@ class AnalyticsService {
       const { count: diagnosesCount, error: diagnosesError } = await supabase
         .from('patient_diagnoses')
         .select('*', { count: 'exact', head: true })
-        .gte('diagnosed_date', startDate.toISOString().split('T')[0])
-        .lte('diagnosed_date', endDate.toISOString().split('T')[0]);
+        .gte('diagnosed_date', startDateStr)
+        .lte('diagnosed_date', endDateStr);
 
-      if (diagnosesError) {
-        throw diagnosesError;
-      }
+      if (diagnosesError) throw diagnosesError;
 
       // 6. Drugs Dispensed (from invoice_items where item_type = 'medicine')
       const { count: drugsDispensedCount, error: drugsError } = await supabase
@@ -331,9 +333,7 @@ class AnalyticsService {
         .gte('added_at', startDateISO)
         .lte('added_at', endDateISO);
 
-      if (drugsError) {
-        throw drugsError;
-      }
+      if (drugsError) throw drugsError;
 
       // Format reporting month as YYYY-MM
       const reportingMonth = `${year}-${String(month).padStart(2, '0')}`;
@@ -366,3 +366,4 @@ class AnalyticsService {
 }
 
 export default AnalyticsService;
+

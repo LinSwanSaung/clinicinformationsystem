@@ -7,9 +7,7 @@ import { formatCurrencySync, refreshCurrencyCache } from '@/utils/currency';
 
 function get(obj, ...keys) {
   for (const k of keys) {
-    if (obj && obj[k] !== undefined && obj[k] !== null) {
-      return obj[k];
-    }
+    if (obj && obj[k] !== undefined && obj[k] !== null) return obj[k];
   }
   return undefined;
 }

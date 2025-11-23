@@ -23,10 +23,10 @@ const PatientDocumentManager = ({
             </div>
           </div>
 
-          <div className="rounded-lg border-2 border-dashed border-gray-300 p-8 text-center transition-colors hover:border-gray-400">
-            <Upload size={32} className="mx-auto mb-4 text-gray-400" />
-            <h4 className="mb-2 text-sm font-medium text-gray-700">Upload Patient Documents</h4>
-            <p className="mb-4 text-sm text-gray-500">
+          <div className="rounded-lg border-2 border-dashed border-border p-8 text-center transition-colors hover:border-primary/50">
+            <Upload size={32} className="mx-auto mb-4 text-muted-foreground" />
+            <h4 className="mb-2 text-sm font-medium text-foreground">Upload Patient Documents</h4>
+            <p className="mb-4 text-sm text-muted-foreground">
               Drag and drop files here, or click to select files
             </p>
             <Button size="sm" className="px-4 py-2 text-sm" onClick={onUploadFile}>
@@ -49,26 +49,26 @@ const PatientDocumentManager = ({
             {files.map((file, index) => (
               <div
                 key={index}
-                className="flex items-center justify-between rounded-lg border bg-gray-50 p-4 transition-shadow hover:shadow-md"
+                className="flex items-center justify-between rounded-lg border bg-muted/50 p-4 transition-shadow hover:shadow-md"
               >
                 <div className="flex items-center space-x-4">
-                  <div className="flex h-12 w-12 items-center justify-center rounded bg-blue-100">
-                    <FileText size={20} className="text-blue-600" />
+                  <div className="flex h-12 w-12 items-center justify-center rounded bg-blue-100 dark:bg-blue-900/30">
+                    <FileText size={20} className="text-blue-600 dark:text-blue-400" />
                   </div>
                   <div>
-                    <p className="text-sm font-bold text-gray-900">{file.name}</p>
-                    <p className="text-xs text-gray-500">
+                    <p className="text-sm font-bold text-foreground">{file.name}</p>
+                    <p className="text-xs text-muted-foreground">
                       <span className="capitalize">{file.type?.replace('_', ' ')}</span> •{' '}
                       {file.size}
                     </p>
                     {file.uploadDate && (
                       <div className="mt-1 flex items-center">
-                        <Calendar size={12} className="mr-1 text-gray-400" />
-                        <span className="text-xs text-gray-400">{file.uploadDate}</span>
+                        <Calendar size={12} className="mr-1 text-muted-foreground" />
+                        <span className="text-xs text-muted-foreground">{file.uploadDate}</span>
                       </div>
                     )}
                     {file.uploadedBy && (
-                      <p className="mt-1 text-xs text-gray-400">Uploaded by: {file.uploadedBy}</p>
+                      <p className="mt-1 text-xs text-muted-foreground">Uploaded by: {file.uploadedBy}</p>
                     )}
                   </div>
                 </div>
@@ -103,8 +103,8 @@ const PatientDocumentManager = ({
           </div>
         ) : (
           <div className="py-8 text-center">
-            <FileText size={32} className="mx-auto mb-3 text-gray-400" />
-            <p className="text-sm text-gray-500">No documents available</p>
+            <FileText size={32} className="mx-auto mb-3 text-muted-foreground" />
+            <p className="text-sm text-muted-foreground">No documents available</p>
           </div>
         )}
       </Card>

@@ -152,41 +152,38 @@ class QueueService {
     // Check if patient already has an active visit (in_progress)
     // Business rule: If visit status is 'in_progress', block new visits regardless of invoice status
     const activeVisit = await this.visitService.getPatientActiveVisit(patient_id);
-
+    
     if (activeVisit) {
       // Get detailed information about the active visit to provide better error message
       let visitDetails = null;
       let invoice = null;
       let activeToken = null;
-
+      
       try {
         visitDetails = await this.visitService.getVisitDetails(activeVisit.id);
-
+        
         // Get invoice information
         if (visitDetails?.data) {
           const { default: invoiceService } = await import('./Invoice.service.js');
           invoice = await invoiceService.getInvoiceByVisit(activeVisit.id);
-
+          
           // Get active token for this visit
           activeToken = await this.queueTokenModel.getTokenByVisitId(activeVisit.id);
         }
       } catch (detailError) {
-        logger.warn(
-          `[QUEUE] Could not fetch visit details for error message:`,
-          detailError.message
-        );
+        logger.warn(`[QUEUE] Could not fetch visit details for error message:`, detailError.message);
       }
-
+      
       // Determine the specific blocking reason and create appropriate error message
       let errorMessage = '';
       let errorCode = 'ACTIVE_VISIT_EXISTS';
-
+      
       if (activeToken) {
         const tokenStatus = activeToken.status;
-        const doctorName = activeToken.doctor
+        const doctorName = activeToken.doctor 
           ? `Dr. ${activeToken.doctor.first_name} ${activeToken.doctor.last_name}`
           : 'a doctor';
-
+          
         if (tokenStatus === 'serving') {
           errorMessage = `Patient is currently in consultation with ${doctorName} (Token #${activeToken.token_number}). Please wait for the consultation to complete before creating a new visit.`;
           errorCode = 'PATIENT_IN_CONSULTATION';
@@ -200,7 +197,7 @@ class QueueService {
         const invoiceStatus = invoice.status;
         const totalAmount = parseFloat(invoice.total_amount || 0);
         const balanceDue = parseFloat(invoice.balance_due || 0);
-
+        
         if (invoiceStatus === 'pending' && totalAmount === 0) {
           errorMessage = `Patient has an active visit with an unpaid invoice (Invoice #${invoice.invoice_number || 'N/A'}, Amount: $0.00). Please process the payment at the cashier counter to complete the visit.`;
         } else if (invoiceStatus === 'pending') {
@@ -215,25 +212,28 @@ class QueueService {
         // No token or invoice found, but visit is still in_progress
         errorMessage = `Patient has an active visit (Visit ID: ${activeVisit.id}) that is not yet completed. Please complete or cancel the current visit before creating a new one.`;
       }
-
+      
       logger.warn(
         `[QUEUE] ❌ BLOCKING new visit for patient ${patient_id} - ${errorCode}: ${errorMessage}`
       );
-
-      throw new ApplicationError(errorMessage, 409, errorCode, {
-        activeVisitId: activeVisit.id,
-        patientId: patient_id,
-        tokenId: activeToken?.id || null,
-        tokenNumber: activeToken?.token_number || null,
-        tokenStatus: activeToken?.status || null,
-        invoiceId: invoice?.id || null,
-        invoiceNumber: invoice?.invoice_number || null,
-        invoiceStatus: invoice?.status || null,
-      });
+      
+      throw new ApplicationError(
+        errorMessage,
+        409,
+        errorCode,
+        { 
+          activeVisitId: activeVisit.id, 
+          patientId: patient_id,
+          tokenId: activeToken?.id || null,
+          tokenNumber: activeToken?.token_number || null,
+          tokenStatus: activeToken?.status || null,
+          invoiceId: invoice?.id || null,
+          invoiceNumber: invoice?.invoice_number || null,
+          invoiceStatus: invoice?.status || null,
+        }
+      );
     }
-    logger.debug(
-      `[QUEUE] ✅ No active visits found for patient ${patient_id} - allowing new visit`
-    );
+    logger.debug(`[QUEUE] ✅ No active visits found for patient ${patient_id} - allowing new visit`);
 
     // For walk-ins (no appointment_id), check if doctor can accept more patients
     if (!appointment_id) {
@@ -247,27 +247,22 @@ class QueueService {
     // This is a secondary check in case visit check didn't catch it
     const existingToken = await this.queueTokenModel.getPatientCurrentToken(patient_id);
     if (existingToken) {
-      const doctorName = existingToken.doctor
+      const doctorName = existingToken.doctor 
         ? `Dr. ${existingToken.doctor.first_name} ${existingToken.doctor.last_name}`
         : 'a doctor';
-      const statusMessage =
-        existingToken.status === 'serving'
-          ? 'currently in consultation'
-          : existingToken.status === 'called'
-            ? 'called and waiting'
-            : existingToken.status === 'ready'
-              ? 'ready for consultation'
-              : 'waiting in queue';
-
+      const statusMessage = existingToken.status === 'serving' 
+        ? 'currently in consultation'
+        : existingToken.status === 'called'
+        ? 'called and waiting'
+        : existingToken.status === 'ready'
+        ? 'ready for consultation'
+        : 'waiting in queue';
+        
       throw new ApplicationError(
         `Patient already has an active queue token (#${existingToken.token_number}) with ${doctorName} and is ${statusMessage}. Please complete or cancel the current visit before queueing again.`,
         409,
         'ACTIVE_TOKEN_EXISTS',
-        {
-          tokenId: existingToken.id,
-          tokenNumber: existingToken.token_number,
-          tokenStatus: existingToken.status,
-        }
+        { tokenId: existingToken.id, tokenNumber: existingToken.token_number, tokenStatus: existingToken.status }
       );
     }
 
@@ -281,8 +276,7 @@ class QueueService {
       let appointmentType = 'walk_in'; // Default for walk-ins
 
       // Handle empty strings - treat them as null
-      let chiefComplaint =
-        reason_for_visit && reason_for_visit.trim() ? reason_for_visit.trim() : null;
+      let chiefComplaint = (reason_for_visit && reason_for_visit.trim()) ? reason_for_visit.trim() : null;
 
       // If this is from an appointment, fetch the appointment to get its type and reason_for_visit
       if (appointment_id) {
@@ -302,10 +296,7 @@ class QueueService {
             appointmentType = 'appointment'; // Fallback if appointment not found
           }
         } catch (apptError) {
-          logger.warn(
-            '[QUEUE] Could not fetch appointment for visit_type, using default:',
-            apptError.message
-          );
+          logger.warn('[QUEUE] Could not fetch appointment for visit_type, using default:', apptError.message);
           appointmentType = 'appointment'; // Fallback on error
         }
       }
@@ -318,7 +309,7 @@ class QueueService {
         chief_complaint: chiefComplaint, // Transfer reason_for_visit to chief_complaint (null if empty)
         status: 'in_progress',
       };
-
+      
       logger.debug('[QUEUE] Creating visit with data:', {
         patient_id: visitData.patient_id,
         doctor_id: visitData.doctor_id,
@@ -450,22 +441,17 @@ class QueueService {
       if (!nextToken) {
         return {
           success: false,
-          message:
-            'No patients ready in queue. Please wait for the nurse to mark patients as ready.',
+          message: 'No patients ready in queue. Please wait for the nurse to mark patients as ready.',
         };
       }
-
+      
       // Double-check that the patient is marked as ready (status should be 'called')
       if (nextToken.status !== 'called') {
         throw new ApplicationError(
           `Patient (Token #${nextToken.token_number}) is not ready yet. Please wait for the nurse to mark them as ready.`,
           400,
           'PATIENT_NOT_READY',
-          {
-            tokenId: nextToken.id,
-            tokenNumber: nextToken.token_number,
-            currentStatus: nextToken.status,
-          }
+          { tokenId: nextToken.id, tokenNumber: nextToken.token_number, currentStatus: nextToken.status }
         );
       }
 
@@ -516,9 +502,7 @@ class QueueService {
             relatedEntityType: 'queue_token',
             relatedEntityId: nextInQueue.id,
           });
-          logger.info(
-            `[QUEUE] ✅ Notified next-in-line patient ${nextInQueue.patient_id} (Token #${nextInQueue.token_number}) after callNextAndStart`
-          );
+          logger.info(`[QUEUE] ✅ Notified next-in-line patient ${nextInQueue.patient_id} (Token #${nextInQueue.token_number}) after callNextAndStart`);
         }
       } catch (nerr) {
         logger.warn('[QUEUE] Failed to notify next-in-line on callNextAndStart:', nerr.message);
@@ -788,18 +772,14 @@ class QueueService {
         message: 'No patients ready in queue. Please wait for the nurse to mark patients as ready.',
       };
     }
-
+    
     // Double-check that the patient is marked as ready (status should be 'called')
     if (nextToken.status !== 'called') {
       throw new ApplicationError(
         `Patient (Token #${nextToken.token_number}) is not ready yet. Please wait for the nurse to mark them as ready.`,
         400,
         'PATIENT_NOT_READY',
-        {
-          tokenId: nextToken.id,
-          tokenNumber: nextToken.token_number,
-          currentStatus: nextToken.status,
-        }
+        { tokenId: nextToken.id, tokenNumber: nextToken.token_number, currentStatus: nextToken.status }
       );
     }
 
@@ -840,9 +820,7 @@ class QueueService {
           relatedEntityType: 'queue_token',
           relatedEntityId: nextInQueue.id,
         });
-        logger.info(
-          `[QUEUE] ✅ Notified next-in-line patient ${nextInQueue.patient_id} (Token #${nextInQueue.token_number})`
-        );
+        logger.info(`[QUEUE] ✅ Notified next-in-line patient ${nextInQueue.patient_id} (Token #${nextInQueue.token_number})`);
       }
     } catch (nerr2) {
       logger.warn('[QUEUE] Failed to notify next-in-line patient:', nerr2.message);
@@ -907,9 +885,7 @@ class QueueService {
           relatedEntityType: 'queue_token',
           relatedEntityId: updatedToken.id,
         });
-        logger.info(
-          `[QUEUE] ✅ Sent ready notification to patient ${token.patient_id} for token ${tokenId}`
-        );
+        logger.info(`[QUEUE] ✅ Sent ready notification to patient ${token.patient_id} for token ${tokenId}`);
       } catch (nerr) {
         logger.warn('[QUEUE] Failed to notify patient (marked ready):', nerr.message);
       }
@@ -922,26 +898,24 @@ class QueueService {
           token.doctor_id,
           token.issued_date
         );
-
+        
         // Filter for active tokens (serving, called)
-        const activeTokens = allTokens.filter((t) => ['serving', 'called'].includes(t.status));
-
+        const activeTokens = allTokens.filter((t) => 
+          ['serving', 'called'].includes(t.status)
+        );
+        
         // Sort by: serving first, then called, then by token_number
         activeTokens.sort((a, b) => {
-          if (a.status === 'serving' && b.status !== 'serving') {
-            return -1;
-          }
-          if (a.status !== 'serving' && b.status === 'serving') {
-            return 1;
-          }
+          if (a.status === 'serving' && b.status !== 'serving') return -1;
+          if (a.status !== 'serving' && b.status === 'serving') return 1;
           return a.token_number - b.token_number;
         });
-
+        
         // Check if this patient is the first one in the ready queue (after any serving patients)
         const servingCount = activeTokens.filter((t) => t.status === 'serving').length;
         const calledTokens = activeTokens.filter((t) => t.status === 'called');
         const isFirstReady = calledTokens.length > 0 && calledTokens[0].id === updatedToken.id;
-
+        
         // If they're the first ready patient (or only one), they're next in line
         if (isFirstReady || (servingCount === 0 && calledTokens.length === 1)) {
           const { default: NotificationService } = await import('./Notification.service.js');
@@ -952,15 +926,10 @@ class QueueService {
             relatedEntityType: 'queue_token',
             relatedEntityId: updatedToken.id,
           });
-          logger.info(
-            `[QUEUE] ✅ Sent "next in line" notification to patient ${token.patient_id} (Token #${updatedToken.token_number}) - they are first/only in queue`
-          );
+          logger.info(`[QUEUE] ✅ Sent "next in line" notification to patient ${token.patient_id} (Token #${updatedToken.token_number}) - they are first/only in queue`);
         }
       } catch (nextInLineError) {
-        logger.warn(
-          '[QUEUE] Failed to check/send "next in line" notification:',
-          nextInLineError.message
-        );
+        logger.warn('[QUEUE] Failed to check/send "next in line" notification:', nextInLineError.message);
       }
 
       // Get the updated token with patient details using the existing method
@@ -1129,13 +1098,9 @@ class QueueService {
             relatedEntityType: 'queue_token',
             relatedEntityId: nextInQueue.id,
           });
-          logger.info(
-            `[QUEUE] ✅ Notified next-in-line patient ${nextInQueue.patient_id} (Token #${nextInQueue.token_number}) after consultation started`
-          );
+          logger.info(`[QUEUE] ✅ Notified next-in-line patient ${nextInQueue.patient_id} (Token #${nextInQueue.token_number}) after consultation started`);
         } else if (!nextInQueue) {
-          logger.debug(
-            `[QUEUE] No next patient in queue to notify for doctor ${currentToken.doctor_id}`
-          );
+          logger.debug(`[QUEUE] No next patient in queue to notify for doctor ${currentToken.doctor_id}`);
         }
       } catch (nerr) {
         logger.warn('[QUEUE] Failed to notify next-in-line on startConsultation:', nerr.message);
@@ -1216,10 +1181,7 @@ class QueueService {
                 appointmentType = 'appointment';
               }
             } catch (apptError) {
-              logger.warn(
-                '[QUEUE] Could not fetch appointment for visit_type, using default:',
-                apptError.message
-              );
+              logger.warn('[QUEUE] Could not fetch appointment for visit_type, using default:', apptError.message);
               appointmentType = 'appointment';
             }
           }
@@ -1719,7 +1681,7 @@ class QueueService {
 
     // Get token-based queue
     const tokens = await this.queueTokenModel.getByDoctorAndDate(doctorId, queueDate);
-
+    
     // Enhance tokens with visit chief_complaint - always fetch if visit_id exists
     const enhancedTokens = await Promise.all(
       tokens.map(async (token) => {
@@ -1731,8 +1693,7 @@ class QueueService {
               // Merge visit data, prioritizing fetched data
               token.visit = {
                 id: visitDetails.data.id,
-                chief_complaint:
-                  visitDetails.data.chief_complaint || token.appointment?.reason_for_visit || null,
+                chief_complaint: visitDetails.data.chief_complaint || token.appointment?.reason_for_visit || null,
                 visit_type: visitDetails.data.visit_type || token.visit?.visit_type,
                 status: visitDetails.data.status || token.visit?.status,
                 ...token.visit, // Keep any other visit data from join
@@ -1741,22 +1702,16 @@ class QueueService {
               if (token.visit.chief_complaint) {
                 token.chief_complaint = token.visit.chief_complaint;
               }
-              logger.debug(
-                `[QUEUE] Enhanced token ${token.id} (token #${token.token_number}) with visit data:`,
-                {
-                  visit_id: token.visit_id,
-                  chief_complaint: token.visit.chief_complaint,
-                  visit_type: token.visit.visit_type,
-                }
-              );
+              logger.debug(`[QUEUE] Enhanced token ${token.id} (token #${token.token_number}) with visit data:`, {
+                visit_id: token.visit_id,
+                chief_complaint: token.visit.chief_complaint,
+                visit_type: token.visit.visit_type,
+              });
             } else {
               logger.warn(`[QUEUE] Visit details returned no data for visit_id ${token.visit_id}`);
             }
           } catch (error) {
-            logger.warn(
-              `[QUEUE] Failed to fetch visit details for token ${token.id}:`,
-              error.message
-            );
+            logger.warn(`[QUEUE] Failed to fetch visit details for token ${token.id}:`, error.message);
             // Fallback to appointment reason_for_visit if visit fetch fails
             if (token.appointment?.reason_for_visit && !token.visit?.chief_complaint) {
               token.visit = {

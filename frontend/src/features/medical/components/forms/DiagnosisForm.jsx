@@ -17,7 +17,7 @@ const DiagnosisForm = ({ diagnosis, onChange, disabled = false }) => {
           value={diagnosis.diagnosis_name}
           onChange={(e) => handleChange('diagnosis_name', e.target.value)}
           disabled={disabled}
-          className="w-full rounded-md border border-gray-300 px-3 py-2 focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:bg-gray-100"
+          className="w-full rounded-md border border-input bg-background px-3 py-2 text-foreground focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary disabled:bg-muted"
         />
       </div>
 
@@ -29,7 +29,7 @@ const DiagnosisForm = ({ diagnosis, onChange, disabled = false }) => {
           value={diagnosis.icd_10_code}
           onChange={(e) => handleChange('icd_10_code', e.target.value)}
           disabled={disabled}
-          className="w-full rounded-md border border-gray-300 px-3 py-2 focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:bg-gray-100"
+          className="w-full rounded-md border border-input bg-background px-3 py-2 text-foreground focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary disabled:bg-muted"
         />
       </div>
 
@@ -39,7 +39,7 @@ const DiagnosisForm = ({ diagnosis, onChange, disabled = false }) => {
           value={diagnosis.category}
           onChange={(e) => handleChange('category', e.target.value)}
           disabled={disabled}
-          className="w-full rounded-md border border-gray-300 px-3 py-2 focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:bg-gray-100"
+          className="w-full rounded-md border border-input bg-background px-3 py-2 text-foreground focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary disabled:bg-muted"
         >
           <option value="primary">Primary</option>
           <option value="secondary">Secondary</option>
@@ -56,7 +56,7 @@ const DiagnosisForm = ({ diagnosis, onChange, disabled = false }) => {
           value={diagnosis.status}
           onChange={(e) => handleChange('status', e.target.value)}
           disabled={disabled}
-          className="w-full rounded-md border border-gray-300 px-3 py-2 focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:bg-gray-100"
+          className="w-full rounded-md border border-input bg-background px-3 py-2 text-foreground focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary disabled:bg-muted"
         >
           <option value="active">Active</option>
           <option value="resolved">Resolved</option>
@@ -74,7 +74,7 @@ const DiagnosisForm = ({ diagnosis, onChange, disabled = false }) => {
           value={diagnosis.diagnosis_date}
           onChange={(e) => handleChange('diagnosis_date', e.target.value)}
           disabled={disabled}
-          className="w-full rounded-md border border-gray-300 px-3 py-2 focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:bg-gray-100"
+          className="w-full rounded-md border border-input bg-background px-3 py-2 text-foreground focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary disabled:bg-muted"
         />
       </div>
 
@@ -86,7 +86,7 @@ const DiagnosisForm = ({ diagnosis, onChange, disabled = false }) => {
           onChange={(e) => handleChange('clinical_notes', e.target.value)}
           disabled={disabled}
           rows={3}
-          className="w-full rounded-md border border-gray-300 px-3 py-2 focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:bg-gray-100"
+          className="w-full rounded-md border border-input bg-background px-3 py-2 text-foreground focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary disabled:bg-muted"
         />
       </div>
     </div>

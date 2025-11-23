@@ -145,7 +145,7 @@ const InvoiceHistoryItem = memo(({ invoice, onView, onDownload }) => {
     <div
       key={invoice.id}
       className={`hover:bg-muted/50 flex items-center justify-between rounded-lg border p-4 transition-colors ${
-        invoice.hasCreditPayment ? 'border-blue-200 bg-blue-50/50' : ''
+        invoice.hasCreditPayment ? 'border-blue-200 dark:border-blue-800 bg-blue-50/50 dark:bg-blue-950/30' : ''
       }`}
     >
       <div className="flex-1">
@@ -164,7 +164,7 @@ const InvoiceHistoryItem = memo(({ invoice, onView, onDownload }) => {
             </div>
             <p className="text-sm text-muted-foreground">{invoice.patientName}</p>
             {invoice.creditAmount && (
-              <p className="mt-1 text-xs font-medium text-blue-700">
+              <p className="mt-1 text-xs font-medium text-blue-700 dark:text-blue-300">
                 Includes {formatCurrencySync(invoice.creditAmount)} credit from previous invoices
               </p>
             )}
@@ -184,18 +184,18 @@ const InvoiceHistoryItem = memo(({ invoice, onView, onDownload }) => {
             <p className="text-xs text-muted-foreground">
               Paid: {formatCurrencySync(invoice.amountPaid)}
               {invoice.status === 'partial_paid' && invoice.balanceDue > 0 && (
-                <span className="ml-1 text-amber-700">(partial)</span>
+                <span className="ml-1 text-amber-700 dark:text-amber-300 dark:text-amber-300">(partial)</span>
               )}
             </p>
           )}
           {invoice.outstandingBalancePaidFromLater > 0 && (
-            <p className="text-xs font-medium text-blue-700">
-              Outstanding paid: {formatCurrencySync(invoice.outstandingBalancePaidFromLater)} (from
-              later visit)
+            <p className="text-xs font-medium text-blue-700 dark:text-blue-300">
+              Outstanding paid: {formatCurrencySync(invoice.outstandingBalancePaidFromLater)}{' '}
+              (from later visit)
             </p>
           )}
           {invoice.balanceDue > 0 && (
-            <p className="text-xs font-medium text-amber-700">
+            <p className="text-xs font-medium text-amber-700 dark:text-amber-300 dark:text-amber-300">
               Balance: {formatCurrencySync(invoice.balanceDue)}
             </p>
           )}
@@ -215,7 +215,12 @@ const InvoiceHistoryItem = memo(({ invoice, onView, onDownload }) => {
             <Eye className="h-4 w-4" />
             View
           </Button>
-          <Button variant="outline" size="sm" onClick={() => onDownload(invoice)} className="gap-2">
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => onDownload(invoice)}
+            className="gap-2"
+          >
             <Download className="h-4 w-4" />
             Receipt
           </Button>
@@ -241,12 +246,7 @@ const CashierDashboard = () => {
     data: completedInvoicesData,
     isLoading: _isCompletedLoading,
     refetch: refetchCompleted,
-  } = useInvoices({
-    type: 'completed',
-    limit: 50,
-    offset: 0,
-    refetchInterval: POLLING_INTERVALS.DASHBOARD,
-  }); // 60 seconds (completed invoices change less frequently)
+  } = useInvoices({ type: 'completed', limit: 50, offset: 0, refetchInterval: POLLING_INTERVALS.DASHBOARD }); // 60 seconds (completed invoices change less frequently)
 
   // Invoice history state
   const [invoiceHistory, setInvoiceHistory] = useState([]);
@@ -519,66 +519,60 @@ const CashierDashboard = () => {
   };
 
   // View invoice details from payment history
-  const handleViewHistoryInvoice = useCallback(
-    async (historyItem) => {
-      try {
-        const response = await invoiceService.getInvoiceById(historyItem.rawData.id);
-        setSelectedPayment({
-          ...historyItem.rawData,
-          invoice: historyItem.rawData,
-          invoiceDetails: response,
-        });
-        setInvoiceModalOpen(true);
+  const handleViewHistoryInvoice = useCallback(async (historyItem) => {
+    try {
+      const response = await invoiceService.getInvoiceById(historyItem.rawData.id);
+      setSelectedPayment({
+        ...historyItem.rawData,
+        invoice: historyItem.rawData,
+        invoiceDetails: response,
+      });
+      setInvoiceModalOpen(true);
 
-        // Fetch patient's total remaining credit
-        const patientId = response.patient?.id || historyItem.rawData.patient_id;
-        if (patientId) {
-          try {
-            const creditData = await invoiceService.getPatientRemainingCredit(patientId);
-            setPatientRemainingCredit(creditData?.totalCredit || 0);
-          } catch (creditError) {
-            logger.error('Failed to fetch patient remaining credit:', creditError);
-            setPatientRemainingCredit(0);
-          }
+      // Fetch patient's total remaining credit
+      const patientId = response.patient?.id || historyItem.rawData.patient_id;
+      if (patientId) {
+        try {
+          const creditData = await invoiceService.getPatientRemainingCredit(patientId);
+          setPatientRemainingCredit(creditData?.totalCredit || 0);
+        } catch (creditError) {
+          logger.error('Failed to fetch patient remaining credit:', creditError);
+          setPatientRemainingCredit(0);
         }
-      } catch (error) {
-        logger.error('Failed to fetch invoice:', error);
-        showError('Failed to load invoice details');
       }
-    },
-    [showError]
-  );
+    } catch (error) {
+      logger.error('Failed to fetch invoice:', error);
+      showError('Failed to load invoice details');
+    }
+  }, [showError]);
 
   // Download receipt for invoice
-  const handleDownloadReceipt = useCallback(
-    async (historyItem) => {
-      try {
-        // Get the first payment transaction for this invoice
-        const paymentId = historyItem.rawData.payment_transactions?.[0]?.id;
+  const handleDownloadReceipt = useCallback(async (historyItem) => {
+    try {
+      // Get the first payment transaction for this invoice
+      const paymentId = historyItem.rawData.payment_transactions?.[0]?.id;
 
-        if (!paymentId) {
-          showWarning('No payment found for this invoice');
-          return;
-        }
-
-        const blob = await api.getBlob(`/payments/${paymentId}/receipt/pdf`, {
-          headers: { Accept: 'application/pdf' },
-        });
-        const url = window.URL.createObjectURL(blob);
-        const link = document.createElement('a');
-        link.href = url;
-        link.download = `receipt_${historyItem.rawData.invoice_number || historyItem.id}.pdf`;
-        document.body.appendChild(link);
-        link.click();
-        document.body.removeChild(link);
-        window.URL.revokeObjectURL(url);
-      } catch (error) {
-        logger.error('Failed to download receipt:', error);
-        showError('Failed to download receipt. Please try again.');
+      if (!paymentId) {
+        showWarning('No payment found for this invoice');
+        return;
       }
-    },
-    [showWarning, showError]
-  );
+
+      const blob = await api.getBlob(`/payments/${paymentId}/receipt/pdf`, {
+        headers: { Accept: 'application/pdf' },
+      });
+      const url = window.URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = `receipt_${historyItem.rawData.invoice_number || historyItem.id}.pdf`;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      window.URL.revokeObjectURL(url);
+    } catch (error) {
+      logger.error('Failed to download receipt:', error);
+      showError('Failed to download receipt. Please try again.');
+    }
+  }, [showWarning, showError]);
 
   const handleRefresh = async () => {
     try {
@@ -1009,8 +1003,9 @@ const CashierDashboard = () => {
     }
 
     // Check if outstanding balance is selected - discount should account for it
-    const outstandingBalanceAmount =
-      addOutstandingToInvoice && outstandingBalance ? outstandingBalance.totalBalance : 0;
+    const outstandingBalanceAmount = addOutstandingToInvoice && outstandingBalance 
+      ? outstandingBalance.totalBalance 
+      : 0;
 
     // Calculate discount values
     const discountPercentage = discountPercent > 0 ? discountPercent : 0;
@@ -1022,7 +1017,7 @@ const CashierDashboard = () => {
         setIsProcessing(true);
         const version = selectedInvoice.version || null;
         await invoiceService.updateDiscount(selectedInvoice.id, 0, 0, version);
-
+        
         // Refresh invoice to get new version
         const refreshedInvoice = await invoiceService.getInvoiceById(selectedInvoice.id);
         setSelectedInvoice(refreshedInvoice);
@@ -1032,10 +1027,7 @@ const CashierDashboard = () => {
         showSuccess('Discount cleared');
       } catch (error) {
         logger.error('Error clearing discount:', error);
-        if (
-          error.response?.data?.code === 'VERSION_MISMATCH' ||
-          error.code === 'VERSION_MISMATCH'
-        ) {
+        if (error.response?.data?.code === 'VERSION_MISMATCH' || error.code === 'VERSION_MISMATCH') {
           showError(
             'Invoice was modified by another user. Please refresh and try again.',
             'Version Conflict'
@@ -1057,7 +1049,7 @@ const CashierDashboard = () => {
     try {
       setIsProcessing(true);
       const version = selectedInvoice.version || null;
-
+      
       await invoiceService.updateDiscount(
         selectedInvoice.id,
         discountAmountValue,
@@ -1071,7 +1063,7 @@ const CashierDashboard = () => {
       // Update discount fields to match what's saved
       setDiscountPercent(refreshedInvoice.discount_percentage || 0);
       setDiscountAmount(refreshedInvoice.discount_amount || 0);
-
+      
       // Show success message with outstanding balance info if applicable
       let successMsg = 'Discount applied successfully';
       if (outstandingBalanceAmount > 0) {
@@ -1104,16 +1096,7 @@ const CashierDashboard = () => {
     } finally {
       setIsProcessing(false);
     }
-  }, [
-    selectedInvoice,
-    discountPercent,
-    discountAmount,
-    totals,
-    outstandingBalance,
-    addOutstandingToInvoice,
-    showError,
-    showSuccess,
-  ]);
+  }, [selectedInvoice, discountPercent, discountAmount, totals, outstandingBalance, addOutstandingToInvoice, showError, showSuccess]);
 
   const handleApproveInvoice = useCallback(async () => {
     // If partial payment is selected, check the 2-invoice limit
@@ -1259,7 +1242,7 @@ const CashierDashboard = () => {
 
       // Get current invoice version for optimistic locking
       let currentVersion = selectedInvoice?.version || null;
-
+      
       // Step 1: Update medication items in the invoice
       for (const med of medications) {
         if (med.action === 'dispense' && med.dispensedQuantity > 0) {
@@ -1294,7 +1277,7 @@ const CashierDashboard = () => {
               },
               currentVersion
             );
-
+            
             // Refresh invoice again
             const refreshedInvoice2 = await invoiceService.getInvoiceById(selectedInvoice.id);
             currentVersion = refreshedInvoice2?.version || null;
@@ -1313,7 +1296,7 @@ const CashierDashboard = () => {
             },
             currentVersion
           );
-
+          
           // Refresh invoice to get new version
           const refreshedInvoice = await invoiceService.getInvoiceById(selectedInvoice.id);
           currentVersion = refreshedInvoice?.version || null;
@@ -1326,7 +1309,7 @@ const CashierDashboard = () => {
       // Refresh invoice to get latest version and verify it hasn't changed
       const refreshedInvoiceBeforePayment = await invoiceService.getInvoiceById(selectedInvoice.id);
       const latestVersion = refreshedInvoiceBeforePayment?.version || null;
-
+      
       // If version changed during medication updates, throw error immediately
       if (currentVersion !== null && latestVersion !== currentVersion) {
         const error = new Error(
@@ -1337,15 +1320,14 @@ const CashierDashboard = () => {
         error.expectedVersion = currentVersion;
         throw error;
       }
-
+      
       // Update to latest version
       currentVersion = latestVersion;
       setSelectedInvoice(refreshedInvoiceBeforePayment);
-
+      
       // CRITICAL: Check if outstanding balance flag in invoice matches local state
       // This ensures version consistency - if another user changed the flag, we detect it
-      const invoiceOutstandingFlag =
-        refreshedInvoiceBeforePayment.include_outstanding_balance || false;
+      const invoiceOutstandingFlag = refreshedInvoiceBeforePayment.include_outstanding_balance || false;
       if (addOutstandingToInvoice !== invoiceOutstandingFlag) {
         const error = new Error(
           `Outstanding balance flag was changed by another user. Please refresh and try again.`
@@ -1355,18 +1337,12 @@ const CashierDashboard = () => {
         error.expectedVersion = currentVersion;
         throw error;
       }
-
+      
       // CRITICAL: If outstanding balance is selected, verify outstanding invoices haven't been paid/modified
-      if (
-        addOutstandingToInvoice &&
-        outstandingBalance &&
-        outstandingBalance.invoices?.length > 0
-      ) {
+      if (addOutstandingToInvoice && outstandingBalance && outstandingBalance.invoices?.length > 0) {
         try {
           // Refresh outstanding balance to check if any invoices were paid or modified
-          const freshBalanceData = await invoiceService.getPatientOutstandingBalance(
-            selectedInvoice.patient_id
-          );
+          const freshBalanceData = await invoiceService.getPatientOutstandingBalance(selectedInvoice.patient_id);
           const otherOutstandingInvoices = freshBalanceData.invoices.filter(
             (inv) => inv.id !== selectedInvoice.id
           );
@@ -1374,7 +1350,7 @@ const CashierDashboard = () => {
           // Check each outstanding invoice
           for (const oldInvoice of outstandingBalance.invoices) {
             const freshInvoice = otherOutstandingInvoices.find((inv) => inv.id === oldInvoice.id);
-
+            
             if (!freshInvoice) {
               // Invoice was paid or deleted by another user
               const error = new Error(
@@ -1394,9 +1370,7 @@ const CashierDashboard = () => {
             }
 
             // Check if balance due changed (invoice was partially paid)
-            if (
-              parseFloat(freshInvoice.balance_due || 0) !== parseFloat(oldInvoice.balance_due || 0)
-            ) {
+            if (parseFloat(freshInvoice.balance_due || 0) !== parseFloat(oldInvoice.balance_due || 0)) {
               const error = new Error(
                 `Outstanding invoice ${freshInvoice.invoice_number || freshInvoice.id} balance has changed (may have been partially paid). Please refresh and try again.`
               );
@@ -1427,18 +1401,16 @@ const CashierDashboard = () => {
           });
         } catch (error) {
           // Re-throw if it's our custom error
-          if (
-            error.code === 'OUTSTANDING_INVOICE_PAID' ||
-            error.code === 'OUTSTANDING_INVOICE_VERSION_MISMATCH' ||
-            error.code === 'OUTSTANDING_INVOICE_BALANCE_CHANGED'
-          ) {
+          if (error.code === 'OUTSTANDING_INVOICE_PAID' || 
+              error.code === 'OUTSTANDING_INVOICE_VERSION_MISMATCH' || 
+              error.code === 'OUTSTANDING_INVOICE_BALANCE_CHANGED') {
             throw error;
           }
           logger.error('Error checking outstanding balance versions:', error);
           throw new Error('Failed to verify outstanding balance. Please refresh and try again.');
         }
       }
-
+      
       // Save payment state AFTER we've verified the invoice version is current
       // This prevents showing generic error on refresh if version mismatch occurs
       sessionStorage.setItem('pendingPayment', JSON.stringify(paymentState));
@@ -1448,7 +1420,7 @@ const CashierDashboard = () => {
         // Pay off outstanding invoices in order (oldest first)
         for (const oldInvoice of outstandingBalance.invoices) {
           const balanceDue = parseFloat(oldInvoice.balance_due);
-
+          
           // Skip if balance is 0 or negative
           if (balanceDue <= 0) {
             continue;
@@ -1468,13 +1440,10 @@ const CashierDashboard = () => {
             );
           } catch (outstandingError) {
             // Re-throw with context about which invoice failed
-            if (
-              outstandingError.response?.data?.code === 'VERSION_MISMATCH' ||
-              outstandingError.code === 'VERSION_MISMATCH'
-            ) {
+            if (outstandingError.response?.data?.code === 'VERSION_MISMATCH' || outstandingError.code === 'VERSION_MISMATCH') {
               const error = new Error(
                 `Outstanding invoice ${oldInvoice.invoice_number || oldInvoice.id} was modified by another user. ` +
-                  `Please refresh the invoice and try again.`
+                `Please refresh the invoice and try again.`
               );
               error.code = 'OUTSTANDING_INVOICE_VERSION_MISMATCH';
               throw error;
@@ -1545,10 +1514,7 @@ const CashierDashboard = () => {
           await invoiceService.completeInvoice(selectedInvoice.id, currentUser?.id, currentVersion);
         } catch (paymentError) {
           // If recordPayment fails with version mismatch, re-throw to be caught by outer catch
-          if (
-            paymentError.response?.data?.code === 'VERSION_MISMATCH' ||
-            paymentError.code === 'VERSION_MISMATCH'
-          ) {
+          if (paymentError.response?.data?.code === 'VERSION_MISMATCH' || paymentError.code === 'VERSION_MISMATCH') {
             throw paymentError; // Re-throw to be handled by outer catch block
           }
           throw paymentError; // Re-throw other errors
@@ -1587,44 +1553,30 @@ const CashierDashboard = () => {
       setPaymentDueDate('');
     } catch (error) {
       logger.error('Payment processing error:', error);
-
+      
       // Close payment dialog on any error
       setShowPaymentDialog(false);
-
+      
       // Clear pending payment state if version mismatch or outstanding invoice issues (prevents generic error on refresh)
-      if (
-        error.response?.data?.code === 'VERSION_MISMATCH' ||
-        error.code === 'VERSION_MISMATCH' ||
-        error.response?.data?.code === 'OUTSTANDING_INVOICE_PAID' ||
-        error.code === 'OUTSTANDING_INVOICE_PAID' ||
-        error.response?.data?.code === 'OUTSTANDING_INVOICE_VERSION_MISMATCH' ||
-        error.code === 'OUTSTANDING_INVOICE_VERSION_MISMATCH' ||
-        error.response?.data?.code === 'OUTSTANDING_INVOICE_BALANCE_CHANGED' ||
-        error.code === 'OUTSTANDING_INVOICE_BALANCE_CHANGED'
-      ) {
+      if (error.response?.data?.code === 'VERSION_MISMATCH' || error.code === 'VERSION_MISMATCH' ||
+          error.response?.data?.code === 'OUTSTANDING_INVOICE_PAID' || error.code === 'OUTSTANDING_INVOICE_PAID' ||
+          error.response?.data?.code === 'OUTSTANDING_INVOICE_VERSION_MISMATCH' || error.code === 'OUTSTANDING_INVOICE_VERSION_MISMATCH' ||
+          error.response?.data?.code === 'OUTSTANDING_INVOICE_BALANCE_CHANGED' || error.code === 'OUTSTANDING_INVOICE_BALANCE_CHANGED') {
         sessionStorage.removeItem('pendingPayment');
       }
-
+      
       // Handle outstanding invoice errors
-      if (
-        error.response?.data?.code === 'OUTSTANDING_INVOICE_PAID' ||
-        error.code === 'OUTSTANDING_INVOICE_PAID' ||
-        error.response?.data?.code === 'OUTSTANDING_INVOICE_VERSION_MISMATCH' ||
-        error.code === 'OUTSTANDING_INVOICE_VERSION_MISMATCH' ||
-        error.response?.data?.code === 'OUTSTANDING_INVOICE_BALANCE_CHANGED' ||
-        error.code === 'OUTSTANDING_INVOICE_BALANCE_CHANGED'
-      ) {
+      if (error.response?.data?.code === 'OUTSTANDING_INVOICE_PAID' || error.code === 'OUTSTANDING_INVOICE_PAID' ||
+          error.response?.data?.code === 'OUTSTANDING_INVOICE_VERSION_MISMATCH' || error.code === 'OUTSTANDING_INVOICE_VERSION_MISMATCH' ||
+          error.response?.data?.code === 'OUTSTANDING_INVOICE_BALANCE_CHANGED' || error.code === 'OUTSTANDING_INVOICE_BALANCE_CHANGED') {
         showError(
-          error.message ||
-            'One or more outstanding invoices have been paid or modified by another user. Please refresh the invoice and try again.',
+          error.message || 'One or more outstanding invoices have been paid or modified by another user. Please refresh the invoice and try again.',
           'Outstanding Balance Changed'
         );
         // Refresh outstanding balance
         if (selectedInvoice?.patient_id) {
           try {
-            const updatedBalanceData = await invoiceService.getPatientOutstandingBalance(
-              selectedInvoice.patient_id
-            );
+            const updatedBalanceData = await invoiceService.getPatientOutstandingBalance(selectedInvoice.patient_id);
             const updatedOtherInvoices = updatedBalanceData.invoices.filter(
               (inv) => inv.id !== selectedInvoice.id
             );
@@ -1647,23 +1599,18 @@ const CashierDashboard = () => {
         setIsProcessing(false);
         return;
       }
-
+      
       // Handle "already fully paid" error - refresh invoice and show info message
-      if (
-        error.message?.includes('already fully paid') ||
-        error.response?.data?.message?.includes('already fully paid')
-      ) {
+      if (error.message?.includes('already fully paid') || error.response?.data?.message?.includes('already fully paid')) {
         // Invoice was paid by another user - refresh and show success message
         if (selectedInvoice?.id) {
           try {
             const refreshedInvoice = await invoiceService.getInvoiceById(selectedInvoice.id);
             setSelectedInvoice(refreshedInvoice);
-
+            
             // If invoice is now paid, show success and close detail
             if (refreshedInvoice.status === 'paid') {
-              showSuccess(
-                `Invoice ${refreshedInvoice.invoice_number || refreshedInvoice.id} has already been paid by another user.`
-              );
+              showSuccess(`Invoice ${refreshedInvoice.invoice_number || refreshedInvoice.id} has already been paid by another user.`);
               handleCloseInvoiceDetail();
               await refetchPending();
               await refetchCompleted();
@@ -1681,7 +1628,7 @@ const CashierDashboard = () => {
         setIsProcessing(false);
         return;
       }
-
+      
       // Handle version mismatch errors
       if (error.response?.data?.code === 'VERSION_MISMATCH' || error.code === 'VERSION_MISMATCH') {
         showError(
@@ -1696,11 +1643,10 @@ const CashierDashboard = () => {
             // Update discount fields to match what's in the database
             setDiscountPercent(refreshedInvoice.discount_percentage || 0);
             setDiscountAmount(refreshedInvoice.discount_amount || 0);
-
+            
             // Check if invoice was already paid by another user
             if (refreshedInvoice.status === 'paid' || refreshedInvoice.status === 'partial_paid') {
-              const statusText =
-                refreshedInvoice.status === 'paid' ? 'fully paid' : 'partially paid';
+              const statusText = refreshedInvoice.status === 'paid' ? 'fully paid' : 'partially paid';
               showError(
                 `This invoice has already been ${statusText} by another user. The visit should be completed automatically. The invoice will be closed.`,
                 'Invoice Already Paid'
@@ -1717,9 +1663,7 @@ const CashierDashboard = () => {
             logger.error('Error refreshing invoice:', refreshError);
             // Check if invoice was deleted or not found
             if (refreshError.response?.status === 404) {
-              showError(
-                'Invoice not found. It may have been deleted or completed by another user.'
-              );
+              showError('Invoice not found. It may have been deleted or completed by another user.');
               handleCloseInvoiceDetail();
             } else {
               showError('Failed to refresh invoice. Please close and reopen the invoice.');
@@ -1744,7 +1688,7 @@ const CashierDashboard = () => {
       case 'completed':
         return 'bg-green-100 text-green-800 border-green-200';
       default:
-        return 'bg-gray-100 text-gray-800 border-gray-200';
+        return 'bg-muted text-muted-foreground border-border';
     }
   };
 
@@ -1755,9 +1699,9 @@ const CashierDashboard = () => {
       case 'normal':
         return 'bg-blue-100 text-blue-800 border-blue-200';
       case 'low':
-        return 'bg-gray-100 text-gray-800 border-gray-200';
+        return 'bg-muted text-muted-foreground border-border';
       default:
-        return 'bg-gray-100 text-gray-800 border-gray-200';
+        return 'bg-muted text-muted-foreground border-border';
     }
   };
 
@@ -2222,12 +2166,12 @@ const CashierDashboard = () => {
                     className={
                       invoiceLimitReached
                         ? 'border-red-300 bg-red-50'
-                        : 'border-amber-200 bg-amber-50'
+                        : 'border-amber-200 dark:border-amber-800 bg-amber-50'
                     }
                   >
                     <CardHeader>
                       <CardTitle
-                        className={`flex items-center gap-2 ${invoiceLimitReached ? 'text-red-900' : 'text-amber-900'}`}
+                        className={`flex items-center gap-2 ${invoiceLimitReached ? 'text-red-900' : 'text-amber-900 dark:text-amber-200'}`}
                       >
                         <AlertCircle className="h-5 w-5" />
                         {invoiceLimitReached ? '⚠️ Invoice Limit Reached' : 'Outstanding Balance'}
@@ -2244,7 +2188,7 @@ const CashierDashboard = () => {
                             of:
                           </p>
                           <p
-                            className={`text-3xl font-bold ${invoiceLimitReached ? 'text-red-900' : 'text-amber-900'}`}
+                            className={`text-3xl font-bold ${invoiceLimitReached ? 'text-red-900' : 'text-amber-900 dark:text-amber-200'}`}
                           >
                             {formatCurrencySync(outstandingBalance.totalBalance)}
                           </p>
@@ -2273,7 +2217,7 @@ const CashierDashboard = () => {
                             {outstandingBalance.invoices.map((inv) => (
                               <div
                                 key={inv.id}
-                                className={`flex items-center gap-2 text-xs ${invoiceLimitReached ? 'text-red-700' : 'text-amber-700'}`}
+                                className={`flex items-center gap-2 text-xs ${invoiceLimitReached ? 'text-red-700' : 'text-amber-700 dark:text-amber-300'}`}
                               >
                                 <Receipt className="h-3 w-3" />
                                 Invoice #{inv.invoice_number || inv.id.slice(0, 8)} -{' '}
@@ -2295,7 +2239,7 @@ const CashierDashboard = () => {
 
                       {/* Action: Add to current invoice */}
                       <div
-                        className={`flex items-center gap-3 rounded-lg border bg-white p-3 ${invoiceLimitReached ? 'border-red-300' : 'border-amber-200'}`}
+                        className={`flex items-center gap-3 rounded-lg border bg-card p-3 ${invoiceLimitReached ? 'border-destructive/50' : 'border-amber-200 dark:border-amber-800 dark:border-amber-800'}`}
                       >
                         <input
                           type="checkbox"
@@ -2313,18 +2257,13 @@ const CashierDashboard = () => {
                                   selectedInvoice.version
                                 );
                                 // Refresh invoice to get updated version
-                                const refreshedInvoice = await invoiceService.getInvoiceById(
-                                  selectedInvoice.id
-                                );
+                                const refreshedInvoice = await invoiceService.getInvoiceById(selectedInvoice.id);
                                 setSelectedInvoice(refreshedInvoice);
                               } catch (error) {
                                 logger.error('Error updating outstanding balance flag:', error);
                                 // Revert checkbox state on error
                                 setAddOutstandingToInvoice(!newValue);
-                                if (
-                                  error.response?.data?.code === 'VERSION_MISMATCH' ||
-                                  error.code === 'VERSION_MISMATCH'
-                                ) {
+                                if (error.response?.data?.code === 'VERSION_MISMATCH' || error.code === 'VERSION_MISMATCH') {
                                   showError(
                                     'Invoice was modified by another user. The invoice has been refreshed with the latest changes.',
                                     'Version Conflict'
@@ -2332,21 +2271,15 @@ const CashierDashboard = () => {
                                   // Refresh invoice
                                   if (selectedInvoice?.id) {
                                     try {
-                                      const refreshedInvoice = await invoiceService.getInvoiceById(
-                                        selectedInvoice.id
-                                      );
+                                      const refreshedInvoice = await invoiceService.getInvoiceById(selectedInvoice.id);
                                       setSelectedInvoice(refreshedInvoice);
-                                      setAddOutstandingToInvoice(
-                                        refreshedInvoice.include_outstanding_balance || false
-                                      );
+                                      setAddOutstandingToInvoice(refreshedInvoice.include_outstanding_balance || false);
                                     } catch (refreshError) {
                                       logger.error('Error refreshing invoice:', refreshError);
                                     }
                                   }
                                 } else {
-                                  showError(
-                                    'Failed to update outstanding balance flag. Please try again.'
-                                  );
+                                  showError('Failed to update outstanding balance flag. Please try again.');
                                 }
                               }
                             }
@@ -2355,7 +2288,7 @@ const CashierDashboard = () => {
                         />
                         <label
                           htmlFor="addOutstanding"
-                          className={`flex-1 cursor-pointer text-sm font-medium ${invoiceLimitReached ? 'text-red-900' : 'text-amber-900'}`}
+                          className={`flex-1 cursor-pointer text-sm font-medium ${invoiceLimitReached ? 'text-red-900' : 'text-amber-900 dark:text-amber-200'}`}
                         >
                           {invoiceLimitReached
                             ? `⚠️ Must add outstanding balance (${formatCurrencySync(outstandingBalance.totalBalance)}) - cannot create another unpaid invoice`
@@ -2573,10 +2506,10 @@ const CashierDashboard = () => {
                                 <Badge
                                   className={
                                     med.action === 'dispense'
-                                      ? 'bg-green-100 text-green-800'
+                                      ? 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200'
                                       : med.action === 'write-out'
-                                        ? 'bg-blue-100 text-blue-800'
-                                        : 'bg-gray-100 text-gray-800'
+                                        ? 'bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200'
+                                        : 'bg-muted text-muted-foreground'
                                   }
                                 >
                                   {med.action}
@@ -2695,14 +2628,14 @@ const CashierDashboard = () => {
                                   {/* Auto Write-out Warning */}
                                   {med.dispensedQuantity < med.quantity &&
                                     med.dispensedQuantity > 0 && (
-                                      <div className="flex items-start gap-2 rounded border border-blue-200 bg-blue-50 p-2 text-xs">
-                                        <AlertCircle className="mt-0.5 h-4 w-4 text-blue-600" />
+                                      <div className="flex items-start gap-2 rounded border border-blue-200 dark:border-blue-800 bg-blue-50 dark:bg-blue-950/30 p-2 text-xs">
+                                        <AlertCircle className="mt-0.5 h-4 w-4 text-blue-600 dark:text-blue-400" />
                                         <div>
-                                          <p className="font-medium text-blue-900">
+                                          <p className="font-medium text-blue-900 dark:text-blue-200">
                                             {med.quantity - med.dispensedQuantity} units will be
                                             written out
                                           </p>
-                                          <p className="text-blue-700">
+                                          <p className="text-blue-700 dark:text-blue-300">
                                             Remaining quantity not dispensed will be marked as
                                             write-out (not charged)
                                           </p>
@@ -2743,7 +2676,7 @@ const CashierDashboard = () => {
 
                       {/* Outstanding Balance Line Item */}
                       {totals.outstandingBalance > 0 && (
-                        <div className="flex justify-between font-medium text-amber-700">
+                        <div className="flex justify-between font-medium text-amber-700 dark:text-amber-300">
                           <span className="flex items-center gap-1">
                             <AlertCircle className="h-4 w-4" />
                             Previous Balance
@@ -2761,7 +2694,7 @@ const CashierDashboard = () => {
                       {/* Discount Section */}
                       <div className="space-y-2">
                         <Label className="text-sm font-medium">Apply Discount</Label>
-
+                        
                         {/* Quick Discounts */}
                         <div className="space-y-2">
                           <Label className="text-xs text-muted-foreground">Quick Discounts</Label>
@@ -2796,7 +2729,7 @@ const CashierDashboard = () => {
                             </Button>
                           </div>
                         </div>
-
+                        
                         <div className="grid grid-cols-2 gap-2">
                           <div>
                             <Label className="text-xs">Percentage</Label>
@@ -2859,19 +2792,16 @@ const CashierDashboard = () => {
                             </>
                           )}
                         </Button>
-
+                        
                         {/* Outstanding Balance Warning */}
-                        {addOutstandingToInvoice &&
-                          outstandingBalance &&
-                          outstandingBalance.totalBalance > 0 && (
-                            <div className="rounded-lg border border-amber-200 bg-amber-50 p-2 text-xs">
-                              <p className="flex items-center gap-1 text-amber-800">
-                                <AlertCircle className="h-3 w-3" />
-                                Discount will be calculated on subtotal including outstanding
-                                balance of {formatCurrencySync(outstandingBalance.totalBalance)}
-                              </p>
-                            </div>
-                          )}
+                        {addOutstandingToInvoice && outstandingBalance && outstandingBalance.totalBalance > 0 && (
+                          <div className="rounded-lg border border-amber-200 dark:border-amber-800 bg-amber-50 p-2 text-xs">
+                            <p className="flex items-center gap-1 text-amber-800">
+                              <AlertCircle className="h-3 w-3" />
+                              Discount will be calculated on subtotal including outstanding balance of {formatCurrencySync(outstandingBalance.totalBalance)}
+                            </p>
+                          </div>
+                        )}
                       </div>
 
                       {totals.discountAmount > 0 && (
@@ -2941,6 +2871,7 @@ const CashierDashboard = () => {
                       />
                     </div>
 
+
                     {/* Partial Payment Toggle */}
                     <div className="space-y-3 border-t pt-4">
                       <div className="flex items-center justify-between">
@@ -2979,7 +2910,7 @@ const CashierDashboard = () => {
                       )}
 
                       {isPartialPayment && (
-                        <div className="space-y-3 rounded-lg border border-amber-200 bg-amber-50 p-3">
+                        <div className="space-y-3 rounded-lg border border-amber-200 dark:border-amber-800 bg-amber-50 p-3">
                           {invoiceLimitReached && addOutstandingToInvoice && (
                             <div className="mb-2 rounded border border-red-300 bg-red-100 p-2 text-xs text-red-900">
                               <AlertCircle className="mr-1 inline h-4 w-4" />
@@ -2991,7 +2922,7 @@ const CashierDashboard = () => {
                           <div className="space-y-2">
                             <Label className="text-sm">Amount to Pay Now</Label>
                             <div className="flex">
-                              <div className="flex items-center rounded-l-md border border-r-0 bg-white px-3 py-2">
+                              <div className="flex items-center rounded-l-md border border-r-0 bg-card px-3 py-2">
                                 <DollarSign className="h-4 w-4" />
                               </div>
                               <Input
@@ -2999,14 +2930,14 @@ const CashierDashboard = () => {
                                 value={partialAmount}
                                 onChange={(e) => setPartialAmount(e.target.value)}
                                 placeholder="0.00"
-                                className="rounded-l-none bg-white"
+                                className="rounded-l-none bg-card"
                                 min="0"
                                 max={totals.total}
                                 step="0.01"
                               />
                             </div>
                             {partialAmount && parseFloat(partialAmount) < totals.total && (
-                              <p className="text-xs text-amber-700">
+                              <p className="text-xs text-amber-700 dark:text-amber-300">
                                 Balance Due:{' '}
                                 {formatCurrencySync(totals.total - parseFloat(partialAmount || 0))}
                               </p>
@@ -3020,7 +2951,7 @@ const CashierDashboard = () => {
                               onChange={(e) => setHoldReason(e.target.value)}
                               placeholder="Why is this payment being held? (e.g., Patient will pay remaining balance next visit)"
                               rows={2}
-                              className="bg-white"
+                              className="bg-card"
                             />
                           </div>
 
@@ -3030,7 +2961,7 @@ const CashierDashboard = () => {
                               type="date"
                               value={paymentDueDate}
                               onChange={(e) => setPaymentDueDate(e.target.value)}
-                              className="bg-white"
+                              className="bg-card"
                               min={new Date().toISOString().split('T')[0]}
                             />
                           </div>
@@ -3089,7 +3020,7 @@ const CashierDashboard = () => {
               {clinicSettings?.payment_qr_code_url ? (
                 <>
                   <div className="flex justify-center">
-                    <div className="rounded-lg border-2 border-gray-300 bg-white p-4">
+                    <div className="rounded-lg border-2 border-border bg-card p-4">
                       <img
                         src={clinicSettings.payment_qr_code_url}
                         alt="Payment QR Code"
@@ -3107,7 +3038,7 @@ const CashierDashboard = () => {
                       id="qrScanned"
                       checked={qrScannedConfirmed}
                       onChange={(e) => setQrScannedConfirmed(e.target.checked)}
-                      className="h-4 w-4 rounded border-gray-300"
+                      className="h-4 w-4 rounded border-input"
                     />
                     <Label htmlFor="qrScanned" className="cursor-pointer text-sm font-normal">
                       I have scanned and paid
@@ -3161,7 +3092,7 @@ const CashierDashboard = () => {
 
                 {/* Payment Type */}
                 {isPartialPayment ? (
-                  <div className="space-y-2 rounded border border-amber-200 bg-amber-50 p-3">
+                  <div className="space-y-2 rounded border border-amber-200 dark:border-amber-800 bg-amber-50 p-3">
                     <div className="flex items-center gap-2 font-medium text-amber-800">
                       <AlertCircle className="h-4 w-4" />
                       Partial Payment
@@ -3181,13 +3112,13 @@ const CashierDashboard = () => {
                       </span>
                     </div>
                     {holdReason && (
-                      <div className="border-t border-amber-200 pt-2">
-                        <span className="text-xs text-amber-700">Hold Reason:</span>
-                        <p className="mt-1 text-sm text-amber-900">{holdReason}</p>
+                      <div className="border-t border-amber-200 dark:border-amber-800 pt-2">
+                        <span className="text-xs text-amber-700 dark:text-amber-300">Hold Reason:</span>
+                        <p className="mt-1 text-sm text-amber-900 dark:text-amber-200">{holdReason}</p>
                       </div>
                     )}
                     {paymentDueDate && (
-                      <div className="text-xs text-amber-700">
+                      <div className="text-xs text-amber-700 dark:text-amber-300 dark:text-amber-300">
                         Due Date: {new Date(paymentDueDate).toLocaleDateString()}
                       </div>
                     )}
@@ -3417,8 +3348,8 @@ const CashierDashboard = () => {
                             key={idx}
                             className={`flex items-center justify-between rounded p-3 text-sm ${
                               isCreditPayment
-                                ? 'border border-blue-200 bg-blue-50'
-                                : 'border border-green-200 bg-green-50'
+                                ? 'border border-blue-200 dark:border-blue-800 bg-blue-50 dark:bg-blue-950/30'
+                                : 'border border-green-200 dark:border-green-800 bg-green-50 dark:bg-green-950/30'
                             }`}
                           >
                             <div className="flex-1">

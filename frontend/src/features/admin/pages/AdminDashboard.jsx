@@ -11,6 +11,7 @@ import {
   DollarSign,
   ClipboardList,
   Building2,
+  BarChart3,
 } from 'lucide-react';
 import PageLayout from '@/components/layout/PageLayout';
 import api from '@/services/api';
@@ -254,6 +255,12 @@ const AdminDashboard = () => {
       description: 'View system activities and audit logs',
       icon: Settings,
       action: () => navigate('/admin/audit-logs'),
+    },
+    {
+      title: 'Analytics Dashboard',
+      description: 'View system analytics and export DHIS2 data',
+      icon: BarChart3,
+      action: () => navigate('/admin/analytics'),
     },
   ];
 

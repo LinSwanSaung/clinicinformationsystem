@@ -46,7 +46,7 @@ export function PaymentDetailModal({
     <FormModal
       isOpen={open}
       onOpenChange={onOpenChange}
-      title={`Process Invoice - ${invoice?.id ?? ''}`}
+      title={`Process Invoice - ${invoice?.invoice_number || invoice?.id || ''}`}
       onSubmit={handleSubmit}
       isLoading={!!isProcessing}
       size="xl"

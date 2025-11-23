@@ -239,14 +239,12 @@ class InvoiceService {
       if (error.code === 'VERSION_MISMATCH') {
         throw error;
       }
-
+      
       // Provide user-friendly error messages
       if (error.message?.includes('coerce') || error.message?.includes('JSON')) {
-        throw new Error(
-          'Unable to add service. The invoice may have been modified. Please refresh the page and try again.'
-        );
+        throw new Error('Unable to add service. The invoice may have been modified. Please refresh the page and try again.');
       }
-
+      
       throw new Error(`Failed to add service item: ${error.message}`);
     }
   }
@@ -311,14 +309,12 @@ class InvoiceService {
       if (error.code === 'VERSION_MISMATCH') {
         throw error;
       }
-
+      
       // Provide user-friendly error messages
       if (error.message?.includes('coerce') || error.message?.includes('JSON')) {
-        throw new Error(
-          'Unable to add medicine. The invoice may have been modified. Please refresh the page and try again.'
-        );
+        throw new Error('Unable to add medicine. The invoice may have been modified. Please refresh the page and try again.');
       }
-
+      
       throw new Error(`Failed to add medicine item: ${error.message}`);
     }
   }
@@ -417,20 +413,16 @@ class InvoiceService {
       if (error.code === 'VERSION_MISMATCH') {
         throw error;
       }
-
+      
       // Provide user-friendly error messages
       if (error.message?.includes('not found') || error.message?.includes('deleted')) {
-        throw new Error(
-          'This item was deleted by another user. Please refresh the page to see the latest changes.'
-        );
+        throw new Error('This item was deleted by another user. Please refresh the page to see the latest changes.');
       }
-
+      
       if (error.message?.includes('coerce') || error.message?.includes('JSON')) {
-        throw new Error(
-          'This item may have been deleted or modified. Please refresh the page and try again.'
-        );
+        throw new Error('This item may have been deleted or modified. Please refresh the page and try again.');
       }
-
+      
       throw new Error(`Failed to update invoice item: ${error.message}`);
     }
   }
@@ -505,20 +497,16 @@ class InvoiceService {
       if (error.code === 'VERSION_MISMATCH') {
         throw error;
       }
-
+      
       // Provide user-friendly error messages
       if (error.message?.includes('not found') || error.message?.includes('deleted')) {
-        throw new Error(
-          'This item was deleted by another user. Please refresh the page to see the latest changes.'
-        );
+        throw new Error('This item was deleted by another user. Please refresh the page to see the latest changes.');
       }
-
+      
       if (error.message?.includes('coerce') || error.message?.includes('JSON')) {
-        throw new Error(
-          'This item may have been deleted or modified. Please refresh the page and try again.'
-        );
+        throw new Error('This item may have been deleted or modified. Please refresh the page and try again.');
       }
-
+      
       throw new Error(`Failed to remove invoice item: ${error.message}`);
     }
   }
@@ -589,7 +577,7 @@ class InvoiceService {
           );
         }
       }
-
+      
       // Update outstanding balance flag (version already checked if provided)
       await InvoiceModel.updateInvoice(invoiceId, {
         include_outstanding_balance: Boolean(includeOutstandingBalance),
@@ -639,7 +627,7 @@ class InvoiceService {
         // Version already checked above, use regular update
         // (We don't use atomic RPC function due to Supabase JSONB parsing issues)
       }
-
+      
       // Update discount (version already checked if provided)
       await InvoiceModel.updateInvoice(invoiceId, {
         discount_amount: parseFloat(discountAmount || 0),
@@ -662,19 +650,17 @@ class InvoiceService {
           }
         );
       }
-
+      
       // Re-throw ApplicationError as-is
       if (error instanceof ApplicationError) {
         throw error;
       }
-
+      
       // Provide user-friendly error messages
       if (error.message?.includes('coerce') || error.message?.includes('JSON')) {
-        throw new Error(
-          'Unable to update discount. The invoice may have been modified. Please refresh the page and try again.'
-        );
+        throw new Error('Unable to update discount. The invoice may have been modified. Please refresh the page and try again.');
       }
-
+      
       throw new Error(`Failed to update discount: ${error.message}`);
     }
   }
@@ -730,7 +716,7 @@ class InvoiceService {
             }
             return invoice; // Return already-paid invoice (idempotent)
           }
-
+          
           // Invoice is not paid and version mismatch - throw error
           const error = new ApplicationError(
             `Invoice was modified by another user. Current version: ${invoice.version}, Expected: ${expectedVersion}. Please refresh and try again.`,
@@ -893,7 +879,7 @@ class InvoiceService {
       if (error instanceof ApplicationError) {
         throw error;
       }
-
+      
       // Re-throw version mismatch errors as ApplicationError
       if (error.code === 'VERSION_MISMATCH') {
         throw new ApplicationError(
@@ -907,7 +893,7 @@ class InvoiceService {
           }
         );
       }
-
+      
       // Provide user-friendly error messages
       if (error.message?.includes('coerce') || error.message?.includes('JSON')) {
         throw new ApplicationError(
@@ -916,7 +902,7 @@ class InvoiceService {
           'INVOICE_COMPLETION_FAILED'
         );
       }
-
+      
       if (error.message?.includes('not found')) {
         throw new ApplicationError(
           'Invoice or visit not found. They may have been deleted.',
@@ -924,7 +910,7 @@ class InvoiceService {
           'INVOICE_NOT_FOUND'
         );
       }
-
+      
       throw new ApplicationError(
         `Failed to complete invoice: ${error.message}`,
         500,
@@ -943,15 +929,13 @@ class InvoiceService {
     } catch (error) {
       // Provide user-friendly error messages
       if (error.message?.includes('coerce') || error.message?.includes('JSON')) {
-        throw new Error(
-          'Unable to cancel invoice. The invoice may have been modified. Please refresh the page and try again.'
-        );
+        throw new Error('Unable to cancel invoice. The invoice may have been modified. Please refresh the page and try again.');
       }
-
+      
       if (error.message?.includes('not found')) {
         throw new Error('Invoice not found. It may have been deleted.');
       }
-
+      
       throw new Error(`Failed to cancel invoice: ${error.message}`);
     }
   }
@@ -1030,7 +1014,7 @@ class InvoiceService {
               transaction: null, // No new transaction since invoice is already paid
             };
           }
-
+          
           // Invoice is not paid and version mismatch - throw error
           const error = new Error(
             `Invoice was modified by another user. Current version: ${invoice.version}, Expected: ${expectedVersion}. Please refresh and try again.`
@@ -1132,20 +1116,17 @@ class InvoiceService {
           // Check if visit is already completed to avoid unnecessary updates
           const visitDetails = await this.visitService.getVisitDetails(updatedInvoice.visit_id);
           const visitStatus = visitDetails?.data?.status || visitDetails?.status;
-
+          
           if (visitStatus !== 'completed') {
             // Determine payment status based on invoice status
             const paymentStatus = updatedInvoice.status === 'paid' ? 'paid' : 'partial';
 
             // Complete the visit automatically when payment is made (allows new visits)
-            const completionResult = await this.visitService.completeVisit(
-              updatedInvoice.visit_id,
-              {
-                payment_status: paymentStatus,
-                completed_by: paymentData.processed_by,
-              }
-            );
-
+            const completionResult = await this.visitService.completeVisit(updatedInvoice.visit_id, {
+              payment_status: paymentStatus,
+              completed_by: paymentData.processed_by,
+            });
+            
             // Verify visit was actually completed
             if (completionResult?.success && completionResult?.data) {
               visitCompleted = true;
@@ -1279,23 +1260,21 @@ class InvoiceService {
           }
         );
       }
-
+      
       // Provide user-friendly error messages
       if (error.message?.includes('coerce') || error.message?.includes('JSON')) {
-        throw new Error(
-          'Unable to process payment. The invoice may have been modified. Please refresh the page and try again.'
-        );
+        throw new Error('Unable to process payment. The invoice may have been modified. Please refresh the page and try again.');
       }
-
+      
       if (error.message?.includes('not found')) {
         throw new Error('Invoice not found. It may have been deleted.');
       }
-
+      
       // Re-throw ApplicationError as-is (already user-friendly)
       if (error instanceof ApplicationError) {
         throw error;
       }
-
+      
       throw new Error(`Failed to record payment: ${error.message}`);
     }
   }
@@ -1322,15 +1301,13 @@ class InvoiceService {
     } catch (error) {
       // Provide user-friendly error messages
       if (error.message?.includes('coerce') || error.message?.includes('JSON')) {
-        throw new Error(
-          'Unable to put invoice on hold. The invoice may have been modified. Please refresh the page and try again.'
-        );
+        throw new Error('Unable to put invoice on hold. The invoice may have been modified. Please refresh the page and try again.');
       }
-
+      
       if (error.message?.includes('not found')) {
         throw new Error('Invoice not found. It may have been deleted.');
       }
-
+      
       throw new Error(`Failed to put invoice on hold: ${error.message}`);
     }
   }
@@ -1345,15 +1322,13 @@ class InvoiceService {
     } catch (error) {
       // Provide user-friendly error messages
       if (error.message?.includes('coerce') || error.message?.includes('JSON')) {
-        throw new Error(
-          'Unable to resume invoice. The invoice may have been modified. Please refresh the page and try again.'
-        );
+        throw new Error('Unable to resume invoice. The invoice may have been modified. Please refresh the page and try again.');
       }
-
+      
       if (error.message?.includes('not found')) {
         throw new Error('Invoice not found. It may have been deleted.');
       }
-
+      
       throw new Error(`Failed to resume invoice: ${error.message}`);
     }
   }

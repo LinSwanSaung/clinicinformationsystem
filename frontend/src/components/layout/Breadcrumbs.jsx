@@ -85,10 +85,10 @@ const Breadcrumbs = () => {
           <Fragment key={crumb.path}>
             <motion.button
               onClick={() => !isLast && navigate(crumb.path)}
-              className={`flex items-center gap-1 transition-colors duration-200 ${
+              className={`flex items-center gap-1 rounded-md px-2 py-1 transition-colors duration-200 ${
                 isLast
-                  ? 'cursor-default font-medium text-foreground'
-                  : 'cursor-pointer hover:text-foreground'
+                  ? 'cursor-default bg-card font-medium text-foreground'
+                  : 'cursor-pointer bg-transparent hover:bg-accent hover:text-foreground'
               }`}
               whileHover={!isLast ? { scale: 1.05 } : {}}
               whileTap={!isLast ? { scale: 0.95 } : {}}

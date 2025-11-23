@@ -184,7 +184,9 @@ const PatientMedicalRecordManagement = () => {
                     ? visitPrescriptions
                         .filter((p) => {
                           // Match by doctor ID
-                          if (p.doctor_id !== note.doctor_id) return false;
+                          if (p.doctor_id !== note.doctor_id) {
+                            return false;
+                          }
 
                           // Match by time window (prescriptions created within 5 minutes of note)
                           const prescriptionTime = new Date(
@@ -477,7 +479,9 @@ const PatientMedicalRecordManagement = () => {
 
     input.onchange = async (e) => {
       const files = Array.from(e.target.files);
-      if (files.length === 0) return;
+      if (files.length === 0) {
+        return;
+      }
 
       try {
         setUploadingFiles(true);
@@ -624,7 +628,7 @@ const PatientMedicalRecordManagement = () => {
               {activeTab === 'overview' && (
                 <>
                   {!hasActiveVisit && (
-                    <Card className="mb-4 border-amber-300 dark:border-amber-700 bg-amber-50 dark:bg-amber-950/30 p-4">
+                    <Card className="mb-4 border-amber-300 bg-amber-50 p-4 dark:border-amber-700 dark:bg-amber-950/30">
                       <div className="flex items-center space-x-3 text-amber-800 dark:text-amber-200">
                         <AlertCircle size={20} />
                         <div>

@@ -581,7 +581,7 @@ const ServiceSelector = ({ visitId, onServicesAdded }) => {
 
       {/* Show message if invoice is completed */}
       {invoice && ['paid', 'cancelled'].includes(invoice.status) && (
-        <div className="mt-3 rounded-lg border border-blue-200 dark:border-blue-800 bg-blue-50 dark:bg-blue-950/30 p-4 text-center">
+        <div className="mt-3 rounded-lg border border-blue-200 bg-blue-50 p-4 text-center dark:border-blue-800 dark:bg-blue-950/30">
           <p className="text-sm font-medium text-blue-800">
             {invoice.status === 'paid'
               ? '✓ Invoice has been paid and completed'

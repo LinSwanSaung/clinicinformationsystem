@@ -85,39 +85,42 @@ const DoctorQueueDetailPage = () => {
   const [isUserActive, setIsUserActive] = useState(true);
   const isInitialLoad = useRef(true);
 
-  const loadQueueData = useCallback(async (silent = false) => {
-    try {
-      if (!silent) {
-      setIsLoading(true);
-      }
-      setError(null);
-
-      // Get queue status from our backend
-      const queueStatus = await queueService.getDoctorQueueStatus(doctorId);
-      setQueueData(queueStatus);
-
-      // Get all doctors to find the specific doctor info
-      const doctorsResponse = await queueService.getAllDoctorsQueueStatus();
-
-      if (doctorsResponse && doctorsResponse.data) {
-        const foundDoctor = doctorsResponse.data.find((d) => d.id === doctorId);
-
-        if (foundDoctor) {
-          setDoctor(foundDoctor);
-        } else {
-          setError('Doctor not found');
+  const loadQueueData = useCallback(
+    async (silent = false) => {
+      try {
+        if (!silent) {
+          setIsLoading(true);
         }
-      } else {
-        setError('Unable to load doctor information');
+        setError(null);
+
+        // Get queue status from our backend
+        const queueStatus = await queueService.getDoctorQueueStatus(doctorId);
+        setQueueData(queueStatus);
+
+        // Get all doctors to find the specific doctor info
+        const doctorsResponse = await queueService.getAllDoctorsQueueStatus();
+
+        if (doctorsResponse && doctorsResponse.data) {
+          const foundDoctor = doctorsResponse.data.find((d) => d.id === doctorId);
+
+          if (foundDoctor) {
+            setDoctor(foundDoctor);
+          } else {
+            setError('Doctor not found');
+          }
+        } else {
+          setError('Unable to load doctor information');
+        }
+      } catch (err) {
+        setError(err.message || 'Failed to load queue data');
+      } finally {
+        if (!silent) {
+          setIsLoading(false);
+        }
       }
-    } catch (err) {
-      setError(err.message || 'Failed to load queue data');
-    } finally {
-      if (!silent) {
-      setIsLoading(false);
-      }
-    }
-  }, [doctorId]);
+    },
+    [doctorId]
+  );
 
   // Initial load
   useEffect(() => {
@@ -347,7 +350,9 @@ const DoctorQueueDetailPage = () => {
 
           <Card>
             <CardContent className="p-6">
-              <div className="text-2xl font-bold text-muted-foreground">{completedTokens.length}</div>
+              <div className="text-2xl font-bold text-muted-foreground">
+                {completedTokens.length}
+              </div>
               <p className="text-sm text-muted-foreground">Completed</p>
             </CardContent>
           </Card>

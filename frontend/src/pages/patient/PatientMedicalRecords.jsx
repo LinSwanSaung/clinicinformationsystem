@@ -289,7 +289,7 @@ const PatientMedicalRecords = () => {
                           key={prescription.id}
                           className={`space-y-3 rounded-lg border p-4 transition-all ${
                             isActive
-                              ? 'border-green-500 dark:border-green-700 bg-green-50 dark:bg-green-950/30 shadow-md ring-2 ring-green-200 dark:ring-green-800'
+                              ? 'border-green-500 bg-green-50 shadow-md ring-2 ring-green-200 dark:border-green-700 dark:bg-green-950/30 dark:ring-green-800'
                               : 'border-border bg-card'
                           }`}
                         >
@@ -397,10 +397,10 @@ const PatientMedicalRecords = () => {
                         <span
                           className={`rounded px-2 py-1 text-xs ${
                             allergy.severity === 'severe'
-                              ? 'bg-red-100 dark:bg-red-900/30 text-red-800 dark:text-red-200'
+                              ? 'bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-200'
                               : allergy.severity === 'moderate'
-                                ? 'bg-yellow-100 dark:bg-yellow-900/30 text-yellow-800 dark:text-yellow-200'
-                                : 'bg-blue-100 dark:bg-blue-900/30 text-blue-800 dark:text-blue-200'
+                                ? 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-200'
+                                : 'bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-200'
                           }`}
                         >
                           {allergy.severity}
@@ -451,7 +451,7 @@ const PatientMedicalRecords = () => {
                           <span
                             className={`rounded px-2 py-1 text-xs ${
                               diagnosis.status === 'active'
-                                ? 'bg-green-100 dark:bg-green-900/30 text-green-800 dark:text-green-200'
+                                ? 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-200'
                                 : 'bg-muted text-muted-foreground'
                             }`}
                           >
@@ -461,10 +461,10 @@ const PatientMedicalRecords = () => {
                             <span
                               className={`rounded px-2 py-1 text-xs ${
                                 diagnosis.severity === 'severe'
-                                  ? 'bg-red-100 dark:bg-red-900/30 text-red-800 dark:text-red-200'
+                                  ? 'bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-200'
                                   : diagnosis.severity === 'moderate'
-                                    ? 'bg-yellow-100 dark:bg-yellow-900/30 text-yellow-800 dark:text-yellow-200'
-                                    : 'bg-blue-100 dark:bg-blue-900/30 text-blue-800 dark:text-blue-200'
+                                    ? 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-200'
+                                    : 'bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-200'
                               }`}
                             >
                               {diagnosis.severity}

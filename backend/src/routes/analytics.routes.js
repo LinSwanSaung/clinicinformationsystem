@@ -57,7 +57,11 @@ router.get(
     const { limit = 5, startDate, endDate } = req.query;
 
     const analyticsService = new AnalyticsService();
-    const result = await analyticsService.getTopDoctors({ limit: parseInt(limit), startDate, endDate });
+    const result = await analyticsService.getTopDoctors({
+      limit: parseInt(limit),
+      startDate,
+      endDate,
+    });
 
     res.json(result);
   })
@@ -112,4 +116,3 @@ router.get(
 );
 
 export default router;
-

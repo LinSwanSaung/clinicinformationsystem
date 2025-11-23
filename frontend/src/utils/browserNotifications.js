@@ -153,4 +153,3 @@ class BrowserNotificationService {
 
 // Export singleton instance
 export default new BrowserNotificationService();
-

@@ -454,7 +454,10 @@ const WalkInModal = ({ isOpen, onClose, onSubmit }) => {
       // Get error code and details from the error object
       const errorCode = error.code || error.response?.data?.code;
       const errorDetails = error.details || error.response?.data?.details;
-      const errorMessage = error.message || error.response?.data?.message || 'Failed to create walk-in appointment. Please try again.';
+      const errorMessage =
+        error.message ||
+        error.response?.data?.message ||
+        'Failed to create walk-in appointment. Please try again.';
 
       // Handle specific error codes with appropriate UI feedback
       if (errorCode === 'PATIENT_IN_CONSULTATION') {
@@ -466,14 +469,18 @@ const WalkInModal = ({ isOpen, onClose, onSubmit }) => {
         if (errorDetails?.tokenNumber) {
           additionalInfo = `\n\nToken #${errorDetails.tokenNumber} is ${errorDetails.tokenStatus || 'active'}.`;
         }
-        showWarning(`${errorMessage}${additionalInfo}\n\nPlease complete or cancel the current visit before creating a new one.`);
+        showWarning(
+          `${errorMessage}${additionalInfo}\n\nPlease complete or cancel the current visit before creating a new one.`
+        );
       } else if (errorCode === 'INVOICE_NOT_COMPLETED') {
         // Patient has unpaid invoice
         let additionalInfo = '';
         if (errorDetails?.invoiceNumber) {
           additionalInfo = `\n\nInvoice #${errorDetails.invoiceNumber} (Status: ${errorDetails.invoiceStatus || 'pending'})`;
         }
-        showWarning(`${errorMessage}${additionalInfo}\n\nPlease direct the patient to the cashier counter to complete payment.`);
+        showWarning(
+          `${errorMessage}${additionalInfo}\n\nPlease direct the patient to the cashier counter to complete payment.`
+        );
       } else if (errorCode === 'ACTIVE_VISIT_EXISTS') {
         // Generic active visit error
         showWarning(errorMessage);
@@ -787,7 +794,8 @@ const WalkInModal = ({ isOpen, onClose, onSubmit }) => {
                   </div>
 
                   <p className="text-sm font-medium">
-                    Available Doctors Today{doctors.length !== allDoctors.length ? ` (${doctors.length} found)` : ''}:
+                    Available Doctors Today
+                    {doctors.length !== allDoctors.length ? ` (${doctors.length} found)` : ''}:
                   </p>
 
                   {isLoadingDoctors ? (

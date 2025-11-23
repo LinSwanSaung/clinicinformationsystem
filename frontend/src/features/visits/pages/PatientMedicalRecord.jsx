@@ -586,7 +586,9 @@ const PatientMedicalRecord = () => {
 
         const notePrescriptions = Array.isArray(existingPrescriptions)
           ? existingPrescriptions.filter((p) => {
-              if (p.doctor_id !== editingNote.doctor_id) return false;
+              if (p.doctor_id !== editingNote.doctor_id) {
+                return false;
+              }
               const prescriptionTime = new Date(p.created_at || p.prescribed_date).getTime();
               const timeDiff = Math.abs(noteTime - prescriptionTime);
               return timeDiff <= timeWindow;
@@ -901,7 +903,7 @@ const PatientMedicalRecord = () => {
           {activeTab === 'overview' && (
             <>
               {!loading && visitCheckComplete && !hasActiveVisit && (
-                <Card className="mb-4 border-amber-300 dark:border-amber-700 bg-amber-50 dark:bg-amber-950/30 p-4">
+                <Card className="mb-4 border-amber-300 bg-amber-50 p-4 dark:border-amber-700 dark:bg-amber-950/30">
                   <div className="flex items-center space-x-3 text-amber-800 dark:text-amber-200">
                     <AlertCircle size={20} />
                     <div>
@@ -965,7 +967,7 @@ const PatientMedicalRecord = () => {
           {activeTab === 'notes' && (
             <>
               {!loading && visitCheckComplete && !hasActiveVisit && (
-                <Card className="mb-4 border-amber-300 dark:border-amber-700 bg-amber-50 dark:bg-amber-950/30 p-4">
+                <Card className="mb-4 border-amber-300 bg-amber-50 p-4 dark:border-amber-700 dark:bg-amber-950/30">
                   <div className="flex items-center space-x-3 text-amber-800 dark:text-amber-200">
                     <AlertCircle size={20} />
                     <div>
@@ -1047,7 +1049,7 @@ const PatientMedicalRecord = () => {
             </DialogHeader>
             <div className="space-y-4">
               {!activeVisitId && (
-                <div className="rounded-md border border-yellow-200 dark:border-yellow-800 bg-yellow-50 dark:bg-yellow-950/30 p-3 text-sm text-yellow-800 dark:text-yellow-200">
+                <div className="rounded-md border border-yellow-200 bg-yellow-50 p-3 text-sm text-yellow-800 dark:border-yellow-800 dark:bg-yellow-950/30 dark:text-yellow-200">
                   Patient does not have an active visit. This diagnosis will be recorded without
                   linking to a visit.
                 </div>
@@ -1083,7 +1085,7 @@ const PatientMedicalRecord = () => {
             </DialogHeader>
             <div className="space-y-4">
               {!activeVisitId && (
-                <div className="rounded-md border border-yellow-200 dark:border-yellow-800 bg-yellow-50 dark:bg-yellow-950/30 p-3 text-sm text-yellow-800 dark:text-yellow-200">
+                <div className="rounded-md border border-yellow-200 bg-yellow-50 p-3 text-sm text-yellow-800 dark:border-yellow-800 dark:bg-yellow-950/30 dark:text-yellow-200">
                   Patient does not have an active visit. This allergy will be recorded without
                   linking to a visit.
                 </div>

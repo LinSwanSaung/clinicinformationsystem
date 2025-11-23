@@ -24,13 +24,17 @@ import { formatCurrencySync } from '@/utils/currency';
 
 // Utility to get CSS variable value and convert oklch to hex if needed
 const getCSSVariable = (varName, fallback) => {
-  if (typeof window === 'undefined') return fallback;
-  
+  if (typeof window === 'undefined') {
+    return fallback;
+  }
+
   const root = document.documentElement;
   const value = getComputedStyle(root).getPropertyValue(varName).trim();
-  
-  if (!value) return fallback;
-  
+
+  if (!value) {
+    return fallback;
+  }
+
   // If it's oklch, we need to get the computed color
   if (value.startsWith('oklch')) {
     // Create a temporary element to get the computed RGB value
@@ -41,18 +45,23 @@ const getCSSVariable = (varName, fallback) => {
     document.body.appendChild(tempEl);
     const computedColor = getComputedStyle(tempEl).color;
     document.body.removeChild(tempEl);
-    
+
     // Convert rgb(r, g, b) to hex
     const rgb = computedColor.match(/\d+/g);
     if (rgb && rgb.length === 3) {
-      return '#' + rgb.map(x => {
-        const hex = parseInt(x).toString(16);
-        return hex.length === 1 ? '0' + hex : hex;
-      }).join('');
+      return (
+        '#' +
+        rgb
+          .map((x) => {
+            const hex = parseInt(x).toString(16);
+            return hex.length === 1 ? '0' + hex : hex;
+          })
+          .join('')
+      );
     }
     return fallback;
   }
-  
+
   return value;
 };
 
@@ -117,16 +126,16 @@ const AnalyticsDashboard = () => {
       ]);
 
       // Handle both response formats: { success: true, data: [...] } or direct array
-      const revenueData = Array.isArray(revenueRes) ? revenueRes : (revenueRes?.data || []);
-      const visitData = Array.isArray(visitRes) ? visitRes : (visitRes?.data || []);
-      const doctorsData = Array.isArray(doctorsRes) ? doctorsRes : (doctorsRes?.data || []);
-      const paymentData = Array.isArray(paymentRes) ? paymentRes : (paymentRes?.data || []);
+      const revenueData = Array.isArray(revenueRes) ? revenueRes : revenueRes?.data || [];
+      const visitData = Array.isArray(visitRes) ? visitRes : visitRes?.data || [];
+      const doctorsData = Array.isArray(doctorsRes) ? doctorsRes : doctorsRes?.data || [];
+      const paymentData = Array.isArray(paymentRes) ? paymentRes : paymentRes?.data || [];
 
       setRevenueTrends(revenueData);
       setVisitStatus(visitData);
       setTopDoctors(doctorsData);
       setPaymentMethods(paymentData);
-      
+
       // Log for debugging
       console.log('Analytics data loaded:', {
         revenueRes,
@@ -152,14 +161,16 @@ const AnalyticsDashboard = () => {
 
   // Export DHIS2 CSV
   const handleExportCSV = async () => {
-    if (exporting) return; // Prevent multiple clicks
-    
+    if (exporting) {
+      return;
+    } // Prevent multiple clicks
+
     try {
       setExporting(true);
       setError('');
-      
+
       logger.info('Starting CSV export', { year: exportMonth.year, month: exportMonth.month });
-      
+
       const result = await analyticsService.exportDHIS2CSV({
         year: exportMonth.year,
         month: exportMonth.month,
@@ -170,14 +181,16 @@ const AnalyticsDashboard = () => {
 
       // Handle both response formats: { success: true, data: {...} } or direct { data: {...} }
       const csvData = result?.data || result;
-      
+
       if (!csvData || typeof csvData !== 'object') {
-        throw new Error('Invalid data format received from server. Expected an object with CSV data.');
+        throw new Error(
+          'Invalid data format received from server. Expected an object with CSV data.'
+        );
       }
 
       // Convert object to CSV format properly
       const headers = Object.keys(csvData);
-      const values = headers.map(header => {
+      const values = headers.map((header) => {
         const value = csvData[header];
         // Escape commas and quotes in values, wrap in quotes if needed
         if (value === null || value === undefined) {
@@ -189,7 +202,7 @@ const AnalyticsDashboard = () => {
         }
         return stringValue;
       });
-      
+
       const csvContent = [headers.join(','), values.join(',')].join('\n');
 
       // Create download
@@ -206,7 +219,7 @@ const AnalyticsDashboard = () => {
       link.click();
       document.body.removeChild(link);
       URL.revokeObjectURL(url);
-      
+
       logger.info('CSV export successful', { year: exportMonth.year, month: exportMonth.month });
     } catch (err) {
       logger.error('Failed to export CSV:', err);
@@ -277,7 +290,7 @@ const AnalyticsDashboard = () => {
           </CardHeader>
           <CardContent>
             {revenueTrends.length === 0 ? (
-              <div className="flex items-center justify-center h-[300px] text-muted-foreground">
+              <div className="flex h-[300px] items-center justify-center text-muted-foreground">
                 No revenue data available for the selected period
               </div>
             ) : (
@@ -323,7 +336,7 @@ const AnalyticsDashboard = () => {
           </CardHeader>
           <CardContent>
             {visitStatus.length === 0 ? (
-              <div className="flex items-center justify-center h-[300px] text-muted-foreground">
+              <div className="flex h-[300px] items-center justify-center text-muted-foreground">
                 No visit data available for the selected period
               </div>
             ) : (
@@ -342,7 +355,10 @@ const AnalyticsDashboard = () => {
                     dataKey="count"
                   >
                     {visitStatus.map((entry, index) => (
-                      <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length] || COLORS[0]} />
+                      <Cell
+                        key={`cell-${index}`}
+                        fill={COLORS[index % COLORS.length] || COLORS[0]}
+                      />
                     ))}
                   </Pie>
                   <Tooltip />
@@ -364,7 +380,7 @@ const AnalyticsDashboard = () => {
           </CardHeader>
           <CardContent>
             {paymentMethods.length === 0 ? (
-              <div className="flex items-center justify-center h-[300px] text-muted-foreground">
+              <div className="flex h-[300px] items-center justify-center text-muted-foreground">
                 No payment data available for the selected period
               </div>
             ) : (
@@ -377,7 +393,10 @@ const AnalyticsDashboard = () => {
                   <Legend />
                   <Bar dataKey="amount" name="Revenue">
                     {paymentMethods.map((entry, index) => (
-                      <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length] || COLORS[0]} />
+                      <Cell
+                        key={`cell-${index}`}
+                        fill={COLORS[index % COLORS.length] || COLORS[0]}
+                      />
                     ))}
                   </Bar>
                 </BarChart>
@@ -400,15 +419,15 @@ const AnalyticsDashboard = () => {
               <table className="w-full">
                 <thead>
                   <tr className="border-b">
-                    <th className="text-left p-2">Doctor Name</th>
-                    <th className="text-right p-2">Visits</th>
-                    <th className="text-right p-2">Revenue</th>
+                    <th className="p-2 text-left">Doctor Name</th>
+                    <th className="p-2 text-right">Visits</th>
+                    <th className="p-2 text-right">Revenue</th>
                   </tr>
                 </thead>
                 <tbody>
                   {topDoctors.length === 0 ? (
                     <tr>
-                      <td colSpan={3} className="text-center p-4 text-muted-foreground">
+                      <td colSpan={3} className="p-4 text-center text-muted-foreground">
                         No data available
                       </td>
                     </tr>
@@ -418,8 +437,8 @@ const AnalyticsDashboard = () => {
                         <td className="p-2">
                           <span className="font-medium">{doctor.doctorName}</span>
                         </td>
-                        <td className="text-right p-2">{doctor.visits}</td>
-                        <td className="text-right p-2">{formatCurrencySync(doctor.revenue)}</td>
+                        <td className="p-2 text-right">{doctor.visits}</td>
+                        <td className="p-2 text-right">{formatCurrencySync(doctor.revenue)}</td>
                       </tr>
                     ))
                   )}
@@ -448,7 +467,7 @@ const AnalyticsDashboard = () => {
                   onChange={(e) =>
                     setExportMonth({ ...exportMonth, year: parseInt(e.target.value) })
                   }
-                  className="rounded-md border border-input bg-background px-3 py-2 text-sm w-24"
+                  className="w-24 rounded-md border border-input bg-background px-3 py-2 text-sm"
                   min="2020"
                   max="2100"
                 />
@@ -482,4 +501,3 @@ const AnalyticsDashboard = () => {
 };
 
 export default AnalyticsDashboard;
-

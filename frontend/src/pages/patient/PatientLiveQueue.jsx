@@ -60,7 +60,9 @@ const PatientLiveQueue = () => {
   // Load patient's queue status
   const loadQueueStatus = async (showLoader = true) => {
     try {
-      if (showLoader) setIsLoading(true);
+      if (showLoader) {
+        setIsLoading(true);
+      }
       setError(null);
 
       // Get patient's current queue status
@@ -71,7 +73,7 @@ const PatientLiveQueue = () => {
       if (previousStatusRef.current && status.token) {
         const previousStatus = previousStatusRef.current.status;
         const currentStatus = status.token.status;
-        
+
         // Notify when status changes to 'called' (patient's turn)
         if (previousStatus !== 'called' && currentStatus === 'called') {
           browserNotifications.showQueueTurn(
@@ -79,7 +81,7 @@ const PatientLiveQueue = () => {
             'Please proceed to the consultation room. It is your turn!'
           );
         }
-        
+
         // Notify when status changes to 'serving' (consultation started)
         if (previousStatus !== 'serving' && currentStatus === 'serving') {
           browserNotifications.showNotification(
@@ -89,7 +91,7 @@ const PatientLiveQueue = () => {
           );
         }
       }
-      
+
       // Update previous status
       if (status.token) {
         previousStatusRef.current = {
@@ -128,7 +130,9 @@ const PatientLiveQueue = () => {
 
   // Auto-refresh
   useEffect(() => {
-    if (!autoRefresh) return;
+    if (!autoRefresh) {
+      return;
+    }
 
     const interval = setInterval(() => {
       loadQueueStatus(false);
@@ -163,9 +167,12 @@ const PatientLiveQueue = () => {
 
   // Helper to check if a specific queue token is the next one to be served
   const isTokenNextInLine = (queueToken, allTokens) => {
-    if (!queueToken || !allTokens || !Array.isArray(allTokens) || allTokens.length === 0)
+    if (!queueToken || !allTokens || !Array.isArray(allTokens) || allTokens.length === 0) {
       return false;
-    if (queueToken.status === 'serving') return true;
+    }
+    if (queueToken.status === 'serving') {
+      return true;
+    }
 
     const activeStatuses = ['waiting', 'called', 'serving'];
     const statusOrder = { serving: 0, called: 1, waiting: 2 };
@@ -174,19 +181,27 @@ const PatientLiveQueue = () => {
       .filter((t) => t && activeStatuses.includes(t.status))
       .sort((a, b) => {
         const statusDiff = statusOrder[a.status] - statusOrder[b.status];
-        if (statusDiff !== 0) return statusDiff;
+        if (statusDiff !== 0) {
+          return statusDiff;
+        }
         const priorityDiff = (b.priority || 1) - (a.priority || 1);
-        if (priorityDiff !== 0) return priorityDiff;
+        if (priorityDiff !== 0) {
+          return priorityDiff;
+        }
         return (a.token_number || 0) - (b.token_number || 0);
       });
 
-    if (activeTokens.length === 0) return false;
+    if (activeTokens.length === 0) {
+      return false;
+    }
 
     const servingTokens = activeTokens.filter((t) => t.status === 'serving');
     const nextToken =
       servingTokens.length > 0 ? activeTokens[servingTokens.length] : activeTokens[0];
 
-    if (!nextToken) return false;
+    if (!nextToken) {
+      return false;
+    }
 
     return (
       nextToken.id === queueToken.id ||
@@ -222,8 +237,12 @@ const PatientLiveQueue = () => {
   };
 
   const formatWaitTime = (minutes) => {
-    if (!minutes || minutes < 0) return t('patient.liveQueue.unknown');
-    if (minutes === 0) return t('patient.liveQueue.now');
+    if (!minutes || minutes < 0) {
+      return t('patient.liveQueue.unknown');
+    }
+    if (minutes === 0) {
+      return t('patient.liveQueue.now');
+    }
 
     const hours = Math.floor(minutes / 60);
     const mins = minutes % 60;
@@ -251,7 +270,9 @@ const PatientLiveQueue = () => {
 
   // Verify if patient is actually next in line by checking the queue
   const isActuallyNextInLine = () => {
-    if (!token) return false;
+    if (!token) {
+      return false;
+    }
 
     // If doctorQueue is loaded, use the helper function
     if (doctorQueue?.tokens && Array.isArray(doctorQueue.tokens)) {
@@ -267,9 +288,13 @@ const PatientLiveQueue = () => {
 
   // Calculate estimated wait based on clinic settings and queue position
   const calculateEstimatedWait = () => {
-    if (!position || position <= 0) return 0;
+    if (!position || position <= 0) {
+      return 0;
+    }
     // If currently being served, wait time is 0
-    if (token?.status === 'serving') return 0;
+    if (token?.status === 'serving') {
+      return 0;
+    }
     // Calculate: consultation time * (people ahead in queue)
     return consultationDuration * (position - 1);
   };
@@ -278,7 +303,9 @@ const PatientLiveQueue = () => {
 
   // Get current token being consulted
   const getCurrentToken = () => {
-    if (!doctorQueue?.tokens) return null;
+    if (!doctorQueue?.tokens) {
+      return null;
+    }
     return doctorQueue.tokens.find((t) => t.status === 'serving');
   };
 
@@ -574,7 +601,7 @@ const PatientLiveQueue = () => {
                                 isYourToken
                                   ? 'bg-primary/5 ring-primary/20 border-primary ring-2'
                                   : 'hover:border-primary/30 border-border'
-                              } ${queueToken.status === 'serving' ? 'border-blue-300 dark:border-blue-700 bg-blue-50 dark:bg-blue-950/30' : ''}`}
+                              } ${queueToken.status === 'serving' ? 'border-blue-300 bg-blue-50 dark:border-blue-700 dark:bg-blue-950/30' : ''}`}
                             >
                               <div className="flex items-center gap-3">
                                 <div

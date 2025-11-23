@@ -19,13 +19,17 @@ import logger from '@/utils/logger';
 
 // Utility to get CSS variable value and convert oklch to hex if needed
 const getCSSVariable = (varName, fallback) => {
-  if (typeof window === 'undefined') return fallback;
-  
+  if (typeof window === 'undefined') {
+    return fallback;
+  }
+
   const root = document.documentElement;
   const value = getComputedStyle(root).getPropertyValue(varName).trim();
-  
-  if (!value) return fallback;
-  
+
+  if (!value) {
+    return fallback;
+  }
+
   // If it's oklch, we need to get the computed color
   if (value.startsWith('oklch')) {
     // Create a temporary element to get the computed RGB value
@@ -36,18 +40,23 @@ const getCSSVariable = (varName, fallback) => {
     document.body.appendChild(tempEl);
     const computedColor = getComputedStyle(tempEl).color;
     document.body.removeChild(tempEl);
-    
+
     // Convert rgb(r, g, b) to hex
     const rgb = computedColor.match(/\d+/g);
     if (rgb && rgb.length === 3) {
-      return '#' + rgb.map(x => {
-        const hex = parseInt(x).toString(16);
-        return hex.length === 1 ? '0' + hex : hex;
-      }).join('');
+      return (
+        '#' +
+        rgb
+          .map((x) => {
+            const hex = parseInt(x).toString(16);
+            return hex.length === 1 ? '0' + hex : hex;
+          })
+          .join('')
+      );
     }
     return fallback;
   }
-  
+
   return value;
 };
 
@@ -55,7 +64,6 @@ const getCSSVariable = (varName, fallback) => {
 const getPrimaryChartColor = () => {
   return getCSSVariable('--chart-1', '#3ECF8E');
 };
-
 
 const VitalsSkeleton = () => (
   <Card className="p-6">
@@ -73,7 +81,9 @@ const VitalsSkeleton = () => (
 );
 
 const coerceNumber = (value) => {
-  if (value === null || value === undefined) return null;
+  if (value === null || value === undefined) {
+    return null;
+  }
   const parsed = typeof value === 'number' ? value : Number(value);
   return Number.isFinite(parsed) ? parsed : null;
 };
@@ -119,14 +129,16 @@ const prepareVitalSeries = (visits = []) => {
 };
 
 const calculateDelta = (current, previous, isGoodWhenLower = false) => {
-  if (current === null || previous === null)
+  if (current === null || previous === null) {
     return { value: null, indicator: null, color: 'text-muted-foreground' };
+  }
 
   const delta = current - previous;
   const absDelta = Math.abs(delta);
 
-  if (absDelta < 0.1)
+  if (absDelta < 0.1) {
     return { value: 0, indicator: <Minus className="h-3 w-3" />, color: 'text-muted-foreground' };
+  }
 
   const isIncrease = delta > 0;
   let color = 'text-muted-foreground';
@@ -143,7 +155,9 @@ const calculateDelta = (current, previous, isGoodWhenLower = false) => {
 };
 
 const CustomTooltip = ({ active, payload }) => {
-  if (!active || !payload || !payload.length) return null;
+  if (!active || !payload || !payload.length) {
+    return null;
+  }
 
   const data = payload[0].payload;
   const date = new Date(data.recordedAt).toLocaleString('en-US', {
@@ -176,7 +190,9 @@ const CustomTooltip = ({ active, payload }) => {
 
 // Helper to get computed color from CSS variable (handles oklch format)
 const getComputedColor = (varName, fallback = '#ffffff') => {
-  if (typeof window === 'undefined') return fallback;
+  if (typeof window === 'undefined') {
+    return fallback;
+  }
   const root = document.documentElement;
   const value = getComputedStyle(root).getPropertyValue(varName).trim();
   if (value) {
@@ -202,7 +218,9 @@ const VitalCard = memo(({ title, value, unit, delta, chartData, dataKey, color: 
   const axisColor = useMemo(() => getComputedColor('--foreground'), []);
   // Check if we have enough data points
   const validValues = useMemo(() => {
-    if (!chartData || chartData.length < 1) return [];
+    if (!chartData || chartData.length < 1) {
+      return [];
+    }
     const values = chartData.map((d) => d[dataKey]).filter((v) => v !== null && Number.isFinite(v));
     logger.debug(`[VitalCard ${title}] Raw data:`, chartData);
     logger.debug(`[VitalCard ${title}] dataKey: ${dataKey}, values:`, values);
@@ -213,7 +231,9 @@ const VitalCard = memo(({ title, value, unit, delta, chartData, dataKey, color: 
   const showDots = validValues.length <= 3; // Show dots when we have 3 or fewer points
 
   const computedDomain = useMemo(() => {
-    if (!hasValidData) return [0, 100];
+    if (!hasValidData) {
+      return [0, 100];
+    }
 
     const min = Math.min(...validValues);
     const max = Math.max(...validValues);
@@ -364,7 +384,9 @@ const BloodPressureCard = memo(({ chartData, latest, previous }) => {
   const diaDelta = calculateDelta(latest?.diastolic, previous?.diastolic, true);
 
   const combinedDelta = useMemo(() => {
-    if (sysDelta.value === null && diaDelta.value === null) return null;
+    if (sysDelta.value === null && diaDelta.value === null) {
+      return null;
+    }
 
     const sysAbs = Math.abs(sysDelta.value || 0);
     const diaAbs = Math.abs(diaDelta.value || 0);
@@ -374,11 +396,17 @@ const BloodPressureCard = memo(({ chartData, latest, previous }) => {
   }, [sysDelta, diaDelta]);
 
   const validValues = useMemo(() => {
-    if (!chartData || chartData.length < 1) return [];
+    if (!chartData || chartData.length < 1) {
+      return [];
+    }
     const allValues = [];
     chartData.forEach((d) => {
-      if (d.systolic !== null && Number.isFinite(d.systolic)) allValues.push(d.systolic);
-      if (d.diastolic !== null && Number.isFinite(d.diastolic)) allValues.push(d.diastolic);
+      if (d.systolic !== null && Number.isFinite(d.systolic)) {
+        allValues.push(d.systolic);
+      }
+      if (d.diastolic !== null && Number.isFinite(d.diastolic)) {
+        allValues.push(d.diastolic);
+      }
     });
     logger.debug('[BloodPressureCard] Chart data:', chartData);
     logger.debug('[BloodPressureCard] Valid BP values:', allValues);
@@ -398,7 +426,9 @@ const BloodPressureCard = memo(({ chartData, latest, previous }) => {
   );
 
   const computedDomain = useMemo(() => {
-    if (!hasValidData) return [40, 160];
+    if (!hasValidData) {
+      return [40, 160];
+    }
 
     const min = Math.min(...validValues);
     const max = Math.max(...validValues);
@@ -501,10 +531,7 @@ const BloodPressureCard = memo(({ chartData, latest, previous }) => {
                     }}
                   />
 
-                  <Legend
-                    verticalAlign="top"
-                    height={20}
-                  />
+                  <Legend verticalAlign="top" height={20} />
 
                   <Line
                     type="monotone"

@@ -310,7 +310,9 @@ const EmployeeManagement = () => {
                 />
               </div>
               <div>
-                <label className="mb-1 block text-sm font-medium text-foreground">Phone Number</label>
+                <label className="mb-1 block text-sm font-medium text-foreground">
+                  Phone Number
+                </label>
                 <Input
                   placeholder="Enter phone number"
                   value={formData.phone}
@@ -483,7 +485,9 @@ const EmployeeManagement = () => {
                 />
               </div>
               <div>
-                <label className="mb-1 block text-sm font-medium text-foreground">Phone Number</label>
+                <label className="mb-1 block text-sm font-medium text-foreground">
+                  Phone Number
+                </label>
                 <Input
                   placeholder="Enter phone number"
                   value={formData.phone}

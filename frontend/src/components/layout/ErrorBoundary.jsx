@@ -30,7 +30,9 @@ class ErrorBoundary extends React.Component {
                 The application encountered an error. Please refresh the page or contact support.
               </p>
               <details className="rounded bg-muted p-4 text-left text-sm">
-                <summary className="cursor-pointer font-medium text-foreground">Error Details</summary>
+                <summary className="cursor-pointer font-medium text-foreground">
+                  Error Details
+                </summary>
                 <div className="mt-2">
                   <p className="text-foreground">
                     <strong>Error:</strong>{' '}
@@ -48,7 +50,7 @@ class ErrorBoundary extends React.Component {
               </details>
               <button
                 onClick={() => window.location.reload()}
-                className="mt-4 rounded bg-primary px-4 py-2 text-primary-foreground hover:bg-primary/90"
+                className="hover:bg-primary/90 mt-4 rounded bg-primary px-4 py-2 text-primary-foreground"
               >
                 Refresh Page
               </button>

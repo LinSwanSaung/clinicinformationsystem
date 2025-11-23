@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo, useCallback } from 'react';
 import { useParams, useNavigate, useLocation } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { invoiceService } from '@/features/billing';
@@ -161,7 +161,18 @@ const InvoiceManagement = () => {
     );
   };
 
-  const calculateTotals = () => {
+  // Memoized totals calculation - only recalculates when dependencies change
+  const totals = useMemo(() => {
+    if (!invoice) {
+      return {
+        servicesTotal: 0,
+        medicationsTotal: 0,
+        subtotal: 0,
+        discountAmount: 0,
+        total: 0,
+      };
+    }
+
     const servicesTotal = (invoice?.services || []).reduce(
       (sum, service) => sum + (parseFloat(service.price) || 0),
       0
@@ -187,22 +198,22 @@ const InvoiceManagement = () => {
       discountAmount: discountAmountCalc,
       total: Math.max(0, total),
     };
-  };
+  }, [invoice, invoice?.services, medications, discountPercent, discountAmount]);
 
-  const handleDiscountPercentChange = (percent) => {
+  const handleDiscountPercentChange = useCallback((percent) => {
     setDiscountPercent(percent);
     setDiscountAmount(0);
-  };
+  }, []);
 
-  const handleDiscountAmountChange = (amount) => {
+  const handleDiscountAmountChange = useCallback((amount) => {
     setDiscountAmount(amount);
     setDiscountPercent(0);
-  };
+  }, []);
 
   const handleProcessPayment = async () => {
     setIsProcessing(true);
     try {
-      const totals = calculateTotals();
+      // Use memoized totals
       const amountToRecord = paymentAmount ? parseFloat(paymentAmount) : totals.total;
 
       // Validate payment amount
@@ -254,9 +265,7 @@ const InvoiceManagement = () => {
     }
   };
 
-  const totals = invoice
-    ? calculateTotals()
-    : { servicesTotal: 0, medicationsTotal: 0, subtotal: 0, discountAmount: 0, total: 0 };
+  // totals is already memoized above
 
   if (loading || !invoice) {
     return (

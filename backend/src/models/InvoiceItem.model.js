@@ -32,11 +32,16 @@ class InvoiceItemModel extends BaseModel {
       .from(this.tableName)
       .select('*')
       .eq('id', id)
-      .single();
+      .maybeSingle(); // Use maybeSingle to handle missing items gracefully
 
     if (error) {
       throw error;
     }
+
+    if (!data) {
+      throw new Error('Invoice item not found');
+    }
+
     return data;
   }
 
@@ -65,11 +70,16 @@ class InvoiceItemModel extends BaseModel {
       .update(updates)
       .eq('id', id)
       .select()
-      .single();
+      .maybeSingle(); // Use maybeSingle to handle deleted items gracefully
 
     if (error) {
       throw error;
     }
+
+    if (!data) {
+      throw new Error('Invoice item not found. It may have been deleted by another user.');
+    }
+
     return data;
   }
 
@@ -82,11 +92,16 @@ class InvoiceItemModel extends BaseModel {
       .delete()
       .eq('id', id)
       .select()
-      .single();
+      .maybeSingle(); // Use maybeSingle to handle already-deleted items gracefully
 
     if (error) {
       throw error;
     }
+
+    if (!data) {
+      throw new Error('Invoice item not found. It may have already been deleted.');
+    }
+
     return data;
   }
 

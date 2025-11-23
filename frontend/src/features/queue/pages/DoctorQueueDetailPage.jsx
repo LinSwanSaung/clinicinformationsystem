@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import {
@@ -17,6 +17,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import PageLayout from '@/components/layout/PageLayout';
 import { queueService } from '@/features/queue';
+import { POLLING_INTERVALS } from '@/constants/polling';
 
 // Animation variants (reserved for future use)
 const _pageVariants = {
@@ -81,40 +82,77 @@ const DoctorQueueDetailPage = () => {
   const [queueData, setQueueData] = useState(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState(null);
+  const [isUserActive, setIsUserActive] = useState(true);
+  const isInitialLoad = useRef(true);
 
-  const loadQueueData = async () => {
-    try {
-      setIsLoading(true);
-      setError(null);
-
-      // Get queue status from our backend
-      const queueStatus = await queueService.getDoctorQueueStatus(doctorId);
-      setQueueData(queueStatus);
-
-      // Get all doctors to find the specific doctor info
-      const doctorsResponse = await queueService.getAllDoctorsQueueStatus();
-
-      if (doctorsResponse && doctorsResponse.data) {
-        const foundDoctor = doctorsResponse.data.find((d) => d.id === doctorId);
-
-        if (foundDoctor) {
-          setDoctor(foundDoctor);
-        } else {
-          setError('Doctor not found');
+  const loadQueueData = useCallback(
+    async (silent = false) => {
+      try {
+        if (!silent) {
+          setIsLoading(true);
         }
-      } else {
-        setError('Unable to load doctor information');
-      }
-    } catch (err) {
-      setError(err.message || 'Failed to load queue data');
-    } finally {
-      setIsLoading(false);
-    }
-  };
+        setError(null);
 
+        // Get queue status from our backend
+        const queueStatus = await queueService.getDoctorQueueStatus(doctorId);
+        setQueueData(queueStatus);
+
+        // Get all doctors to find the specific doctor info
+        const doctorsResponse = await queueService.getAllDoctorsQueueStatus();
+
+        if (doctorsResponse && doctorsResponse.data) {
+          const foundDoctor = doctorsResponse.data.find((d) => d.id === doctorId);
+
+          if (foundDoctor) {
+            setDoctor(foundDoctor);
+          } else {
+            setError('Doctor not found');
+          }
+        } else {
+          setError('Unable to load doctor information');
+        }
+      } catch (err) {
+        setError(err.message || 'Failed to load queue data');
+      } finally {
+        if (!silent) {
+          setIsLoading(false);
+        }
+      }
+    },
+    [doctorId]
+  );
+
+  // Initial load
   useEffect(() => {
     loadQueueData();
+    isInitialLoad.current = false;
   }, [doctorId]);
+
+  // Auto-refresh when user is active
+  useEffect(() => {
+    // Track user activity
+    const handleActivity = () => setIsUserActive(true);
+
+    // Simple activity detection
+    const events = ['mousedown', 'mousemove', 'keypress', 'scroll', 'touchstart'];
+    events.forEach((event) => {
+      document.addEventListener(event, handleActivity, { passive: true });
+    });
+
+    // Auto-refresh interval
+    const refreshInterval = setInterval(() => {
+      if (isUserActive && !isInitialLoad.current) {
+        loadQueueData(true); // Silent refresh
+      }
+    }, POLLING_INTERVALS.QUEUE); // Refresh every 10 seconds
+
+    return () => {
+      clearInterval(refreshInterval);
+      events.forEach((event) => {
+        document.removeEventListener(event, handleActivity);
+      });
+    };
+  }, [doctorId, isUserActive, loadQueueData]);
 
   const getStatusColor = (status) => {
     switch (status) {

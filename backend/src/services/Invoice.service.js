@@ -170,14 +170,33 @@ class InvoiceService {
   }
 
   /**
-   * Add service item to invoice
+   * Add service item to invoice with version checking (optimistic locking)
+   * @param {string} invoiceId - Invoice ID
+   * @param {Object} serviceData - Service data
+   * @param {string} addedBy - User ID who added the item
+   * @param {number} [expectedVersion] - Expected invoice version (for optimistic locking)
+   * @returns {Promise<Object>} Created item
    */
-  async addServiceItem(invoiceId, serviceData, addedBy) {
+  async addServiceItem(invoiceId, serviceData, addedBy, expectedVersion = null) {
     try {
       // Validate invoice exists and is editable
       const invoice = await InvoiceModel.getInvoiceById(invoiceId);
       if (!invoice) {
         throw new Error('Invoice not found');
+      }
+
+      // If version is provided, check it matches
+      if (expectedVersion !== null && expectedVersion !== undefined) {
+        if (invoice.version !== expectedVersion) {
+          const error = new Error(
+            `Invoice was modified by another user. Current version: ${invoice.version}, Expected: ${expectedVersion}. Please refresh and try again.`
+          );
+          error.code = 'VERSION_MISMATCH';
+          error.currentVersion = invoice.version;
+          error.expectedVersion = expectedVersion;
+          error.currentInvoice = invoice;
+          throw error;
+        }
       }
 
       // Allow adding services to pending, draft, or partial_paid invoices
@@ -195,6 +214,8 @@ class InvoiceService {
         throw new Error('Missing required fields: service_name, unit_price');
       }
 
+      // Version checking is done above, now just add the item normally
+      // (Application-level version checking is sufficient - no need for atomic RPC functions)
       const itemData = {
         invoice_id: invoiceId,
         item_type: 'service',
@@ -209,26 +230,64 @@ class InvoiceService {
 
       const item = await InvoiceItemModel.createItem(itemData);
 
-      // Recalculate invoice totals
+      // Recalculate invoice totals (this will increment version via trigger)
       await this.recalculateInvoiceTotal(invoiceId);
 
       return item;
     } catch (error) {
+      // Re-throw version mismatch errors as-is
+      if (error.code === 'VERSION_MISMATCH') {
+        throw error;
+      }
+
+      // Provide user-friendly error messages
+      if (error.message?.includes('coerce') || error.message?.includes('JSON')) {
+        throw new Error(
+          'Unable to add service. The invoice may have been modified. Please refresh the page and try again.'
+        );
+      }
+
       throw new Error(`Failed to add service item: ${error.message}`);
     }
   }
 
   /**
-   * Add medicine item to invoice
+   * Add medicine item to invoice with version checking (optimistic locking)
+   * @param {string} invoiceId - Invoice ID
+   * @param {Object} medicineData - Medicine data
+   * @param {string} addedBy - User ID who added the item
+   * @param {number} [expectedVersion] - Expected invoice version (for optimistic locking)
+   * @returns {Promise<Object>} Created item
    */
-  async addMedicineItem(invoiceId, medicineData, addedBy) {
+  async addMedicineItem(invoiceId, medicineData, addedBy, expectedVersion = null) {
     try {
+      // Get invoice to check version if provided
+      if (expectedVersion !== null && expectedVersion !== undefined) {
+        const invoice = await InvoiceModel.getInvoiceById(invoiceId);
+        if (!invoice) {
+          throw new Error('Invoice not found');
+        }
+
+        if (invoice.version !== expectedVersion) {
+          const error = new Error(
+            `Invoice was modified by another user. Current version: ${invoice.version}, Expected: ${expectedVersion}. Please refresh and try again.`
+          );
+          error.code = 'VERSION_MISMATCH';
+          error.currentVersion = invoice.version;
+          error.expectedVersion = expectedVersion;
+          error.currentInvoice = invoice;
+          throw error;
+        }
+      }
+
       const { prescription_id, medicine_name, quantity = 1, unit_price, notes } = medicineData;
 
       if (!medicine_name || unit_price === undefined) {
         throw new Error('Missing required fields: medicine_name, unit_price');
       }
 
+      // Version checking is done above, now just add the item normally
+      // (Application-level version checking is sufficient - no need for atomic RPC functions)
       const itemData = {
         invoice_id: invoiceId,
         item_type: 'medicine',
@@ -243,11 +302,23 @@ class InvoiceService {
 
       const item = await InvoiceItemModel.createItem(itemData);
 
-      // Recalculate invoice totals
+      // Recalculate invoice totals (this will increment version via trigger)
       await this.recalculateInvoiceTotal(invoiceId);
 
       return item;
     } catch (error) {
+      // Re-throw version mismatch errors as-is
+      if (error.code === 'VERSION_MISMATCH') {
+        throw error;
+      }
+
+      // Provide user-friendly error messages
+      if (error.message?.includes('coerce') || error.message?.includes('JSON')) {
+        throw new Error(
+          'Unable to add medicine. The invoice may have been modified. Please refresh the page and try again.'
+        );
+      }
+
       throw new Error(`Failed to add medicine item: ${error.message}`);
     }
   }
@@ -291,13 +362,41 @@ class InvoiceService {
   }
 
   /**
-   * Update invoice item
+   * Update invoice item with version checking (optimistic locking)
+   * @param {string} itemId - Invoice item ID
+   * @param {Object} updates - Fields to update
+   * @param {number} [expectedVersion] - Expected invoice version (for optimistic locking)
+   * @returns {Promise<Object>} Updated item
    */
-  async updateInvoiceItem(itemId, updates) {
+  async updateInvoiceItem(itemId, updates, expectedVersion = null) {
     try {
+      // Get item to find invoice
+      const item = await InvoiceItemModel.getItemById(itemId);
+      if (!item) {
+        throw new Error('Invoice item not found');
+      }
+
+      // If version is provided, check it matches
+      if (expectedVersion !== null && expectedVersion !== undefined) {
+        const invoice = await InvoiceModel.getInvoiceById(item.invoice_id);
+        if (!invoice) {
+          throw new Error('Invoice not found');
+        }
+
+        if (invoice.version !== expectedVersion) {
+          const error = new Error(
+            `Invoice was modified by another user. Current version: ${invoice.version}, Expected: ${expectedVersion}. Please refresh and try again.`
+          );
+          error.code = 'VERSION_MISMATCH';
+          error.currentVersion = invoice.version;
+          error.expectedVersion = expectedVersion;
+          error.currentInvoice = invoice;
+          throw error;
+        }
+      }
+
       // Recalculate total_price if quantity or unit_price changed
       if (updates.quantity !== undefined || updates.unit_price !== undefined) {
-        const item = await InvoiceItemModel.getItemById(itemId);
         const quantity =
           updates.quantity !== undefined ? parseFloat(updates.quantity) : parseFloat(item.quantity);
         const unitPrice =
@@ -314,16 +413,36 @@ class InvoiceService {
 
       return updatedItem;
     } catch (error) {
+      // Re-throw version mismatch errors as-is
+      if (error.code === 'VERSION_MISMATCH') {
+        throw error;
+      }
+
+      // Provide user-friendly error messages
+      if (error.message?.includes('not found') || error.message?.includes('deleted')) {
+        throw new Error(
+          'This item was deleted by another user. Please refresh the page to see the latest changes.'
+        );
+      }
+
+      if (error.message?.includes('coerce') || error.message?.includes('JSON')) {
+        throw new Error(
+          'This item may have been deleted or modified. Please refresh the page and try again.'
+        );
+      }
+
       throw new Error(`Failed to update invoice item: ${error.message}`);
     }
   }
 
   /**
-   * Remove invoice item
+   * Remove invoice item with version checking (optimistic locking)
    * @param {string} itemId - Invoice item ID
    * @param {Object} currentUser - Current user making the request (for role validation)
+   * @param {number} [expectedVersion] - Expected invoice version (for optimistic locking)
+   * @returns {Promise<Object>} Deleted item
    */
-  async removeInvoiceItem(itemId, currentUser = null) {
+  async removeInvoiceItem(itemId, currentUser = null, expectedVersion = null) {
     try {
       // First, get the item to check invoice and visit status
       const item = await InvoiceItemModel.getItemById(itemId);
@@ -332,9 +451,23 @@ class InvoiceService {
       }
 
       // Get the invoice to check status and visit
-      const invoice = await InvoiceModel.findById(item.invoice_id);
+      const invoice = await InvoiceModel.getInvoiceById(item.invoice_id);
       if (!invoice) {
         throw new Error('Invoice not found');
+      }
+
+      // If version is provided, check it matches
+      if (expectedVersion !== null && expectedVersion !== undefined) {
+        if (invoice.version !== expectedVersion) {
+          const error = new Error(
+            `Invoice was modified by another user. Current version: ${invoice.version}, Expected: ${expectedVersion}. Please refresh and try again.`
+          );
+          error.code = 'VERSION_MISMATCH';
+          error.currentVersion = invoice.version;
+          error.expectedVersion = expectedVersion;
+          error.currentInvoice = invoice;
+          throw error;
+        }
       }
 
       // If user is a doctor, validate that consultation is still active
@@ -368,6 +501,24 @@ class InvoiceService {
 
       return deletedItem;
     } catch (error) {
+      // Re-throw version mismatch errors as-is
+      if (error.code === 'VERSION_MISMATCH') {
+        throw error;
+      }
+
+      // Provide user-friendly error messages
+      if (error.message?.includes('not found') || error.message?.includes('deleted')) {
+        throw new Error(
+          'This item was deleted by another user. Please refresh the page to see the latest changes.'
+        );
+      }
+
+      if (error.message?.includes('coerce') || error.message?.includes('JSON')) {
+        throw new Error(
+          'This item may have been deleted or modified. Please refresh the page and try again.'
+        );
+      }
+
       throw new Error(`Failed to remove invoice item: ${error.message}`);
     }
   }
@@ -409,10 +560,87 @@ class InvoiceService {
   }
 
   /**
-   * Update invoice discount
+   * Update invoice outstanding balance inclusion flag with version checking (optimistic locking)
+   * @param {string} invoiceId - Invoice ID
+   * @param {boolean} includeOutstandingBalance - Whether to include outstanding balance
+   * @param {number} [expectedVersion] - Expected invoice version (for optimistic locking)
+   * @returns {Promise<Object>} Updated invoice
    */
-  async updateDiscount(invoiceId, discountAmount, discountPercentage = 0) {
+  async updateOutstandingBalanceFlag(invoiceId, includeOutstandingBalance, expectedVersion = null) {
     try {
+      // Get current invoice to check version
+      const invoice = await InvoiceModel.getInvoiceById(invoiceId);
+      if (!invoice) {
+        throw new Error('Invoice not found');
+      }
+
+      // If version is provided, check it matches
+      if (expectedVersion !== null && expectedVersion !== undefined) {
+        if (invoice.version !== expectedVersion) {
+          throw new ApplicationError(
+            `Invoice was modified by another user. Current version: ${invoice.version}, Expected: ${expectedVersion}. Please refresh and try again.`,
+            409,
+            'VERSION_MISMATCH',
+            {
+              invoiceId,
+              currentVersion: invoice.version,
+              expectedVersion,
+            }
+          );
+        }
+      }
+
+      // Update outstanding balance flag (version already checked if provided)
+      await InvoiceModel.updateInvoice(invoiceId, {
+        include_outstanding_balance: Boolean(includeOutstandingBalance),
+      });
+
+      // Return updated invoice
+      const updatedInvoice = await InvoiceModel.getInvoiceById(invoiceId);
+      return updatedInvoice;
+    } catch (error) {
+      // Re-throw ApplicationError as-is
+      if (error instanceof ApplicationError) {
+        throw error;
+      }
+      throw new Error(`Failed to update outstanding balance flag: ${error.message}`);
+    }
+  }
+
+  /**
+   * Update invoice discount with version checking (optimistic locking)
+   * @param {string} invoiceId - Invoice ID
+   * @param {number} discountAmount - Discount amount
+   * @param {number} discountPercentage - Discount percentage
+   * @param {number} [expectedVersion] - Expected invoice version (for optimistic locking)
+   * @returns {Promise<Object>} Updated invoice
+   */
+  async updateDiscount(invoiceId, discountAmount, discountPercentage = 0, expectedVersion = null) {
+    try {
+      // Get current invoice to check version
+      const invoice = await InvoiceModel.getInvoiceById(invoiceId);
+      if (!invoice) {
+        throw new Error('Invoice not found');
+      }
+
+      // If version is provided, check it matches
+      if (expectedVersion !== null && expectedVersion !== undefined) {
+        if (invoice.version !== expectedVersion) {
+          const error = new Error(
+            `Invoice was modified by another user. Current version: ${invoice.version}, Expected: ${expectedVersion}. Please refresh and try again.`
+          );
+          error.code = 'VERSION_MISMATCH';
+          error.currentVersion = invoice.version;
+          error.expectedVersion = expectedVersion;
+          error.currentInvoice = invoice;
+          throw error;
+        }
+
+        // Version already checked above, use regular update
+        // (We don't use atomic RPC function due to Supabase JSONB parsing issues)
+      }
+
+      // Update discount (version already checked if provided)
       await InvoiceModel.updateInvoice(invoiceId, {
         discount_amount: parseFloat(discountAmount || 0),
         discount_percentage: parseFloat(discountPercentage || 0),
@@ -421,6 +649,32 @@ class InvoiceService {
       await this.recalculateInvoiceTotal(invoiceId);
       return this.getInvoiceById(invoiceId);
     } catch (error) {
+      // Re-throw version mismatch errors as ApplicationError
+      if (error.code === 'VERSION_MISMATCH') {
+        throw new ApplicationError(
+          error.message || 'Invoice was modified by another user. Please refresh and try again.',
+          409,
+          'VERSION_MISMATCH',
+          {
+            invoiceId,
+            currentVersion: error.currentVersion,
+            expectedVersion: error.expectedVersion,
+          }
+        );
+      }
+
+      // Re-throw ApplicationError as-is
+      if (error instanceof ApplicationError) {
+        throw error;
+      }
+
+      // Provide user-friendly error messages
+      if (error.message?.includes('coerce') || error.message?.includes('JSON')) {
+        throw new Error(
+          'Unable to update discount. The invoice may have been modified. Please refresh the page and try again.'
+        );
+      }
+
       throw new Error(`Failed to update discount: ${error.message}`);
     }
   }
@@ -436,15 +690,62 @@ class InvoiceService {
    *
    * @param {string} invoiceId - The invoice ID
    * @param {string} completedBy - User ID who completed the invoice
+   * @param {number} [expectedVersion] - Expected invoice version (for optimistic locking)
    * @returns {Promise<Object>} Completed invoice data
    * @throws {ApplicationError} If invoice not found, has no visit_id, or visit completion fails
    */
-  async completeInvoice(invoiceId, completedBy) {
+  async completeInvoice(invoiceId, completedBy, expectedVersion = null) {
     try {
       // 1. Get the invoice details including visit_id
       const invoice = await InvoiceModel.getInvoiceById(invoiceId);
       if (!invoice) {
         throw new ApplicationError('Invoice not found', 404, 'INVOICE_NOT_FOUND');
+      }
+
+      // 1.5. Version check (if provided) - but allow if invoice is already paid (idempotent)
+      if (expectedVersion !== null && expectedVersion !== undefined) {
+        if (invoice.version !== expectedVersion) {
+          // If invoice is already paid, this is idempotent - complete visit and return
+          if (invoice.status === 'paid') {
+            // Version mismatch but invoice is paid - complete visit if needed and return (idempotent)
+            if (invoice.visit_id) {
+              try {
+                const visitDetails = await this.visitService.getVisitDetails(invoice.visit_id);
+                if (visitDetails?.data?.status !== 'completed') {
+                  await this.visitService.completeVisit(invoice.visit_id, {
+                    payment_status: 'paid',
+                    completed_by: completedBy,
+                  });
+                  logger.info(
+                    `[InvoiceService] Auto-completed visit ${invoice.visit_id} for already-paid invoice ${invoiceId} (version mismatch handled)`
+                  );
+                }
+              } catch (visitError) {
+                logger.error(
+                  `[InvoiceService] Failed to complete visit ${invoice.visit_id} for already-paid invoice:`,
+                  visitError
+                );
+                // Don't throw - invoice is already paid, just log the error
+              }
+            }
+            return invoice; // Return already-paid invoice (idempotent)
+          }
+
+          // Invoice is not paid and version mismatch - throw error
+          const error = new ApplicationError(
+            `Invoice was modified by another user. Current version: ${invoice.version}, Expected: ${expectedVersion}. Please refresh and try again.`,
+            409,
+            'VERSION_MISMATCH',
+            {
+              invoiceId,
+              currentVersion: invoice.version,
+              expectedVersion,
+              message: 'Invoice version mismatch - concurrent payment detected',
+            }
+          );
+          error.code = 'VERSION_MISMATCH';
+          throw error;
+        }
       }
 
       // 2. Idempotency check: if invoice is already paid, ensure visit is also completed
@@ -592,6 +893,38 @@ class InvoiceService {
       if (error instanceof ApplicationError) {
         throw error;
       }
+
+      // Re-throw version mismatch errors as ApplicationError
+      if (error.code === 'VERSION_MISMATCH') {
+        throw new ApplicationError(
+          error.message || 'Invoice was modified by another user. Please refresh and try again.',
+          409,
+          'VERSION_MISMATCH',
+          {
+            invoiceId,
+            currentVersion: error.currentVersion,
+            expectedVersion: error.expectedVersion,
+          }
+        );
+      }
+
+      // Provide user-friendly error messages
+      if (error.message?.includes('coerce') || error.message?.includes('JSON')) {
+        throw new ApplicationError(
+          'Unable to complete invoice. The invoice may have been modified. Please refresh the page and try again.',
+          500,
+          'INVOICE_COMPLETION_FAILED'
+        );
+      }
+
+      if (error.message?.includes('not found')) {
+        throw new ApplicationError(
+          'Invoice or visit not found. They may have been deleted.',
+          404,
+          'INVOICE_NOT_FOUND'
+        );
+      }
+
       throw new ApplicationError(
         `Failed to complete invoice: ${error.message}`,
         500,
@@ -608,6 +941,17 @@ class InvoiceService {
       const invoice = await InvoiceModel.cancelInvoice(invoiceId, cancelledBy, reason);
       return invoice;
     } catch (error) {
+      // Provide user-friendly error messages
+      if (error.message?.includes('coerce') || error.message?.includes('JSON')) {
+        throw new Error(
+          'Unable to cancel invoice. The invoice may have been modified. Please refresh the page and try again.'
+        );
+      }
+
+      if (error.message?.includes('not found')) {
+        throw new Error('Invoice not found. It may have been deleted.');
+      }
+
       throw new Error(`Failed to cancel invoice: ${error.message}`);
     }
   }
@@ -641,9 +985,13 @@ class InvoiceService {
   }
 
   /**
-   * Record partial payment for invoice
+   * Record partial payment for invoice with version checking (optimistic locking)
+   * @param {string} invoiceId - Invoice ID
+   * @param {Object} paymentData - Payment data
+   * @param {number} [expectedVersion] - Expected invoice version (for optimistic locking)
+   * @returns {Promise<Object>} Updated invoice and payment transaction
    */
-  async recordPartialPayment(invoiceId, paymentData) {
+  async recordPartialPayment(invoiceId, paymentData, expectedVersion = null) {
     try {
       // Validate payment amount
       const invoice = await InvoiceModel.getInvoiceById(invoiceId);
@@ -651,9 +999,84 @@ class InvoiceService {
         throw new Error('Invoice not found');
       }
 
-      // Check if invoice is already fully paid
+      // Version check (if provided) - but allow if invoice is already paid (idempotent)
+      if (expectedVersion !== null && expectedVersion !== undefined) {
+        if (invoice.version !== expectedVersion) {
+          // If invoice is already paid, this is idempotent - ensure visit is completed and return
+          if (invoice.status === 'paid') {
+            // Version mismatch but invoice is paid - ensure visit is completed and return
+            if (invoice.visit_id) {
+              try {
+                const visitDetails = await this.visitService.getVisitDetails(invoice.visit_id);
+                if (visitDetails?.data?.status !== 'completed') {
+                  await this.visitService.completeVisit(invoice.visit_id, {
+                    payment_status: 'paid',
+                    completed_by: paymentData.processed_by,
+                  });
+                  logger.info(
+                    `[InvoiceService] Auto-completed visit ${invoice.visit_id} for already-paid invoice ${invoiceId} (version mismatch in partial payment)`
+                  );
+                }
+              } catch (visitError) {
+                logger.error(
+                  `[InvoiceService] Failed to complete visit ${invoice.visit_id} for already-paid invoice:`,
+                  visitError
+                );
+              }
+            }
+            // Return the already-paid invoice (idempotent)
+            return {
+              invoice,
+              transaction: null, // No new transaction since invoice is already paid
+            };
+          }
+
+          // Invoice is not paid and version mismatch - throw error
+          const error = new Error(
+            `Invoice was modified by another user. Current version: ${invoice.version}, Expected: ${expectedVersion}. Please refresh and try again.`
+          );
+          error.code = 'VERSION_MISMATCH';
+          error.currentVersion = invoice.version;
+          error.expectedVersion = expectedVersion;
+          error.currentInvoice = invoice;
+          throw error;
+        }
+      }
+
+      // Check if invoice is already fully paid (idempotent - return invoice if already paid)
+      // Only check for 'paid' status, not 'partial_paid' (partial_paid invoices can still accept more payments)
       if (invoice.status === 'paid') {
-        throw new Error('Invoice is already fully paid');
+        // Check if there's actually a balance due (double-check to avoid false positives)
+        const currentBalance = parseFloat(invoice.balance_due || 0);
+        if (currentBalance <= 0) {
+          // Invoice is already fully paid - ensure visit is completed and return idempotently
+          if (invoice.visit_id) {
+            try {
+              const visitDetails = await this.visitService.getVisitDetails(invoice.visit_id);
+              if (visitDetails?.data?.status !== 'completed') {
+                await this.visitService.completeVisit(invoice.visit_id, {
+                  payment_status: 'paid',
+                  completed_by: paymentData.processed_by,
+                });
+                logger.info(
+                  `[InvoiceService] Auto-completed visit ${invoice.visit_id} for already-paid invoice ${invoiceId} (partial payment attempt)`
+                );
+              }
+            } catch (visitError) {
+              logger.error(
+                `[InvoiceService] Failed to complete visit ${invoice.visit_id} for already-paid invoice:`,
+                visitError
+              );
+            }
+          }
+          // Return the already-paid invoice (idempotent) - no error, just return existing state
+          return {
+            invoice,
+            transaction: null, // No new transaction since invoice is already paid
+          };
+        }
+        // Invoice status is 'paid' but balance_due > 0 - this is a data integrity issue
+        // Allow the payment to proceed (it will update the invoice status correctly)
       }
 
       // Policy: Maximum 2 partial payments per invoice
@@ -708,28 +1131,46 @@ class InvoiceService {
         try {
           // Check if visit is already completed to avoid unnecessary updates
           const visitDetails = await this.visitService.getVisitDetails(updatedInvoice.visit_id);
-          if (visitDetails?.data?.status !== 'completed') {
+          const visitStatus = visitDetails?.data?.status || visitDetails?.status;
+
+          if (visitStatus !== 'completed') {
             // Determine payment status based on invoice status
             const paymentStatus = updatedInvoice.status === 'paid' ? 'paid' : 'partial';
 
             // Complete the visit automatically when payment is made (allows new visits)
-            await this.visitService.completeVisit(updatedInvoice.visit_id, {
-              payment_status: paymentStatus,
-              completed_by: paymentData.processed_by,
-            });
-            visitCompleted = true;
-            logger.info(
-              `[InvoiceService] Auto-completed visit ${updatedInvoice.visit_id} after payment (status: ${updatedInvoice.status})`
+            const completionResult = await this.visitService.completeVisit(
+              updatedInvoice.visit_id,
+              {
+                payment_status: paymentStatus,
+                completed_by: paymentData.processed_by,
+              }
             );
+
+            // Verify visit was actually completed
+            if (completionResult?.success && completionResult?.data) {
+              visitCompleted = true;
+              logger.info(
+                `[InvoiceService] Auto-completed visit ${updatedInvoice.visit_id} after payment (status: ${updatedInvoice.status})`
+              );
+            } else {
+              throw new Error('Visit completion returned unsuccessful result');
+            }
           } else {
             visitCompleted = true; // Visit was already completed
           }
         } catch (visitError) {
           // Log error but don't fail payment - visit can be completed manually later
+          // However, this is a critical error - visit should be completed when payment is made
           logger.error(
-            `[InvoiceService] Failed to auto-complete visit ${updatedInvoice.visit_id} after payment:`,
+            `[InvoiceService] CRITICAL: Failed to auto-complete visit ${updatedInvoice.visit_id} after payment:`,
             visitError
           );
+          logger.error(
+            `[InvoiceService] Visit ${updatedInvoice.visit_id} will remain in_progress even though invoice ${updatedInvoice.id} is ${updatedInvoice.status}. This may prevent patient from starting new visits.`
+          );
+          // Don't throw - payment was successful, but visit completion failed
+          // NOTE: Visit completion must be done manually by admin via Pending Items page
+          // Business rule: Active visits block new visits regardless of invoice status
         }
       }
 
@@ -825,6 +1266,36 @@ class InvoiceService {
         transaction: atomicResult.payment,
       };
     } catch (error) {
+      // Re-throw version mismatch errors as ApplicationError
+      if (error.code === 'VERSION_MISMATCH') {
+        throw new ApplicationError(
+          error.message || 'Invoice was modified by another user. Please refresh and try again.',
+          409,
+          'VERSION_MISMATCH',
+          {
+            invoiceId,
+            currentVersion: error.currentVersion,
+            expectedVersion: error.expectedVersion,
+          }
+        );
+      }
+
+      // Provide user-friendly error messages
+      if (error.message?.includes('coerce') || error.message?.includes('JSON')) {
+        throw new Error(
+          'Unable to process payment. The invoice may have been modified. Please refresh the page and try again.'
+        );
+      }
+
+      if (error.message?.includes('not found')) {
+        throw new Error('Invoice not found. It may have been deleted.');
+      }
+
+      // Re-throw ApplicationError as-is (already user-friendly)
+      if (error instanceof ApplicationError) {
+        throw error;
+      }
+
       throw new Error(`Failed to record payment: ${error.message}`);
     }
   }
@@ -849,6 +1320,17 @@ class InvoiceService {
       const invoice = await InvoiceModel.putOnHold(invoiceId, holdData);
       return invoice;
     } catch (error) {
+      // Provide user-friendly error messages
+      if (error.message?.includes('coerce') || error.message?.includes('JSON')) {
+        throw new Error(
+          'Unable to put invoice on hold. The invoice may have been modified. Please refresh the page and try again.'
+        );
+      }
+
+      if (error.message?.includes('not found')) {
+        throw new Error('Invoice not found. It may have been deleted.');
+      }
+
       throw new Error(`Failed to put invoice on hold: ${error.message}`);
     }
   }
@@ -861,6 +1343,17 @@ class InvoiceService {
       const invoice = await InvoiceModel.resumeFromHold(invoiceId);
       return invoice;
     } catch (error) {
+      // Provide user-friendly error messages
+      if (error.message?.includes('coerce') || error.message?.includes('JSON')) {
+        throw new Error(
+          'Unable to resume invoice. The invoice may have been modified. Please refresh the page and try again.'
+        );
+      }
+
+      if (error.message?.includes('not found')) {
+        throw new Error('Invoice not found. It may have been deleted.');
+      }
+
       throw new Error(`Failed to resume invoice: ${error.message}`);
     }
   }

@@ -12,13 +12,16 @@ function createQueryClient() {
   return new QueryClient({
     defaultOptions: {
       queries: {
-        staleTime: 30_000,
+        staleTime: 60_000, // 60 seconds - data is considered fresh for 1 minute (reduced refetches)
+        cacheTime: 5 * 60 * 1000, // 5 minutes - keep cached data for 5 minutes
         retry: 1,
         refetchOnWindowFocus: false,
         onError: (error) => {
           // Skip auth handled elsewhere
           const message = error?.message || 'Failed to load data';
-          if (message.toLowerCase().includes('unauthorized')) return;
+          if (message.toLowerCase().includes('unauthorized')) {
+            return;
+          }
           window.dispatchEvent(
             new CustomEvent('global-error', {
               detail: { message },
@@ -29,7 +32,9 @@ function createQueryClient() {
       mutations: {
         onError: (error) => {
           const message = error?.message || 'Action failed';
-          if (message.toLowerCase().includes('unauthorized')) return;
+          if (message.toLowerCase().includes('unauthorized')) {
+            return;
+          }
           window.dispatchEvent(
             new CustomEvent('global-error', {
               detail: { message },

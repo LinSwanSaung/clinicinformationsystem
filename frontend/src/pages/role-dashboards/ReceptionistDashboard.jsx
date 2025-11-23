@@ -383,41 +383,52 @@ const ReceptionistDashboard = () => {
       patient_id: walkInData.patient.id, // UUID string
       doctor_id: walkInData.doctor.id, // UUID string
       priority: 3, // number - normal priority for walk-ins
+      reason_for_visit: walkInData.reason_for_visit || '', // Transfer reason to chief_complaint
     };
 
-    // Call backend API to create queue token
-    const response = await queueService.issueToken(tokenData);
+    try {
+      // Call backend API to create queue token
+      const response = await queueService.issueToken(tokenData);
 
-    if (response.success) {
-      const tokenResult = response.data || {};
-      const issuedToken = tokenResult.token || null;
-      const tokenMessage = tokenResult.message || response.message;
+      if (response.success) {
+        const tokenResult = response.data || {};
+        const issuedToken = tokenResult.token || null;
+        const tokenMessage = tokenResult.message || response.message;
 
-      // Create a new appointment entry for local state
-      const newAppointment = {
-        id: issuedToken?.id || `walkin-${Date.now()}`,
-        patient_name: `${walkInData.patient.first_name} ${walkInData.patient.last_name}`,
-        appointment_time: walkInData.appointment_time,
-        doctor_name: `Dr. ${walkInData.doctor.first_name} ${walkInData.doctor.last_name}`,
-        visit_type: walkInData.visit_type,
-        status: walkInData.status,
-        notes: walkInData.notes,
-        isWalkIn: true,
-        token_number: issuedToken?.token_number || tokenResult.token_number || null,
-        queueMessage: tokenMessage,
-      };
+        // Create a new appointment entry for local state
+        const newAppointment = {
+          id: issuedToken?.id || `walkin-${Date.now()}`,
+          patient_name: `${walkInData.patient.first_name} ${walkInData.patient.last_name}`,
+          appointment_time: walkInData.appointment_time,
+          doctor_name: `Dr. ${walkInData.doctor.first_name} ${walkInData.doctor.last_name}`,
+          visit_type: walkInData.visit_type,
+          status: walkInData.status,
+          notes: walkInData.notes,
+          isWalkIn: true,
+          token_number: issuedToken?.token_number || tokenResult.token_number || null,
+          queueMessage: tokenMessage,
+        };
 
-      // Add to the appointment list
-      setTodayAppointments((prev) => [...prev, newAppointment]);
+        // Add to the appointment list
+        setTodayAppointments((prev) => [...prev, newAppointment]);
 
-      // Update stats
-      setStats((prev) => ({
-        ...prev,
-        todayAppointments: prev.todayAppointments + 1,
-        arrived: prev.arrived + 1, // Walk-ins are marked as ready/arrived
-      }));
-    } else {
-      throw new Error(response.message || 'Failed to create walk-in appointment');
+        // Update stats
+        setStats((prev) => ({
+          ...prev,
+          todayAppointments: prev.todayAppointments + 1,
+          arrived: prev.arrived + 1, // Walk-ins are marked as ready/arrived
+        }));
+      } else {
+        throw new Error(response.message || 'Failed to create walk-in appointment');
+      }
+    } catch (error) {
+      logger.error('[ReceptionistDashboard] Error creating walk-in:', error);
+
+      // Display the detailed error message from backend
+      const errorMessage =
+        error.message || 'Failed to create walk-in appointment. Please try again.';
+      showError(errorMessage);
+      throw error; // Re-throw to let WalkInModal handle it if needed
     }
   };
 

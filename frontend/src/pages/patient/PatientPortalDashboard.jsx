@@ -12,6 +12,7 @@ import { patientPortalService } from '@/features/patients';
 import logger from '@/utils/logger';
 import { StatCard } from '@/components/library/dashboard/StatCard';
 import { Wallet } from 'lucide-react';
+import { POLLING_INTERVALS } from '@/constants/polling';
 
 const PatientPortalDashboard = () => {
   const { t, i18n } = useTranslation();
@@ -92,6 +93,31 @@ const PatientPortalDashboard = () => {
     loadAppointments();
   }, [loadProfile, loadVisits, loadAppointments]);
 
+  // Auto-refresh appointments and credit balance
+  useEffect(() => {
+    const refreshInterval = setInterval(() => {
+      // Refresh appointments (they can change if new ones are booked)
+      loadAppointments();
+      // Refresh credit balance (it can change if payments are made)
+      (async () => {
+        try {
+          setCreditState((s) => ({ ...s, loading: true, error: null }));
+          const res = await patientPortalService.getOutstandingBalance();
+          const value = Number(res?.data?.totalBalance ?? res?.totalBalance ?? 0);
+          setCreditState({ value, loading: false, error: null });
+        } catch (e) {
+          setCreditState({
+            value: 0,
+            loading: false,
+            error: e.message || 'Failed to load outstanding balance',
+          });
+        }
+      })();
+    }, POLLING_INTERVALS.DASHBOARD); // Refresh every 60 seconds
+
+    return () => clearInterval(refreshInterval);
+  }, [loadAppointments]);
+
   const lastVisit = useMemo(() => {
     if (!Array.isArray(visitsState.data) || visitsState.data.length === 0) {
       logger.debug('[lastVisit] No visits data available');
@@ -109,7 +135,9 @@ const PatientPortalDashboard = () => {
 
     logger.debug('[lastVisit] Relevant visits:', relevantVisits);
 
-    if (relevantVisits.length === 0) return null;
+    if (relevantVisits.length === 0) {
+      return null;
+    }
 
     // Sort by date, most recent first
     const sorted = relevantVisits.sort((a, b) => new Date(b.visit_date) - new Date(a.visit_date));
@@ -118,7 +146,9 @@ const PatientPortalDashboard = () => {
   }, [visitsState.data]);
 
   const vitalsVisits = useMemo(() => {
-    if (!Array.isArray(visitsState.data)) return [];
+    if (!Array.isArray(visitsState.data)) {
+      return [];
+    }
     return visitsState.data.filter((v) => v.vitals && Object.keys(v.vitals).length > 0);
   }, [visitsState.data]);
 
@@ -135,14 +165,17 @@ const PatientPortalDashboard = () => {
         const res = await patientPortalService.getOutstandingBalance();
         // Get totalBalance from outstanding balance response
         const value = Number(res?.data?.totalBalance ?? res?.totalBalance ?? 0);
-        if (mounted) setCreditState({ value, loading: false, error: null });
+        if (mounted) {
+          setCreditState({ value, loading: false, error: null });
+        }
       } catch (e) {
-        if (mounted)
+        if (mounted) {
           setCreditState({
             value: 0,
             loading: false,
             error: e.message || 'Failed to load outstanding balance',
           });
+        }
       }
     })();
     return () => {

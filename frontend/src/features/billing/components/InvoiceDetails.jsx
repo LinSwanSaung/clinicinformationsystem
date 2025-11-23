@@ -1,16 +1,63 @@
 import { User, FileText, Pill } from 'lucide-react';
 import { Separator } from '@/components/ui/separator';
-import { useState, useEffect } from 'react';
+import { useState, useEffect, memo } from 'react';
 import clinicSettingsService from '@/services/clinicSettingsService';
 import { APP_CONFIG } from '@/constants/app';
 import { formatCurrencySync, refreshCurrencyCache } from '@/utils/currency';
 
 function get(obj, ...keys) {
   for (const k of keys) {
-    if (obj && obj[k] !== undefined && obj[k] !== null) return obj[k];
+    if (obj && obj[k] !== undefined && obj[k] !== null) {
+      return obj[k];
+    }
   }
   return undefined;
 }
+
+// Memoized Service Item Component
+const ServiceItem = memo(({ item }) => (
+  <div className="bg-muted/50 flex items-start justify-between rounded-lg p-3">
+    <div className="flex-1">
+      <p className="font-medium">{item.item_name}</p>
+      {item.notes && <p className="mt-1 text-xs text-muted-foreground">{item.notes}</p>}
+      <p className="mt-1 text-xs text-muted-foreground">Quantity: {item.quantity || 1}</p>
+    </div>
+    <div className="text-right">
+      <p className="font-semibold">
+        ${(Number(item.unit_price || 0) * (item.quantity || 1)).toFixed(2)}
+      </p>
+      <p className="text-xs text-muted-foreground">
+        ${Number(item.unit_price || 0).toFixed(2)} each
+      </p>
+    </div>
+  </div>
+));
+
+ServiceItem.displayName = 'ServiceItem';
+
+// Memoized Medicine Item Component
+const MedicineItem = memo(({ item }) => (
+  <div className="flex items-start justify-between rounded-lg border border-blue-100 bg-blue-50 p-3">
+    <div className="flex-1">
+      <div className="flex items-center gap-2">
+        <Pill className="h-4 w-4 text-blue-600" />
+        <p className="font-medium">{item.item_name}</p>
+      </div>
+      {item.notes && <p className="mt-1 text-xs text-muted-foreground">{item.notes}</p>}
+      <p className="mt-1 text-xs text-muted-foreground">Quantity: {item.quantity || 1}</p>
+    </div>
+    <div className="text-right">
+      <p className="font-semibold">
+        {formatCurrencySync(Number(item.unit_price || 0) * (item.quantity || 1))}
+      </p>
+      <p className="text-xs text-muted-foreground">
+        {formatCurrencySync(Number(item.unit_price || 0))} each
+      </p>
+    </div>
+  </div>
+));
+
+MedicineItem.displayName = 'MedicineItem';
 
 export default function InvoiceDetails({ invoice, fallback, payment, showPaymentSection = true }) {
   const [clinicSettings, setClinicSettings] = useState({
@@ -185,58 +232,13 @@ export default function InvoiceDetails({ invoice, fallback, payment, showPayment
             {items
               .filter((i) => i.item_type === 'service')
               .map((item, idx) => (
-                <div
-                  key={`svc-${idx}`}
-                  className="bg-muted/50 flex items-start justify-between rounded-lg p-3"
-                >
-                  <div className="flex-1">
-                    <p className="font-medium">{item.item_name}</p>
-                    {item.notes && (
-                      <p className="mt-1 text-xs text-muted-foreground">{item.notes}</p>
-                    )}
-                    <p className="mt-1 text-xs text-muted-foreground">
-                      Quantity: {item.quantity || 1}
-                    </p>
-                  </div>
-                  <div className="text-right">
-                    <p className="font-semibold">
-                      ${(Number(item.unit_price || 0) * (item.quantity || 1)).toFixed(2)}
-                    </p>
-                    <p className="text-xs text-muted-foreground">
-                      ${Number(item.unit_price || 0).toFixed(2)} each
-                    </p>
-                  </div>
-                </div>
+                <ServiceItem key={`svc-${item.id || idx}`} item={item} />
               ))}
 
             {items
               .filter((i) => i.item_type === 'medicine')
               .map((item, idx) => (
-                <div
-                  key={`med-${idx}`}
-                  className="flex items-start justify-between rounded-lg border border-blue-100 bg-blue-50 p-3"
-                >
-                  <div className="flex-1">
-                    <div className="flex items-center gap-2">
-                      <Pill className="h-4 w-4 text-blue-600" />
-                      <p className="font-medium">{item.item_name}</p>
-                    </div>
-                    {item.notes && (
-                      <p className="mt-1 text-xs text-muted-foreground">{item.notes}</p>
-                    )}
-                    <p className="mt-1 text-xs text-muted-foreground">
-                      Quantity: {item.quantity || 1}
-                    </p>
-                  </div>
-                  <div className="text-right">
-                    <p className="font-semibold">
-                      {formatCurrencySync(Number(item.unit_price || 0) * (item.quantity || 1))}
-                    </p>
-                    <p className="text-xs text-muted-foreground">
-                      {formatCurrencySync(Number(item.unit_price || 0))} each
-                    </p>
-                  </div>
-                </div>
+                <MedicineItem key={`med-${item.id || idx}`} item={item} />
               ))}
           </div>
         )}

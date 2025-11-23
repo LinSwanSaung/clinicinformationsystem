@@ -99,6 +99,7 @@ const AppointmentsPage = () => {
     date: new Date(), // Initialize to current date
     time: '09:00',
     type: 'Regular Checkup',
+    reason_for_visit: '',
     notes: '',
   });
 
@@ -572,6 +573,7 @@ const AppointmentsPage = () => {
         appointment_date: localDateString,
         appointment_time: newAppointment.time,
         appointment_type: newAppointment.type,
+        reason_for_visit: newAppointment.reason_for_visit || '',
         notes: newAppointment.notes,
         status: 'scheduled',
       };
@@ -704,6 +706,7 @@ const AppointmentsPage = () => {
         date: new Date(appointment.appointment_date),
         time: appointment.appointment_time,
         type: appointment.appointment_type || 'Regular Checkup',
+        reason_for_visit: appointment.reason_for_visit || '',
         notes: appointment.notes || '',
       });
 

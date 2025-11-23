@@ -11,6 +11,7 @@ const queueTokenSchema = Joi.object({
   appointment_id: Joi.string().uuid().optional(),
   priority: Joi.number().integer().min(1).max(5).optional().default(1),
   estimated_wait_time: Joi.number().integer().min(0).max(480).optional().default(7),
+  reason_for_visit: Joi.string().max(1000).optional().allow('', null),
 });
 
 const queueActionSchema = Joi.object({
@@ -71,6 +72,7 @@ const bulkTokensSchema = Joi.object({
         doctor_id: Joi.string().uuid().required(),
         appointment_id: Joi.string().uuid().optional(),
         priority: Joi.number().integer().min(1).max(5).optional().default(1),
+        reason_for_visit: Joi.string().max(1000).optional().allow('', null),
       })
     )
     .min(1)

@@ -14,6 +14,7 @@ import {
   Activity,
   Heart,
   Download,
+  FileText,
 } from 'lucide-react';
 
 /**
@@ -89,7 +90,9 @@ const VisitHistoryCard = ({ visit, isExpanded = false, onToggleExpand, onDownloa
   };
 
   const formatDate = (dateString) => {
-    if (!dateString) return 'N/A';
+    if (!dateString) {
+      return 'N/A';
+    }
     return new Date(dateString).toLocaleDateString('en-US', {
       year: 'numeric',
       month: 'short',
@@ -100,7 +103,9 @@ const VisitHistoryCard = ({ visit, isExpanded = false, onToggleExpand, onDownloa
   };
 
   const formatCurrency = (amount) => {
-    if (!amount) return 'N/A';
+    if (!amount) {
+      return 'N/A';
+    }
     return formatCurrencySync(amount);
   };
 
@@ -159,6 +164,19 @@ const VisitHistoryCard = ({ visit, isExpanded = false, onToggleExpand, onDownloa
       {/* Expanded Content */}
       {localExpanded && (
         <div className="space-y-6 p-4">
+          {/* Chief Complaint / Reason for Visit */}
+          {visit.chief_complaint && (
+            <div>
+              <h4 className="mb-2 flex items-center font-medium text-gray-700">
+                <FileText size={16} className="mr-2 text-blue-600" />
+                {t('patient.visit.chiefComplaint') || 'Reason for Visit'}
+              </h4>
+              <p className="rounded-md bg-blue-50 p-3 text-sm text-gray-600">
+                {visit.chief_complaint}
+              </p>
+            </div>
+          )}
+
           {/* Primary Diagnosis */}
           {visit.diagnosis && (
             <div>

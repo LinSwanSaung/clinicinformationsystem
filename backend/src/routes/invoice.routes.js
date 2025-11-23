@@ -142,7 +142,8 @@ router.post(
   authorize(ROLES.ADMIN, ROLES.DOCTOR, 'cashier'),
   asyncHandler(async (req, res) => {
     const { id } = req.params;
-    const item = await InvoiceService.addServiceItem(id, req.body, req.user.id);
+    const { version } = req.body; // Get version from request body
+    const item = await InvoiceService.addServiceItem(id, req.body, req.user.id, version);
 
     res.status(201).json({
       success: true,
@@ -163,7 +164,8 @@ router.post(
   authorize(ROLES.ADMIN, ROLES.DOCTOR, 'cashier', 'pharmacist'),
   asyncHandler(async (req, res) => {
     const { id } = req.params;
-    const item = await InvoiceService.addMedicineItem(id, req.body, req.user.id);
+    const { version } = req.body; // Get version from request body
+    const item = await InvoiceService.addMedicineItem(id, req.body, req.user.id, version);
 
     res.status(201).json({
       success: true,
@@ -214,7 +216,8 @@ router.put(
   authorize(ROLES.ADMIN, ROLES.CASHIER, 'pharmacist'),
   asyncHandler(async (req, res) => {
     const { itemId } = req.params;
-    const item = await InvoiceService.updateInvoiceItem(itemId, req.body);
+    const { version } = req.body; // Get version from request body
+    const item = await InvoiceService.updateInvoiceItem(itemId, req.body, version);
 
     res.status(200).json({
       success: true,
@@ -235,12 +238,41 @@ router.delete(
   authorize(ROLES.ADMIN, ROLES.DOCTOR, ROLES.CASHIER, 'pharmacist'),
   asyncHandler(async (req, res) => {
     const { itemId } = req.params;
-    const item = await InvoiceService.removeInvoiceItem(itemId, req.user);
+    const { version } = req.query; // Get version from query string for DELETE
+    const versionNum = version ? parseInt(version, 10) : null;
+    const item = await InvoiceService.removeInvoiceItem(itemId, req.user, versionNum);
 
     res.status(200).json({
       success: true,
       message: 'Invoice item removed successfully',
       data: item,
+    });
+  })
+);
+
+/**
+ * @route   PUT /api/invoices/:id/outstanding-balance-flag
+ * @desc    Update invoice outstanding balance inclusion flag
+ * @access  Private (Cashier, Admin)
+ */
+router.put(
+  '/:id/outstanding-balance-flag',
+  authenticate,
+  authorize(ROLES.ADMIN, ROLES.CASHIER),
+  asyncHandler(async (req, res) => {
+    const { id } = req.params;
+    const { include_outstanding_balance, version } = req.body;
+
+    const invoice = await InvoiceService.updateOutstandingBalanceFlag(
+      id,
+      include_outstanding_balance,
+      version
+    );
+
+    res.status(200).json({
+      success: true,
+      message: 'Outstanding balance flag updated successfully',
+      data: invoice,
     });
   })
 );
@@ -256,9 +288,14 @@ router.put(
   authorize(ROLES.ADMIN, ROLES.CASHIER),
   asyncHandler(async (req, res) => {
     const { id } = req.params;
-    const { discount_amount, discount_percentage } = req.body;
+    const { discount_amount, discount_percentage, version } = req.body;
 
-    const invoice = await InvoiceService.updateDiscount(id, discount_amount, discount_percentage);
+    const invoice = await InvoiceService.updateDiscount(
+      id,
+      discount_amount,
+      discount_percentage,
+      version
+    );
 
     res.status(200).json({
       success: true,
@@ -279,10 +316,10 @@ router.put(
   authorize(ROLES.ADMIN, ROLES.CASHIER),
   asyncHandler(async (req, res) => {
     const { id } = req.params;
-    const { completed_by } = req.body;
+    const { completed_by, version } = req.body;
     const userId = completed_by || req.user.id;
 
-    const invoice = await InvoiceService.completeInvoice(id, userId);
+    const invoice = await InvoiceService.completeInvoice(id, userId, version);
 
     // Audit log - CRITICAL: Track who completed the invoice
     await logAuditEvent({
@@ -473,8 +510,9 @@ router.post(
       payment_due_date,
       processed_by: req.user.id,
     };
+    const { version } = req.body;
 
-    const result = await InvoiceService.recordPartialPayment(id, paymentData);
+    const result = await InvoiceService.recordPartialPayment(id, paymentData, version);
 
     // Audit log - Track partial payments
     await logAuditEvent({

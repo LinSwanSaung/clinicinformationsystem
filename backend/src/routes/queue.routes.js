@@ -41,6 +41,9 @@ router.get('/doctor/:doctorId/capacity', authenticate, async (req, res) => {
 router.post('/token', authenticate, validateQueueToken, async (req, res) => {
   try {
     // Pass the current user info to the service for audit logging
+    logger.debug(
+      `[QUEUE ROUTE] Issuing token for patient ${req.body.patient_id}, doctor ${req.body.doctor_id}`
+    );
     const result = await queueService.issueToken(req.body, req.user);
     res.status(201).json({
       success: true,
@@ -48,9 +51,19 @@ router.post('/token', authenticate, validateQueueToken, async (req, res) => {
       message: result.message,
     });
   } catch (error) {
-    res.status(400).json({
+    // Respect the error's status code if it's an ApplicationError
+    const statusCode = error.statusCode || error.status || 400;
+    logger.error(`[QUEUE ROUTE] Error issuing token:`, {
+      message: error.message,
+      statusCode,
+      code: error.code,
+      details: error.details,
+    });
+    res.status(statusCode).json({
       success: false,
       message: error.message,
+      code: error.code || 'UNKNOWN_ERROR',
+      details: error.details || null,
     });
   }
 });

@@ -9,7 +9,7 @@ const ArrayResponse = z.object({
 });
 
 export function useInvoices(params = { type: 'pending', limit: 50, offset: 0 }) {
-  const { type = 'pending', limit = 50, offset = 0 } = params || {};
+  const { type = 'pending', limit = 50, offset = 0, refetchInterval } = params || {};
 
   const query = useQuery({
     queryKey: ['invoices', { type, limit, offset }],
@@ -35,7 +35,10 @@ export function useInvoices(params = { type: 'pending', limit: 50, offset: 0 }) 
       }
       return parsed.data;
     },
-    staleTime: 30_000,
+    staleTime: 60_000, // 60 seconds - data is fresh for 1 minute (reduced refetches)
+    refetchInterval: refetchInterval !== undefined ? refetchInterval : false,
+    refetchIntervalInBackground: false, // Don't poll in background tabs (reduces DB load)
+    refetchOnWindowFocus: false,
   });
 
   return {

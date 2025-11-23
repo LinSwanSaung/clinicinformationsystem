@@ -30,10 +30,10 @@ const NotificationBell = () => {
     // apiService.get() returns the full response, so we need to access data.data.count
     const c = unreadQuery.data?.data?.count ?? unreadQuery.data?.count;
     const previousCount = unreadCount;
-
+    
     if (typeof c === 'number') {
       setUnreadCount(c);
-
+      
       // Show browser notification when new notifications arrive
       if (c > previousCount && previousCount > 0) {
         const newCount = c - previousCount;
@@ -57,34 +57,23 @@ const NotificationBell = () => {
       // Backend returns: { success: true, data: [...] }
       // notificationService.getNotifications() returns response.data which is { success: true, data: [...] }
       const newNotifications = response?.data || (Array.isArray(response) ? response : []);
-
+      
       // Check for new notifications and show browser alerts
       setNotifications((prevNotifications) => {
         if (prevNotifications.length > 0) {
-          const previousIds = new Set(prevNotifications.map((n) => n.id));
-          const newOnes = newNotifications.filter((n) => !previousIds.has(n.id));
-
-          newOnes.forEach((notification) => {
+          const previousIds = new Set(prevNotifications.map(n => n.id));
+          const newOnes = newNotifications.filter(n => !previousIds.has(n.id));
+          
+          newOnes.forEach(notification => {
             // Show browser notification for important types
-            if (
-              notification.type === 'warning' ||
-              notification.related_entity_type === 'queue_token'
-            ) {
+            if (notification.type === 'warning' || notification.related_entity_type === 'queue_token') {
               // Queue turn notification
-              if (
-                notification.title.includes('Turn') ||
-                notification.title.includes('called') ||
-                notification.title.includes('You are')
-              ) {
+              if (notification.title.includes('Turn') || notification.title.includes('called') || notification.title.includes('You are')) {
                 const tokenMatch = notification.message.match(/Token #(\d+)/);
                 const tokenNumber = tokenMatch ? tokenMatch[1] : '';
                 browserNotifications.showQueueTurn(tokenNumber, notification.message);
               } else {
-                browserNotifications.showNotification(
-                  notification.title,
-                  notification.message,
-                  notification.type
-                );
+                browserNotifications.showNotification(notification.title, notification.message, notification.type);
               }
             } else if (notification.related_entity_type === 'appointment') {
               // Appointment reminder
@@ -92,7 +81,7 @@ const NotificationBell = () => {
             }
           });
         }
-
+        
         return newNotifications;
       });
     } catch (error) {
@@ -168,15 +157,9 @@ const NotificationBell = () => {
     const diffMs = now - date;
     const diffMins = Math.floor(diffMs / 60000);
 
-    if (diffMins < 1) {
-      return 'Just now';
-    }
-    if (diffMins < 60) {
-      return `${diffMins}m ago`;
-    }
-    if (diffMins < 1440) {
-      return `${Math.floor(diffMins / 60)}h ago`;
-    }
+    if (diffMins < 1) return 'Just now';
+    if (diffMins < 60) return `${diffMins}m ago`;
+    if (diffMins < 1440) return `${Math.floor(diffMins / 60)}h ago`;
     return date.toLocaleDateString();
   };
 
@@ -184,13 +167,13 @@ const NotificationBell = () => {
   const getNotificationColor = (type) => {
     switch (type) {
       case 'success':
-        return 'text-green-600';
+        return 'text-green-600 dark:text-green-400';
       case 'warning':
-        return 'text-yellow-600';
+        return 'text-yellow-600 dark:text-yellow-400';
       case 'error':
-        return 'text-red-600';
+        return 'text-red-600 dark:text-red-400';
       default:
-        return 'text-blue-600';
+        return 'text-primary';
     }
   };
 
@@ -199,7 +182,7 @@ const NotificationBell = () => {
       {/* Bell Icon */}
       <button
         onClick={toggleDropdown}
-        className="relative rounded-lg p-2 text-gray-600 transition-colors hover:bg-gray-100 hover:text-gray-900"
+        className="relative rounded-lg bg-transparent p-2 text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
         aria-label="Notifications"
       >
         <Bell className="h-6 w-6" />
@@ -214,14 +197,14 @@ const NotificationBell = () => {
 
       {/* Dropdown */}
       {isOpen && (
-        <div className="absolute right-0 z-50 mt-2 w-96 rounded-lg border border-gray-200 bg-white shadow-lg">
+        <div className="absolute right-0 z-50 mt-2 w-96 rounded-lg border border-border bg-popover shadow-lg">
           {/* Header */}
-          <div className="flex items-center justify-between border-b border-gray-200 p-4">
-            <h3 className="text-lg font-semibold text-gray-900">Notifications</h3>
+          <div className="flex items-center justify-between border-b border-border p-4">
+            <h3 className="text-lg font-semibold text-popover-foreground">Notifications</h3>
             {unreadCount > 0 && (
               <button
                 onClick={handleMarkAllAsRead}
-                className="text-sm font-medium text-blue-600 hover:text-blue-700"
+                className="text-sm font-medium text-primary hover:text-primary/80"
               >
                 Mark all as read
               </button>
@@ -231,8 +214,8 @@ const NotificationBell = () => {
           {/* Notifications List */}
           <div className="max-h-96 overflow-y-auto">
             {loading ? (
-              <div className="p-8 text-center text-gray-500">
-                <div className="inline-block h-6 w-6 animate-spin rounded-full border-2 border-blue-600 border-t-transparent"></div>
+              <div className="p-8 text-center text-muted-foreground">
+                <div className="inline-block h-6 w-6 animate-spin rounded-full border-2 border-primary border-t-transparent"></div>
                 <p className="mt-2">Loading...</p>
               </div>
             ) : notifications.length === 0 ? (
@@ -244,12 +227,12 @@ const NotificationBell = () => {
                 />
               </div>
             ) : (
-              <ul className="divide-y divide-gray-100">
+              <ul className="divide-y divide-border">
                 {notifications.map((notification) => (
                   <li
                     key={notification.id}
-                    className={`p-4 transition-colors hover:bg-gray-50 ${
-                      !notification.is_read ? 'bg-blue-50' : ''
+                    className={`p-4 transition-colors hover:bg-accent ${
+                      !notification.is_read ? 'bg-primary/10' : ''
                     }`}
                   >
                     <div className="flex items-start gap-3">
@@ -259,22 +242,22 @@ const NotificationBell = () => {
 
                       <div className="min-w-0 flex-1">
                         <div className="flex items-start justify-between gap-2">
-                          <h4 className="text-sm font-semibold text-gray-900">
+                          <h4 className="text-sm font-semibold text-popover-foreground">
                             {notification.title}
                           </h4>
                           {!notification.is_read && (
                             <button
                               onClick={() => handleMarkAsRead(notification.id)}
-                              className="flex-shrink-0 text-xs text-blue-600 hover:text-blue-700"
+                              className="flex-shrink-0 text-xs text-primary hover:text-primary/80"
                             >
                               Mark read
                             </button>
                           )}
                         </div>
 
-                        <p className="mt-1 text-sm text-gray-600">{notification.message}</p>
+                        <p className="mt-1 text-sm text-muted-foreground">{notification.message}</p>
 
-                        <p className="mt-1 text-xs text-gray-500">
+                        <p className="mt-1 text-xs text-muted-foreground">
                           {formatTime(notification.created_at)}
                         </p>
                       </div>
@@ -287,8 +270,8 @@ const NotificationBell = () => {
 
           {/* Footer */}
           {notifications.length > 0 && (
-            <div className="border-t border-gray-200 p-3 text-center">
-              <button className="text-sm font-medium text-blue-600 hover:text-blue-700">
+            <div className="border-t border-border p-3 text-center">
+              <button className="text-sm font-medium text-primary hover:text-primary/80">
                 View all notifications
               </button>
             </div>

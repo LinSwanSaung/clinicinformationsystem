@@ -18,13 +18,6 @@ router.get(
   asyncHandler(async (req, res) => {
     const { startDate, endDate } = req.query;
 
-    if (!startDate || !endDate) {
-      return res.status(400).json({
-        success: false,
-        message: 'Start date and end date are required',
-      });
-    }
-
     const analyticsService = new AnalyticsService();
     const result = await analyticsService.getRevenueTrends({ startDate, endDate });
 
@@ -64,11 +57,7 @@ router.get(
     const { limit = 5, startDate, endDate } = req.query;
 
     const analyticsService = new AnalyticsService();
-    const result = await analyticsService.getTopDoctors({
-      limit: parseInt(limit),
-      startDate,
-      endDate,
-    });
+    const result = await analyticsService.getTopDoctors({ limit: parseInt(limit), startDate, endDate });
 
     res.json(result);
   })
@@ -123,3 +112,4 @@ router.get(
 );
 
 export default router;
+

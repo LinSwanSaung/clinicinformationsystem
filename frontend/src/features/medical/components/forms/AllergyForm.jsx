@@ -17,7 +17,7 @@ const AllergyForm = ({ allergy, onChange, disabled = false }) => {
           value={allergy.allergy_name}
           onChange={(e) => handleChange('allergy_name', e.target.value)}
           disabled={disabled}
-          className="w-full rounded-md border border-gray-300 px-3 py-2 focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:bg-gray-100"
+          className="w-full rounded-md border border-input bg-background px-3 py-2 text-foreground focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary disabled:bg-muted"
         />
       </div>
 
@@ -27,7 +27,7 @@ const AllergyForm = ({ allergy, onChange, disabled = false }) => {
           value={allergy.allergen_type}
           onChange={(e) => handleChange('allergen_type', e.target.value)}
           disabled={disabled}
-          className="w-full rounded-md border border-gray-300 px-3 py-2 focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:bg-gray-100"
+          className="w-full rounded-md border border-input bg-background px-3 py-2 text-foreground focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary disabled:bg-muted"
         >
           <option value="medication">Medication</option>
           <option value="food">Food</option>
@@ -45,7 +45,7 @@ const AllergyForm = ({ allergy, onChange, disabled = false }) => {
           value={allergy.severity}
           onChange={(e) => handleChange('severity', e.target.value)}
           disabled={disabled}
-          className="w-full rounded-md border border-gray-300 px-3 py-2 focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:bg-gray-100"
+          className="w-full rounded-md border border-input bg-background px-3 py-2 text-foreground focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary disabled:bg-muted"
         >
           <option value="mild">Mild</option>
           <option value="moderate">Moderate</option>
@@ -62,7 +62,7 @@ const AllergyForm = ({ allergy, onChange, disabled = false }) => {
           onChange={(e) => handleChange('reaction', e.target.value)}
           disabled={disabled}
           rows={3}
-          className="w-full rounded-md border border-gray-300 px-3 py-2 focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:bg-gray-100"
+          className="w-full rounded-md border border-input bg-background px-3 py-2 text-foreground focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary disabled:bg-muted"
         />
       </div>
     </div>

@@ -390,7 +390,7 @@ const PatientDetailPage = () => {
                     <ClipboardList className="h-5 w-5 text-blue-500" />
                     <h4 className="font-semibold">Diagnosis History</h4>
                   </div>
-                  <div className="rounded-lg border border-blue-200 bg-blue-50 p-4">
+                  <div className="rounded-lg border border-blue-200 dark:border-blue-800 bg-blue-50 dark:bg-blue-950/30 p-4">
                     {diagnoses && diagnoses.length > 0 ? (
                       <div className="space-y-3">
                         {diagnoses.map((diagnosis, index) => (

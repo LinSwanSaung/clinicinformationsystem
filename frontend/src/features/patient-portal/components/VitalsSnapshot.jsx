@@ -17,6 +17,46 @@ import {
 } from 'recharts';
 import logger from '@/utils/logger';
 
+// Utility to get CSS variable value and convert oklch to hex if needed
+const getCSSVariable = (varName, fallback) => {
+  if (typeof window === 'undefined') return fallback;
+  
+  const root = document.documentElement;
+  const value = getComputedStyle(root).getPropertyValue(varName).trim();
+  
+  if (!value) return fallback;
+  
+  // If it's oklch, we need to get the computed color
+  if (value.startsWith('oklch')) {
+    // Create a temporary element to get the computed RGB value
+    const tempEl = document.createElement('div');
+    tempEl.style.color = value;
+    tempEl.style.position = 'absolute';
+    tempEl.style.visibility = 'hidden';
+    document.body.appendChild(tempEl);
+    const computedColor = getComputedStyle(tempEl).color;
+    document.body.removeChild(tempEl);
+    
+    // Convert rgb(r, g, b) to hex
+    const rgb = computedColor.match(/\d+/g);
+    if (rgb && rgb.length === 3) {
+      return '#' + rgb.map(x => {
+        const hex = parseInt(x).toString(16);
+        return hex.length === 1 ? '0' + hex : hex;
+      }).join('');
+    }
+    return fallback;
+  }
+  
+  return value;
+};
+
+// Get chart colors from CSS variables (Supabase theme)
+const getPrimaryChartColor = () => {
+  return getCSSVariable('--chart-1', '#3ECF8E');
+};
+
+
 const VitalsSkeleton = () => (
   <Card className="p-6">
     <Skeleton className="mb-6 h-6 w-48" />
@@ -134,7 +174,32 @@ const CustomTooltip = ({ active, payload }) => {
   );
 };
 
+// Helper to get computed color from CSS variable (handles oklch format)
+const getComputedColor = (varName, fallback = '#ffffff') => {
+  if (typeof window === 'undefined') return fallback;
+  const root = document.documentElement;
+  const value = getComputedStyle(root).getPropertyValue(varName).trim();
+  if (value) {
+    // If it's oklch, create a temp element to get computed RGB
+    if (value.startsWith('oklch')) {
+      const tempEl = document.createElement('div');
+      tempEl.style.color = value;
+      tempEl.style.position = 'absolute';
+      tempEl.style.visibility = 'hidden';
+      document.body.appendChild(tempEl);
+      const computedColor = getComputedStyle(tempEl).color;
+      document.body.removeChild(tempEl);
+      return computedColor;
+    }
+    return value.startsWith('#') ? value : `hsl(${value})`;
+  }
+  return fallback;
+};
+
 const VitalCard = memo(({ title, value, unit, delta, chartData, dataKey, color: _color }) => {
+  const chartColor = useMemo(() => getPrimaryChartColor(), []);
+  const titleColor = useMemo(() => getComputedColor('--card-foreground'), []);
+  const axisColor = useMemo(() => getComputedColor('--foreground'), []);
   // Check if we have enough data points
   const validValues = useMemo(() => {
     if (!chartData || chartData.length < 1) return [];
@@ -190,7 +255,8 @@ const VitalCard = memo(({ title, value, unit, delta, chartData, dataKey, color: 
           {/* Header */}
           <div className="space-y-1">
             <h3
-              className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground"
+              className="text-[10px] font-bold uppercase tracking-wider"
+              style={{ color: titleColor }}
               tabIndex={0}
             >
               {title}
@@ -234,7 +300,7 @@ const VitalCard = memo(({ title, value, unit, delta, chartData, dataKey, color: 
                     dataKey="t"
                     type="number"
                     domain={['dataMin', 'dataMax']}
-                    tick={{ fontSize: 10, fill: 'hsl(var(--muted-foreground))' }}
+                    tick={{ fontSize: 10, fill: axisColor, opacity: 0.7 }}
                     tickLine={false}
                     axisLine={{ stroke: 'hsl(var(--border))' }}
                     tickFormatter={(timestamp) => {
@@ -245,7 +311,7 @@ const VitalCard = memo(({ title, value, unit, delta, chartData, dataKey, color: 
 
                   <YAxis
                     domain={computedDomain}
-                    tick={{ fontSize: 10, fill: 'hsl(var(--muted-foreground))' }}
+                    tick={{ fontSize: 10, fill: axisColor, opacity: 0.7 }}
                     tickLine={false}
                     axisLine={false}
                     width={35}
@@ -264,11 +330,11 @@ const VitalCard = memo(({ title, value, unit, delta, chartData, dataKey, color: 
                     type="monotone"
                     dataKey={dataKey}
                     name={title}
-                    stroke="#2563eb"
+                    stroke={chartColor}
                     strokeWidth={3}
                     strokeOpacity={1}
-                    dot={showDots ? { r: 4, fill: '#2563eb', strokeWidth: 0 } : false}
-                    activeDot={{ r: 6, fill: '#2563eb', stroke: 'white', strokeWidth: 2 }}
+                    dot={showDots ? { r: 4, fill: chartColor, strokeWidth: 0 } : false}
+                    activeDot={{ r: 6, fill: chartColor, stroke: 'white', strokeWidth: 2 }}
                     connectNulls
                     unit={` ${unit}`}
                     isAnimationActive={false}
@@ -287,6 +353,8 @@ VitalCard.displayName = 'VitalCard';
 
 const BloodPressureCard = memo(({ chartData, latest, previous }) => {
   const { t } = useTranslation();
+  const titleColor = useMemo(() => getComputedColor('--card-foreground'), []);
+  const axisColor = useMemo(() => getComputedColor('--foreground'), []);
 
   const sysValue = latest?.systolic !== null ? latest.systolic : null;
   const diaValue = latest?.diastolic !== null ? latest.diastolic : null;
@@ -360,7 +428,8 @@ const BloodPressureCard = memo(({ chartData, latest, previous }) => {
           {/* Header */}
           <div className="space-y-1">
             <h3
-              className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground"
+              className="text-[10px] font-bold uppercase tracking-wider"
+              style={{ color: titleColor }}
               tabIndex={0}
             >
               {t('patient.vitalsSnapshot.bloodPressure')}
@@ -406,7 +475,7 @@ const BloodPressureCard = memo(({ chartData, latest, previous }) => {
                     dataKey="t"
                     type="number"
                     domain={['dataMin', 'dataMax']}
-                    tick={{ fontSize: 10, fill: 'hsl(var(--muted-foreground))' }}
+                    tick={{ fontSize: 10, fill: axisColor, opacity: 0.7 }}
                     tickLine={false}
                     axisLine={{ stroke: 'hsl(var(--border))' }}
                     tickFormatter={(timestamp) => {
@@ -417,7 +486,7 @@ const BloodPressureCard = memo(({ chartData, latest, previous }) => {
 
                   <YAxis
                     domain={computedDomain}
-                    tick={{ fontSize: 10, fill: 'hsl(var(--muted-foreground))' }}
+                    tick={{ fontSize: 10, fill: axisColor, opacity: 0.7 }}
                     tickLine={false}
                     axisLine={false}
                     width={35}
@@ -435,8 +504,6 @@ const BloodPressureCard = memo(({ chartData, latest, previous }) => {
                   <Legend
                     verticalAlign="top"
                     height={20}
-                    iconType="line"
-                    wrapperStyle={{ fontSize: '10px', paddingBottom: '4px' }}
                   />
 
                   <Line

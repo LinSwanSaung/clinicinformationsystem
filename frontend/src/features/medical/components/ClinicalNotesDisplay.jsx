@@ -39,52 +39,52 @@ const ClinicalNotesDisplay = ({
       <div className="space-y-4">
         {notes.length > 0 ? (
           notes.map((note, index) => (
-            <div key={index} className="overflow-hidden rounded-lg border border-gray-200">
+            <div key={index} className="overflow-hidden rounded-lg border border-border">
               <div
-                className="cursor-pointer bg-gray-50 p-4 transition-colors hover:bg-gray-100"
+                className="cursor-pointer bg-muted/50 p-4 transition-colors hover:bg-accent"
                 onClick={() => toggleNote(index)}
               >
                 <div className="flex items-center justify-between">
                   <div className="flex items-center space-x-3">
-                    <Calendar size={16} className="text-gray-500" />
-                    <span className="text-sm font-medium">{note.date}</span>
+                    <Calendar size={16} className="text-muted-foreground" />
+                    <span className="text-sm font-medium text-foreground">{note.date}</span>
                   </div>
                   <ChevronDown
                     size={16}
-                    className={`text-gray-500 transition-transform ${expandedNote === index ? 'rotate-180' : ''}`}
+                    className={`text-muted-foreground transition-transform ${expandedNote === index ? 'rotate-180' : ''}`}
                   />
                 </div>
               </div>
 
               {expandedNote === index && (
-                <div className="border-t border-gray-200 bg-white p-4">
+                <div className="border-t border-border bg-card p-4">
                   {note.diagnosis && note.diagnosis !== 'N/A' && (
                     <div className="mb-4">
-                      <h5 className="mb-2 text-sm font-bold text-gray-800">Diagnosis:</h5>
-                      <p className="rounded-lg bg-yellow-50 p-3 text-sm text-gray-700">
+                      <h5 className="mb-2 text-sm font-bold text-foreground">Diagnosis:</h5>
+                      <p className="rounded-lg bg-yellow-50 dark:bg-yellow-950/30 p-3 text-sm text-foreground">
                         {note.diagnosis}
                       </p>
                     </div>
                   )}
 
                   <div className="mb-4">
-                    <h5 className="mb-2 text-sm font-bold text-gray-800">Clinical Notes:</h5>
-                    <p className="text-sm leading-relaxed text-gray-700">{note.note}</p>
+                    <h5 className="mb-2 text-sm font-bold text-foreground">Clinical Notes:</h5>
+                    <p className="text-sm leading-relaxed text-foreground">{note.note}</p>
                   </div>
 
                   {note.prescribedMedications && note.prescribedMedications.length > 0 && (
                     <div>
-                      <h5 className="mb-3 text-sm font-bold text-gray-800">
+                      <h5 className="mb-3 text-sm font-bold text-foreground">
                         Prescribed Medications:
                       </h5>
                       <div className="space-y-2">
                         {note.prescribedMedications.map((medication, medIndex) => (
-                          <div key={medIndex} className="rounded-lg bg-blue-50 p-3">
+                          <div key={medIndex} className="rounded-lg bg-blue-50 dark:bg-blue-950/30 p-3">
                             <div className="mb-1 flex items-center justify-between">
-                              <span className="text-sm font-medium">{medication.name}</span>
-                              <span className="text-xs text-gray-600">- {medication.dosage}</span>
+                              <span className="text-sm font-medium text-foreground">{medication.name}</span>
+                              <span className="text-xs text-muted-foreground">- {medication.dosage}</span>
                             </div>
-                            <div className="mt-2 space-y-1 text-xs text-gray-600">
+                            <div className="mt-2 space-y-1 text-xs text-muted-foreground">
                               {medication.frequency && <div>Frequency: {medication.frequency}</div>}
                               {medication.duration && <div>Duration: {medication.duration}</div>}
                               {medication.quantity && <div>Quantity: {medication.quantity}</div>}
@@ -121,10 +121,10 @@ const ClinicalNotesDisplay = ({
           ))
         ) : (
           <div className="py-8 text-center">
-            <FileText size={32} className="mx-auto mb-3 text-gray-400" />
-            <p className="text-sm text-gray-500">No doctor&apos;s notes available</p>
+            <FileText size={32} className="mx-auto mb-3 text-muted-foreground" />
+            <p className="text-sm text-muted-foreground">No doctor&apos;s notes available</p>
             {canAddNotes && (
-              <p className="mt-2 text-xs text-gray-400">
+              <p className="mt-2 text-xs text-muted-foreground">
                 Click &quot;Add Note&quot; to create the first note
               </p>
             )}

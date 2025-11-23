@@ -363,7 +363,7 @@ const PatientMedicalRecord = () => {
     return (
       <PageLayout title="Patient Medical Record" subtitle="Loading patient data..." fullWidth>
         <div className="flex h-64 items-center justify-center">
-          <div className="text-lg text-gray-600">Loading...</div>
+          <div className="text-lg text-muted-foreground">Loading...</div>
         </div>
       </PageLayout>
     );
@@ -901,8 +901,8 @@ const PatientMedicalRecord = () => {
           {activeTab === 'overview' && (
             <>
               {!loading && visitCheckComplete && !hasActiveVisit && (
-                <Card className="mb-4 border-amber-300 bg-amber-50 p-4">
-                  <div className="flex items-center space-x-3 text-amber-800">
+                <Card className="mb-4 border-amber-300 dark:border-amber-700 bg-amber-50 dark:bg-amber-950/30 p-4">
+                  <div className="flex items-center space-x-3 text-amber-800 dark:text-amber-200">
                     <AlertCircle size={20} />
                     <div>
                       <p className="font-semibold">No Active Consultation</p>
@@ -934,7 +934,7 @@ const PatientMedicalRecord = () => {
 
           {activeTab === 'history' && (
             <div className="space-y-4">
-              <h3 className="mb-6 text-xl font-semibold text-gray-800">Patient Visit History</h3>
+              <h3 className="mb-6 text-xl font-semibold text-foreground">Patient Visit History</h3>
               {displayPatient.visits && displayPatient.visits.length > 0 ? (
                 displayPatient.visits.map((visit, index) => (
                   <VisitHistoryCard
@@ -947,12 +947,12 @@ const PatientMedicalRecord = () => {
               ) : (
                 <Card className="p-12 text-center">
                   <div className="flex flex-col items-center space-y-4">
-                    <Activity size={48} className="text-gray-300" />
+                    <Activity size={48} className="text-muted-foreground" />
                     <div>
-                      <p className="text-lg font-medium text-gray-600">
+                      <p className="text-lg font-medium text-muted-foreground">
                         No visit history available
                       </p>
-                      <p className="mt-2 text-sm text-gray-500">
+                      <p className="mt-2 text-sm text-muted-foreground">
                         Visit history will appear here once the patient completes visits
                       </p>
                     </div>
@@ -965,8 +965,8 @@ const PatientMedicalRecord = () => {
           {activeTab === 'notes' && (
             <>
               {!loading && visitCheckComplete && !hasActiveVisit && (
-                <Card className="mb-4 border-amber-300 bg-amber-50 p-4">
-                  <div className="flex items-center space-x-3 text-amber-800">
+                <Card className="mb-4 border-amber-300 dark:border-amber-700 bg-amber-50 dark:bg-amber-950/30 p-4">
+                  <div className="flex items-center space-x-3 text-amber-800 dark:text-amber-200">
                     <AlertCircle size={20} />
                     <div>
                       <p className="font-semibold">No Active Consultation</p>
@@ -1047,7 +1047,7 @@ const PatientMedicalRecord = () => {
             </DialogHeader>
             <div className="space-y-4">
               {!activeVisitId && (
-                <div className="rounded-md border border-yellow-200 bg-yellow-50 p-3 text-sm text-yellow-800">
+                <div className="rounded-md border border-yellow-200 dark:border-yellow-800 bg-yellow-50 dark:bg-yellow-950/30 p-3 text-sm text-yellow-800 dark:text-yellow-200">
                   Patient does not have an active visit. This diagnosis will be recorded without
                   linking to a visit.
                 </div>
@@ -1060,7 +1060,7 @@ const PatientMedicalRecord = () => {
               <div className="flex justify-end space-x-3 border-t pt-4">
                 <button
                   onClick={() => setIsAddDiagnosisModalOpen(false)}
-                  className="rounded-md border border-gray-300 px-4 py-2 text-gray-700 hover:bg-gray-50"
+                  className="rounded-md border border-input px-4 py-2 text-foreground hover:bg-accent"
                 >
                   Cancel
                 </button>
@@ -1083,7 +1083,7 @@ const PatientMedicalRecord = () => {
             </DialogHeader>
             <div className="space-y-4">
               {!activeVisitId && (
-                <div className="rounded-md border border-yellow-200 bg-yellow-50 p-3 text-sm text-yellow-800">
+                <div className="rounded-md border border-yellow-200 dark:border-yellow-800 bg-yellow-50 dark:bg-yellow-950/30 p-3 text-sm text-yellow-800 dark:text-yellow-200">
                   Patient does not have an active visit. This allergy will be recorded without
                   linking to a visit.
                 </div>
@@ -1096,7 +1096,7 @@ const PatientMedicalRecord = () => {
               <div className="flex justify-end space-x-3 border-t pt-4">
                 <button
                   onClick={() => setIsAddAllergyModalOpen(false)}
-                  className="rounded-md border border-gray-300 px-4 py-2 text-gray-700 hover:bg-gray-50"
+                  className="rounded-md border border-input px-4 py-2 text-foreground hover:bg-accent"
                 >
                   Cancel
                 </button>

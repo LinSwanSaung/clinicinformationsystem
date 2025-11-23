@@ -19,9 +19,7 @@ function createQueryClient() {
         onError: (error) => {
           // Skip auth handled elsewhere
           const message = error?.message || 'Failed to load data';
-          if (message.toLowerCase().includes('unauthorized')) {
-            return;
-          }
+          if (message.toLowerCase().includes('unauthorized')) return;
           window.dispatchEvent(
             new CustomEvent('global-error', {
               detail: { message },
@@ -32,9 +30,7 @@ function createQueryClient() {
       mutations: {
         onError: (error) => {
           const message = error?.message || 'Action failed';
-          if (message.toLowerCase().includes('unauthorized')) {
-            return;
-          }
+          if (message.toLowerCase().includes('unauthorized')) return;
           window.dispatchEvent(
             new CustomEvent('global-error', {
               detail: { message },

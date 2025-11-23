@@ -10,11 +10,11 @@ const NavigationTabs = ({
   onTabChange,
   className = '',
   tabClassName = '',
-  activeTabClassName = 'bg-emerald-600 text-white',
-  inactiveTabClassName = 'bg-gray-100 text-gray-700 hover:bg-gray-200',
+  activeTabClassName = 'bg-primary text-primary-foreground',
+  inactiveTabClassName = 'bg-muted text-muted-foreground hover:bg-accent hover:text-foreground',
 }) => {
   return (
-    <div className={`rounded-lg bg-white p-2 shadow-sm ${className}`}>
+    <div className={`rounded-lg bg-card p-2 shadow-sm ${className}`}>
       <nav className="flex space-x-1">
         {tabs.map((tab) => (
           <button

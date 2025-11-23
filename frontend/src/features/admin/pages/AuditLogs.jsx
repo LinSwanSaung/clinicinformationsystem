@@ -128,14 +128,14 @@ const AuditLogs = () => {
         {/* Filters */}
         <Card className="p-6">
           <div className="mb-4 flex items-center space-x-3">
-            <Filter size={20} className="text-gray-600" />
+            <Filter size={20} className="text-muted-foreground" />
             <h3 className="text-lg font-bold">Filters</h3>
           </div>
           <div className="mb-4 grid grid-cols-1 gap-4 md:grid-cols-4">
             <div>
-              <label className="mb-1 block text-sm font-medium text-gray-700">Action</label>
+              <label className="mb-1 block text-sm font-medium text-foreground">Action</label>
               <select
-                className="w-full rounded border border-gray-300 px-3 py-2 text-sm"
+                className="w-full rounded border border-input bg-background px-3 py-2 text-sm text-foreground"
                 value={filters.action}
                 onChange={(e) => handleFilterChange('action', e.target.value)}
               >
@@ -148,9 +148,9 @@ const AuditLogs = () => {
               </select>
             </div>
             <div>
-              <label className="mb-1 block text-sm font-medium text-gray-700">Entity</label>
+              <label className="mb-1 block text-sm font-medium text-foreground">Entity</label>
               <select
-                className="w-full rounded border border-gray-300 px-3 py-2 text-sm"
+                className="w-full rounded border border-input bg-background px-3 py-2 text-sm text-foreground"
                 value={filters.entity}
                 onChange={(e) => handleFilterChange('entity', e.target.value)}
               >
@@ -163,19 +163,19 @@ const AuditLogs = () => {
               </select>
             </div>
             <div>
-              <label className="mb-1 block text-sm font-medium text-gray-700">Start Date</label>
+              <label className="mb-1 block text-sm font-medium text-foreground">Start Date</label>
               <input
                 type="date"
-                className="w-full rounded border border-gray-300 px-3 py-2 text-sm"
+                className="w-full rounded border border-input bg-background px-3 py-2 text-sm text-foreground"
                 value={filters.start_date}
                 onChange={(e) => handleFilterChange('start_date', e.target.value)}
               />
             </div>
             <div>
-              <label className="mb-1 block text-sm font-medium text-gray-700">End Date</label>
+              <label className="mb-1 block text-sm font-medium text-foreground">End Date</label>
               <input
                 type="date"
-                className="w-full rounded border border-gray-300 px-3 py-2 text-sm"
+                className="w-full rounded border border-input bg-background px-3 py-2 text-sm text-foreground"
                 value={filters.end_date}
                 onChange={(e) => handleFilterChange('end_date', e.target.value)}
               />
@@ -216,10 +216,10 @@ const AuditLogs = () => {
                 label: 'User',
                 render: (_, row) => (
                   <div>
-                    <p className="font-medium text-gray-900">
+                    <p className="font-medium text-foreground">
                       {row.user ? `${row.user.first_name} ${row.user.last_name}` : 'System'}
                     </p>
-                    <p className="text-xs text-gray-500">
+                    <p className="text-xs text-muted-foreground">
                       {row.new_values?.role || row.user?.role || 'N/A'}
                     </p>
                   </div>
@@ -237,7 +237,7 @@ const AuditLogs = () => {
               {
                 key: 'entity',
                 label: 'Entity',
-                render: (_, row) => <span className="text-gray-700">{row.table_name || '—'}</span>,
+                render: (_, row) => <span className="text-foreground">{row.table_name || '—'}</span>,
               },
               {
                 key: 'result',
@@ -255,7 +255,7 @@ const AuditLogs = () => {
                 key: 'ip',
                 label: 'IP',
                 render: (_, row) => (
-                  <span className="text-xs text-gray-600">{row.ip_address || '—'}</span>
+                  <span className="text-xs text-muted-foreground">{row.ip_address || '—'}</span>
                 ),
               },
             ]}

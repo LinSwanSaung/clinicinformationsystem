@@ -47,7 +47,7 @@ const VisitHistoryCard = ({ visit, isExpanded = false, onToggleExpand, onDownloa
       case 'cancelled':
         return 'bg-red-100 text-red-800 border-red-200';
       default:
-        return 'bg-gray-100 text-gray-800 border-gray-200';
+        return 'bg-muted text-muted-foreground border-border';
     }
   };
 
@@ -62,11 +62,11 @@ const VisitHistoryCard = ({ visit, isExpanded = false, onToggleExpand, onDownloa
       case 'insurance_pending':
         return 'bg-blue-100 text-blue-800 border-blue-200';
       case 'no_invoice':
-        return 'bg-gray-100 text-gray-600 border-gray-200';
+        return 'bg-muted text-muted-foreground border-border';
       case 'error':
         return 'bg-red-100 text-red-600 border-red-200';
       default:
-        return 'bg-gray-100 text-gray-800 border-gray-200';
+        return 'bg-muted text-muted-foreground border-border';
     }
   };
 
@@ -90,9 +90,7 @@ const VisitHistoryCard = ({ visit, isExpanded = false, onToggleExpand, onDownloa
   };
 
   const formatDate = (dateString) => {
-    if (!dateString) {
-      return 'N/A';
-    }
+    if (!dateString) return 'N/A';
     return new Date(dateString).toLocaleDateString('en-US', {
       year: 'numeric',
       month: 'short',
@@ -103,31 +101,29 @@ const VisitHistoryCard = ({ visit, isExpanded = false, onToggleExpand, onDownloa
   };
 
   const formatCurrency = (amount) => {
-    if (!amount) {
-      return 'N/A';
-    }
+    if (!amount) return 'N/A';
     return formatCurrencySync(amount);
   };
 
   return (
-    <Card className="overflow-hidden border border-gray-200 transition-shadow hover:shadow-md">
+    <Card className="overflow-hidden border border-border transition-shadow hover:shadow-md">
       {/* Header - Always Visible */}
       <div
-        className="cursor-pointer bg-gray-50 p-4 transition-colors hover:bg-gray-100"
+        className="cursor-pointer bg-muted/50 p-4 transition-colors hover:bg-accent"
         onClick={handleToggle}
       >
         <div className="flex items-center justify-between">
           <div className="flex items-center space-x-3">
             {localExpanded ? (
-              <ChevronDown size={20} className="flex-shrink-0 text-gray-500" />
+              <ChevronDown size={20} className="flex-shrink-0 text-muted-foreground" />
             ) : (
-              <ChevronRight size={20} className="flex-shrink-0 text-gray-500" />
+              <ChevronRight size={20} className="flex-shrink-0 text-muted-foreground" />
             )}
             <div className="flex items-center space-x-4">
               <Calendar size={18} className="text-blue-600" />
               <div>
-                <h3 className="font-semibold text-gray-900">{formatDate(visit.visit_date)}</h3>
-                <p className="text-sm text-gray-600">
+                <h3 className="font-semibold text-foreground">{formatDate(visit.visit_date)}</h3>
+                <p className="text-sm text-muted-foreground">
                   {visit.visit_type || t('patient.visit.generalVisit')} - Dr. {visit.doctor_name}
                 </p>
               </div>
@@ -151,7 +147,7 @@ const VisitHistoryCard = ({ visit, isExpanded = false, onToggleExpand, onDownloa
                   e.stopPropagation();
                   onDownloadPDF(visit.id);
                 }}
-                className="h-8 px-2 hover:bg-blue-50"
+                className="h-8 px-2 hover:bg-accent"
                 title={t('patient.visit.downloadVisitSummary')}
               >
                 <Download size={16} className="text-blue-600" />
@@ -167,78 +163,76 @@ const VisitHistoryCard = ({ visit, isExpanded = false, onToggleExpand, onDownloa
           {/* Chief Complaint / Reason for Visit */}
           {visit.chief_complaint && (
             <div>
-              <h4 className="mb-2 flex items-center font-medium text-gray-700">
+              <h4 className="mb-2 flex items-center font-medium text-foreground">
                 <FileText size={16} className="mr-2 text-blue-600" />
                 {t('patient.visit.chiefComplaint') || 'Reason for Visit'}
               </h4>
-              <p className="rounded-md bg-blue-50 p-3 text-sm text-gray-600">
-                {visit.chief_complaint}
-              </p>
+              <p className="rounded-md bg-blue-50 dark:bg-blue-950/30 p-3 text-sm text-muted-foreground">{visit.chief_complaint}</p>
             </div>
           )}
 
           {/* Primary Diagnosis */}
           {visit.diagnosis && (
             <div>
-              <h4 className="mb-2 flex items-center font-medium text-gray-700">
+              <h4 className="mb-2 flex items-center font-medium text-foreground">
                 <Activity size={16} className="mr-2 text-green-600" />
                 {t('patient.visit.primaryDiagnosis')}
               </h4>
-              <p className="rounded-md bg-green-50 p-3 text-sm text-gray-600">{visit.diagnosis}</p>
+              <p className="rounded-md bg-green-50 dark:bg-green-950/30 p-3 text-sm text-muted-foreground">{visit.diagnosis}</p>
             </div>
           )}
 
           {/* Vital Signs */}
           {visit.vitals && (
             <div>
-              <h4 className="mb-3 flex items-center font-medium text-gray-700">
+              <h4 className="mb-3 flex items-center font-medium text-foreground">
                 <Heart size={16} className="mr-2 text-pink-600" />
                 {t('patient.visit.vitalSigns')}
               </h4>
               <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
                 {visit.vitals.blood_pressure_systolic && visit.vitals.blood_pressure_diastolic && (
-                  <div className="rounded-md border border-gray-200 bg-gray-50 p-3">
-                    <p className="mb-1 text-xs text-gray-600">
+                  <div className="rounded-md border border-border bg-muted/50 p-3">
+                    <p className="mb-1 text-xs text-muted-foreground">
                       {t('patient.vitals.bloodPressure')}
                     </p>
-                    <p className="text-lg font-semibold text-gray-900">
+                    <p className="text-lg font-semibold text-foreground">
                       {visit.vitals.blood_pressure_systolic}/{visit.vitals.blood_pressure_diastolic}
                     </p>
-                    <p className="text-xs text-gray-500">mmHg</p>
+                    <p className="text-xs text-muted-foreground">mmHg</p>
                   </div>
                 )}
                 {visit.vitals.heart_rate && (
-                  <div className="rounded-md border border-gray-200 bg-gray-50 p-3">
-                    <p className="mb-1 text-xs text-gray-600">{t('patient.vitals.heartRate')}</p>
-                    <p className="text-lg font-semibold text-gray-900">{visit.vitals.heart_rate}</p>
-                    <p className="text-xs text-gray-500">bpm</p>
+                  <div className="rounded-md border border-border bg-muted/50 p-3">
+                    <p className="mb-1 text-xs text-muted-foreground">{t('patient.vitals.heartRate')}</p>
+                    <p className="text-lg font-semibold text-foreground">{visit.vitals.heart_rate}</p>
+                    <p className="text-xs text-muted-foreground">bpm</p>
                   </div>
                 )}
                 {visit.vitals.temperature && (
-                  <div className="rounded-md border border-gray-200 bg-gray-50 p-3">
-                    <p className="mb-1 text-xs text-gray-600">{t('patient.vitals.temperature')}</p>
-                    <p className="text-lg font-semibold text-gray-900">
+                  <div className="rounded-md border border-border bg-muted/50 p-3">
+                    <p className="mb-1 text-xs text-muted-foreground">{t('patient.vitals.temperature')}</p>
+                    <p className="text-lg font-semibold text-foreground">
                       {visit.vitals.temperature}
                     </p>
-                    <p className="text-xs text-gray-500">°{visit.vitals.temperature_unit || 'F'}</p>
+                    <p className="text-xs text-muted-foreground">°{visit.vitals.temperature_unit || 'F'}</p>
                   </div>
                 )}
                 {visit.vitals.weight && (
-                  <div className="rounded-md border border-gray-200 bg-gray-50 p-3">
-                    <p className="mb-1 text-xs text-gray-600">{t('patient.vitals.weight')}</p>
-                    <p className="text-lg font-semibold text-gray-900">{visit.vitals.weight}</p>
-                    <p className="text-xs text-gray-500">{visit.vitals.weight_unit || 'kg'}</p>
+                  <div className="rounded-md border border-border bg-muted/50 p-3">
+                    <p className="mb-1 text-xs text-muted-foreground">{t('patient.vitals.weight')}</p>
+                    <p className="text-lg font-semibold text-foreground">{visit.vitals.weight}</p>
+                    <p className="text-xs text-muted-foreground">{visit.vitals.weight_unit || 'kg'}</p>
                   </div>
                 )}
                 {visit.vitals.oxygen_saturation && (
-                  <div className="rounded-md border border-gray-200 bg-gray-50 p-3">
-                    <p className="mb-1 text-xs text-gray-600">
+                  <div className="rounded-md border border-border bg-muted/50 p-3">
+                    <p className="mb-1 text-xs text-muted-foreground">
                       {t('patient.vitals.oxygenSaturation')}
                     </p>
-                    <p className="text-lg font-semibold text-gray-900">
+                    <p className="text-lg font-semibold text-foreground">
                       {visit.vitals.oxygen_saturation}
                     </p>
-                    <p className="text-xs text-gray-500">%</p>
+                    <p className="text-xs text-muted-foreground">%</p>
                   </div>
                 )}
               </div>
@@ -248,7 +242,7 @@ const VisitHistoryCard = ({ visit, isExpanded = false, onToggleExpand, onDownloa
           {/* Allergies Recorded During Visit */}
           {visit.allergies && visit.allergies.length > 0 && (
             <div>
-              <h4 className="mb-3 flex items-center font-medium text-gray-700">
+              <h4 className="mb-3 flex items-center font-medium text-foreground">
                 <AlertTriangle size={16} className="mr-2 text-red-600" />
                 {t('patient.visit.allergiesRecorded')}
               </h4>
@@ -286,7 +280,7 @@ const VisitHistoryCard = ({ visit, isExpanded = false, onToggleExpand, onDownloa
           {/* Diagnoses Recorded During Visit */}
           {visit.visit_diagnoses && visit.visit_diagnoses.length > 0 && (
             <div>
-              <h4 className="mb-3 flex items-center font-medium text-gray-700">
+              <h4 className="mb-3 flex items-center font-medium text-foreground">
                 <Activity size={16} className="mr-2 text-purple-600" />
                 {t('patient.visit.diagnosesFromVisit')}
               </h4>
@@ -338,7 +332,7 @@ const VisitHistoryCard = ({ visit, isExpanded = false, onToggleExpand, onDownloa
           {/* Medications Prescribed */}
           {visit.prescriptions && visit.prescriptions.length > 0 && (
             <div>
-              <h4 className="mb-3 flex items-center font-medium text-gray-700">
+              <h4 className="mb-3 flex items-center font-medium text-foreground">
                 <Pill size={16} className="mr-2 text-blue-600" />
                 {t('patient.visit.medicationsPrescribed')}
               </h4>
@@ -349,7 +343,7 @@ const VisitHistoryCard = ({ visit, isExpanded = false, onToggleExpand, onDownloa
                       prescription.id ||
                       `prescription-${prescription.medication_name}-${prescription.dosage}`
                     }
-                    className="rounded-md border border-blue-200 bg-blue-50 p-3"
+                    className="rounded-md border border-blue-200 dark:border-blue-800 bg-blue-50 dark:bg-blue-950/30 p-3"
                   >
                     <div className="flex items-start justify-between">
                       <div>
@@ -370,7 +364,7 @@ const VisitHistoryCard = ({ visit, isExpanded = false, onToggleExpand, onDownloa
                         className={`text-xs ${
                           prescription.status === 'active'
                             ? 'bg-green-100 text-green-800'
-                            : 'bg-gray-100 text-gray-800'
+                            : 'bg-muted text-muted-foreground'
                         }`}
                       >
                         {prescription.status}
@@ -385,16 +379,16 @@ const VisitHistoryCard = ({ visit, isExpanded = false, onToggleExpand, onDownloa
           {/* Visit Cost Summary */}
           {(visit.consultation_fee || visit.services_total || visit.total_cost) && (
             <div>
-              <h4 className="mb-3 flex items-center font-medium text-gray-700">
+              <h4 className="mb-3 flex items-center font-medium text-foreground">
                 <DollarSign size={16} className="mr-2 text-green-600" />
                 Visit Cost Summary
               </h4>
-              <div className="rounded-md border border-gray-200 bg-gray-50 p-4">
+              <div className="rounded-md border border-border bg-muted/50 p-4">
                 <div className="space-y-3">
                   {visit.consultation_fee && visit.consultation_fee > 0 && (
                     <div className="flex justify-between text-sm">
-                      <span className="text-gray-600">{t('patient.visit.consultationFee')}:</span>
-                      <span className="font-medium text-gray-900">
+                      <span className="text-muted-foreground">{t('patient.visit.consultationFee')}:</span>
+                      <span className="font-medium text-foreground">
                         {formatCurrency(visit.consultation_fee)}
                       </span>
                     </div>
@@ -403,16 +397,16 @@ const VisitHistoryCard = ({ visit, isExpanded = false, onToggleExpand, onDownloa
                   {/* Services Detail */}
                   {visit.invoice?.service_items && visit.invoice.service_items.length > 0 && (
                     <div className="space-y-1.5">
-                      <div className="text-sm font-medium text-gray-700">
+                      <div className="text-sm font-medium text-foreground">
                         {t('patient.visit.services')} ({visit.invoice.service_items.length}{' '}
                         {t('patient.visit.items')}):
                       </div>
                       {visit.invoice.service_items.map((service, idx) => (
                         <div key={idx} className="flex justify-between pl-3 text-sm">
-                          <span className="text-gray-600">
+                          <span className="text-muted-foreground">
                             • {service.item_name} {service.quantity > 1 && `(x${service.quantity})`}
                           </span>
-                          <span className="font-medium text-gray-900">
+                          <span className="font-medium text-foreground">
                             {formatCurrency(service.total_price)}
                           </span>
                         </div>
@@ -423,16 +417,16 @@ const VisitHistoryCard = ({ visit, isExpanded = false, onToggleExpand, onDownloa
                   {/* Medications Detail */}
                   {visit.invoice?.medicine_items && visit.invoice.medicine_items.length > 0 && (
                     <div className="space-y-1.5">
-                      <div className="text-sm font-medium text-gray-700">
+                      <div className="text-sm font-medium text-foreground">
                         {t('patient.visit.medications')} ({visit.invoice.medicine_items.length}{' '}
                         {t('patient.visit.dispensed')}):
                       </div>
                       {visit.invoice.medicine_items.map((med, idx) => (
                         <div key={idx} className="flex justify-between pl-3 text-sm">
-                          <span className="text-gray-600">
+                          <span className="text-muted-foreground">
                             • {med.item_name} {med.quantity > 1 && `(x${med.quantity})`}
                           </span>
-                          <span className="font-medium text-gray-900">
+                          <span className="font-medium text-foreground">
                             {formatCurrency(med.total_price)}
                           </span>
                         </div>
@@ -446,13 +440,13 @@ const VisitHistoryCard = ({ visit, isExpanded = false, onToggleExpand, onDownloa
                     (!visit.invoice?.medicine_items ||
                       visit.invoice.medicine_items.length === 0) && (
                       <div className="space-y-1.5">
-                        <div className="text-sm font-medium text-gray-700">
+                        <div className="text-sm font-medium text-foreground">
                           {t('patient.visit.medicationsPrescribed')} ({visit.prescriptions.length}):
                         </div>
                         {visit.prescriptions.slice(0, 3).map((rx, idx) => (
                           <div key={idx} className="flex justify-between pl-3 text-sm">
-                            <span className="text-gray-600">• {rx.medication_name}</span>
-                            <span className="text-xs italic text-gray-500">
+                            <span className="text-muted-foreground">• {rx.medication_name}</span>
+                            <span className="text-xs italic text-muted-foreground">
                               {t('patient.visit.notYetDispensed')}
                             </span>
                           </div>
@@ -467,12 +461,12 @@ const VisitHistoryCard = ({ visit, isExpanded = false, onToggleExpand, onDownloa
                     )}
 
                   {visit.total_cost && visit.total_cost > 0 && (
-                    <div className="flex items-center justify-between border-t border-gray-300 pt-3">
-                      <span className="font-semibold text-gray-700">
+                    <div className="flex items-center justify-between border-t border-border pt-3">
+                      <span className="font-semibold text-foreground">
                         {t('patient.visit.totalCost')}:
                       </span>
                       <div className="flex items-center space-x-2">
-                        <span className="text-lg font-bold text-gray-900">
+                        <span className="text-lg font-bold text-foreground">
                           {formatCurrency(visit.total_cost)}
                         </span>
                         <Badge className={getPaymentStatusColor(visit.payment_status)}>
@@ -483,8 +477,8 @@ const VisitHistoryCard = ({ visit, isExpanded = false, onToggleExpand, onDownloa
                   )}
                   {(!visit.total_cost || visit.total_cost === 0) &&
                     visit.payment_status !== 'paid' && (
-                      <div className="flex items-center justify-between border-t border-gray-300 pt-2">
-                        <span className="font-semibold text-gray-700">
+                      <div className="flex items-center justify-between border-t border-border pt-2">
+                        <span className="font-semibold text-foreground">
                           {t('patient.visit.paymentStatus')}:
                         </span>
                         <Badge className={getPaymentStatusColor('pending')}>

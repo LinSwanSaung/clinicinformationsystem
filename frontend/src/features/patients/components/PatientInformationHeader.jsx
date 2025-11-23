@@ -28,7 +28,7 @@ const PatientInformationHeader = ({
 
         <div className="flex-1">
           <div className="mb-4 flex items-center justify-between">
-            <h1 className="text-2xl font-bold text-gray-900">{fullName}</h1>
+            <h1 className="text-2xl font-bold text-foreground">{fullName}</h1>
             <div className="flex space-x-3">
               {showBackButton && onBackClick && (
                 <Button
@@ -56,12 +56,12 @@ const PatientInformationHeader = ({
 
           <div className="grid grid-cols-1 gap-4 text-sm md:grid-cols-2 lg:grid-cols-4">
             <div>
-              <span className="text-gray-500">Patient ID:</span>
-              <p className="font-medium text-gray-900">{patient.patient_number || patient.id}</p>
+              <span className="text-muted-foreground">Patient ID:</span>
+              <p className="font-medium text-foreground">{patient.patient_number || patient.id}</p>
             </div>
             <div>
-              <span className="text-gray-500">Age:</span>
-              <p className="font-medium text-gray-900">
+              <span className="text-muted-foreground">Age:</span>
+              <p className="font-medium text-foreground">
                 {patient.age ||
                   (patient.date_of_birth
                     ? Math.floor(
@@ -73,12 +73,12 @@ const PatientInformationHeader = ({
               </p>
             </div>
             <div>
-              <span className="text-gray-500">Gender:</span>
-              <p className="font-medium text-gray-900">{patient.gender}</p>
+              <span className="text-muted-foreground">Gender:</span>
+              <p className="font-medium text-foreground">{patient.gender}</p>
             </div>
             <div>
-              <span className="text-gray-500">Blood Type:</span>
-              <p className="font-medium text-gray-900">
+              <span className="text-muted-foreground">Blood Type:</span>
+              <p className="font-medium text-foreground">
                 {patient.blood_group || patient.bloodType || 'Not specified'}
               </p>
             </div>
@@ -88,14 +88,14 @@ const PatientInformationHeader = ({
             <div className="mt-4 flex space-x-6">
               {patient.phone && (
                 <div className="flex items-center space-x-2">
-                  <Phone size={16} className="text-gray-500" />
-                  <span className="text-sm text-gray-700">{patient.phone}</span>
+                  <Phone size={16} className="text-muted-foreground" />
+                  <span className="text-sm text-foreground">{patient.phone}</span>
                 </div>
               )}
               {patient.email && (
                 <div className="flex items-center space-x-2">
-                  <Mail size={16} className="text-gray-500" />
-                  <span className="text-sm text-gray-700">{patient.email}</span>
+                  <Mail size={16} className="text-muted-foreground" />
+                  <span className="text-sm text-foreground">{patient.email}</span>
                 </div>
               )}
             </div>
@@ -103,7 +103,7 @@ const PatientInformationHeader = ({
 
           {patient.urgency && (
             <div className="mt-4">
-              <Badge className="bg-orange-100 px-3 py-1 text-sm text-orange-800">
+              <Badge className="bg-orange-100 dark:bg-orange-900/30 px-3 py-1 text-sm text-orange-800 dark:text-orange-200">
                 Priority: {patient.urgency}
               </Badge>
             </div>

@@ -21,6 +21,7 @@ import {
 import { motion, AnimatePresence } from 'framer-motion';
 import { employeeService } from '@/features/admin';
 import NotificationBell from './NotificationBell';
+import ThemeToggle from './ThemeToggle';
 import LanguageSwitcher from './LanguageSwitcher';
 import clinicSettingsService from '@/services/clinicSettingsService';
 import { APP_CONFIG } from '@/constants/app';
@@ -360,7 +361,7 @@ const Navbar = () => {
                       className={`flex items-center gap-2 px-4 py-2 text-base font-medium transition-all ${
                         item.isActive
                           ? 'hover:bg-primary/90 bg-primary text-primary-foreground'
-                          : 'text-muted-foreground hover:bg-accent hover:text-foreground'
+                          : 'bg-transparent text-muted-foreground hover:bg-accent hover:text-foreground'
                       }`}
                     >
                       <Icon className="h-5 w-5" />
@@ -415,6 +416,9 @@ const Navbar = () => {
 
           {/* Notifications */}
           <NotificationBell />
+
+          {/* Theme Toggle */}
+          <ThemeToggle />
 
           {/* Language Switcher - Only for non-admin roles */}
           {user?.role !== 'admin' && <LanguageSwitcher />}

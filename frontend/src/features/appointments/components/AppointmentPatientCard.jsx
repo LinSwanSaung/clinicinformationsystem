@@ -41,19 +41,19 @@ const AppointmentPatientCard = ({
   const getStatusColor = (status) => {
     switch (status) {
       case 'scheduled':
-        return 'bg-blue-100 text-blue-800 border-blue-200';
+        return 'bg-blue-100 dark:bg-blue-900/30 text-blue-800 dark:text-blue-200 border-blue-200 dark:border-blue-800';
       case 'confirmed':
-        return 'bg-green-100 text-green-800 border-green-200';
+        return 'bg-green-100 dark:bg-green-900/30 text-green-800 dark:text-green-200 border-green-200 dark:border-green-800';
       case 'in_progress':
-        return 'bg-yellow-100 text-yellow-800 border-yellow-200';
+        return 'bg-yellow-100 dark:bg-yellow-900/30 text-yellow-800 dark:text-yellow-200 border-yellow-200 dark:border-yellow-800';
       case 'completed':
-        return 'bg-gray-100 text-gray-800 border-gray-200';
+        return 'bg-gray-100 dark:bg-muted/50 text-gray-800 dark:text-muted-foreground border-gray-200 dark:border-border';
       case 'cancelled':
-        return 'bg-red-100 text-red-800 border-red-200';
+        return 'bg-red-100 dark:bg-red-900/30 text-red-800 dark:text-red-200 border-red-200 dark:border-red-800';
       case 'no_show':
-        return 'bg-orange-100 text-orange-800 border-orange-200';
+        return 'bg-orange-100 dark:bg-orange-900/30 text-orange-800 dark:text-orange-200 border-orange-200 dark:border-orange-800';
       default:
-        return 'bg-gray-100 text-gray-800 border-gray-200';
+        return 'bg-gray-100 dark:bg-muted/50 text-gray-800 dark:text-muted-foreground border-gray-200 dark:border-border';
     }
   };
 
@@ -144,6 +144,7 @@ const AppointmentPatientCard = ({
                 </div>
               </div>
               <Badge
+                variant="outline"
                 className={`${getStatusColor(appointment.status)} flex w-fit flex-shrink-0 items-center gap-1`}
               >
                 <StatusIcon className="h-3 w-3" />
@@ -177,7 +178,7 @@ const AppointmentPatientCard = ({
               <div className="flex flex-wrap gap-1.5 sm:gap-2">
                 <Badge
                   variant="outline"
-                  className="border-blue-200 bg-blue-50 text-xs text-blue-700"
+                  className="border-blue-200 dark:border-blue-800 bg-blue-50 dark:bg-blue-950/30 text-xs text-blue-700 dark:text-blue-200"
                 >
                   <Stethoscope className="mr-1 h-3 w-3" />
                   <span className="truncate">
@@ -187,7 +188,7 @@ const AppointmentPatientCard = ({
                 {doctor.specialty && (
                   <Badge
                     variant="outline"
-                    className="border-purple-200 bg-purple-50 text-xs text-purple-700"
+                    className="border-purple-200 dark:border-purple-800 bg-purple-50 dark:bg-purple-900/30 text-xs text-purple-700 dark:text-purple-200"
                   >
                     <span className="truncate">{doctor.specialty}</span>
                   </Badge>
@@ -195,7 +196,7 @@ const AppointmentPatientCard = ({
                 {appointment.appointment_type && (
                   <Badge
                     variant="outline"
-                    className="border-green-200 bg-green-50 text-xs text-green-700"
+                    className="border-green-200 dark:border-green-800 bg-green-50 dark:bg-green-900/30 text-xs text-green-700 dark:text-green-200"
                   >
                     <span className="truncate">{appointment.appointment_type}</span>
                   </Badge>
@@ -208,7 +209,7 @@ const AppointmentPatientCard = ({
                   {patient.blood_group && (
                     <Badge
                       variant="outline"
-                      className="border-red-200 bg-red-50 text-xs text-red-700"
+                      className="border-red-200 dark:border-red-800 bg-red-50 dark:bg-red-900/30 text-xs text-red-700 dark:text-red-200"
                     >
                       Blood: {patient.blood_group}
                     </Badge>
@@ -216,7 +217,7 @@ const AppointmentPatientCard = ({
                   {patient.allergies && (
                     <Badge
                       variant="outline"
-                      className="border-orange-200 bg-orange-50 text-orange-700"
+                      className="border-orange-200 dark:border-orange-800 bg-orange-50 dark:bg-orange-900/30 text-orange-700 dark:text-orange-200"
                     >
                       <AlertCircle className="mr-1 h-3 w-3" />
                       Allergies: {patient.allergies}
@@ -263,7 +264,7 @@ const AppointmentPatientCard = ({
                       variant="outline"
                       size="sm"
                       onClick={() => setShowCancelDialog(true)}
-                      className="w-full text-red-600 hover:bg-red-50 hover:text-red-700 sm:flex-1"
+                      className="w-full text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/30 hover:text-red-700 dark:hover:text-red-300 sm:flex-1"
                     >
                       <XCircle className="mr-2 h-3 w-3 sm:h-4 sm:w-4" />
                       <span className="text-xs sm:text-sm">Cancel</span>

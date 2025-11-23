@@ -66,10 +66,7 @@ export function startAppointmentReminders() {
               sentNotifications.set(morningReminderKey, now.getTime());
               logger.info(`[REMINDERS] Sent morning reminder for appointment ${appt.id}`);
             } catch (nerr) {
-              logger.warn(
-                `[REMINDERS] Failed to send morning reminder for appointment ${appt.id}:`,
-                nerr.message
-              );
+              logger.warn(`[REMINDERS] Failed to send morning reminder for appointment ${appt.id}:`, nerr.message);
             }
           }
         }
@@ -96,10 +93,7 @@ export function startAppointmentReminders() {
               sentNotifications.set(oneHourReminderKey, now.getTime());
               logger.info(`[REMINDERS] Sent 1-hour reminder for appointment ${appt.id}`);
             } catch (nerr) {
-              logger.warn(
-                `[REMINDERS] Failed to send 1-hour reminder for appointment ${appt.id}:`,
-                nerr.message
-              );
+              logger.warn(`[REMINDERS] Failed to send 1-hour reminder for appointment ${appt.id}:`, nerr.message);
             }
           }
         }

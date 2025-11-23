@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect } from 'react';
-import { Plus, X, ChevronDown } from 'lucide-react';
+import { Plus, X } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 
@@ -67,109 +67,6 @@ const commonDurations = [
   '60 days',
   '90 days',
 ];
-
-// Combobox component for autocomplete with free text (reserved for future use)
-// eslint-disable-next-line unused-imports/no-unused-vars
-const Combobox = ({ value, onChange, options, placeholder, className = '' }) => {
-  const [isOpen, setIsOpen] = useState(false);
-  const [inputValue, setInputValue] = useState(value);
-  const [dropdownPosition, setDropdownPosition] = useState({ top: 0, left: 0, width: 0 });
-  const containerRef = useRef(null);
-  const inputRef = useRef(null);
-
-  useEffect(() => {
-    setInputValue(value);
-  }, [value]);
-
-  useEffect(() => {
-    const handleClickOutside = (event) => {
-      if (containerRef.current && !containerRef.current.contains(event.target)) {
-        setIsOpen(false);
-      }
-    };
-
-    document.addEventListener('mousedown', handleClickOutside);
-    return () => document.removeEventListener('mousedown', handleClickOutside);
-  }, []);
-
-  // Calculate dropdown position when opening
-  useEffect(() => {
-    if (isOpen && inputRef.current) {
-      const rect = inputRef.current.getBoundingClientRect();
-      setDropdownPosition({
-        top: rect.bottom + 2,
-        left: rect.left,
-        width: rect.width,
-      });
-    }
-  }, [isOpen]);
-
-  const filteredOptions = options.filter((option) =>
-    option.toLowerCase().includes((inputValue || '').toLowerCase())
-  );
-
-  const handleInputChange = (e) => {
-    const newValue = e.target.value;
-    setInputValue(newValue);
-    onChange(newValue);
-    setIsOpen(true);
-  };
-
-  const handleSelectOption = (option) => {
-    setInputValue(option);
-    onChange(option);
-    setIsOpen(false);
-  };
-
-  const toggleDropdown = () => {
-    setIsOpen(!isOpen);
-  };
-
-  return (
-    <>
-      <div ref={containerRef} className={`relative ${className}`}>
-        <div className="relative">
-          <input
-            ref={inputRef}
-            type="text"
-            className="h-9 w-full rounded-md border border-gray-300 px-3 pr-8 text-sm focus:border-transparent focus:outline-none focus:ring-2 focus:ring-blue-500"
-            value={inputValue || ''}
-            onChange={handleInputChange}
-            onFocus={() => setIsOpen(true)}
-            placeholder={placeholder}
-          />
-          <ChevronDown
-            className="absolute right-2 top-1/2 -translate-y-1/2 cursor-pointer text-gray-400"
-            size={16}
-            onClick={toggleDropdown}
-          />
-        </div>
-      </div>
-
-      {/* Portal-style dropdown with fixed positioning */}
-      {isOpen && filteredOptions.length > 0 && (
-        <div
-          className="fixed z-[9999] max-h-60 overflow-auto rounded-md border border-gray-300 bg-white shadow-lg"
-          style={{
-            top: `${dropdownPosition.top}px`,
-            left: `${dropdownPosition.left}px`,
-            width: `${dropdownPosition.width}px`,
-          }}
-        >
-          {filteredOptions.map((option, idx) => (
-            <div
-              key={idx}
-              className="cursor-pointer px-3 py-2 text-sm hover:bg-blue-50"
-              onClick={() => handleSelectOption(option)}
-            >
-              {option}
-            </div>
-          ))}
-        </div>
-      )}
-    </>
-  );
-};
 
 export const MedicationForm = ({
   medications,
@@ -269,7 +166,7 @@ export const MedicationForm = ({
     <div className={`space-y-4 ${className}`}>
       {showLabel && (
         <div className="flex items-center justify-between">
-          <label className="block text-sm font-medium text-gray-700">Prescribed Medications</label>
+          <label className="block text-sm font-medium text-foreground">Prescribed Medications</label>
           {canAdd && (
             <Button
               type="button"
@@ -287,10 +184,10 @@ export const MedicationForm = ({
 
       <div className="max-h-[500px] space-y-4 overflow-y-auto">
         {medications.map((medication, index) => (
-          <div key={index} className="space-y-3 rounded-lg border border-gray-200 bg-gray-50 p-4">
+          <div key={index} className="space-y-3 rounded-lg border border-border bg-muted/50 p-4">
             {/* Header with remove button */}
             <div className="flex items-center justify-between">
-              <span className="text-sm font-semibold text-gray-700">Medication #{index + 1}</span>
+              <span className="text-sm font-semibold text-foreground">Medication #{index + 1}</span>
               {canRemove && medications.length > 1 && (
                 <Button
                   type="button"
@@ -307,7 +204,7 @@ export const MedicationForm = ({
             {/* Row 1: Medication Name and Dosage */}
             <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
               <div>
-                <label className="mb-1 block text-xs font-medium text-gray-600">
+                <label className="mb-1 block text-xs font-medium text-foreground">
                   Medication Name <span className="text-red-500">*</span>
                 </label>
                 {medication.customName ? (
@@ -348,14 +245,14 @@ export const MedicationForm = ({
                         });
                         onChange(updated);
                       }}
-                      className="h-9 border-gray-300 px-3 text-xs hover:bg-gray-50"
+                      className="h-9 border-input px-3 text-xs hover:bg-accent"
                     >
                       List
                     </Button>
                   </div>
                 ) : (
                   <select
-                    className="h-9 w-full rounded-md border border-gray-300 px-3 text-sm focus:border-transparent focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    className="h-9 w-full rounded-md border border-input bg-background px-3 text-sm text-foreground focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary"
                     value={medication.customName ? '' : medication.name || ''}
                     onChange={(e) => {
                       const value = e.target.value;
@@ -381,7 +278,7 @@ export const MedicationForm = ({
               </div>
 
               <div>
-                <label className="mb-1 block text-xs font-medium text-gray-600">
+                <label className="mb-1 block text-xs font-medium text-foreground">
                   Dosage <span className="text-red-500">*</span>
                 </label>
                 {medication.customDosage ? (
@@ -408,7 +305,7 @@ export const MedicationForm = ({
                   </div>
                 ) : (
                   <select
-                    className="h-9 w-full rounded-md border border-gray-300 px-3 text-sm focus:border-transparent focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    className="h-9 w-full rounded-md border border-input bg-background px-3 text-sm text-foreground focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary"
                     value={medication.dosage || ''}
                     onChange={(e) => {
                       const value = e.target.value;
@@ -436,7 +333,7 @@ export const MedicationForm = ({
             {/* Row 2: Frequency and Duration */}
             <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
               <div>
-                <label className="mb-1 block text-xs font-medium text-gray-600">
+                <label className="mb-1 block text-xs font-medium text-foreground">
                   Frequency <span className="text-red-500">*</span>
                 </label>
                 <select
@@ -454,7 +351,7 @@ export const MedicationForm = ({
               </div>
 
               <div>
-                <label className="mb-1 block text-xs font-medium text-gray-600">Duration</label>
+                <label className="mb-1 block text-xs font-medium text-foreground">Duration</label>
                 <select
                   className="h-9 w-full rounded-md border border-gray-300 px-3 text-sm focus:border-transparent focus:outline-none focus:ring-2 focus:ring-blue-500"
                   value={medication.duration || ''}
@@ -473,7 +370,7 @@ export const MedicationForm = ({
             {/* Row 3: Quantity (Auto-calculated) and Refills */}
             <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
               <div>
-                <label className="mb-1 block text-xs font-medium text-gray-600">
+                <label className="mb-1 block text-xs font-medium text-foreground">
                   Quantity
                   {medication.quantity && (
                     <span className="ml-1 text-xs text-green-600">(Auto-calculated)</span>
@@ -490,7 +387,7 @@ export const MedicationForm = ({
               </div>
 
               <div>
-                <label className="mb-1 block text-xs font-medium text-gray-600">Refills</label>
+                <label className="mb-1 block text-xs font-medium text-foreground">Refills</label>
                 <select
                   className="h-9 w-full rounded-md border border-gray-300 px-3 text-sm focus:border-transparent focus:outline-none focus:ring-2 focus:ring-blue-500"
                   value={medication.refills || 0}
@@ -512,7 +409,7 @@ export const MedicationForm = ({
             <div>
               <label className="mb-1 block text-xs font-medium text-gray-600">Instructions</label>
               <textarea
-                className="min-h-[60px] w-full resize-none rounded-md border border-gray-300 px-3 py-2 text-sm focus:border-transparent focus:outline-none focus:ring-2 focus:ring-blue-500"
+                className="min-h-[60px] w-full resize-none rounded-md border border-input bg-background px-3 py-2 text-sm text-foreground focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary"
                 placeholder="e.g., Take with food. Avoid alcohol."
                 value={medication.instructions || ''}
                 onChange={(e) => handleMedicationChange(index, 'instructions', e.target.value)}
@@ -523,7 +420,7 @@ export const MedicationForm = ({
       </div>
 
       {medications.length === 0 && (
-        <div className="py-4 text-center text-sm text-gray-500">No medications prescribed</div>
+        <div className="py-4 text-center text-sm text-muted-foreground">No medications prescribed</div>
       )}
     </div>
   );

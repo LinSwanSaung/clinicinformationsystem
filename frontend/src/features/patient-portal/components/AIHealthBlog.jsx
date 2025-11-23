@@ -106,13 +106,13 @@ const AIHealthBlog = ({ patientId, language }) => {
           <h2 className="text-xl font-bold">{t('patient.aiHealth.title')}</h2>
         </div>
         <div className="space-y-3">
-          <div className="h-4 w-3/4 animate-pulse rounded bg-gray-200" />
-          <div className="h-4 w-full animate-pulse rounded bg-gray-200" />
-          <div className="h-4 w-5/6 animate-pulse rounded bg-gray-200" />
-          <div className="h-4 w-full animate-pulse rounded bg-gray-200" />
-          <div className="h-4 w-2/3 animate-pulse rounded bg-gray-200" />
+          <div className="h-4 w-3/4 animate-pulse rounded bg-muted" />
+          <div className="h-4 w-full animate-pulse rounded bg-muted" />
+          <div className="h-4 w-5/6 animate-pulse rounded bg-muted" />
+          <div className="h-4 w-full animate-pulse rounded bg-muted" />
+          <div className="h-4 w-2/3 animate-pulse rounded bg-muted" />
         </div>
-        <p className="mt-4 text-center text-sm text-gray-500">{t('patient.aiHealth.loading')}</p>
+        <p className="mt-4 text-center text-sm text-muted-foreground">{t('patient.aiHealth.loading')}</p>
       </Card>
     );
   }
@@ -142,27 +142,27 @@ const AIHealthBlog = ({ patientId, language }) => {
   }
 
   return (
-    <Card className="border-purple-200 bg-gradient-to-br from-purple-50 to-blue-50 p-6">
+    <Card className="border-purple-200 dark:border-purple-900/50 bg-gradient-to-br from-purple-50 to-blue-50 dark:from-purple-950/20 dark:to-blue-950/20 p-6">
       <div className="mb-4 flex items-start justify-between">
         <div className="flex items-center space-x-3">
-          <div className="rounded-lg bg-purple-100 p-2">
-            <Sparkles className="h-6 w-6 text-purple-600" />
+          <div className="rounded-lg bg-purple-100 dark:bg-purple-900/30 p-2">
+            <Sparkles className="h-6 w-6 text-purple-600 dark:text-purple-400" />
           </div>
           <div>
-            <h2 className="flex items-center gap-2 text-xl font-bold text-gray-900">
+            <h2 className="flex items-center gap-2 text-xl font-bold text-foreground">
               {t('patient.aiHealth.title')}
-              <span className="inline-flex items-center gap-1 rounded-full bg-purple-100 px-2.5 py-1 text-xs font-semibold text-purple-700">
+              <span className="inline-flex items-center gap-1 rounded-full bg-purple-100 dark:bg-purple-900/30 px-2.5 py-1 text-xs font-semibold text-purple-700 dark:text-purple-200">
                 {meta.emoji} {meta.label}
               </span>
             </h2>
             {healthAdvice.type === 'diagnosis-based' && healthAdvice.diagnosis && (
-              <p className="flex flex-wrap items-center gap-1 text-sm text-gray-600">
+              <p className="flex flex-wrap items-center gap-1 text-sm text-muted-foreground">
                 {t('patient.aiHealth.diagnosisPrefix')}{' '}
-                <span className="font-semibold">{healthAdvice.diagnosis}</span>
+                <span className="font-semibold text-foreground">{healthAdvice.diagnosis}</span>
                 {healthAdvice.diagnosedDate && (
                   <>
-                    <span className="text-gray-400">•</span>
-                    <span className="text-gray-500">
+                    <span className="text-muted-foreground/50">•</span>
+                    <span className="text-muted-foreground">
                       {new Date(healthAdvice.diagnosedDate).toLocaleDateString(locale)}
                     </span>
                   </>
@@ -170,7 +170,7 @@ const AIHealthBlog = ({ patientId, language }) => {
               </p>
             )}
             {healthAdvice.type === 'wellness' && (
-              <p className="flex items-center text-sm text-gray-600">
+              <p className="flex items-center text-sm text-muted-foreground">
                 <Heart className="mr-1 h-4 w-4 text-pink-500" />
                 {meta.label}
               </p>
@@ -182,51 +182,51 @@ const AIHealthBlog = ({ patientId, language }) => {
           variant="ghost"
           size="sm"
           disabled={refreshing}
-          className="text-purple-600 hover:bg-purple-100 hover:text-purple-700"
+          className="text-purple-600 dark:text-purple-400 hover:bg-purple-100 dark:hover:bg-purple-900/30 hover:text-purple-700 dark:hover:text-purple-300"
         >
           <RefreshCw className={`h-4 w-4 ${refreshing ? 'animate-spin' : ''}`} />
         </Button>
       </div>
 
       <div className="prose prose-sm max-w-none">
-        <div className="space-y-4 rounded-lg border border-purple-100 bg-white p-5 shadow-sm">
+        <div className="space-y-4 rounded-lg border border-purple-100 dark:border-purple-900/50 bg-card p-5 shadow-sm">
           <div className="flex items-start gap-3">
             <PartyPopper className="mt-0.5 h-5 w-5 text-amber-500" />
             <div>
-              <p className="text-sm font-semibold text-gray-800">
+              <p className="text-sm font-semibold text-foreground">
                 {t('patient.aiHealth.introTitle')}
               </p>
-              <p className="text-sm text-gray-600">{t('patient.aiHealth.introBody')}</p>
+              <p className="text-sm text-muted-foreground">{t('patient.aiHealth.introBody')}</p>
             </div>
           </div>
 
           <ReactMarkdown
             components={{
               h1: (props) => (
-                <h1 className="mb-2 mt-4 text-lg font-bold text-gray-900 first:mt-0" {...props} />
+                <h1 className="mb-2 mt-4 text-lg font-bold text-foreground first:mt-0" {...props} />
               ),
               h2: (props) => (
-                <h2 className="mb-2 mt-3 text-base font-semibold text-gray-800" {...props} />
+                <h2 className="mb-2 mt-3 text-base font-semibold text-foreground" {...props} />
               ),
               h3: (props) => (
-                <h3 className="mb-1 mt-2 text-sm font-semibold text-gray-700" {...props} />
+                <h3 className="mb-1 mt-2 text-sm font-semibold text-foreground" {...props} />
               ),
-              p: (props) => <p className="mb-2 text-sm leading-relaxed text-gray-700" {...props} />,
+              p: (props) => <p className="mb-2 text-sm leading-relaxed text-foreground" {...props} />,
               ul: (props) => (
                 <ul
-                  className="mb-2 list-inside list-disc space-y-1 text-sm text-gray-700"
+                  className="mb-2 list-inside list-disc space-y-1 text-sm text-foreground"
                   {...props}
                 />
               ),
               ol: (props) => (
                 <ol
-                  className="mb-2 list-inside list-decimal space-y-1 text-sm text-gray-700"
+                  className="mb-2 list-inside list-decimal space-y-1 text-sm text-foreground"
                   {...props}
                 />
               ),
               li: (props) => <li className="ml-2" {...props} />,
-              strong: (props) => <strong className="font-semibold text-gray-900" {...props} />,
-              em: (props) => <em className="italic text-gray-600" {...props} />,
+              strong: (props) => <strong className="font-semibold text-foreground" {...props} />,
+              em: (props) => <em className="italic text-muted-foreground" {...props} />,
             }}
           >
             {healthAdvice.content}
@@ -234,14 +234,14 @@ const AIHealthBlog = ({ patientId, language }) => {
         </div>
       </div>
 
-      <div className="mt-4 rounded-lg border border-yellow-200 bg-yellow-50 p-3">
-        <p className="text-xs leading-relaxed text-yellow-800">
+      <div className="mt-4 rounded-lg border border-yellow-200 dark:border-yellow-800 bg-yellow-50 dark:bg-yellow-950/30 p-3">
+        <p className="text-xs leading-relaxed text-yellow-800 dark:text-yellow-200">
           {t('patient.aiHealth.disclaimer')}
         </p>
       </div>
 
       {healthAdvice.generatedAt && (
-        <p className="mt-3 text-right text-xs text-gray-500">
+        <p className="mt-3 text-right text-xs text-muted-foreground">
           {t('patient.aiHealth.generatedAt')}:{' '}
           {new Date(healthAdvice.generatedAt).toLocaleString(locale)}
         </p>

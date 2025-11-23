@@ -41,8 +41,8 @@ const AdminLogin = () => {
               <Stethoscope className="h-8 w-8 text-white" />
             </div>
           </div>
-          <h1 className="mb-2 text-3xl font-bold text-gray-900">ThriveCare</h1>
-          <p className="text-gray-600">Clinic Information System</p>
+          <h1 className="mb-2 text-3xl font-bold text-foreground">ThriveCare</h1>
+          <p className="text-muted-foreground">Clinic Information System</p>
         </div>
 
         {/* Login Card */}
@@ -54,17 +54,17 @@ const AdminLogin = () => {
           <CardContent>
             <form onSubmit={handleLogin} className="space-y-4">
               {error && (
-                <div className="rounded-md border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-600">
+                <div className="rounded-md border border-destructive/50 bg-destructive/10 px-4 py-3 text-sm text-destructive">
                   {error}
                 </div>
               )}
 
               <div className="space-y-2">
-                <label htmlFor="email" className="text-sm font-medium text-gray-700">
+                <label htmlFor="email" className="text-sm font-medium text-foreground">
                   Email Address
                 </label>
                 <div className="relative">
-                  <Mail className="absolute left-3 top-3 h-4 w-4 text-gray-400" />
+                  <Mail className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
                   <Input
                     id="email"
                     type="email"
@@ -79,11 +79,11 @@ const AdminLogin = () => {
               </div>
 
               <div className="space-y-2">
-                <label htmlFor="password" className="text-sm font-medium text-gray-700">
+                <label htmlFor="password" className="text-sm font-medium text-foreground">
                   Password
                 </label>
                 <div className="relative">
-                  <Lock className="absolute left-3 top-3 h-4 w-4 text-gray-400" />
+                  <Lock className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
                   <Input
                     id="password"
                     type="password"
@@ -110,9 +110,9 @@ const AdminLogin = () => {
             </form>
 
             {/* Development helper */}
-            <div className="mt-6 rounded-md border bg-gray-50 p-4">
-              <p className="mb-2 text-sm font-medium text-gray-700">Test Credentials:</p>
-              <div className="space-y-1 text-xs text-gray-600">
+            <div className="mt-6 rounded-md border border-border bg-muted/50 p-4">
+              <p className="mb-2 text-sm font-medium text-foreground">Test Credentials:</p>
+              <div className="space-y-1 text-xs text-muted-foreground">
                 <div>
                   <strong>Admin:</strong> admin@clinic.com / admin123
                 </div>

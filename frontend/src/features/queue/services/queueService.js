@@ -33,17 +33,16 @@ class QueueService {
       return response;
     } catch (error) {
       // Extract detailed error message from API response
-      const errorMessage =
-        error.response?.data?.message || error.message || 'Failed to issue queue token';
+      const errorMessage = error.response?.data?.message || error.message || 'Failed to issue queue token';
       const errorCode = error.response?.data?.code;
       const errorDetails = error.response?.data?.details;
-
+      
       // Create enhanced error with code and details
       const enhancedError = new Error(errorMessage);
       enhancedError.code = errorCode;
       enhancedError.details = errorDetails;
       enhancedError.status = error.response?.status;
-
+      
       throw enhancedError;
     }
   }
@@ -454,9 +453,7 @@ class QueueService {
 
       const waitingTokens = allTokens.filter((t) => t && t.status === 'waiting');
 
-      if (waitingTokens.length === 0) {
-        return 0;
-      }
+      if (waitingTokens.length === 0) return 0;
 
       const totalWaitTime = waitingTokens.reduce((sum, token) => {
         try {
@@ -482,11 +479,11 @@ class QueueService {
       waiting: 'bg-yellow-100 text-yellow-800 border-yellow-200',
       called: 'bg-blue-100 text-blue-800 border-blue-200',
       serving: 'bg-green-100 text-green-800 border-green-200',
-      completed: 'bg-gray-100 text-gray-800 border-gray-200',
-      missed: 'bg-red-100 text-red-800 border-red-200',
-      cancelled: 'bg-gray-100 text-gray-600 border-gray-200',
+      completed: 'bg-muted text-muted-foreground border-border',
+      missed: 'bg-red-100 text-red-800 border-red-200 dark:bg-red-900 dark:text-red-200 dark:border-red-800',
+      cancelled: 'bg-muted text-muted-foreground border-border',
     };
-    return statusColors[status] || 'bg-gray-100 text-gray-800 border-gray-200';
+    return statusColors[status] || 'bg-muted text-muted-foreground border-border';
   }
 
   /**
@@ -500,7 +497,7 @@ class QueueService {
       4: 'bg-red-100 text-red-800',
       5: 'bg-purple-100 text-purple-800',
     };
-    return priorityColors[priority] || 'bg-gray-100 text-gray-800';
+    return priorityColors[priority] || 'bg-muted text-muted-foreground';
   }
 
   /**

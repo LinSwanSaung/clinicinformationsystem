@@ -193,7 +193,7 @@ const DoctorAvailability = () => {
                             <CardTitle className="text-lg">
                               Dr. {doctor.first_name} {doctor.last_name}
                             </CardTitle>
-                            <p className="text-sm text-gray-600">{doctor.specialty || 'General'}</p>
+                            <p className="text-sm text-muted-foreground">{doctor.specialty || 'General'}</p>
                           </div>
                         </div>
                       </div>
@@ -201,32 +201,32 @@ const DoctorAvailability = () => {
 
                     <CardContent className="space-y-3">
                       <div className="space-y-2">
-                        <div className="flex items-center gap-2 text-sm text-gray-600">
+                        <div className="flex items-center gap-2 text-sm text-muted-foreground">
                           <Mail className="h-4 w-4" />
                           <span>{doctor.email}</span>
                         </div>
-                        <div className="flex items-center gap-2 text-sm text-gray-600">
+                        <div className="flex items-center gap-2 text-sm text-muted-foreground">
                           <Phone className="h-4 w-4" />
                           <span>{doctor.phone || 'N/A'}</span>
                         </div>
-                        <div className="flex items-center gap-2 text-sm text-gray-600">
+                        <div className="flex items-center gap-2 text-sm text-muted-foreground">
                           <Calendar className="h-4 w-4" />
                           <span>Availability: {availabilitySummary}</span>
                         </div>
                       </div>
 
-                      <div className="mt-3 flex flex-wrap items-center gap-2 text-xs text-gray-500">
-                        <span className="font-medium text-gray-700">
+                      <div className="mt-3 flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
+                        <span className="font-medium text-foreground">
                           {activeDayCount} active {activeDayCount === 1 ? 'day' : 'days'}
                         </span>
-                        <span className="text-gray-300">|</span>
-                        <span className="font-medium text-gray-500">
+                        <span className="text-border">|</span>
+                        <span className="font-medium text-muted-foreground">
                           {offDayCount} {offDayCount === 1 ? 'day off' : 'days off'}
                         </span>
                       </div>
 
                       {activeDayCount === 0 ? (
-                        <div className="mt-3 rounded-lg border border-dashed border-gray-200 bg-gray-50 p-3 text-sm text-gray-600">
+                        <div className="mt-3 rounded-lg border border-dashed border-border bg-muted/50 p-3 text-sm text-muted-foreground">
                           No availability has been configured. Use the button below to add working
                           hours.
                         </div>
@@ -240,10 +240,10 @@ const DoctorAvailability = () => {
                               const baseClasses =
                                 'px-3 py-1 rounded-full text-sm font-medium border transition-all';
                               const stateClasses = !isActive
-                                ? 'bg-gray-100 text-gray-400 border-gray-200 cursor-not-allowed'
+                                ? 'bg-muted text-muted-foreground border-border cursor-not-allowed opacity-50'
                                 : isSelected
-                                  ? 'bg-emerald-100 text-emerald-700 border-emerald-200 shadow-sm'
-                                  : 'bg-emerald-50 text-emerald-700 border-emerald-200 hover:bg-emerald-100';
+                                  ? 'bg-primary/20 text-primary border-primary/30 shadow-sm'
+                                  : 'bg-primary/10 text-primary border-primary/20 hover:bg-primary/20';
 
                               return (
                                 <button
@@ -268,13 +268,13 @@ const DoctorAvailability = () => {
                           </div>
 
                           {selectedDay && sortedSelectedSlots.length > 0 && (
-                            <div className="mt-3 rounded-lg border border-emerald-100 bg-emerald-50/80 p-3">
-                              <div className="flex items-center justify-between text-sm font-medium text-emerald-800">
+                            <div className="mt-3 rounded-lg border border-primary/20 bg-primary/10 p-3">
+                              <div className="flex items-center justify-between text-sm font-medium text-primary">
                                 <div className="flex items-center gap-2">
                                   <Calendar className="h-4 w-4" />
                                   <span>{selectedDay}</span>
                                 </div>
-                                <span className="text-xs text-emerald-700">
+                                <span className="text-xs text-primary">
                                   {sortedSelectedSlots.length}{' '}
                                   {sortedSelectedSlots.length === 1 ? 'slot' : 'slots'}
                                 </span>
@@ -283,7 +283,7 @@ const DoctorAvailability = () => {
                                 {sortedSelectedSlots.map((slot, index) => (
                                   <span
                                     key={slot.id || `${slot.start_time}-${slot.end_time}-${index}`}
-                                    className="rounded-full border border-emerald-200 bg-white px-3 py-1 text-sm text-emerald-700 shadow-sm"
+                                    className="rounded-full border border-primary/30 bg-card px-3 py-1 text-sm text-primary shadow-sm"
                                   >
                                     {formatTimeRange(slot.start_time, slot.end_time)}
                                   </span>
@@ -316,9 +316,9 @@ const DoctorAvailability = () => {
             {doctors.length === 0 && (
               <Card>
                 <CardContent className="p-8 text-center">
-                  <Stethoscope className="mx-auto mb-4 h-12 w-12 text-gray-400" />
-                  <h3 className="mb-2 text-lg font-medium text-gray-900">No doctors found</h3>
-                  <p className="mb-4 text-gray-600">
+                  <Stethoscope className="mx-auto mb-4 h-12 w-12 text-muted-foreground" />
+                  <h3 className="mb-2 text-lg font-medium text-card-foreground">No doctors found</h3>
+                  <p className="mb-4 text-muted-foreground">
                     Add doctors in the Employee Management page first.
                   </p>
                   <Button onClick={() => navigate('/admin/employees')}>
@@ -491,11 +491,11 @@ const ScheduleDialog = ({ isOpen, onClose, doctor, onScheduleAdded }) => {
                   </SelectContent>
                 </Select>
               </div>
-              <p className="mt-1 text-xs text-gray-500">Format: H:MM (e.g., 9:00, 10:30)</p>
+              <p className="mt-1 text-xs text-muted-foreground">Format: H:MM (e.g., 9:00, 10:30)</p>
             </div>
 
             <div>
-              <label className="mb-2 block text-sm font-medium text-gray-700">End Time</label>
+              <label className="mb-2 block text-sm font-medium text-foreground">End Time</label>
               <div className="flex gap-2">
                 <Input
                   type="text"
@@ -517,7 +517,7 @@ const ScheduleDialog = ({ isOpen, onClose, doctor, onScheduleAdded }) => {
                   </SelectContent>
                 </Select>
               </div>
-              <p className="mt-1 text-xs text-gray-500">Format: H:MM (e.g., 9:00, 10:30)</p>
+              <p className="mt-1 text-xs text-muted-foreground">Format: H:MM (e.g., 9:00, 10:30)</p>
             </div>
           </div>
 

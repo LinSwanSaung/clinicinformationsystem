@@ -37,11 +37,11 @@ class InvoiceItemModel extends BaseModel {
     if (error) {
       throw error;
     }
-
+    
     if (!data) {
       throw new Error('Invoice item not found');
     }
-
+    
     return data;
   }
 
@@ -75,11 +75,11 @@ class InvoiceItemModel extends BaseModel {
     if (error) {
       throw error;
     }
-
+    
     if (!data) {
       throw new Error('Invoice item not found. It may have been deleted by another user.');
     }
-
+    
     return data;
   }
 
@@ -97,11 +97,11 @@ class InvoiceItemModel extends BaseModel {
     if (error) {
       throw error;
     }
-
+    
     if (!data) {
       throw new Error('Invoice item not found. It may have already been deleted.');
     }
-
+    
     return data;
   }
 

@@ -178,120 +178,111 @@ const NurseDashboard = () => {
   }, [selectedDoctor, doctorsQuery]);
 
   // Handle viewing doctor's patients
-  const handleViewPatients = useCallback(
-    async (doctor) => {
-      try {
-        setLoading(true);
-        setSelectedDoctor(doctor);
+  const handleViewPatients = useCallback(async (doctor) => {
+    try {
+      setLoading(true);
+      setSelectedDoctor(doctor);
 
-        // Fetch fresh queue data from the backend instead of using cached data
-        logger.debug('🔄 [NURSE] Fetching fresh queue data for doctor:', doctor.id);
-        const queueResponse = await queueService.getDoctorQueueStatus(doctor.id);
+      // Fetch fresh queue data from the backend instead of using cached data
+      logger.debug('🔄 [NURSE] Fetching fresh queue data for doctor:', doctor.id);
+      const queueResponse = await queueService.getDoctorQueueStatus(doctor.id);
 
-        if (!queueResponse.success) {
-          logger.error('Failed to fetch queue status:', queueResponse);
-          setPatients([]);
-          return;
-        }
+      if (!queueResponse.success) {
+        logger.error('Failed to fetch queue status:', queueResponse);
+        setPatients([]);
+        return;
+      }
 
-        // Get both tokens (walk-ins) and appointments (scheduled) from the fresh queue data
-        const queueTokens = queueResponse.data?.tokens || [];
-        const queueAppointments = queueResponse.data?.appointments || [];
-        logger.debug(
-          `📋 [NURSE] Received ${queueTokens.length} tokens and ${queueAppointments.length} appointments from backend`
-        );
+      // Get both tokens (walk-ins) and appointments (scheduled) from the fresh queue data
+      const queueTokens = queueResponse.data?.tokens || [];
+      const queueAppointments = queueResponse.data?.appointments || [];
+      logger.debug(
+        `📋 [NURSE] Received ${queueTokens.length} tokens and ${queueAppointments.length} appointments from backend`
+      );
 
-        // Debug: Log token status breakdown
-        const statusBreakdown = queueTokens.reduce((acc, token) => {
-          acc[token.status] = (acc[token.status] || 0) + 1;
-          return acc;
-        }, {});
-        logger.debug(`📊 [NURSE] Token status breakdown:`, statusBreakdown);
+      // Debug: Log token status breakdown
+      const statusBreakdown = queueTokens.reduce((acc, token) => {
+        acc[token.status] = (acc[token.status] || 0) + 1;
+        return acc;
+      }, {});
+      logger.debug(`📊 [NURSE] Token status breakdown:`, statusBreakdown);
 
-        // Filter out cancelled appointments - include ALL other statuses (waiting, called, serving, completed, missed)
-        // This ensures we show all patients for the day, including completed consultations
-        const activeTokens = queueTokens.filter((token) => token.status !== 'cancelled');
-        logger.debug(
-          `📋 [NURSE] Filtered to ${activeTokens.length} tokens (excluded ${queueTokens.length - activeTokens.length} cancelled). Statuses included: ${Object.keys(
-            statusBreakdown
-          )
-            .filter((s) => s !== 'cancelled')
-            .join(', ')}`
-        );
+      // Filter out cancelled appointments - include ALL other statuses (waiting, called, serving, completed, missed)
+      // This ensures we show all patients for the day, including completed consultations
+      const activeTokens = queueTokens.filter((token) => token.status !== 'cancelled');
+      logger.debug(
+        `📋 [NURSE] Filtered to ${activeTokens.length} tokens (excluded ${queueTokens.length - activeTokens.length} cancelled). Statuses included: ${Object.keys(statusBreakdown).filter(s => s !== 'cancelled').join(', ')}`
+      );
 
-        // Use only queue tokens (no appointment queue)
-        // Show ALL tokens for the day - each token represents a visit, so patients with multiple visits will show multiple entries
-        const allPatients = activeTokens.map((t) => ({ ...t, queueType: 'token' }));
+      // Use only queue tokens (no appointment queue)
+      // Show ALL tokens for the day - each token represents a visit, so patients with multiple visits will show multiple entries
+      const allPatients = activeTokens.map((t) => ({ ...t, queueType: 'token' }));
 
-        // Sort by token number (ascending) to show patients in order they were seen
-        // This ensures all patients for the day are visible, including completed ones
-        allPatients.sort((a, b) => {
-          // First sort by status: serving > called > waiting > completed > missed
-          const statusOrder = { serving: 0, called: 1, waiting: 2, completed: 3, missed: 4 };
-          const statusDiff = (statusOrder[a.status] ?? 5) - (statusOrder[b.status] ?? 5);
-          if (statusDiff !== 0) {
-            return statusDiff;
+      // Sort by token number (ascending) to show patients in order they were seen
+      // This ensures all patients for the day are visible, including completed ones
+      allPatients.sort((a, b) => {
+        // First sort by status: serving > called > waiting > completed > missed
+        const statusOrder = { serving: 0, called: 1, waiting: 2, completed: 3, missed: 4 };
+        const statusDiff = (statusOrder[a.status] ?? 5) - (statusOrder[b.status] ?? 5);
+        if (statusDiff !== 0) return statusDiff;
+        
+        // Then by token number
+        return (a.token_number || 0) - (b.token_number || 0);
+      });
+
+      logger.debug(
+        `📋 [NURSE] Showing ${allPatients.length} tokens (all patients for the day, including completed)`
+      );
+
+      // Fetch vitals for each patient using the new per-visit logic
+      // OPTIMIZATION: Skip vitals fetch for completed patients (they won't change)
+      // This reduces API calls significantly
+      const patientsWithVitals = await Promise.all(
+        allPatients.map(async (patient) => {
+          // Skip vitals fetch for completed/missed patients - they won't change
+          if (patient.status === 'completed' || patient.status === 'missed') {
+            return {
+              ...patient,
+              latestVitals: null, // Completed patients don't need fresh vitals
+            };
           }
 
-          // Then by token number
-          return (a.token_number || 0) - (b.token_number || 0);
-        });
+          try {
+            const vitals = await fetchTokenVitals(patient);
 
-        logger.debug(
-          `📋 [NURSE] Showing ${allPatients.length} tokens (all patients for the day, including completed)`
-        );
+            const patientWithVitals = {
+              ...patient,
+              latestVitals: vitals,
+            };
 
-        // Fetch vitals for each patient using the new per-visit logic
-        // OPTIMIZATION: Skip vitals fetch for completed patients (they won't change)
-        // This reduces API calls significantly
-        const patientsWithVitals = await Promise.all(
-          allPatients.map(async (patient) => {
-            // Skip vitals fetch for completed/missed patients - they won't change
-            if (patient.status === 'completed' || patient.status === 'missed') {
-              return {
-                ...patient,
-                latestVitals: null, // Completed patients don't need fresh vitals
-              };
-            }
+            logger.debug(`[NURSE] Patient #${patient.token_number} after vitals fetch:`, {
+              token_number: patient.token_number,
+              visit_id: patient.visit_id,
+              hasLatestVitals: !!patientWithVitals.latestVitals,
+              latestVitals: patientWithVitals.latestVitals,
+            });
 
-            try {
-              const vitals = await fetchTokenVitals(patient);
+            return patientWithVitals;
+          } catch (error) {
+            logger.debug(`No vitals found for patient ${patient.patient?.id}`);
+            return {
+              ...patient,
+              latestVitals: null,
+            };
+          }
+        })
+      );
 
-              const patientWithVitals = {
-                ...patient,
-                latestVitals: vitals,
-              };
-
-              logger.debug(`[NURSE] Patient #${patient.token_number} after vitals fetch:`, {
-                token_number: patient.token_number,
-                visit_id: patient.visit_id,
-                hasLatestVitals: !!patientWithVitals.latestVitals,
-                latestVitals: patientWithVitals.latestVitals,
-              });
-
-              return patientWithVitals;
-            } catch (error) {
-              logger.debug(`No vitals found for patient ${patient.patient?.id}`);
-              return {
-                ...patient,
-                latestVitals: null,
-              };
-            }
-          })
-        );
-
-        logger.debug('✅ [NURSE] Patient list updated with fresh vitals and appointments');
-        logger.debug('[NURSE] Total patients with vitals data:', patientsWithVitals.length);
-        setPatients(patientsWithVitals);
-      } catch (error) {
-        logger.error('Failed to load patients:', error);
-        setPatients([]);
-      } finally {
-        setLoading(false);
-      }
-    },
-    [showError]
-  );
+      logger.debug('✅ [NURSE] Patient list updated with fresh vitals and appointments');
+      logger.debug('[NURSE] Total patients with vitals data:', patientsWithVitals.length);
+      setPatients(patientsWithVitals);
+    } catch (error) {
+      logger.error('Failed to load patients:', error);
+      setPatients([]);
+    } finally {
+      setLoading(false);
+    }
+  }, [showError]);
 
   // Auto-refresh patient list when viewing a specific doctor
   const selectedDoctorRef = useRef(selectedDoctor);
@@ -300,18 +291,13 @@ const NurseDashboard = () => {
   }, [selectedDoctor]);
 
   useEffect(() => {
-    if (!selectedDoctor) {
-      return;
-    }
+    if (!selectedDoctor) return;
 
     // Set up auto-refresh interval for patient list
     const refreshInterval = setInterval(() => {
       if (selectedDoctorRef.current) {
         // Silent refresh - fetch fresh data without showing loading
-        logger.debug(
-          '[NURSE] Auto-refreshing patient list for doctor:',
-          selectedDoctorRef.current.id
-        );
+        logger.debug('[NURSE] Auto-refreshing patient list for doctor:', selectedDoctorRef.current.id);
         queueService
           .getDoctorQueueStatus(selectedDoctorRef.current.id)
           .then((queueResponse) => {
@@ -324,9 +310,7 @@ const NurseDashboard = () => {
               allPatients.sort((a, b) => {
                 const statusOrder = { serving: 0, called: 1, waiting: 2, completed: 3, missed: 4 };
                 const statusDiff = (statusOrder[a.status] ?? 5) - (statusOrder[b.status] ?? 5);
-                if (statusDiff !== 0) {
-                  return statusDiff;
-                }
+                if (statusDiff !== 0) return statusDiff;
                 return (a.token_number || 0) - (b.token_number || 0);
               });
 
@@ -487,10 +471,10 @@ const NurseDashboard = () => {
         };
 
         logger.debug('💾 [NURSE] Saving vitals:', vitalsData);
-
+        
         // Find the patient token to update
         const patientToken = patients.find(
-          (p) => p.patient?.id === patientId || p.id === patientId
+          (p) => (p.patient?.id === patientId || p.id === patientId)
         );
 
         // Optimistically update vitals in UI immediately
@@ -538,17 +522,9 @@ const NurseDashboard = () => {
 
                 // Sort by status and token number
                 allPatients.sort((a, b) => {
-                  const statusOrder = {
-                    serving: 0,
-                    called: 1,
-                    waiting: 2,
-                    completed: 3,
-                    missed: 4,
-                  };
+                  const statusOrder = { serving: 0, called: 1, waiting: 2, completed: 3, missed: 4 };
                   const statusDiff = (statusOrder[a.status] ?? 5) - (statusOrder[b.status] ?? 5);
-                  if (statusDiff !== 0) {
-                    return statusDiff;
-                  }
+                  if (statusDiff !== 0) return statusDiff;
                   return (a.token_number || 0) - (b.token_number || 0);
                 });
 
@@ -602,99 +578,95 @@ const NurseDashboard = () => {
       const token = patients.find(
         (p) => (p.patient?.id === patientId || p.id === patientId) && p.status === 'waiting'
       );
-
+      
       if (!token) {
         showError('Could not find active token for this patient.');
         return;
       }
 
       try {
-        // Optimistic update - update UI immediately
-        setPatients((prevPatients) =>
-          prevPatients.map((p) => (p.id === token.id ? { ...p, status: 'called' } : p))
-        );
+          // Optimistic update - update UI immediately
+          setPatients((prevPatients) =>
+            prevPatients.map((p) =>
+              p.id === token.id ? { ...p, status: 'called' } : p
+            )
+          );
 
-        showSuccess('Patient marked as ready');
+          showSuccess('Patient marked as ready');
 
-        // Then update on server (in background)
-        await queueService.markPatientReady(token.id);
+          // Then update on server (in background)
+          await queueService.markPatientReady(token.id);
 
-        // Silent refresh to sync with server (preserves optimistic update)
-        if (selectedDoctor) {
-          // Silent refresh without loading spinner
-          queueService
-            .getDoctorQueueStatus(selectedDoctor.id)
-            .then((queueResponse) => {
-              if (queueResponse.success && queueResponse.data) {
-                const queueTokens = queueResponse.data.tokens || [];
-                const activeTokens = queueTokens.filter((token) => token.status !== 'cancelled');
-                const allPatients = activeTokens.map((t) => ({ ...t, queueType: 'token' }));
+          // Silent refresh to sync with server (preserves optimistic update)
+          if (selectedDoctor) {
+            // Silent refresh without loading spinner
+            queueService
+              .getDoctorQueueStatus(selectedDoctor.id)
+              .then((queueResponse) => {
+                if (queueResponse.success && queueResponse.data) {
+                  const queueTokens = queueResponse.data.tokens || [];
+                  const activeTokens = queueTokens.filter((token) => token.status !== 'cancelled');
+                  const allPatients = activeTokens.map((t) => ({ ...t, queueType: 'token' }));
 
-                // Sort by status and token number (same as main load)
-                allPatients.sort((a, b) => {
-                  const statusOrder = {
-                    serving: 0,
-                    called: 1,
-                    waiting: 2,
-                    completed: 3,
-                    missed: 4,
-                  };
-                  const statusDiff = (statusOrder[a.status] ?? 5) - (statusOrder[b.status] ?? 5);
-                  if (statusDiff !== 0) {
-                    return statusDiff;
-                  }
-                  return (a.token_number || 0) - (b.token_number || 0);
-                });
+                  // Sort by status and token number (same as main load)
+                  allPatients.sort((a, b) => {
+                    const statusOrder = { serving: 0, called: 1, waiting: 2, completed: 3, missed: 4 };
+                    const statusDiff = (statusOrder[a.status] ?? 5) - (statusOrder[b.status] ?? 5);
+                    if (statusDiff !== 0) return statusDiff;
+                    return (a.token_number || 0) - (b.token_number || 0);
+                  });
 
-                // Fetch vitals and update silently
-                Promise.all(
-                  allPatients.map(async (patient) => {
-                    try {
-                      const vitals = await fetchTokenVitals(patient);
-                      return { ...patient, latestVitals: vitals };
-                    } catch {
-                      return { ...patient, latestVitals: null };
-                    }
-                  })
-                ).then((patientsWithVitals) => {
-                  // Merge with existing to preserve optimistic updates
-                  setPatients((prevPatients) => {
-                    return patientsWithVitals.map((newPatient) => {
-                      const existing = prevPatients.find((p) => p.id === newPatient.id);
-                      // Preserve optimistic status if it was just updated
-                      // But prioritize server status if it's more advanced (e.g., 'serving' from doctor)
-                      if (existing && existing.status !== newPatient.status) {
-                        // If server says 'serving' (doctor started consultation), always use that
-                        if (newPatient.status === 'serving') {
-                          return newPatient; // Server status is authoritative
-                        }
-                        // If existing is 'serving' but server says 'called', keep 'serving' (doctor just started)
-                        if (existing.status === 'serving' && newPatient.status === 'called') {
-                          return { ...newPatient, status: existing.status };
-                        }
-                        // For mark ready optimistic update, preserve temporarily
-                        if (existing.status === 'called' && newPatient.status === 'waiting') {
-                          return { ...newPatient, status: existing.status };
-                        }
-                        // Default: use server status
-                        return newPatient;
+                  // Fetch vitals and update silently
+                  Promise.all(
+                    allPatients.map(async (patient) => {
+                      try {
+                        const vitals = await fetchTokenVitals(patient);
+                        return { ...patient, latestVitals: vitals };
+                      } catch {
+                        return { ...patient, latestVitals: null };
                       }
-                      return newPatient;
+                    })
+                  ).then((patientsWithVitals) => {
+                    // Merge with existing to preserve optimistic updates
+                    setPatients((prevPatients) => {
+                      return patientsWithVitals.map((newPatient) => {
+                        const existing = prevPatients.find((p) => p.id === newPatient.id);
+                        // Preserve optimistic status if it was just updated
+                        // But prioritize server status if it's more advanced (e.g., 'serving' from doctor)
+                        if (existing && existing.status !== newPatient.status) {
+                          // If server says 'serving' (doctor started consultation), always use that
+                          if (newPatient.status === 'serving') {
+                            return newPatient; // Server status is authoritative
+                          }
+                          // If existing is 'serving' but server says 'called', keep 'serving' (doctor just started)
+                          if (existing.status === 'serving' && newPatient.status === 'called') {
+                            return { ...newPatient, status: existing.status };
+                          }
+                          // For mark ready optimistic update, preserve temporarily
+                          if (existing.status === 'called' && newPatient.status === 'waiting') {
+                            return { ...newPatient, status: existing.status };
+                          }
+                          // Default: use server status
+                          return newPatient;
+                        }
+                        return newPatient;
+                      });
                     });
                   });
-                });
-              }
-            })
-            .catch((error) => {
-              logger.error('Failed to refresh after mark ready:', error);
-            });
-        }
+                }
+              })
+              .catch((error) => {
+                logger.error('Failed to refresh after mark ready:', error);
+              });
+          }
       } catch (error) {
         logger.error('Failed to mark patient ready:', error);
         showError('Failed to mark patient ready. Please try again.');
         // Revert optimistic update on error
         setPatients((prevPatients) =>
-          prevPatients.map((p) => (p.id === token?.id ? { ...p, status: 'waiting' } : p))
+          prevPatients.map((p) =>
+            p.id === token?.id ? { ...p, status: 'waiting' } : p
+          )
         );
       }
     },
@@ -717,7 +689,9 @@ const NurseDashboard = () => {
       try {
         // Optimistic update - update UI immediately
         setPatients((prevPatients) =>
-          prevPatients.map((p) => (p.id === token.id ? { ...p, status: 'waiting' } : p))
+          prevPatients.map((p) =>
+            p.id === token.id ? { ...p, status: 'waiting' } : p
+          )
         );
 
         showSuccess('Patient status reverted to waiting');
@@ -737,17 +711,9 @@ const NurseDashboard = () => {
 
                 // Sort by status and token number
                 allPatients.sort((a, b) => {
-                  const statusOrder = {
-                    serving: 0,
-                    called: 1,
-                    waiting: 2,
-                    completed: 3,
-                    missed: 4,
-                  };
+                  const statusOrder = { serving: 0, called: 1, waiting: 2, completed: 3, missed: 4 };
                   const statusDiff = (statusOrder[a.status] ?? 5) - (statusOrder[b.status] ?? 5);
-                  if (statusDiff !== 0) {
-                    return statusDiff;
-                  }
+                  if (statusDiff !== 0) return statusDiff;
                   return (a.token_number || 0) - (b.token_number || 0);
                 });
 
@@ -787,7 +753,9 @@ const NurseDashboard = () => {
         showError('Failed to unmark patient ready. Please try again.');
         // Revert optimistic update on error
         setPatients((prevPatients) =>
-          prevPatients.map((p) => (p.id === token.id ? { ...p, status: 'called' } : p))
+          prevPatients.map((p) =>
+            p.id === token.id ? { ...p, status: 'called' } : p
+          )
         );
       }
     },
@@ -841,7 +809,9 @@ const NurseDashboard = () => {
           // Optimistic update - remove delay status immediately
           setPatients((prevPatients) =>
             prevPatients.map((p) =>
-              p.id === patient.id ? { ...p, status: 'waiting', delayReason: null } : p
+              p.id === patient.id
+                ? { ...p, status: 'waiting', delayReason: null }
+                : p
             )
           );
 
@@ -1153,7 +1123,7 @@ const NurseDashboard = () => {
                   {/* Search Bar */}
                   <div className="relative max-w-md">
                     <Search
-                      className="absolute left-3 top-1/2 -translate-y-1/2 transform text-gray-400"
+                      className="absolute left-3 top-1/2 -translate-y-1/2 transform text-muted-foreground"
                       size={20}
                     />
                     <Input
@@ -1166,14 +1136,14 @@ const NurseDashboard = () => {
                   </div>
 
                   {/* Status Filter Tabs - Make sure they're visible */}
-                  <div className="w-full rounded-lg border border-gray-200 bg-white p-2 shadow-sm">
-                    <div className="flex space-x-1 rounded-lg bg-gray-100 p-1">
+                  <div className="w-full rounded-lg border border-border bg-card p-2 shadow-sm">
+                    <div className="flex space-x-1 rounded-lg bg-muted p-1">
                       <button
                         onClick={() => setSelectedStatus('all')}
                         className={`flex-1 rounded-md px-4 py-3 text-sm font-medium transition-colors ${
                           selectedStatus === 'all'
-                            ? 'border border-gray-200 bg-white text-gray-900 shadow-sm'
-                            : 'text-gray-500 hover:text-gray-700'
+                            ? 'border border-border bg-card text-card-foreground shadow-sm'
+                            : 'bg-transparent text-muted-foreground hover:bg-accent hover:text-foreground'
                         }`}
                       >
                         All ({patients.length})
@@ -1182,8 +1152,8 @@ const NurseDashboard = () => {
                         onClick={() => setSelectedStatus('waiting')}
                         className={`flex-1 rounded-md px-4 py-3 text-sm font-medium transition-colors ${
                           selectedStatus === 'waiting'
-                            ? 'border border-gray-200 bg-white text-gray-900 shadow-sm'
-                            : 'text-gray-500 hover:text-gray-700'
+                            ? 'border border-border bg-card text-card-foreground shadow-sm'
+                            : 'bg-transparent text-muted-foreground hover:bg-accent hover:text-foreground'
                         }`}
                       >
                         Waiting ({patients.filter((token) => token.status === 'waiting').length})
@@ -1192,8 +1162,8 @@ const NurseDashboard = () => {
                         onClick={() => setSelectedStatus('ready')}
                         className={`flex-1 rounded-md px-4 py-3 text-sm font-medium transition-colors ${
                           selectedStatus === 'ready'
-                            ? 'border border-gray-200 bg-white text-gray-900 shadow-sm'
-                            : 'text-gray-500 hover:text-gray-700'
+                            ? 'border border-border bg-card text-card-foreground shadow-sm'
+                            : 'bg-transparent text-muted-foreground hover:bg-accent hover:text-foreground'
                         }`}
                       >
                         Waiting for Doctor (
@@ -1208,8 +1178,8 @@ const NurseDashboard = () => {
                         onClick={() => setSelectedStatus('serving')}
                         className={`flex-1 rounded-md px-4 py-3 text-sm font-medium transition-colors ${
                           selectedStatus === 'serving'
-                            ? 'border border-gray-200 bg-white text-gray-900 shadow-sm'
-                            : 'text-gray-500 hover:text-gray-700'
+                            ? 'border border-border bg-card text-card-foreground shadow-sm'
+                            : 'bg-transparent text-muted-foreground hover:bg-accent hover:text-foreground'
                         }`}
                       >
                         In Consultation (
@@ -1219,8 +1189,8 @@ const NurseDashboard = () => {
                         onClick={() => setSelectedStatus('completed')}
                         className={`flex-1 rounded-md px-4 py-3 text-sm font-medium transition-colors ${
                           selectedStatus === 'completed'
-                            ? 'border border-gray-200 bg-white text-gray-900 shadow-sm'
-                            : 'text-gray-500 hover:text-gray-700'
+                            ? 'border border-border bg-card text-card-foreground shadow-sm'
+                            : 'bg-transparent text-muted-foreground hover:bg-accent hover:text-foreground'
                         }`}
                       >
                         Completed ({patients.filter((token) => token.status === 'completed').length}
@@ -1255,10 +1225,7 @@ const NurseDashboard = () => {
                           id: token.id, // Use token/queue ID for operations
                           patientId: token.patient?.id, // Store actual patient ID separately
                           visit_id: token.visit_id, // Add visit_id for vitals linking
-                          chief_complaint:
-                            token.visit?.chief_complaint ||
-                            token.appointment?.reason_for_visit ||
-                            null,
+                          chief_complaint: token.visit?.chief_complaint || token.appointment?.reason_for_visit || null,
                           name:
                             `${token.patient?.first_name || ''} ${token.patient?.last_name || ''}`.trim() ||
                             'Unknown Patient',

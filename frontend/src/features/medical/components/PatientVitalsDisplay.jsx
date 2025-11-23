@@ -97,7 +97,7 @@ const PatientVitalsDisplay = ({
               value && (
                 <div
                   key={key}
-                  className="flex items-center justify-between rounded-lg bg-gray-50 p-4"
+                  className="flex items-center justify-between rounded-lg bg-muted/50 p-4"
                 >
                   <div className="flex items-center space-x-3">
                     <Icon size={20} className={color} />
@@ -112,7 +112,7 @@ const PatientVitalsDisplay = ({
           )}
         </div>
       ) : (
-        <p className="text-sm italic text-gray-500">
+        <p className="text-sm italic text-muted-foreground">
           {t('patient.medicalRecords.noVitalsRecorded')}
         </p>
       )}

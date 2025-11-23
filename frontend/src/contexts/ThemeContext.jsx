@@ -13,7 +13,7 @@ export function ThemeProvider({ children }) {
     if (typeof window === 'undefined') {
       return 'light';
     }
-    
+
     try {
       // Check localStorage first
       const savedTheme = localStorage.getItem('theme');
@@ -32,8 +32,10 @@ export function ThemeProvider({ children }) {
   });
 
   useEffect(() => {
-    if (typeof document === 'undefined') return;
-    
+    if (typeof document === 'undefined') {
+      return;
+    }
+
     try {
       const root = document.documentElement;
       if (theme === 'dark') {
@@ -41,7 +43,7 @@ export function ThemeProvider({ children }) {
       } else {
         root.classList.remove('dark');
       }
-      
+
       // Save to localStorage
       if (typeof localStorage !== 'undefined') {
         localStorage.setItem('theme', theme);
@@ -69,4 +71,3 @@ export function useTheme() {
   }
   return context;
 }
-

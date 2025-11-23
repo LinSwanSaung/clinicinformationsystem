@@ -17,7 +17,8 @@ router.post(
   authenticate,
   authorize(ROLES.ADMIN, ROLES.CASHIER),
   asyncHandler(async (req, res) => {
-    const { invoice_id, amount, payment_method, payment_reference, payment_notes, version } = req.body;
+    const { invoice_id, amount, payment_method, payment_reference, payment_notes, version } =
+      req.body;
 
     if (!invoice_id) {
       return res.status(400).json({
@@ -33,7 +34,12 @@ router.post(
       payment_notes,
     };
 
-    const payment = await PaymentService.recordPayment(invoice_id, paymentData, req.user.id, version);
+    const payment = await PaymentService.recordPayment(
+      invoice_id,
+      paymentData,
+      req.user.id,
+      version
+    );
 
     // Audit log - Track payment transaction
     await logAuditEvent({

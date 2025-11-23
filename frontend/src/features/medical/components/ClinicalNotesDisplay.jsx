@@ -41,7 +41,7 @@ const ClinicalNotesDisplay = ({
           notes.map((note, index) => (
             <div key={index} className="overflow-hidden rounded-lg border border-border">
               <div
-                className="cursor-pointer bg-muted/50 p-4 transition-colors hover:bg-accent"
+                className="bg-muted/50 cursor-pointer p-4 transition-colors hover:bg-accent"
                 onClick={() => toggleNote(index)}
               >
                 <div className="flex items-center justify-between">
@@ -61,7 +61,7 @@ const ClinicalNotesDisplay = ({
                   {note.diagnosis && note.diagnosis !== 'N/A' && (
                     <div className="mb-4">
                       <h5 className="mb-2 text-sm font-bold text-foreground">Diagnosis:</h5>
-                      <p className="rounded-lg bg-yellow-50 dark:bg-yellow-950/30 p-3 text-sm text-foreground">
+                      <p className="rounded-lg bg-yellow-50 p-3 text-sm text-foreground dark:bg-yellow-950/30">
                         {note.diagnosis}
                       </p>
                     </div>
@@ -79,10 +79,17 @@ const ClinicalNotesDisplay = ({
                       </h5>
                       <div className="space-y-2">
                         {note.prescribedMedications.map((medication, medIndex) => (
-                          <div key={medIndex} className="rounded-lg bg-blue-50 dark:bg-blue-950/30 p-3">
+                          <div
+                            key={medIndex}
+                            className="rounded-lg bg-blue-50 p-3 dark:bg-blue-950/30"
+                          >
                             <div className="mb-1 flex items-center justify-between">
-                              <span className="text-sm font-medium text-foreground">{medication.name}</span>
-                              <span className="text-xs text-muted-foreground">- {medication.dosage}</span>
+                              <span className="text-sm font-medium text-foreground">
+                                {medication.name}
+                              </span>
+                              <span className="text-xs text-muted-foreground">
+                                - {medication.dosage}
+                              </span>
                             </div>
                             <div className="mt-2 space-y-1 text-xs text-muted-foreground">
                               {medication.frequency && <div>Frequency: {medication.frequency}</div>}

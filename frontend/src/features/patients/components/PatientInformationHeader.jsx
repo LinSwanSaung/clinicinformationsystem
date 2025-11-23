@@ -103,7 +103,7 @@ const PatientInformationHeader = ({
 
           {patient.urgency && (
             <div className="mt-4">
-              <Badge className="bg-orange-100 dark:bg-orange-900/30 px-3 py-1 text-sm text-orange-800 dark:text-orange-200">
+              <Badge className="bg-orange-100 px-3 py-1 text-sm text-orange-800 dark:bg-orange-900/30 dark:text-orange-200">
                 Priority: {patient.urgency}
               </Badge>
             </div>

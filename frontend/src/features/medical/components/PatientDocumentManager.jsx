@@ -23,7 +23,7 @@ const PatientDocumentManager = ({
             </div>
           </div>
 
-          <div className="rounded-lg border-2 border-dashed border-border p-8 text-center transition-colors hover:border-primary/50">
+          <div className="hover:border-primary/50 rounded-lg border-2 border-dashed border-border p-8 text-center transition-colors">
             <Upload size={32} className="mx-auto mb-4 text-muted-foreground" />
             <h4 className="mb-2 text-sm font-medium text-foreground">Upload Patient Documents</h4>
             <p className="mb-4 text-sm text-muted-foreground">
@@ -49,7 +49,7 @@ const PatientDocumentManager = ({
             {files.map((file, index) => (
               <div
                 key={index}
-                className="flex items-center justify-between rounded-lg border bg-muted/50 p-4 transition-shadow hover:shadow-md"
+                className="bg-muted/50 flex items-center justify-between rounded-lg border p-4 transition-shadow hover:shadow-md"
               >
                 <div className="flex items-center space-x-4">
                   <div className="flex h-12 w-12 items-center justify-center rounded bg-blue-100 dark:bg-blue-900/30">
@@ -68,7 +68,9 @@ const PatientDocumentManager = ({
                       </div>
                     )}
                     {file.uploadedBy && (
-                      <p className="mt-1 text-xs text-muted-foreground">Uploaded by: {file.uploadedBy}</p>
+                      <p className="mt-1 text-xs text-muted-foreground">
+                        Uploaded by: {file.uploadedBy}
+                      </p>
                     )}
                   </div>
                 </div>

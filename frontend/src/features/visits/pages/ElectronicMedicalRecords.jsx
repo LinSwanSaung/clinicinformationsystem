@@ -453,7 +453,7 @@ const ElectronicMedicalRecords = () => {
               {!loading && activeTab === 'overview' && (
                 <>
                   {!hasActiveVisit && (
-                    <Card className="mb-4 border-amber-300 dark:border-amber-700 bg-amber-50 dark:bg-amber-950/30 p-4">
+                    <Card className="mb-4 border-amber-300 bg-amber-50 p-4 dark:border-amber-700 dark:bg-amber-950/30">
                       <div className="flex items-center space-x-3 text-amber-800 dark:text-amber-200">
                         <AlertCircle size={20} />
                         <div>
@@ -508,13 +508,13 @@ const ElectronicMedicalRecords = () => {
               {activeTab === 'notes' && (
                 <>
                   {notesAuthError && (
-                    <div className="mb-3 rounded-md border border-yellow-200 dark:border-yellow-800 bg-yellow-50 dark:bg-yellow-950/30 p-3 text-sm text-yellow-800 dark:text-yellow-200">
+                    <div className="mb-3 rounded-md border border-yellow-200 bg-yellow-50 p-3 text-sm text-yellow-800 dark:border-yellow-800 dark:bg-yellow-950/30 dark:text-yellow-200">
                       Unable to load doctor&apos;s notes due to authorization. If your role should
                       have access, please contact an administrator.
                     </div>
                   )}
                   {!loading && visitCheckComplete && !hasActiveVisit && (
-                    <Card className="mb-4 border-amber-300 dark:border-amber-700 bg-amber-50 dark:bg-amber-950/30 p-4">
+                    <Card className="mb-4 border-amber-300 bg-amber-50 p-4 dark:border-amber-700 dark:bg-amber-950/30">
                       <div className="flex items-center space-x-3 text-amber-800 dark:text-amber-200">
                         <AlertCircle size={20} />
                         <div>

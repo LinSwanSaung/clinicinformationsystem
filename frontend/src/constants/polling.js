@@ -1,7 +1,7 @@
 /**
  * Polling interval constants for React Query refetchInterval
  * All values in milliseconds
- * 
+ *
  * IMPORTANT: These intervals affect database load. Keep them reasonable:
  * - Too frequent (10-15s) = excessive API calls and database load
  * - Too slow (5+ min) = stale data

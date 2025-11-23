@@ -237,7 +237,9 @@ const AuditLogs = () => {
               {
                 key: 'entity',
                 label: 'Entity',
-                render: (_, row) => <span className="text-foreground">{row.table_name || '—'}</span>,
+                render: (_, row) => (
+                  <span className="text-foreground">{row.table_name || '—'}</span>
+                ),
               },
               {
                 key: 'result',

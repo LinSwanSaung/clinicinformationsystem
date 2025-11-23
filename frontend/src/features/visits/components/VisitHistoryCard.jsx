@@ -90,7 +90,9 @@ const VisitHistoryCard = ({ visit, isExpanded = false, onToggleExpand, onDownloa
   };
 
   const formatDate = (dateString) => {
-    if (!dateString) return 'N/A';
+    if (!dateString) {
+      return 'N/A';
+    }
     return new Date(dateString).toLocaleDateString('en-US', {
       year: 'numeric',
       month: 'short',
@@ -101,7 +103,9 @@ const VisitHistoryCard = ({ visit, isExpanded = false, onToggleExpand, onDownloa
   };
 
   const formatCurrency = (amount) => {
-    if (!amount) return 'N/A';
+    if (!amount) {
+      return 'N/A';
+    }
     return formatCurrencySync(amount);
   };
 
@@ -109,7 +113,7 @@ const VisitHistoryCard = ({ visit, isExpanded = false, onToggleExpand, onDownloa
     <Card className="overflow-hidden border border-border transition-shadow hover:shadow-md">
       {/* Header - Always Visible */}
       <div
-        className="cursor-pointer bg-muted/50 p-4 transition-colors hover:bg-accent"
+        className="bg-muted/50 cursor-pointer p-4 transition-colors hover:bg-accent"
         onClick={handleToggle}
       >
         <div className="flex items-center justify-between">
@@ -167,7 +171,9 @@ const VisitHistoryCard = ({ visit, isExpanded = false, onToggleExpand, onDownloa
                 <FileText size={16} className="mr-2 text-blue-600" />
                 {t('patient.visit.chiefComplaint') || 'Reason for Visit'}
               </h4>
-              <p className="rounded-md bg-blue-50 dark:bg-blue-950/30 p-3 text-sm text-muted-foreground">{visit.chief_complaint}</p>
+              <p className="rounded-md bg-blue-50 p-3 text-sm text-muted-foreground dark:bg-blue-950/30">
+                {visit.chief_complaint}
+              </p>
             </div>
           )}
 
@@ -178,7 +184,9 @@ const VisitHistoryCard = ({ visit, isExpanded = false, onToggleExpand, onDownloa
                 <Activity size={16} className="mr-2 text-green-600" />
                 {t('patient.visit.primaryDiagnosis')}
               </h4>
-              <p className="rounded-md bg-green-50 dark:bg-green-950/30 p-3 text-sm text-muted-foreground">{visit.diagnosis}</p>
+              <p className="rounded-md bg-green-50 p-3 text-sm text-muted-foreground dark:bg-green-950/30">
+                {visit.diagnosis}
+              </p>
             </div>
           )}
 
@@ -191,7 +199,7 @@ const VisitHistoryCard = ({ visit, isExpanded = false, onToggleExpand, onDownloa
               </h4>
               <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
                 {visit.vitals.blood_pressure_systolic && visit.vitals.blood_pressure_diastolic && (
-                  <div className="rounded-md border border-border bg-muted/50 p-3">
+                  <div className="bg-muted/50 rounded-md border border-border p-3">
                     <p className="mb-1 text-xs text-muted-foreground">
                       {t('patient.vitals.bloodPressure')}
                     </p>
@@ -202,30 +210,42 @@ const VisitHistoryCard = ({ visit, isExpanded = false, onToggleExpand, onDownloa
                   </div>
                 )}
                 {visit.vitals.heart_rate && (
-                  <div className="rounded-md border border-border bg-muted/50 p-3">
-                    <p className="mb-1 text-xs text-muted-foreground">{t('patient.vitals.heartRate')}</p>
-                    <p className="text-lg font-semibold text-foreground">{visit.vitals.heart_rate}</p>
+                  <div className="bg-muted/50 rounded-md border border-border p-3">
+                    <p className="mb-1 text-xs text-muted-foreground">
+                      {t('patient.vitals.heartRate')}
+                    </p>
+                    <p className="text-lg font-semibold text-foreground">
+                      {visit.vitals.heart_rate}
+                    </p>
                     <p className="text-xs text-muted-foreground">bpm</p>
                   </div>
                 )}
                 {visit.vitals.temperature && (
-                  <div className="rounded-md border border-border bg-muted/50 p-3">
-                    <p className="mb-1 text-xs text-muted-foreground">{t('patient.vitals.temperature')}</p>
+                  <div className="bg-muted/50 rounded-md border border-border p-3">
+                    <p className="mb-1 text-xs text-muted-foreground">
+                      {t('patient.vitals.temperature')}
+                    </p>
                     <p className="text-lg font-semibold text-foreground">
                       {visit.vitals.temperature}
                     </p>
-                    <p className="text-xs text-muted-foreground">°{visit.vitals.temperature_unit || 'F'}</p>
+                    <p className="text-xs text-muted-foreground">
+                      °{visit.vitals.temperature_unit || 'F'}
+                    </p>
                   </div>
                 )}
                 {visit.vitals.weight && (
-                  <div className="rounded-md border border-border bg-muted/50 p-3">
-                    <p className="mb-1 text-xs text-muted-foreground">{t('patient.vitals.weight')}</p>
+                  <div className="bg-muted/50 rounded-md border border-border p-3">
+                    <p className="mb-1 text-xs text-muted-foreground">
+                      {t('patient.vitals.weight')}
+                    </p>
                     <p className="text-lg font-semibold text-foreground">{visit.vitals.weight}</p>
-                    <p className="text-xs text-muted-foreground">{visit.vitals.weight_unit || 'kg'}</p>
+                    <p className="text-xs text-muted-foreground">
+                      {visit.vitals.weight_unit || 'kg'}
+                    </p>
                   </div>
                 )}
                 {visit.vitals.oxygen_saturation && (
-                  <div className="rounded-md border border-border bg-muted/50 p-3">
+                  <div className="bg-muted/50 rounded-md border border-border p-3">
                     <p className="mb-1 text-xs text-muted-foreground">
                       {t('patient.vitals.oxygenSaturation')}
                     </p>
@@ -343,7 +363,7 @@ const VisitHistoryCard = ({ visit, isExpanded = false, onToggleExpand, onDownloa
                       prescription.id ||
                       `prescription-${prescription.medication_name}-${prescription.dosage}`
                     }
-                    className="rounded-md border border-blue-200 dark:border-blue-800 bg-blue-50 dark:bg-blue-950/30 p-3"
+                    className="rounded-md border border-blue-200 bg-blue-50 p-3 dark:border-blue-800 dark:bg-blue-950/30"
                   >
                     <div className="flex items-start justify-between">
                       <div>
@@ -383,11 +403,13 @@ const VisitHistoryCard = ({ visit, isExpanded = false, onToggleExpand, onDownloa
                 <DollarSign size={16} className="mr-2 text-green-600" />
                 Visit Cost Summary
               </h4>
-              <div className="rounded-md border border-border bg-muted/50 p-4">
+              <div className="bg-muted/50 rounded-md border border-border p-4">
                 <div className="space-y-3">
                   {visit.consultation_fee && visit.consultation_fee > 0 && (
                     <div className="flex justify-between text-sm">
-                      <span className="text-muted-foreground">{t('patient.visit.consultationFee')}:</span>
+                      <span className="text-muted-foreground">
+                        {t('patient.visit.consultationFee')}:
+                      </span>
                       <span className="font-medium text-foreground">
                         {formatCurrency(visit.consultation_fee)}
                       </span>

@@ -34,7 +34,9 @@ const AppointmentCard = ({
       transition={{ delay: index * 0.05, duration: 0.3 }}
       whileHover={{ scale: 1.01, y: -2 }}
       className={`rounded-lg border bg-background p-3 transition-all duration-200 hover:shadow-md sm:p-4 ${
-        isOverdue ? 'border-orange-200 dark:border-orange-800 bg-orange-50 dark:bg-orange-950/30' : 'border-border'
+        isOverdue
+          ? 'border-orange-200 bg-orange-50 dark:border-orange-800 dark:bg-orange-950/30'
+          : 'border-border'
       } ${className}`}
     >
       <div className="flex flex-col justify-between gap-3 sm:flex-row sm:items-center">
@@ -59,7 +61,7 @@ const AppointmentCard = ({
                     animate={{ scale: 1 }}
                     className="flex items-center"
                   >
-                    <Badge className="border-orange-200 dark:border-orange-800 bg-orange-100 dark:bg-orange-900/30 text-xs text-orange-800 dark:text-orange-200">
+                    <Badge className="border-orange-200 bg-orange-100 text-xs text-orange-800 dark:border-orange-800 dark:bg-orange-900/30 dark:text-orange-200">
                       <AlertCircle className="mr-1 h-3 w-3" />
                       Overdue
                     </Badge>
@@ -73,11 +75,11 @@ const AppointmentCard = ({
                 </div>
                 <div className="flex items-center gap-1">
                   <Stethoscope className="h-3 w-3 flex-shrink-0" />
-                  <span className="truncate rounded-md border border-blue-200 dark:border-blue-800 bg-blue-50 dark:bg-blue-950/30 px-2 py-1 text-xs font-medium text-blue-700 dark:text-blue-200">
+                  <span className="truncate rounded-md border border-blue-200 bg-blue-50 px-2 py-1 text-xs font-medium text-blue-700 dark:border-blue-800 dark:bg-blue-950/30 dark:text-blue-200">
                     {appointment.doctor_name}
                   </span>
                 </div>
-                <span className="truncate rounded-md border border-purple-200 dark:border-purple-800 bg-purple-50 dark:bg-purple-900/30 px-2 py-1 text-xs font-medium text-purple-700 dark:text-purple-200">
+                <span className="truncate rounded-md border border-purple-200 bg-purple-50 px-2 py-1 text-xs font-medium text-purple-700 dark:border-purple-800 dark:bg-purple-900/30 dark:text-purple-200">
                   {appointment.appointment_type || appointment.visit_type || 'Consultation'}
                 </span>
               </div>
@@ -125,7 +127,7 @@ const AppointmentCard = ({
           )}
 
           {appointment.status === 'ready' && (
-            <Badge className="border-green-200 dark:border-green-800 bg-green-50 dark:bg-green-900/30 text-xs text-green-700 dark:text-green-200">
+            <Badge className="border-green-200 bg-green-50 text-xs text-green-700 dark:border-green-800 dark:bg-green-900/30 dark:text-green-200">
               <span className="hidden sm:inline">✓ Ready/Checked In</span>
               <span className="sm:hidden">✓ Ready</span>
             </Badge>

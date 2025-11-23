@@ -30,10 +30,10 @@ const NotificationBell = () => {
     // apiService.get() returns the full response, so we need to access data.data.count
     const c = unreadQuery.data?.data?.count ?? unreadQuery.data?.count;
     const previousCount = unreadCount;
-    
+
     if (typeof c === 'number') {
       setUnreadCount(c);
-      
+
       // Show browser notification when new notifications arrive
       if (c > previousCount && previousCount > 0) {
         const newCount = c - previousCount;
@@ -57,23 +57,34 @@ const NotificationBell = () => {
       // Backend returns: { success: true, data: [...] }
       // notificationService.getNotifications() returns response.data which is { success: true, data: [...] }
       const newNotifications = response?.data || (Array.isArray(response) ? response : []);
-      
+
       // Check for new notifications and show browser alerts
       setNotifications((prevNotifications) => {
         if (prevNotifications.length > 0) {
-          const previousIds = new Set(prevNotifications.map(n => n.id));
-          const newOnes = newNotifications.filter(n => !previousIds.has(n.id));
-          
-          newOnes.forEach(notification => {
+          const previousIds = new Set(prevNotifications.map((n) => n.id));
+          const newOnes = newNotifications.filter((n) => !previousIds.has(n.id));
+
+          newOnes.forEach((notification) => {
             // Show browser notification for important types
-            if (notification.type === 'warning' || notification.related_entity_type === 'queue_token') {
+            if (
+              notification.type === 'warning' ||
+              notification.related_entity_type === 'queue_token'
+            ) {
               // Queue turn notification
-              if (notification.title.includes('Turn') || notification.title.includes('called') || notification.title.includes('You are')) {
+              if (
+                notification.title.includes('Turn') ||
+                notification.title.includes('called') ||
+                notification.title.includes('You are')
+              ) {
                 const tokenMatch = notification.message.match(/Token #(\d+)/);
                 const tokenNumber = tokenMatch ? tokenMatch[1] : '';
                 browserNotifications.showQueueTurn(tokenNumber, notification.message);
               } else {
-                browserNotifications.showNotification(notification.title, notification.message, notification.type);
+                browserNotifications.showNotification(
+                  notification.title,
+                  notification.message,
+                  notification.type
+                );
               }
             } else if (notification.related_entity_type === 'appointment') {
               // Appointment reminder
@@ -81,7 +92,7 @@ const NotificationBell = () => {
             }
           });
         }
-        
+
         return newNotifications;
       });
     } catch (error) {
@@ -157,9 +168,15 @@ const NotificationBell = () => {
     const diffMs = now - date;
     const diffMins = Math.floor(diffMs / 60000);
 
-    if (diffMins < 1) return 'Just now';
-    if (diffMins < 60) return `${diffMins}m ago`;
-    if (diffMins < 1440) return `${Math.floor(diffMins / 60)}h ago`;
+    if (diffMins < 1) {
+      return 'Just now';
+    }
+    if (diffMins < 60) {
+      return `${diffMins}m ago`;
+    }
+    if (diffMins < 1440) {
+      return `${Math.floor(diffMins / 60)}h ago`;
+    }
     return date.toLocaleDateString();
   };
 
@@ -204,7 +221,7 @@ const NotificationBell = () => {
             {unreadCount > 0 && (
               <button
                 onClick={handleMarkAllAsRead}
-                className="text-sm font-medium text-primary hover:text-primary/80"
+                className="hover:text-primary/80 text-sm font-medium text-primary"
               >
                 Mark all as read
               </button>
@@ -248,7 +265,7 @@ const NotificationBell = () => {
                           {!notification.is_read && (
                             <button
                               onClick={() => handleMarkAsRead(notification.id)}
-                              className="flex-shrink-0 text-xs text-primary hover:text-primary/80"
+                              className="hover:text-primary/80 flex-shrink-0 text-xs text-primary"
                             >
                               Mark read
                             </button>
@@ -271,7 +288,7 @@ const NotificationBell = () => {
           {/* Footer */}
           {notifications.length > 0 && (
             <div className="border-t border-border p-3 text-center">
-              <button className="text-sm font-medium text-primary hover:text-primary/80">
+              <button className="hover:text-primary/80 text-sm font-medium text-primary">
                 View all notifications
               </button>
             </div>

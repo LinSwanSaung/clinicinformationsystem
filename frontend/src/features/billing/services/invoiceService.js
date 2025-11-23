@@ -81,7 +81,10 @@ const invoiceService = {
     if (version !== null) {
       payload.version = version;
     }
-    const response = await apiService.put(`/invoices/${invoiceId}/outstanding-balance-flag`, payload);
+    const response = await apiService.put(
+      `/invoices/${invoiceId}/outstanding-balance-flag`,
+      payload
+    );
     return response.data;
   },
 

@@ -193,7 +193,9 @@ const DoctorAvailability = () => {
                             <CardTitle className="text-lg">
                               Dr. {doctor.first_name} {doctor.last_name}
                             </CardTitle>
-                            <p className="text-sm text-muted-foreground">{doctor.specialty || 'General'}</p>
+                            <p className="text-sm text-muted-foreground">
+                              {doctor.specialty || 'General'}
+                            </p>
                           </div>
                         </div>
                       </div>
@@ -226,7 +228,7 @@ const DoctorAvailability = () => {
                       </div>
 
                       {activeDayCount === 0 ? (
-                        <div className="mt-3 rounded-lg border border-dashed border-border bg-muted/50 p-3 text-sm text-muted-foreground">
+                        <div className="bg-muted/50 mt-3 rounded-lg border border-dashed border-border p-3 text-sm text-muted-foreground">
                           No availability has been configured. Use the button below to add working
                           hours.
                         </div>
@@ -268,7 +270,7 @@ const DoctorAvailability = () => {
                           </div>
 
                           {selectedDay && sortedSelectedSlots.length > 0 && (
-                            <div className="mt-3 rounded-lg border border-primary/20 bg-primary/10 p-3">
+                            <div className="border-primary/20 bg-primary/10 mt-3 rounded-lg border p-3">
                               <div className="flex items-center justify-between text-sm font-medium text-primary">
                                 <div className="flex items-center gap-2">
                                   <Calendar className="h-4 w-4" />
@@ -283,7 +285,7 @@ const DoctorAvailability = () => {
                                 {sortedSelectedSlots.map((slot, index) => (
                                   <span
                                     key={slot.id || `${slot.start_time}-${slot.end_time}-${index}`}
-                                    className="rounded-full border border-primary/30 bg-card px-3 py-1 text-sm text-primary shadow-sm"
+                                    className="border-primary/30 rounded-full border bg-card px-3 py-1 text-sm text-primary shadow-sm"
                                   >
                                     {formatTimeRange(slot.start_time, slot.end_time)}
                                   </span>
@@ -317,7 +319,9 @@ const DoctorAvailability = () => {
               <Card>
                 <CardContent className="p-8 text-center">
                   <Stethoscope className="mx-auto mb-4 h-12 w-12 text-muted-foreground" />
-                  <h3 className="mb-2 text-lg font-medium text-card-foreground">No doctors found</h3>
+                  <h3 className="mb-2 text-lg font-medium text-card-foreground">
+                    No doctors found
+                  </h3>
                   <p className="mb-4 text-muted-foreground">
                     Add doctors in the Employee Management page first.
                   </p>

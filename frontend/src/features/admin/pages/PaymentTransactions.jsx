@@ -154,7 +154,9 @@ const PaymentTransactions = () => {
               />
             </div>
             <div>
-              <label className="mb-1 block text-sm font-medium text-foreground">Payment Method</label>
+              <label className="mb-1 block text-sm font-medium text-foreground">
+                Payment Method
+              </label>
               <select
                 className="w-full rounded-md border border-input bg-background px-3 py-2 text-foreground"
                 value={filters.payment_method}
@@ -217,7 +219,9 @@ const PaymentTransactions = () => {
                     <p className="font-medium text-foreground">
                       {row.invoice?.patient?.first_name} {row.invoice?.patient?.last_name}
                     </p>
-                    <p className="text-xs text-muted-foreground">{row.invoice?.patient?.patient_number}</p>
+                    <p className="text-xs text-muted-foreground">
+                      {row.invoice?.patient?.patient_number}
+                    </p>
                   </div>
                 ),
               },
@@ -260,7 +264,9 @@ const PaymentTransactions = () => {
                     <p className="font-medium text-foreground">
                       {row.received_by_user?.first_name} {row.received_by_user?.last_name}
                     </p>
-                    <p className="text-xs capitalize text-muted-foreground">{row.received_by_user?.role}</p>
+                    <p className="text-xs capitalize text-muted-foreground">
+                      {row.received_by_user?.role}
+                    </p>
                   </div>
                 ),
               },

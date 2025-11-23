@@ -97,7 +97,7 @@ const PatientVitalsDisplay = ({
               value && (
                 <div
                   key={key}
-                  className="flex items-center justify-between rounded-lg bg-muted/50 p-4"
+                  className="bg-muted/50 flex items-center justify-between rounded-lg p-4"
                 >
                   <div className="flex items-center space-x-3">
                     <Icon size={20} className={color} />

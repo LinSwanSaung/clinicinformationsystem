@@ -946,11 +946,13 @@ const AppointmentsPage = () => {
                       ) : (
                         <div className="space-y-4">
                           {/* Info message about same-day appointments */}
-                          <div className="rounded-md border border-blue-200 dark:border-blue-800 bg-blue-50 dark:bg-blue-950/30 p-2 sm:p-3">
+                          <div className="rounded-md border border-blue-200 bg-blue-50 p-2 dark:border-blue-800 dark:bg-blue-950/30 sm:p-3">
                             <div className="flex items-start gap-2 text-blue-800 dark:text-blue-200">
                               <CalendarIcon className="mt-0.5 h-4 w-4 flex-shrink-0 sm:h-5 sm:w-5" />
                               <div className="text-xs sm:text-sm">
-                                <p className="mb-1 font-medium text-blue-800 dark:text-blue-200">Appointment Scheduling Policy</p>
+                                <p className="mb-1 font-medium text-blue-800 dark:text-blue-200">
+                                  Appointment Scheduling Policy
+                                </p>
                                 <p className="text-blue-700 dark:text-blue-300">
                                   Same-day appointments are not allowed. Please schedule for
                                   tomorrow or later for better management.
@@ -1065,24 +1067,24 @@ const AppointmentsPage = () => {
                                           disabled={!isAvailable || isDisabled}
                                           className={`relative flex h-6 min-h-[24px] w-full items-center justify-center overflow-hidden rounded-sm border-0 text-[10px] font-medium transition-all duration-200 sm:h-7 sm:min-h-[28px] sm:rounded-md sm:border sm:text-xs md:h-8 md:min-h-[32px] md:text-sm lg:h-9 lg:min-h-[36px] ${!isCurrentMonth ? 'text-muted-foreground/60 dark:text-muted-foreground/50 bg-transparent' : ''} ${isDisabled ? 'text-muted-foreground/40 cursor-not-allowed bg-muted' : ''} ${
                                             isAvailable && !isDisabled && isCurrentMonth
-                                              ? 'transform border-2 border-green-300 dark:border-green-700 bg-green-100 dark:bg-green-900/30 text-green-800 dark:text-green-200 shadow-sm hover:scale-105 hover:bg-green-200 dark:hover:bg-green-900/50 hover:shadow-md'
+                                              ? 'transform border-2 border-green-300 bg-green-100 text-green-800 shadow-sm hover:scale-105 hover:bg-green-200 hover:shadow-md dark:border-green-700 dark:bg-green-900/30 dark:text-green-200 dark:hover:bg-green-900/50'
                                               : ''
                                           } ${
                                             !isAvailable &&
-                                              !isDisabled &&
-                                              selectedDoctor &&
-                                              isCurrentMonth
-                                              ? 'cursor-not-allowed border border-red-200 dark:border-red-800 bg-red-50 dark:bg-red-950/30 text-red-600 dark:text-red-300'
+                                            !isDisabled &&
+                                            selectedDoctor &&
+                                            isCurrentMonth
+                                              ? 'cursor-not-allowed border border-red-200 bg-red-50 text-red-600 dark:border-red-800 dark:bg-red-950/30 dark:text-red-300'
                                               : ''
                                           } ${
                                             isSelected
-                                              ? 'scale-105 transform bg-blue-200 dark:bg-blue-900/50 font-bold text-blue-900 dark:text-blue-100 shadow-lg ring-2 ring-blue-400 dark:ring-blue-600 hover:bg-blue-300 dark:hover:bg-blue-900/70'
+                                              ? 'scale-105 transform bg-blue-200 font-bold text-blue-900 shadow-lg ring-2 ring-blue-400 hover:bg-blue-300 dark:bg-blue-900/50 dark:text-blue-100 dark:ring-blue-600 dark:hover:bg-blue-900/70'
                                               : ''
-                                          } ${isToday && !isSelected ? 'bg-orange-50/50 dark:bg-orange-950/30 font-semibold text-orange-700 dark:text-orange-300 line-through ring-2 ring-orange-400 dark:ring-orange-600' : ''} ${
+                                          } ${isToday && !isSelected ? 'bg-orange-50/50 font-semibold text-orange-700 line-through ring-2 ring-orange-400 dark:bg-orange-950/30 dark:text-orange-300 dark:ring-orange-600' : ''} ${
                                             !isAvailable &&
-                                              !isDisabled &&
-                                              !selectedDoctor &&
-                                              isCurrentMonth
+                                            !isDisabled &&
+                                            !selectedDoctor &&
+                                            isCurrentMonth
                                               ? 'border border-border text-muted-foreground hover:bg-accent'
                                               : ''
                                           } ${!isCurrentMonth ? 'border border-transparent bg-transparent' : ''} `}
@@ -1201,7 +1203,7 @@ const AppointmentsPage = () => {
                               selectedDate &&
                               availableTimeSlots.length > 0 &&
                               !isLoadingTimeSlots && (
-                                <div className="mt-2 rounded-md border border-blue-200 dark:border-blue-800 bg-blue-50 dark:bg-blue-950/30 p-1.5 sm:p-2">
+                                <div className="mt-2 rounded-md border border-blue-200 bg-blue-50 p-1.5 dark:border-blue-800 dark:bg-blue-950/30 sm:p-2">
                                   <div className="flex items-center gap-1.5 text-blue-800 sm:gap-2">
                                     <Clock className="h-3 w-3 flex-shrink-0 sm:h-4 sm:w-4" />
                                     <span className="text-[10px] leading-tight sm:text-xs">

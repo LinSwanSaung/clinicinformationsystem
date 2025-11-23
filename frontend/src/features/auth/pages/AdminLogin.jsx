@@ -54,7 +54,7 @@ const AdminLogin = () => {
           <CardContent>
             <form onSubmit={handleLogin} className="space-y-4">
               {error && (
-                <div className="rounded-md border border-destructive/50 bg-destructive/10 px-4 py-3 text-sm text-destructive">
+                <div className="border-destructive/50 bg-destructive/10 rounded-md border px-4 py-3 text-sm text-destructive">
                   {error}
                 </div>
               )}
@@ -110,7 +110,7 @@ const AdminLogin = () => {
             </form>
 
             {/* Development helper */}
-            <div className="mt-6 rounded-md border border-border bg-muted/50 p-4">
+            <div className="bg-muted/50 mt-6 rounded-md border border-border p-4">
               <p className="mb-2 text-sm font-medium text-foreground">Test Credentials:</p>
               <div className="space-y-1 text-xs text-muted-foreground">
                 <div>

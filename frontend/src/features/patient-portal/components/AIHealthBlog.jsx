@@ -42,7 +42,9 @@ const AIHealthBlog = ({ patientId, language }) => {
 
   const fetchHealthAdvice = useCallback(
     async (showRefreshing = false) => {
-      if (!patientId) return;
+      if (!patientId) {
+        return;
+      }
       try {
         if (showRefreshing) {
           setRefreshing(true);
@@ -112,7 +114,9 @@ const AIHealthBlog = ({ patientId, language }) => {
           <div className="h-4 w-full animate-pulse rounded bg-muted" />
           <div className="h-4 w-2/3 animate-pulse rounded bg-muted" />
         </div>
-        <p className="mt-4 text-center text-sm text-muted-foreground">{t('patient.aiHealth.loading')}</p>
+        <p className="mt-4 text-center text-sm text-muted-foreground">
+          {t('patient.aiHealth.loading')}
+        </p>
       </Card>
     );
   }
@@ -142,16 +146,16 @@ const AIHealthBlog = ({ patientId, language }) => {
   }
 
   return (
-    <Card className="border-purple-200 dark:border-purple-900/50 bg-gradient-to-br from-purple-50 to-blue-50 dark:from-purple-950/20 dark:to-blue-950/20 p-6">
+    <Card className="border-purple-200 bg-gradient-to-br from-purple-50 to-blue-50 p-6 dark:border-purple-900/50 dark:from-purple-950/20 dark:to-blue-950/20">
       <div className="mb-4 flex items-start justify-between">
         <div className="flex items-center space-x-3">
-          <div className="rounded-lg bg-purple-100 dark:bg-purple-900/30 p-2">
+          <div className="rounded-lg bg-purple-100 p-2 dark:bg-purple-900/30">
             <Sparkles className="h-6 w-6 text-purple-600 dark:text-purple-400" />
           </div>
           <div>
             <h2 className="flex items-center gap-2 text-xl font-bold text-foreground">
               {t('patient.aiHealth.title')}
-              <span className="inline-flex items-center gap-1 rounded-full bg-purple-100 dark:bg-purple-900/30 px-2.5 py-1 text-xs font-semibold text-purple-700 dark:text-purple-200">
+              <span className="inline-flex items-center gap-1 rounded-full bg-purple-100 px-2.5 py-1 text-xs font-semibold text-purple-700 dark:bg-purple-900/30 dark:text-purple-200">
                 {meta.emoji} {meta.label}
               </span>
             </h2>
@@ -182,14 +186,14 @@ const AIHealthBlog = ({ patientId, language }) => {
           variant="ghost"
           size="sm"
           disabled={refreshing}
-          className="text-purple-600 dark:text-purple-400 hover:bg-purple-100 dark:hover:bg-purple-900/30 hover:text-purple-700 dark:hover:text-purple-300"
+          className="text-purple-600 hover:bg-purple-100 hover:text-purple-700 dark:text-purple-400 dark:hover:bg-purple-900/30 dark:hover:text-purple-300"
         >
           <RefreshCw className={`h-4 w-4 ${refreshing ? 'animate-spin' : ''}`} />
         </Button>
       </div>
 
       <div className="prose prose-sm max-w-none">
-        <div className="space-y-4 rounded-lg border border-purple-100 dark:border-purple-900/50 bg-card p-5 shadow-sm">
+        <div className="space-y-4 rounded-lg border border-purple-100 bg-card p-5 shadow-sm dark:border-purple-900/50">
           <div className="flex items-start gap-3">
             <PartyPopper className="mt-0.5 h-5 w-5 text-amber-500" />
             <div>
@@ -211,7 +215,9 @@ const AIHealthBlog = ({ patientId, language }) => {
               h3: (props) => (
                 <h3 className="mb-1 mt-2 text-sm font-semibold text-foreground" {...props} />
               ),
-              p: (props) => <p className="mb-2 text-sm leading-relaxed text-foreground" {...props} />,
+              p: (props) => (
+                <p className="mb-2 text-sm leading-relaxed text-foreground" {...props} />
+              ),
               ul: (props) => (
                 <ul
                   className="mb-2 list-inside list-disc space-y-1 text-sm text-foreground"
@@ -234,7 +240,7 @@ const AIHealthBlog = ({ patientId, language }) => {
         </div>
       </div>
 
-      <div className="mt-4 rounded-lg border border-yellow-200 dark:border-yellow-800 bg-yellow-50 dark:bg-yellow-950/30 p-3">
+      <div className="mt-4 rounded-lg border border-yellow-200 bg-yellow-50 p-3 dark:border-yellow-800 dark:bg-yellow-950/30">
         <p className="text-xs leading-relaxed text-yellow-800 dark:text-yellow-200">
           {t('patient.aiHealth.disclaimer')}
         </p>

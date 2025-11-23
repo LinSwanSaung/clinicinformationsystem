@@ -41,7 +41,9 @@ router.get('/doctor/:doctorId/capacity', authenticate, async (req, res) => {
 router.post('/token', authenticate, validateQueueToken, async (req, res) => {
   try {
     // Pass the current user info to the service for audit logging
-    logger.debug(`[QUEUE ROUTE] Issuing token for patient ${req.body.patient_id}, doctor ${req.body.doctor_id}`);
+    logger.debug(
+      `[QUEUE ROUTE] Issuing token for patient ${req.body.patient_id}, doctor ${req.body.doctor_id}`
+    );
     const result = await queueService.issueToken(req.body, req.user);
     res.status(201).json({
       success: true,

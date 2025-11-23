@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import PageLayout from '@/components/layout/PageLayout';
@@ -107,7 +107,7 @@ const NurseDashboard = () => {
     queryKey: ['nurse', 'doctorsQueue'],
     queryFn: () => queueService.getAllDoctorsQueueStatus(),
     enabled: !!user && user.role === ROLES.NURSE && !isUserActive,
-    refetchInterval: isUserActive ? false : POLLING_INTERVALS.DASHBOARD,
+    refetchInterval: isUserActive ? false : POLLING_INTERVALS.NURSE_QUEUE, // 30 seconds (reduced from 15s to reduce DB load)
     refetchIntervalInBackground: false,
     refetchOnWindowFocus: false,
   });
@@ -169,115 +169,707 @@ const NurseDashboard = () => {
   }, []);
 
   // Manual refresh function
-  const handleManualRefresh = async () => {
+  const handleManualRefresh = useCallback(async () => {
     if (selectedDoctor) {
       await handleViewPatients(selectedDoctor);
     } else {
       await doctorsQuery.refetch();
     }
-  };
+  }, [selectedDoctor, doctorsQuery]);
 
   // Handle viewing doctor's patients
-  const handleViewPatients = async (doctor) => {
-    try {
-      setLoading(true);
-      setSelectedDoctor(doctor);
+  const handleViewPatients = useCallback(
+    async (doctor) => {
+      try {
+        setLoading(true);
+        setSelectedDoctor(doctor);
 
-      // Fetch fresh queue data from the backend instead of using cached data
-      logger.debug('🔄 [NURSE] Fetching fresh queue data for doctor:', doctor.id);
-      const queueResponse = await queueService.getDoctorQueueStatus(doctor.id);
+        // Fetch fresh queue data from the backend instead of using cached data
+        logger.debug('🔄 [NURSE] Fetching fresh queue data for doctor:', doctor.id);
+        const queueResponse = await queueService.getDoctorQueueStatus(doctor.id);
 
-      if (!queueResponse.success) {
-        logger.error('Failed to fetch queue status:', queueResponse);
-        setPatients([]);
-        return;
-      }
-
-      // Get both tokens (walk-ins) and appointments (scheduled) from the fresh queue data
-      const queueTokens = queueResponse.data?.tokens || [];
-      const queueAppointments = queueResponse.data?.appointments || [];
-      logger.debug(
-        `📋 [NURSE] Received ${queueTokens.length} tokens and ${queueAppointments.length} appointments from backend`
-      );
-
-      // Debug: Log first token structure to see if visit_id is included
-      if (queueTokens.length > 0) {
-        logger.debug('🔍 [NURSE] First token structure:', JSON.stringify(queueTokens[0], null, 2));
-      }
-
-      // Filter out cancelled appointments - only show active queue tokens
-      const activeTokens = queueTokens.filter((token) => token.status !== 'cancelled');
-      logger.debug(
-        `📋 [NURSE] Filtered to ${activeTokens.length} active tokens (excluded ${queueTokens.length - activeTokens.length} cancelled)`
-      );
-
-      // Use only queue tokens (no appointment queue)
-      const allPatients = activeTokens.map((t) => ({ ...t, queueType: 'token' }));
-
-      // Deduplicate patients - keep only the most recent token per patient
-      const patientMap = new Map();
-      allPatients.forEach((patient) => {
-        const patientId = patient.patient?.id;
-        if (!patientId) return;
-
-        const existing = patientMap.get(patientId);
-        if (!existing || new Date(patient.created_at) > new Date(existing.created_at)) {
-          patientMap.set(patientId, patient);
+        if (!queueResponse.success) {
+          logger.error('Failed to fetch queue status:', queueResponse);
+          setPatients([]);
+          return;
         }
-      });
 
-      const uniquePatients = Array.from(patientMap.values());
-      logger.debug(
-        `📋 [NURSE] Deduplicated ${allPatients.length} entries to ${uniquePatients.length} unique patients`
-      );
+        // Get both tokens (walk-ins) and appointments (scheduled) from the fresh queue data
+        const queueTokens = queueResponse.data?.tokens || [];
+        const queueAppointments = queueResponse.data?.appointments || [];
+        logger.debug(
+          `📋 [NURSE] Received ${queueTokens.length} tokens and ${queueAppointments.length} appointments from backend`
+        );
 
-      // Fetch vitals for each patient using the new per-visit logic
-      const patientsWithVitals = await Promise.all(
-        uniquePatients.map(async (patient) => {
-          try {
-            const vitals = await fetchTokenVitals(patient);
+        // Debug: Log token status breakdown
+        const statusBreakdown = queueTokens.reduce((acc, token) => {
+          acc[token.status] = (acc[token.status] || 0) + 1;
+          return acc;
+        }, {});
+        logger.debug(`📊 [NURSE] Token status breakdown:`, statusBreakdown);
 
-            const patientWithVitals = {
-              ...patient,
-              latestVitals: vitals,
-            };
+        // Filter out cancelled appointments - include ALL other statuses (waiting, called, serving, completed, missed)
+        // This ensures we show all patients for the day, including completed consultations
+        const activeTokens = queueTokens.filter((token) => token.status !== 'cancelled');
+        logger.debug(
+          `📋 [NURSE] Filtered to ${activeTokens.length} tokens (excluded ${queueTokens.length - activeTokens.length} cancelled). Statuses included: ${Object.keys(
+            statusBreakdown
+          )
+            .filter((s) => s !== 'cancelled')
+            .join(', ')}`
+        );
 
-            logger.debug(`[NURSE] Patient #${patient.token_number} after vitals fetch:`, {
-              token_number: patient.token_number,
-              visit_id: patient.visit_id,
-              hasLatestVitals: !!patientWithVitals.latestVitals,
-              latestVitals: patientWithVitals.latestVitals,
-            });
+        // Use only queue tokens (no appointment queue)
+        // Show ALL tokens for the day - each token represents a visit, so patients with multiple visits will show multiple entries
+        const allPatients = activeTokens.map((t) => ({ ...t, queueType: 'token' }));
 
-            return patientWithVitals;
-          } catch (error) {
-            logger.debug(`No vitals found for patient ${patient.patient?.id}`);
-            return {
-              ...patient,
-              latestVitals: null,
-            };
+        // Sort by token number (ascending) to show patients in order they were seen
+        // This ensures all patients for the day are visible, including completed ones
+        allPatients.sort((a, b) => {
+          // First sort by status: serving > called > waiting > completed > missed
+          const statusOrder = { serving: 0, called: 1, waiting: 2, completed: 3, missed: 4 };
+          const statusDiff = (statusOrder[a.status] ?? 5) - (statusOrder[b.status] ?? 5);
+          if (statusDiff !== 0) {
+            return statusDiff;
           }
-        })
-      );
 
-      logger.debug('✅ [NURSE] Patient list updated with fresh vitals and appointments');
-      logger.debug('[NURSE] Total patients with vitals data:', patientsWithVitals.length);
-      setPatients(patientsWithVitals);
-    } catch (error) {
-      logger.error('Failed to load patients:', error);
-      setPatients([]);
-    } finally {
-      setLoading(false);
+          // Then by token number
+          return (a.token_number || 0) - (b.token_number || 0);
+        });
+
+        logger.debug(
+          `📋 [NURSE] Showing ${allPatients.length} tokens (all patients for the day, including completed)`
+        );
+
+        // Fetch vitals for each patient using the new per-visit logic
+        // OPTIMIZATION: Skip vitals fetch for completed patients (they won't change)
+        // This reduces API calls significantly
+        const patientsWithVitals = await Promise.all(
+          allPatients.map(async (patient) => {
+            // Skip vitals fetch for completed/missed patients - they won't change
+            if (patient.status === 'completed' || patient.status === 'missed') {
+              return {
+                ...patient,
+                latestVitals: null, // Completed patients don't need fresh vitals
+              };
+            }
+
+            try {
+              const vitals = await fetchTokenVitals(patient);
+
+              const patientWithVitals = {
+                ...patient,
+                latestVitals: vitals,
+              };
+
+              logger.debug(`[NURSE] Patient #${patient.token_number} after vitals fetch:`, {
+                token_number: patient.token_number,
+                visit_id: patient.visit_id,
+                hasLatestVitals: !!patientWithVitals.latestVitals,
+                latestVitals: patientWithVitals.latestVitals,
+              });
+
+              return patientWithVitals;
+            } catch (error) {
+              logger.debug(`No vitals found for patient ${patient.patient?.id}`);
+              return {
+                ...patient,
+                latestVitals: null,
+              };
+            }
+          })
+        );
+
+        logger.debug('✅ [NURSE] Patient list updated with fresh vitals and appointments');
+        logger.debug('[NURSE] Total patients with vitals data:', patientsWithVitals.length);
+        setPatients(patientsWithVitals);
+      } catch (error) {
+        logger.error('Failed to load patients:', error);
+        setPatients([]);
+      } finally {
+        setLoading(false);
+      }
+    },
+    [showError]
+  );
+
+  // Auto-refresh patient list when viewing a specific doctor
+  const selectedDoctorRef = useRef(selectedDoctor);
+  useEffect(() => {
+    selectedDoctorRef.current = selectedDoctor;
+  }, [selectedDoctor]);
+
+  useEffect(() => {
+    if (!selectedDoctor) {
+      return;
     }
-  };
+
+    // Set up auto-refresh interval for patient list
+    const refreshInterval = setInterval(() => {
+      if (selectedDoctorRef.current) {
+        // Silent refresh - fetch fresh data without showing loading
+        logger.debug(
+          '[NURSE] Auto-refreshing patient list for doctor:',
+          selectedDoctorRef.current.id
+        );
+        queueService
+          .getDoctorQueueStatus(selectedDoctorRef.current.id)
+          .then((queueResponse) => {
+            if (queueResponse.success && queueResponse.data) {
+              const queueTokens = queueResponse.data.tokens || [];
+              const activeTokens = queueTokens.filter((token) => token.status !== 'cancelled');
+              const allPatients = activeTokens.map((t) => ({ ...t, queueType: 'token' }));
+
+              // Sort by status and token number (same as main load)
+              allPatients.sort((a, b) => {
+                const statusOrder = { serving: 0, called: 1, waiting: 2, completed: 3, missed: 4 };
+                const statusDiff = (statusOrder[a.status] ?? 5) - (statusOrder[b.status] ?? 5);
+                if (statusDiff !== 0) {
+                  return statusDiff;
+                }
+                return (a.token_number || 0) - (b.token_number || 0);
+              });
+
+              // Fetch vitals and update state silently
+              // OPTIMIZATION: Skip vitals for completed/missed patients
+              Promise.all(
+                allPatients.map(async (patient) => {
+                  // Skip vitals fetch for completed/missed patients
+                  if (patient.status === 'completed' || patient.status === 'missed') {
+                    return { ...patient, latestVitals: null };
+                  }
+                  try {
+                    const vitals = await fetchTokenVitals(patient);
+                    return { ...patient, latestVitals: vitals };
+                  } catch {
+                    return { ...patient, latestVitals: null };
+                  }
+                })
+              ).then((patientsWithVitals) => {
+                // Update state silently (no loading spinner)
+                setPatients((prevPatients) => {
+                  // Merge with existing to preserve optimistic updates
+                  const merged = patientsWithVitals.map((newPatient) => {
+                    const existing = prevPatients.find((p) => p.id === newPatient.id);
+                    // Preserve optimistic status updates (if status was changed locally)
+                    // But prioritize server status if it's more advanced (e.g., 'serving' or 'completed' from doctor)
+                    if (existing && existing.status !== newPatient.status) {
+                      // If server says 'serving' (doctor started consultation), use that
+                      if (newPatient.status === 'serving') {
+                        return newPatient; // Server status is authoritative
+                      }
+                      // If server says 'completed' (doctor finished consultation), use that
+                      if (newPatient.status === 'completed') {
+                        return newPatient; // Server status is authoritative
+                      }
+                      // If existing is 'serving' but server says 'called', keep 'serving' (doctor just started)
+                      if (existing.status === 'serving' && newPatient.status === 'called') {
+                        return { ...newPatient, status: existing.status };
+                      }
+                      // If existing is 'completed' but server says something else, keep 'completed' (consultation finished)
+                      if (existing.status === 'completed' && newPatient.status !== 'completed') {
+                        return { ...newPatient, status: existing.status };
+                      }
+                      // For other optimistic updates (like 'called' from mark ready), preserve temporarily
+                      if (existing.status === 'called' && newPatient.status === 'waiting') {
+                        return { ...newPatient, status: existing.status };
+                      }
+                      // Default: use server status
+                      return newPatient;
+                    }
+                    return newPatient;
+                  });
+                  return merged;
+                });
+                logger.debug('[NURSE] Auto-refresh completed, updated patient list');
+              });
+            }
+          })
+          .catch((error) => {
+            logger.error('Auto-refresh failed:', error);
+          });
+      }
+    }, POLLING_INTERVALS.QUEUE); // Refresh every 30 seconds (reduced from 10s to reduce DB load)
+
+    return () => clearInterval(refreshInterval);
+  }, [selectedDoctor]);
 
   // Handle going back to doctors view
-  const handleBackToDoctors = () => {
+  const handleBackToDoctors = useCallback(() => {
     setSelectedDoctor(null);
     setPatients([]);
     setPatientSearchTerm('');
     setSelectedStatus('all'); // Reset status filter
-  };
+  }, []);
+
+  // Patient action handlers - memoized to prevent unnecessary re-renders of PatientCard
+  const handleSaveVitals = useCallback(
+    async (patientId, vitalsForm, notes, visitId = null) => {
+      try {
+        if (!patientId || typeof patientId !== 'string') {
+          logger.error('[NURSE] Invalid patient ID provided when saving vitals:', patientId);
+          showError('Unable to determine the patient record. Please refresh and try again.');
+          return;
+        }
+
+        // Parse blood pressure
+        let systolic = null;
+        let diastolic = null;
+        let bpError = null;
+
+        if (vitalsForm.bp && vitalsForm.bp.trim()) {
+          if (!vitalsForm.bp.includes('/')) {
+            bpError = 'Blood pressure must be in format "120/80"';
+          } else {
+            const bpParts = vitalsForm.bp.trim().split('/');
+            if (bpParts.length !== 2) {
+              bpError = 'Blood pressure must be in format "120/80"';
+            } else {
+              const sys = parseInt(bpParts[0].trim());
+              const dia = parseInt(bpParts[1].trim());
+              if (isNaN(sys) || isNaN(dia)) {
+                bpError = 'Blood pressure values must be valid numbers';
+              } else if (sys < 60 || sys > 250) {
+                bpError = 'Systolic pressure must be between 60 and 250 mmHg';
+              } else if (dia < 30 || dia > 150) {
+                bpError = 'Diastolic pressure must be between 30 and 150 mmHg';
+              } else {
+                systolic = sys;
+                diastolic = dia;
+              }
+            }
+          }
+        }
+
+        if (bpError) {
+          showError(`Invalid blood pressure: ${bpError}`);
+          return;
+        }
+
+        // Parse temperature
+        let temperature = null;
+        let temperatureUnit = null;
+        let tempError = null;
+
+        if (vitalsForm.temp && vitalsForm.temp.trim()) {
+          const tempValue = parseFloat(vitalsForm.temp.trim());
+          if (isNaN(tempValue)) {
+            tempError = 'Temperature must be a valid number';
+          } else {
+            if (tempValue >= 30 && tempValue <= 45) {
+              temperature = tempValue;
+              temperatureUnit = 'C';
+            } else if (tempValue >= 86 && tempValue <= 113) {
+              temperature = tempValue;
+              temperatureUnit = 'F';
+            } else {
+              tempError = 'Temperature must be between 30-45°C or 86-113°F';
+            }
+          }
+        }
+
+        if (tempError) {
+          showError(`Invalid temperature: ${tempError}`);
+          return;
+        }
+
+        const vitalsData = {
+          patient_id: patientId,
+          visit_id: visitId || null,
+          temperature: temperature,
+          temperature_unit: temperatureUnit,
+          blood_pressure_systolic: systolic,
+          blood_pressure_diastolic: diastolic,
+          heart_rate: vitalsForm.heartRate ? parseInt(vitalsForm.heartRate) : null,
+          weight: vitalsForm.weight ? parseFloat(vitalsForm.weight) : null,
+          notes: notes || null,
+          priority_level: vitalsForm.priorityLevel || 'normal',
+        };
+
+        logger.debug('💾 [NURSE] Saving vitals:', vitalsData);
+
+        // Find the patient token to update
+        const patientToken = patients.find(
+          (p) => p.patient?.id === patientId || p.id === patientId
+        );
+
+        // Optimistically update vitals in UI immediately
+        if (patientToken) {
+          setPatients((prevPatients) =>
+            prevPatients.map((p) => {
+              if (p.id === patientToken.id) {
+                // Create optimistic vitals object
+                const optimisticVitals = {
+                  blood_pressure_systolic: systolic,
+                  blood_pressure_diastolic: diastolic,
+                  temperature: temperature,
+                  temperature_unit: temperatureUnit,
+                  heart_rate: vitalsForm.heartRate ? parseInt(vitalsForm.heartRate) : null,
+                  weight: vitalsForm.weight ? parseFloat(vitalsForm.weight) : null,
+                  notes: notes || null,
+                  priority_level: vitalsForm.priorityLevel || 'normal',
+                  recorded_at: new Date().toISOString(),
+                };
+                return {
+                  ...p,
+                  latestVitals: optimisticVitals,
+                };
+              }
+              return p;
+            })
+          );
+        }
+
+        showSuccess('Vitals saved successfully!');
+
+        // Then save to server (in background)
+        await vitalsService.saveVitals(patientId, vitalsData);
+
+        // Silent refresh to sync with server (preserves optimistic update)
+        if (selectedDoctor) {
+          // Silent refresh without loading spinner
+          queueService
+            .getDoctorQueueStatus(selectedDoctor.id)
+            .then((queueResponse) => {
+              if (queueResponse.success && queueResponse.data) {
+                const queueTokens = queueResponse.data.tokens || [];
+                const activeTokens = queueTokens.filter((token) => token.status !== 'cancelled');
+                const allPatients = activeTokens.map((t) => ({ ...t, queueType: 'token' }));
+
+                // Sort by status and token number
+                allPatients.sort((a, b) => {
+                  const statusOrder = {
+                    serving: 0,
+                    called: 1,
+                    waiting: 2,
+                    completed: 3,
+                    missed: 4,
+                  };
+                  const statusDiff = (statusOrder[a.status] ?? 5) - (statusOrder[b.status] ?? 5);
+                  if (statusDiff !== 0) {
+                    return statusDiff;
+                  }
+                  return (a.token_number || 0) - (b.token_number || 0);
+                });
+
+                // Fetch vitals and update silently
+                Promise.all(
+                  allPatients.map(async (patient) => {
+                    try {
+                      const vitals = await fetchTokenVitals(patient);
+                      return { ...patient, latestVitals: vitals };
+                    } catch {
+                      return { ...patient, latestVitals: null };
+                    }
+                  })
+                ).then((patientsWithVitals) => {
+                  // Merge with existing to preserve optimistic updates
+                  setPatients((prevPatients) => {
+                    return patientsWithVitals.map((newPatient) => {
+                      const existing = prevPatients.find((p) => p.id === newPatient.id);
+                      // If we just saved vitals optimistically, keep them if server hasn't updated yet
+                      if (existing && existing.latestVitals && !newPatient.latestVitals) {
+                        // Keep optimistic vitals if server hasn't returned them yet
+                        return { ...newPatient, latestVitals: existing.latestVitals };
+                      }
+                      // Use server vitals if available (more up-to-date)
+                      return newPatient;
+                    });
+                  });
+                });
+              }
+            })
+            .catch((error) => {
+              logger.error('Failed to refresh after save vitals:', error);
+            });
+        }
+      } catch (error) {
+        logger.error('Failed to save vitals:', error);
+        if (error.response?.data?.code === 'NO_ACTIVE_VISIT') {
+          showWarning(
+            'Security Check Failed: Cannot record vitals. Patient does not have an active visit.'
+          );
+        } else {
+          showError(`Failed to save vitals: ${error.response?.data?.message || error.message}`);
+        }
+      }
+    },
+    [selectedDoctor, handleViewPatients, showError, showSuccess, showWarning]
+  );
+
+  const handleMarkReady = useCallback(
+    async (patientId) => {
+      const token = patients.find(
+        (p) => (p.patient?.id === patientId || p.id === patientId) && p.status === 'waiting'
+      );
+
+      if (!token) {
+        showError('Could not find active token for this patient.');
+        return;
+      }
+
+      try {
+        // Optimistic update - update UI immediately
+        setPatients((prevPatients) =>
+          prevPatients.map((p) => (p.id === token.id ? { ...p, status: 'called' } : p))
+        );
+
+        showSuccess('Patient marked as ready');
+
+        // Then update on server (in background)
+        await queueService.markPatientReady(token.id);
+
+        // Silent refresh to sync with server (preserves optimistic update)
+        if (selectedDoctor) {
+          // Silent refresh without loading spinner
+          queueService
+            .getDoctorQueueStatus(selectedDoctor.id)
+            .then((queueResponse) => {
+              if (queueResponse.success && queueResponse.data) {
+                const queueTokens = queueResponse.data.tokens || [];
+                const activeTokens = queueTokens.filter((token) => token.status !== 'cancelled');
+                const allPatients = activeTokens.map((t) => ({ ...t, queueType: 'token' }));
+
+                // Sort by status and token number (same as main load)
+                allPatients.sort((a, b) => {
+                  const statusOrder = {
+                    serving: 0,
+                    called: 1,
+                    waiting: 2,
+                    completed: 3,
+                    missed: 4,
+                  };
+                  const statusDiff = (statusOrder[a.status] ?? 5) - (statusOrder[b.status] ?? 5);
+                  if (statusDiff !== 0) {
+                    return statusDiff;
+                  }
+                  return (a.token_number || 0) - (b.token_number || 0);
+                });
+
+                // Fetch vitals and update silently
+                Promise.all(
+                  allPatients.map(async (patient) => {
+                    try {
+                      const vitals = await fetchTokenVitals(patient);
+                      return { ...patient, latestVitals: vitals };
+                    } catch {
+                      return { ...patient, latestVitals: null };
+                    }
+                  })
+                ).then((patientsWithVitals) => {
+                  // Merge with existing to preserve optimistic updates
+                  setPatients((prevPatients) => {
+                    return patientsWithVitals.map((newPatient) => {
+                      const existing = prevPatients.find((p) => p.id === newPatient.id);
+                      // Preserve optimistic status if it was just updated
+                      // But prioritize server status if it's more advanced (e.g., 'serving' from doctor)
+                      if (existing && existing.status !== newPatient.status) {
+                        // If server says 'serving' (doctor started consultation), always use that
+                        if (newPatient.status === 'serving') {
+                          return newPatient; // Server status is authoritative
+                        }
+                        // If existing is 'serving' but server says 'called', keep 'serving' (doctor just started)
+                        if (existing.status === 'serving' && newPatient.status === 'called') {
+                          return { ...newPatient, status: existing.status };
+                        }
+                        // For mark ready optimistic update, preserve temporarily
+                        if (existing.status === 'called' && newPatient.status === 'waiting') {
+                          return { ...newPatient, status: existing.status };
+                        }
+                        // Default: use server status
+                        return newPatient;
+                      }
+                      return newPatient;
+                    });
+                  });
+                });
+              }
+            })
+            .catch((error) => {
+              logger.error('Failed to refresh after mark ready:', error);
+            });
+        }
+      } catch (error) {
+        logger.error('Failed to mark patient ready:', error);
+        showError('Failed to mark patient ready. Please try again.');
+        // Revert optimistic update on error
+        setPatients((prevPatients) =>
+          prevPatients.map((p) => (p.id === token?.id ? { ...p, status: 'waiting' } : p))
+        );
+      }
+    },
+    [patients, selectedDoctor, showError, showSuccess]
+  );
+
+  const handleUnmarkReady = useCallback(
+    async (patientId) => {
+      const token = patients.find(
+        (p) =>
+          (p.patient?.id === patientId || p.id === patientId) &&
+          (p.status === 'ready' || p.status === 'called')
+      );
+
+      if (!token) {
+        showError('Could not find patient token.');
+        return;
+      }
+
+      try {
+        // Optimistic update - update UI immediately
+        setPatients((prevPatients) =>
+          prevPatients.map((p) => (p.id === token.id ? { ...p, status: 'waiting' } : p))
+        );
+
+        showSuccess('Patient status reverted to waiting');
+
+        // Then update on server (in background)
+        await queueService.markPatientWaiting(token.id);
+
+        // Silent refresh to sync with server (preserves optimistic update)
+        if (selectedDoctor) {
+          queueService
+            .getDoctorQueueStatus(selectedDoctor.id)
+            .then((queueResponse) => {
+              if (queueResponse.success && queueResponse.data) {
+                const queueTokens = queueResponse.data.tokens || [];
+                const activeTokens = queueTokens.filter((token) => token.status !== 'cancelled');
+                const allPatients = activeTokens.map((t) => ({ ...t, queueType: 'token' }));
+
+                // Sort by status and token number
+                allPatients.sort((a, b) => {
+                  const statusOrder = {
+                    serving: 0,
+                    called: 1,
+                    waiting: 2,
+                    completed: 3,
+                    missed: 4,
+                  };
+                  const statusDiff = (statusOrder[a.status] ?? 5) - (statusOrder[b.status] ?? 5);
+                  if (statusDiff !== 0) {
+                    return statusDiff;
+                  }
+                  return (a.token_number || 0) - (b.token_number || 0);
+                });
+
+                // Fetch vitals and update silently
+                Promise.all(
+                  allPatients.map(async (patient) => {
+                    try {
+                      const vitals = await fetchTokenVitals(patient);
+                      return { ...patient, latestVitals: vitals };
+                    } catch {
+                      return { ...patient, latestVitals: null };
+                    }
+                  })
+                ).then((patientsWithVitals) => {
+                  // Merge with existing to preserve optimistic updates
+                  setPatients((prevPatients) => {
+                    return patientsWithVitals.map((newPatient) => {
+                      const existing = prevPatients.find((p) => p.id === newPatient.id);
+                      // Preserve optimistic status if it was just updated
+                      if (existing && existing.status !== newPatient.status) {
+                        if (existing.status === 'waiting' && newPatient.status === 'called') {
+                          return { ...newPatient, status: existing.status };
+                        }
+                      }
+                      return newPatient;
+                    });
+                  });
+                });
+              }
+            })
+            .catch((error) => {
+              logger.error('Failed to refresh after unmark ready:', error);
+            });
+        }
+      } catch (error) {
+        logger.error('Failed to unmark patient ready:', error);
+        showError('Failed to unmark patient ready. Please try again.');
+        // Revert optimistic update on error
+        setPatients((prevPatients) =>
+          prevPatients.map((p) => (p.id === token.id ? { ...p, status: 'called' } : p))
+        );
+      }
+    },
+    [patients, selectedDoctor, showError, showSuccess]
+  );
+
+  const handleDelayPatient = useCallback(
+    async (tokenOrQueueId, reason) => {
+      try {
+        const patient = patients.find((p) => p.id === tokenOrQueueId);
+        if (!patient) {
+          showError('Patient not found in current list. Please refresh the page and try again.');
+          return;
+        }
+
+        // Optimistic update - update UI immediately
+        setPatients((prevPatients) =>
+          prevPatients.map((p) =>
+            p.id === patient.id ? { ...p, status: 'delayed', delayReason: reason } : p
+          )
+        );
+
+        // Then update on server
+        await queueService.delayToken(patient.id, reason);
+
+        // Refresh to get latest data
+        if (selectedDoctor) {
+          handleViewPatients(selectedDoctor).catch((error) => {
+            logger.error('Failed to refresh after delay:', error);
+          });
+        }
+
+        showSuccess('Patient has been marked as delayed');
+      } catch (error) {
+        logger.error('Failed to delay patient:', error);
+        showError('Failed to delay patient: ' + (error.message || 'Please try again.'));
+        // Revert optimistic update on error
+        if (selectedDoctor) {
+          handleViewPatients(selectedDoctor);
+        }
+      }
+    },
+    [patients, selectedDoctor, handleViewPatients, showError, showSuccess]
+  );
+
+  const handleRemoveDelay = useCallback(
+    async (tokenOrQueueId) => {
+      try {
+        const patient = patients.find((p) => p.id === tokenOrQueueId);
+        if (patient) {
+          // Optimistic update - remove delay status immediately
+          setPatients((prevPatients) =>
+            prevPatients.map((p) =>
+              p.id === patient.id ? { ...p, status: 'waiting', delayReason: null } : p
+            )
+          );
+
+          // Then update on server
+          const result = await queueService.undelayToken(patient.id);
+
+          // Refresh to get latest data (including new token number)
+          if (selectedDoctor) {
+            handleViewPatients(selectedDoctor).catch((error) => {
+              logger.error('Failed to refresh after remove delay:', error);
+            });
+          }
+
+          showSuccess(
+            `Patient has been added back to the queue with token #${result.newTokenNumber}`
+          );
+        }
+      } catch (error) {
+        logger.error('Failed to remove delay:', error);
+        showError('Failed to remove delay. Please try again.');
+        // Revert optimistic update on error
+        if (selectedDoctor) {
+          handleViewPatients(selectedDoctor);
+        }
+      }
+    },
+    [patients, selectedDoctor, handleViewPatients, showError, showSuccess]
+  );
 
   // Filter doctors based on search term and availability
   const filteredDoctors = doctors.filter((doctor) => {
@@ -663,6 +1255,10 @@ const NurseDashboard = () => {
                           id: token.id, // Use token/queue ID for operations
                           patientId: token.patient?.id, // Store actual patient ID separately
                           visit_id: token.visit_id, // Add visit_id for vitals linking
+                          chief_complaint:
+                            token.visit?.chief_complaint ||
+                            token.appointment?.reason_for_visit ||
+                            null,
                           name:
                             `${token.patient?.first_name || ''} ${token.patient?.last_name || ''}`.trim() ||
                             'Unknown Patient',
@@ -733,278 +1329,11 @@ const NurseDashboard = () => {
                             : null,
                         }}
                         userRole="nurse"
-                        onSaveVitals={async (patientId, vitalsForm, notes, visitId = null) => {
-                          try {
-                            if (!patientId || typeof patientId !== 'string') {
-                              logger.error(
-                                '[NURSE] Invalid patient ID provided when saving vitals:',
-                                patientId
-                              );
-                              showError(
-                                'Unable to determine the patient record. Please refresh and try again.'
-                              );
-                              return;
-                            }
-
-                            // Parse blood pressure with validation
-                            let systolic = null;
-                            let diastolic = null;
-                            let bpError = null;
-
-                            if (vitalsForm.bp && vitalsForm.bp.trim()) {
-                              if (!vitalsForm.bp.includes('/')) {
-                                bpError = 'Blood pressure must be in format "120/80"';
-                              } else {
-                                const bpParts = vitalsForm.bp.trim().split('/');
-                                if (bpParts.length !== 2) {
-                                  bpError = 'Blood pressure must be in format "120/80"';
-                                } else {
-                                  const sys = parseInt(bpParts[0].trim());
-                                  const dia = parseInt(bpParts[1].trim());
-
-                                  if (isNaN(sys) || isNaN(dia)) {
-                                    bpError = 'Blood pressure values must be valid numbers';
-                                  } else if (sys < 60 || sys > 250) {
-                                    bpError = 'Systolic pressure must be between 60 and 250 mmHg';
-                                  } else if (dia < 30 || dia > 150) {
-                                    bpError = 'Diastolic pressure must be between 30 and 150 mmHg';
-                                  } else {
-                                    systolic = sys;
-                                    diastolic = dia;
-                                  }
-                                }
-                              }
-                            }
-
-                            // If there's a blood pressure validation error, show it
-                            if (bpError) {
-                              showError(`Invalid blood pressure: ${bpError}`);
-                              return;
-                            }
-
-                            // Parse and validate temperature
-                            let temperature = null;
-                            let temperatureUnit = null;
-                            let tempError = null;
-
-                            if (vitalsForm.temp && vitalsForm.temp.trim()) {
-                              const tempValue = parseFloat(vitalsForm.temp.trim());
-
-                              if (isNaN(tempValue)) {
-                                tempError = 'Temperature must be a valid number';
-                              } else {
-                                // Auto-detect temperature unit based on value
-                                if (tempValue >= 30 && tempValue <= 45) {
-                                  // Likely Celsius (normal body temp range: 36-40°C)
-                                  temperature = tempValue;
-                                  temperatureUnit = 'C';
-                                } else if (tempValue >= 86 && tempValue <= 113) {
-                                  // Likely Fahrenheit (normal body temp range: 97-104°F)
-                                  temperature = tempValue;
-                                  temperatureUnit = 'F';
-                                } else {
-                                  tempError = 'Temperature must be between 30-45°C or 86-113°F';
-                                }
-                              }
-                            }
-
-                            // If there's a temperature validation error, show it
-                            if (tempError) {
-                              showError(`Invalid temperature: ${tempError}`);
-                              return;
-                            }
-
-                            // Map the vitals form data to backend format
-                            const vitalsData = {
-                              patient_id: patientId,
-                              visit_id: visitId || null,
-                              temperature: temperature,
-                              temperature_unit: temperatureUnit,
-                              blood_pressure_systolic: systolic,
-                              blood_pressure_diastolic: diastolic,
-                              heart_rate: vitalsForm.heartRate
-                                ? parseInt(vitalsForm.heartRate)
-                                : null,
-                              weight: vitalsForm.weight ? parseFloat(vitalsForm.weight) : null,
-                              notes: notes || null,
-                              priority_level: vitalsForm.priorityLevel || 'normal', // Add priority level
-                            };
-
-                            logger.debug('💾 [NURSE] Saving vitals:', vitalsData);
-                            const result = await vitalsService.saveVitals(patientId, vitalsData);
-                            logger.debug('✅ [NURSE] Vitals saved, result:', result);
-
-                            // Wait longer for backend to process and update the queue
-                            await new Promise((resolve) => setTimeout(resolve, 1000));
-
-                            // Refresh the patient data to show updated vitals
-                            if (selectedDoctor) {
-                              logger.debug(
-                                '🔄 [NURSE] Refreshing patient list after vitals save...'
-                              );
-                              await handleViewPatients(selectedDoctor);
-                              logger.debug('✅ [NURSE] Patient list refreshed');
-                            }
-
-                            showSuccess('Vitals saved successfully!');
-                          } catch (error) {
-                            logger.error('Failed to save vitals:', error);
-
-                            // Check for specific error from backend
-                            if (error.response?.data?.code === 'NO_ACTIVE_VISIT') {
-                              showWarning(
-                                'Security Check Failed: Cannot record vitals. Patient does not have an active visit. Please ensure the patient has an active consultation session before recording vitals.'
-                              );
-                            } else {
-                              showError(
-                                `Failed to save vitals: ${error.response?.data?.message || error.message}`
-                              );
-                            }
-                          }
-                        }}
-                        onMarkReady={async (patientId) => {
-                          try {
-                            // Find the ACTIVE token for this patient (not completed)
-                            const token = patients.find(
-                              (p) =>
-                                (p.patient?.id === patientId || p.id === patientId) &&
-                                p.status === 'waiting'
-                            );
-                            if (token) {
-                              await queueService.markPatientReady(token.id);
-
-                              // Refresh the patient data
-                              if (selectedDoctor) {
-                                await handleViewPatients(selectedDoctor);
-                              }
-                            } else {
-                              logger.error('No active token found for patient:', patientId);
-                              showError('Could not find active token for this patient.');
-                            }
-                          } catch (error) {
-                            logger.error('Failed to mark patient ready:', error);
-                            showError('Failed to mark patient ready. Please try again.');
-                          }
-                        }}
-                        onUnmarkReady={async (patientId) => {
-                          try {
-                            // Find the token for this patient that is ready/called
-                            const token = patients.find(
-                              (p) =>
-                                (p.patient?.id === patientId || p.id === patientId) &&
-                                (p.status === 'ready' || p.status === 'called')
-                            );
-                            if (token) {
-                              // Change status back to waiting
-                              await queueService.markPatientWaiting(token.id);
-
-                              // Refresh the patient data
-                              if (selectedDoctor) {
-                                await handleViewPatients(selectedDoctor);
-                              }
-                            }
-                          } catch (error) {
-                            logger.error('Failed to unmark patient ready:', error);
-                            showError('Failed to unmark patient ready. Please try again.');
-                          }
-                        }}
-                        onDelayPatient={async (tokenOrQueueId, reason) => {
-                          try {
-                            logger.debug('🔍 Searching for patient with ID:', tokenOrQueueId);
-                            logger.debug(
-                              '🔍 Available patient IDs:',
-                              patients.map((p) => ({
-                                id: p.id,
-                                name: `${p.patient?.first_name} ${p.patient?.last_name}`,
-                                token: p.token_number,
-                              }))
-                            );
-
-                            // Find the token/queue entry by ID (not by patient ID)
-                            const patient = patients.find((p) => p.id === tokenOrQueueId);
-                            if (!patient) {
-                              logger.error('❌ Patient not found. TokenOrQueueId:', tokenOrQueueId);
-                              logger.error(
-                                '   Available IDs in patients array:',
-                                patients.map((p) => p.id)
-                              );
-                              showError(
-                                'Patient not found in current list. Please refresh the page and try again.'
-                              );
-                              return;
-                            }
-
-                            logger.debug('🔄 Delaying patient:', patient);
-                            logger.debug('   Token/Queue ID:', patient.id);
-                            logger.debug('   Queue Type:', patient.queueType);
-                            logger.debug('   Has appointment_id:', !!patient.appointment_id);
-                            logger.debug(
-                              '   Has token_number vs queue_position:',
-                              patient.token_number,
-                              patient.queue_position
-                            );
-                            logger.debug('   Current Status:', patient.status);
-
-                            // Determine if this is an appointment or token
-                            // Appointments have appointment_id, tokens don't
-                            const isAppointment =
-                              patient.queueType === 'appointment' || patient.appointment_id;
-
-                            logger.debug(
-                              '   → Treating as:',
-                              isAppointment ? 'APPOINTMENT' : 'TOKEN'
-                            );
-
-                            // Call the appropriate delay API based on queue type
-                            // Delay the token
-                            await queueService.delayToken(patient.id, reason);
-                            logger.debug('✅ Token queue patient delayed');
-                            showSuccess('Patient has been marked as delayed');
-
-                            // Refresh the patient data
-                            if (selectedDoctor) {
-                              await handleViewPatients(selectedDoctor);
-                            }
-                          } catch (error) {
-                            logger.error('❌ Failed to delay patient:', error);
-                            showError(
-                              'Failed to delay patient: ' + (error.message || 'Please try again.')
-                            );
-                          }
-                        }}
-                        onRemoveDelay={async (tokenOrQueueId) => {
-                          try {
-                            // Find the token/queue entry by ID (not by patient ID)
-                            const patient = patients.find((p) => p.id === tokenOrQueueId);
-                            if (patient) {
-                              logger.debug('🔄 Undelaying patient:', patient);
-                              logger.debug('   Token/Queue ID:', patient.id);
-                              logger.debug('   Queue Type:', patient.queueType);
-                              logger.debug('   Has appointment_id:', !!patient.appointment_id);
-
-                              // Determine if this is an appointment or token
-                              // Undelay the token
-                              const result = await queueService.undelayToken(patient.id);
-                              logger.debug(
-                                '✅ Token queue patient undelayed. New token:',
-                                result.newTokenNumber
-                              );
-                              showSuccess(
-                                `Patient has been added back to the queue with token #${result.newTokenNumber}`
-                              );
-
-                              // Refresh the patient data
-                              if (selectedDoctor) {
-                                await handleViewPatients(selectedDoctor);
-                              }
-                            }
-                          } catch (error) {
-                            logger.error('Failed to remove delay:', error);
-                            showError(
-                              'Failed to remove delay: ' + (error.message || 'Please try again.')
-                            );
-                          }
-                        }}
+                        onSaveVitals={handleSaveVitals}
+                        onMarkReady={handleMarkReady}
+                        onUnmarkReady={handleUnmarkReady}
+                        onDelayPatient={handleDelayPatient}
+                        onRemoveDelay={handleRemoveDelay}
                         readOnly={false}
                       />
                     ))}

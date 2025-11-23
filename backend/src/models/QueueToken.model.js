@@ -37,6 +37,12 @@ class QueueTokenModel extends BaseModel {
           appointment_time,
           appointment_type,
           reason_for_visit
+        ),
+        visit:visits!visit_id (
+          id,
+          chief_complaint,
+          visit_type,
+          status
         )
       `
       )
@@ -90,7 +96,8 @@ class QueueTokenModel extends BaseModel {
 
   /**
    * Get next token in queue for a doctor
-   * Looks for tokens that are waiting, ready, or called (not yet being served)
+   * Only returns patients who have been marked as ready by the nurse (status: 'called')
+   * Patients with status 'waiting' are not ready and should not be called
    * Orders by token_number first (ascending) to ensure patients are called in token order
    */
   async getNextToken(doctorId, date = null) {
@@ -115,7 +122,7 @@ class QueueTokenModel extends BaseModel {
       )
       .eq('doctor_id', doctorId)
       .eq('issued_date', queueDate)
-      .in('status', ['waiting', 'ready', 'called']) // Include all statuses that mean "ready to be seen"
+      .in('status', ['called']) // Only patients marked as ready by nurse (status changed from 'waiting' to 'called')
       .order('token_number', { ascending: true }) // Primary sort: token number order
       .order('priority', { ascending: false }) // Secondary sort: priority (fallback)
       .limit(1)
@@ -397,11 +404,20 @@ class QueueTokenModel extends BaseModel {
           last_name,
           gender,
           phone
+        ),
+        doctor:users!doctor_id (
+          id,
+          first_name,
+          last_name,
+          specialty
         )
       `
       )
       .eq('visit_id', visitId)
-      .single();
+      .in('status', ['waiting', 'called', 'serving', 'ready'])
+      .order('created_at', { ascending: false })
+      .limit(1)
+      .maybeSingle();
 
     if (error && error.code !== 'PGRST116') {
       // PGRST116 is "no rows found"

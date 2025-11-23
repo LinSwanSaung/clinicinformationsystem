@@ -17,9 +17,58 @@ class PaymentService {
   /**
    * Record a payment
    */
-  async recordPayment(invoiceId, paymentData, receivedBy) {
+  async recordPayment(invoiceId, paymentData, receivedBy, expectedVersion = null) {
     try {
       const { amount, payment_method, payment_reference, payment_notes } = paymentData;
+
+      // Version check (if provided) - must be before any payment operations
+      if (expectedVersion !== null && expectedVersion !== undefined) {
+        const { default: InvoiceService } = await import('./Invoice.service.js');
+        const invoice = await InvoiceService.getInvoiceById(invoiceId);
+        if (!invoice) {
+          throw new Error('Invoice not found');
+        }
+
+        if (invoice.version !== expectedVersion) {
+          // If invoice is already paid, this is idempotent - return early
+          if (invoice.status === 'paid') {
+            // Ensure visit is completed if needed
+            if (invoice.visit_id) {
+              try {
+                const { default: VisitService } = await import('./Visit.service.js');
+                const visitService = new VisitService();
+                const visitDetails = await visitService.getVisitDetails(invoice.visit_id);
+                if (visitDetails?.data?.status !== 'completed') {
+                  await visitService.completeVisit(invoice.visit_id, {
+                    payment_status: 'paid',
+                    completed_by: receivedBy,
+                  });
+                }
+              } catch (visitError) {
+                logger.error(
+                  `Failed to complete visit ${invoice.visit_id} for already-paid invoice:`,
+                  visitError
+                );
+              }
+            }
+            // Return existing payment (idempotent)
+            const { default: PaymentTransactionModel } = await import(
+              '../models/PaymentTransaction.model.js'
+            );
+            const payments = await PaymentTransactionModel.getPaymentsByInvoice(invoiceId);
+            return payments[0] || null;
+          }
+
+          // Invoice is not paid and version mismatch - throw error
+          const error = new Error(
+            `Invoice was modified by another user. Current version: ${invoice.version}, Expected: ${expectedVersion}. Please refresh and try again.`
+          );
+          error.code = 'VERSION_MISMATCH';
+          error.currentVersion = invoice.version;
+          error.expectedVersion = expectedVersion;
+          throw error;
+        }
+      }
 
       // Validate required fields
       if (!amount || !payment_method) {
@@ -92,6 +141,11 @@ class PaymentService {
 
       return atomicResult.payment;
     } catch (error) {
+      // Re-throw version mismatch errors as-is
+      if (error.code === 'VERSION_MISMATCH') {
+        throw error;
+      }
+
       throw new Error(`Failed to record payment: ${error.message}`);
     }
   }

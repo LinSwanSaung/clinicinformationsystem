@@ -2167,6 +2167,12 @@ CREATE TABLE IF NOT EXISTS invoices (
     resolved_by_admin BOOLEAN DEFAULT false,
     resolved_reason TEXT,
     
+    -- Optimistic locking for concurrent edit prevention
+    version INTEGER NOT NULL DEFAULT 1,
+    
+    -- Outstanding balance inclusion flag
+    include_outstanding_balance BOOLEAN DEFAULT false,
+    
     CONSTRAINT valid_invoice_status CHECK (status IN ('draft', 'pending', 'partial_paid', 'paid', 'cancelled', 'refunded')),
     CONSTRAINT valid_payment_method CHECK (payment_method IN ('cash', 'online_payment', 'mixed'))
 );
@@ -2254,6 +2260,37 @@ CREATE TRIGGER update_invoices_updated_at BEFORE UPDATE ON invoices
     FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
 
 -- ===============================================
+-- FUNCTION: Increment Invoice Version (Optimistic Locking)
+-- Auto-increments version when invoice data changes
+-- ===============================================
+CREATE OR REPLACE FUNCTION increment_invoice_version()
+RETURNS TRIGGER AS $$
+BEGIN
+    -- Only increment version if data actually changed (not just updated_at)
+    IF (OLD.subtotal IS DISTINCT FROM NEW.subtotal) OR
+       (OLD.discount_amount IS DISTINCT FROM NEW.discount_amount) OR
+       (OLD.discount_percentage IS DISTINCT FROM NEW.discount_percentage) OR
+       (OLD.tax_amount IS DISTINCT FROM NEW.tax_amount) OR
+       (OLD.total_amount IS DISTINCT FROM NEW.total_amount) OR
+       (OLD.paid_amount IS DISTINCT FROM NEW.paid_amount) OR
+       (OLD.balance IS DISTINCT FROM NEW.balance) OR
+       (OLD.balance_due IS DISTINCT FROM NEW.balance_due) OR
+       (OLD.status IS DISTINCT FROM NEW.status) OR
+       (OLD.on_hold IS DISTINCT FROM NEW.on_hold) THEN
+        NEW.version = OLD.version + 1;
+    ELSE
+        NEW.version = OLD.version; -- Keep same version if only metadata changed
+    END IF;
+    RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
+
+CREATE TRIGGER trigger_increment_invoice_version
+    BEFORE UPDATE ON invoices
+    FOR EACH ROW
+    EXECUTE FUNCTION increment_invoice_version();
+
+-- ===============================================
 -- FUNCTION: Auto-generate Invoice Number (Atomic)
 -- Uses advisory lock to prevent race conditions
 -- ===============================================
@@ -2309,6 +2346,208 @@ CREATE TRIGGER trigger_set_invoice_number
     BEFORE INSERT ON invoices
     FOR EACH ROW
     EXECUTE FUNCTION set_invoice_number();
+
+-- ===============================================
+-- FUNCTION: Update Invoice Atomic (Optimistic Locking)
+-- Atomically updates invoice with version checking to prevent concurrent edit conflicts
+-- ===============================================
+CREATE OR REPLACE FUNCTION update_invoice_atomic(
+  p_invoice_id UUID,
+  p_version INTEGER,  -- Expected current version from frontend
+  p_updates JSONB     -- Fields to update
+)
+RETURNS TABLE (
+  success BOOLEAN,
+  message TEXT,
+  invoice_data JSONB
+) 
+LANGUAGE plpgsql
+AS $$
+DECLARE
+  v_lock_key BIGINT;
+  v_current_version INTEGER;
+  v_current_invoice RECORD;
+  v_updated_invoice RECORD;
+BEGIN
+  -- Generate lock key based on invoice_id
+  v_lock_key := abs(hashtext(p_invoice_id::TEXT))::bigint;
+  
+  -- Acquire advisory lock (blocks until lock is available)
+  PERFORM pg_advisory_xact_lock(v_lock_key);
+  
+  -- Get current invoice state
+  SELECT * INTO v_current_invoice
+  FROM invoices
+  WHERE id = p_invoice_id;
+  
+  IF NOT FOUND THEN
+    RETURN QUERY SELECT FALSE, 'Invoice not found'::TEXT, NULL::JSONB;
+    RETURN;
+  END IF;
+  
+  -- Check version matches (optimistic locking)
+  IF v_current_invoice.version != p_version THEN
+    RETURN QUERY SELECT 
+      FALSE, 
+      format('Invoice was modified by another user. Current version: %s, Expected: %s', 
+             v_current_invoice.version, p_version)::TEXT,
+      to_jsonb(v_current_invoice);
+    RETURN;
+  END IF;
+  
+  -- Version matches - proceed with update
+  -- Build dynamic UPDATE query from JSONB
+  UPDATE invoices
+  SET 
+    subtotal = COALESCE((p_updates->>'subtotal')::DECIMAL, subtotal),
+    discount_amount = COALESCE((p_updates->>'discount_amount')::DECIMAL, discount_amount),
+    discount_percentage = COALESCE((p_updates->>'discount_percentage')::DECIMAL, discount_percentage),
+    tax_amount = COALESCE((p_updates->>'tax_amount')::DECIMAL, tax_amount),
+    total_amount = COALESCE((p_updates->>'total_amount')::DECIMAL, total_amount),
+    paid_amount = COALESCE((p_updates->>'paid_amount')::DECIMAL, paid_amount),
+    balance = COALESCE((p_updates->>'balance')::DECIMAL, balance),
+    balance_due = COALESCE((p_updates->>'balance_due')::DECIMAL, balance_due),
+    status = COALESCE(p_updates->>'status', status),
+    on_hold = COALESCE((p_updates->>'on_hold')::BOOLEAN, on_hold),
+    hold_reason = COALESCE(p_updates->>'hold_reason', hold_reason),
+    payment_due_date = COALESCE((p_updates->>'payment_due_date')::DATE, payment_due_date),
+    updated_at = NOW()
+  WHERE id = p_invoice_id
+    AND version = p_version  -- Double-check version hasn't changed
+  RETURNING * INTO v_updated_invoice;
+  
+  IF NOT FOUND THEN
+    -- Version changed between check and update (shouldn't happen with lock, but safety check)
+    RETURN QUERY SELECT 
+      FALSE, 
+      'Invoice version changed during update. Please refresh and try again.'::TEXT,
+      NULL::JSONB;
+    RETURN;
+  END IF;
+  
+  -- Success - return updated invoice
+  RETURN QUERY SELECT 
+    TRUE,
+    'Invoice updated successfully'::TEXT,
+    to_jsonb(v_updated_invoice);
+END;
+$$;
+
+-- Grant execute permission
+GRANT EXECUTE ON FUNCTION update_invoice_atomic(UUID, INTEGER, JSONB) TO authenticated;
+GRANT EXECUTE ON FUNCTION update_invoice_atomic(UUID, INTEGER, JSONB) TO service_role;
+
+COMMENT ON FUNCTION update_invoice_atomic IS 
+  'Atomically updates invoice with version checking to prevent concurrent edit conflicts. 
+   Returns error if version mismatch detected.';
+
+-- ===============================================
+-- FUNCTION: Add Invoice Item Atomic (Optimistic Locking)
+-- Atomically adds invoice item with version checking to prevent concurrent edit conflicts
+-- ===============================================
+CREATE OR REPLACE FUNCTION add_invoice_item_atomic(
+  p_invoice_id UUID,
+  p_version INTEGER,  -- Expected current version
+  p_item_type VARCHAR(20),
+  p_item_name VARCHAR(255),
+  p_item_description TEXT,
+  p_quantity DECIMAL(10,2),
+  p_unit_price DECIMAL(10,2),
+  p_discount_amount DECIMAL(10,2),
+  p_notes TEXT,
+  p_added_by UUID
+)
+RETURNS TABLE (
+  success BOOLEAN,
+  message TEXT,
+  item_data JSONB,
+  invoice_data JSONB
+) 
+LANGUAGE plpgsql
+AS $$
+DECLARE
+  v_lock_key BIGINT;
+  v_current_version INTEGER;
+  v_current_invoice RECORD;
+  v_new_item RECORD;
+  v_total_price DECIMAL(10,2);
+BEGIN
+  -- Generate lock key
+  v_lock_key := abs(hashtext(p_invoice_id::TEXT))::bigint;
+  
+  -- Acquire advisory lock
+  PERFORM pg_advisory_xact_lock(v_lock_key);
+  
+  -- Get current invoice state
+  SELECT * INTO v_current_invoice
+  FROM invoices
+  WHERE id = p_invoice_id;
+  
+  IF NOT FOUND THEN
+    RETURN QUERY SELECT FALSE, 'Invoice not found'::TEXT, NULL::JSONB, NULL::JSONB;
+    RETURN;
+  END IF;
+  
+  -- Check version matches
+  IF v_current_invoice.version != p_version THEN
+    RETURN QUERY SELECT 
+      FALSE, 
+      format('Invoice was modified by another user. Current version: %s, Expected: %s', 
+             v_current_invoice.version, p_version)::TEXT,
+      NULL::JSONB,
+      to_jsonb(v_current_invoice);
+    RETURN;
+  END IF;
+  
+  -- Calculate total price (handle null discount_amount)
+  v_total_price := (p_quantity * p_unit_price) - COALESCE(NULLIF(p_discount_amount, 0), 0);
+  
+  -- Insert new item
+  INSERT INTO invoice_items (
+    invoice_id,
+    item_type,
+    item_name,
+    item_description,
+    quantity,
+    unit_price,
+    discount_amount,
+    total_price,
+    notes,
+    added_by
+  ) VALUES (
+    p_invoice_id,
+    p_item_type,
+    p_item_name,
+    p_item_description,
+    p_quantity,
+    p_unit_price,
+    COALESCE(p_discount_amount, 0),
+    v_total_price,
+    p_notes,
+    p_added_by
+  ) RETURNING * INTO v_new_item;
+  
+  -- Recalculate invoice totals (this will increment version via trigger)
+  -- Note: We need to recalculate manually since we're in a function
+  -- The trigger will handle version increment
+  
+  -- Success - return new item and updated invoice
+  SELECT * INTO v_current_invoice FROM invoices WHERE id = p_invoice_id;
+  
+  RETURN QUERY SELECT 
+    TRUE,
+    'Item added successfully'::TEXT,
+    to_jsonb(v_new_item),
+    to_jsonb(v_current_invoice);
+END;
+$$;
+
+-- Grant execute permission
+GRANT EXECUTE ON FUNCTION add_invoice_item_atomic(UUID, INTEGER, VARCHAR, VARCHAR, TEXT, DECIMAL, DECIMAL, DECIMAL, TEXT, UUID) TO authenticated;
+GRANT EXECUTE ON FUNCTION add_invoice_item_atomic(UUID, INTEGER, VARCHAR, VARCHAR, TEXT, DECIMAL, DECIMAL, DECIMAL, TEXT, UUID) TO service_role;
+
+COMMENT ON FUNCTION add_invoice_item_atomic IS 
+  'Atomically adds invoice item with version checking to prevent concurrent edit conflicts.';
 
 -- ===============================================
 -- ENABLE ROW LEVEL SECURITY

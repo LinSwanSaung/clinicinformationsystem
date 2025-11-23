@@ -6,6 +6,7 @@ import { isAuthenticated as isAuthed } from '@/features/auth';
 import { POLLING_INTERVALS } from '@/constants/polling';
 import { EmptyState } from '@/components/library';
 import logger from '@/utils/logger';
+import browserNotifications from '@/utils/browserNotifications';
 
 const NotificationBell = () => {
   const [notifications, setNotifications] = useState([]);
@@ -28,8 +29,20 @@ const NotificationBell = () => {
     // Backend returns: { success: true, data: { count: number } }
     // apiService.get() returns the full response, so we need to access data.data.count
     const c = unreadQuery.data?.data?.count ?? unreadQuery.data?.count;
+    const previousCount = unreadCount;
+
     if (typeof c === 'number') {
       setUnreadCount(c);
+
+      // Show browser notification when new notifications arrive
+      if (c > previousCount && previousCount > 0) {
+        const newCount = c - previousCount;
+        browserNotifications.showNotification(
+          `${newCount} New Notification${newCount > 1 ? 's' : ''}`,
+          `You have ${newCount} new notification${newCount > 1 ? 's' : ''}`,
+          'info'
+        );
+      }
     } else if (unreadQuery.data && !unreadQuery.isError) {
       // If we got a response but no count, reset to 0
       setUnreadCount(0);
@@ -41,8 +54,47 @@ const NotificationBell = () => {
     try {
       setLoading(true);
       const response = await notificationService.getNotifications(10);
-      // response is already the data array from notificationService
-      setNotifications(response || []);
+      // Backend returns: { success: true, data: [...] }
+      // notificationService.getNotifications() returns response.data which is { success: true, data: [...] }
+      const newNotifications = response?.data || (Array.isArray(response) ? response : []);
+
+      // Check for new notifications and show browser alerts
+      setNotifications((prevNotifications) => {
+        if (prevNotifications.length > 0) {
+          const previousIds = new Set(prevNotifications.map((n) => n.id));
+          const newOnes = newNotifications.filter((n) => !previousIds.has(n.id));
+
+          newOnes.forEach((notification) => {
+            // Show browser notification for important types
+            if (
+              notification.type === 'warning' ||
+              notification.related_entity_type === 'queue_token'
+            ) {
+              // Queue turn notification
+              if (
+                notification.title.includes('Turn') ||
+                notification.title.includes('called') ||
+                notification.title.includes('You are')
+              ) {
+                const tokenMatch = notification.message.match(/Token #(\d+)/);
+                const tokenNumber = tokenMatch ? tokenMatch[1] : '';
+                browserNotifications.showQueueTurn(tokenNumber, notification.message);
+              } else {
+                browserNotifications.showNotification(
+                  notification.title,
+                  notification.message,
+                  notification.type
+                );
+              }
+            } else if (notification.related_entity_type === 'appointment') {
+              // Appointment reminder
+              browserNotifications.showAppointmentReminder('', notification.message);
+            }
+          });
+        }
+
+        return newNotifications;
+      });
     } catch (error) {
       logger.error('Error fetching notifications:', error);
       setNotifications([]); // Set empty array on error
@@ -116,9 +168,15 @@ const NotificationBell = () => {
     const diffMs = now - date;
     const diffMins = Math.floor(diffMs / 60000);
 
-    if (diffMins < 1) return 'Just now';
-    if (diffMins < 60) return `${diffMins}m ago`;
-    if (diffMins < 1440) return `${Math.floor(diffMins / 60)}h ago`;
+    if (diffMins < 1) {
+      return 'Just now';
+    }
+    if (diffMins < 60) {
+      return `${diffMins}m ago`;
+    }
+    if (diffMins < 1440) {
+      return `${Math.floor(diffMins / 60)}h ago`;
+    }
     return date.toLocaleDateString();
   };
 

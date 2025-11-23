@@ -32,7 +32,19 @@ class QueueService {
       const response = await api.post(`${this.baseURL}/token`, tokenData);
       return response;
     } catch (error) {
-      throw new Error(error.message || 'Failed to issue queue token');
+      // Extract detailed error message from API response
+      const errorMessage =
+        error.response?.data?.message || error.message || 'Failed to issue queue token';
+      const errorCode = error.response?.data?.code;
+      const errorDetails = error.response?.data?.details;
+
+      // Create enhanced error with code and details
+      const enhancedError = new Error(errorMessage);
+      enhancedError.code = errorCode;
+      enhancedError.details = errorDetails;
+      enhancedError.status = error.response?.status;
+
+      throw enhancedError;
     }
   }
 
@@ -442,7 +454,9 @@ class QueueService {
 
       const waitingTokens = allTokens.filter((t) => t && t.status === 'waiting');
 
-      if (waitingTokens.length === 0) return 0;
+      if (waitingTokens.length === 0) {
+        return 0;
+      }
 
       const totalWaitTime = waitingTokens.reduce((sum, token) => {
         try {

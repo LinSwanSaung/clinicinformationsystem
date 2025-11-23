@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, memo } from 'react';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -7,7 +7,7 @@ import { useNavigate } from 'react-router-dom';
 import { allergyService } from '@/features/medical';
 import logger from '@/utils/logger';
 
-export default function ReceptionistPatientCard({ patient, onBookAppointment }) {
+const ReceptionistPatientCard = memo(({ patient, onBookAppointment }) => {
   const navigate = useNavigate();
   const [allergies, setAllergies] = useState([]);
   const [loadingAllergies, setLoadingAllergies] = useState(false);
@@ -146,4 +146,8 @@ export default function ReceptionistPatientCard({ patient, onBookAppointment }) 
       </div>
     </Card>
   );
-}
+});
+
+ReceptionistPatientCard.displayName = 'ReceptionistPatientCard';
+
+export default ReceptionistPatientCard;

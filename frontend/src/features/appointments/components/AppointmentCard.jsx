@@ -78,9 +78,14 @@ const AppointmentCard = ({
                   </span>
                 </div>
                 <span className="truncate rounded-md border border-purple-200 bg-purple-50 px-2 py-1 text-xs font-medium text-purple-700">
-                  {appointment.visit_type}
+                  {appointment.appointment_type || appointment.visit_type || 'Consultation'}
                 </span>
               </div>
+              {appointment.reason_for_visit && (
+                <div className="mt-2 text-xs text-muted-foreground">
+                  <span className="font-medium">Reason:</span> {appointment.reason_for_visit}
+                </div>
+              )}
             </div>
           </div>
         </div>

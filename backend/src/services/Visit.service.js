@@ -77,6 +77,7 @@ class VisitService {
 
   /**
    * Create new visit
+   * IMPORTANT: Checks for active visits to prevent multiple concurrent visits per patient
    */
   async createVisit(visitData) {
     try {
@@ -85,6 +86,17 @@ class VisitService {
 
       if (missingFields.length > 0) {
         throw new Error(`Missing required fields: ${missingFields.join(', ')}`);
+      }
+
+      // CRITICAL: Check if patient already has an active visit
+      // This prevents patients from having multiple concurrent visits
+      const activeVisit = await this.getPatientActiveVisit(visitData.patient_id);
+      if (activeVisit) {
+        throw new Error(
+          `Patient already has an active visit (Visit ID: ${activeVisit.id}). ` +
+            `Please complete or cancel the current visit before creating a new one. ` +
+            `This ensures only one visit can be active at a time.`
+        );
       }
 
       // Set default values and remove fields not in schema

@@ -15,6 +15,7 @@ import {
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { Textarea } from '@/components/ui/textarea';
 import { Badge } from '@/components/ui/badge';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import {
@@ -37,8 +38,11 @@ const WalkInModal = ({ isOpen, onClose, onSubmit }) => {
   const [selectedPatient, setSelectedPatient] = useState(null);
   const [selectedDoctor, setSelectedDoctor] = useState(null);
   const [patientSearch, setPatientSearch] = useState('');
+  const [doctorSearch, setDoctorSearch] = useState('');
+  const [reasonForVisit, setReasonForVisit] = useState('');
   const [patients, setPatients] = useState([]);
   const [doctors, setDoctors] = useState([]);
+  const [allDoctors, setAllDoctors] = useState([]); // Store all doctors for filtering
   const [isLoadingPatients, setIsLoadingPatients] = useState(false);
   const [isLoadingDoctors, setIsLoadingDoctors] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -53,6 +57,7 @@ const WalkInModal = ({ isOpen, onClose, onSubmit }) => {
   const [capacityWarning, setCapacityWarning] = useState(null);
 
   const debouncedPatientSearch = useDebounce(patientSearch, 300);
+  const debouncedDoctorSearch = useDebounce(doctorSearch, 300);
 
   // Mock doctor availability data (unused - kept for future reference)
   // const mockDoctorAvailability = [
@@ -104,6 +109,8 @@ const WalkInModal = ({ isOpen, onClose, onSubmit }) => {
       setSelectedPatient(null);
       setSelectedDoctor(null);
       setPatientSearch('');
+      setDoctorSearch('');
+      setReasonForVisit('');
       loadDoctors();
     }
   }, [isOpen]);
@@ -115,6 +122,23 @@ const WalkInModal = ({ isOpen, onClose, onSubmit }) => {
       setPatients([]);
     }
   }, [debouncedPatientSearch]);
+
+  // Filter doctors based on search term
+  useEffect(() => {
+    if (!debouncedDoctorSearch || debouncedDoctorSearch.trim().length === 0) {
+      // Show all doctors if no search term
+      setDoctors(allDoctors);
+    } else {
+      // Filter doctors by name or specialty
+      const searchLower = debouncedDoctorSearch.toLowerCase().trim();
+      const filtered = allDoctors.filter((doctor) => {
+        const nameMatch = doctor.name.toLowerCase().includes(searchLower);
+        const specialtyMatch = doctor.specialty?.toLowerCase().includes(searchLower);
+        return nameMatch || specialtyMatch;
+      });
+      setDoctors(filtered);
+    }
+  }, [debouncedDoctorSearch, allDoctors]);
 
   const searchPatients = async (searchTerm) => {
     if (!searchTerm || searchTerm.trim().length < 2) {
@@ -177,7 +201,8 @@ const WalkInModal = ({ isOpen, onClose, onSubmit }) => {
         }));
 
         logger.debug('Available doctors for walk-in:', doctorsWithAvailability);
-        setDoctors(doctorsWithAvailability);
+        setAllDoctors(doctorsWithAvailability); // Store all doctors
+        setDoctors(doctorsWithAvailability); // Initially show all
       } else {
         logger.error('Failed to load available doctors');
         setDoctors([]);
@@ -417,6 +442,7 @@ const WalkInModal = ({ isOpen, onClose, onSubmit }) => {
         }),
         visit_type: 'Walk-in',
         status: 'ready', // Walk-ins go straight to ready status
+        reason_for_visit: reasonForVisit.trim(), // Include reason for visit
         notes: 'Walk-in appointment',
       };
 
@@ -425,30 +451,42 @@ const WalkInModal = ({ isOpen, onClose, onSubmit }) => {
     } catch (error) {
       logger.error('Error creating walk-in appointment:', error);
 
-      // Check if the error is about an existing token
-      if (error.message && error.message.includes('already has an active token')) {
-        // Extract token details from the error message if available
-        let tokenDetails = '';
-        try {
-          const tokenMatch = error.message.match(/Token: ({.*})/);
-          if (tokenMatch) {
-            const tokenData = JSON.parse(tokenMatch[1]);
-            tokenDetails =
-              `\n\nExisting Token Details:\n` +
-              `• Token Number: ${tokenData.token_number}\n` +
-              `• Status: ${tokenData.status}\n` +
-              `• Issued Time: ${new Date(tokenData.issued_time).toLocaleTimeString()}\n` +
-              `• Estimated Wait: ${tokenData.estimated_wait_time} minutes`;
-          }
-        } catch (parseError) {
-          // Ignore parsing errors
-        }
+      // Get error code and details from the error object
+      const errorCode = error.code || error.response?.data?.code;
+      const errorDetails = error.details || error.response?.data?.details;
+      const errorMessage =
+        error.message ||
+        error.response?.data?.message ||
+        'Failed to create walk-in appointment. Please try again.';
 
+      // Handle specific error codes with appropriate UI feedback
+      if (errorCode === 'PATIENT_IN_CONSULTATION') {
+        // Patient is currently in consultation
+        showWarning(errorMessage);
+      } else if (errorCode === 'ACTIVE_TOKEN_IN_QUEUE' || errorCode === 'ACTIVE_TOKEN_EXISTS') {
+        // Patient has active token in queue
+        let additionalInfo = '';
+        if (errorDetails?.tokenNumber) {
+          additionalInfo = `\n\nToken #${errorDetails.tokenNumber} is ${errorDetails.tokenStatus || 'active'}.`;
+        }
         showWarning(
-          `This patient already has an active queue token for this doctor today.${tokenDetails}\n\nPlease:\n1. Check the current queue status, or\n2. Complete/cancel the existing token first, or\n3. Choose a different doctor`
+          `${errorMessage}${additionalInfo}\n\nPlease complete or cancel the current visit before creating a new one.`
         );
+      } else if (errorCode === 'INVOICE_NOT_COMPLETED') {
+        // Patient has unpaid invoice
+        let additionalInfo = '';
+        if (errorDetails?.invoiceNumber) {
+          additionalInfo = `\n\nInvoice #${errorDetails.invoiceNumber} (Status: ${errorDetails.invoiceStatus || 'pending'})`;
+        }
+        showWarning(
+          `${errorMessage}${additionalInfo}\n\nPlease direct the patient to the cashier counter to complete payment.`
+        );
+      } else if (errorCode === 'ACTIVE_VISIT_EXISTS') {
+        // Generic active visit error
+        showWarning(errorMessage);
       } else {
-        showError(error.message || 'Failed to create walk-in appointment. Please try again.');
+        // Generic error
+        showError(errorMessage);
       }
     } finally {
       setIsSubmitting(false);
@@ -470,6 +508,7 @@ const WalkInModal = ({ isOpen, onClose, onSubmit }) => {
     setSelectedPatient(null);
     setSelectedDoctor(null);
     setPatientSearch('');
+    setDoctorSearch('');
     setPatients([]);
     setPatientHasActiveAppointment(false);
     setActiveAppointmentDetails(null);
@@ -728,7 +767,36 @@ const WalkInModal = ({ isOpen, onClose, onSubmit }) => {
                 )}
 
                 <div className="space-y-4">
-                  <p className="text-sm font-medium">Available Doctors Today:</p>
+                  <div className="space-y-3">
+                    <p className="text-sm font-medium">Reason for Visit *</p>
+                    <Textarea
+                      value={reasonForVisit}
+                      onChange={(e) => setReasonForVisit(e.target.value)}
+                      placeholder="Enter the reason for this visit (e.g., follow-up, new symptoms, routine checkup)..."
+                      className="min-h-[80px]"
+                      required
+                    />
+                  </div>
+
+                  <div className="space-y-3">
+                    <p className="text-sm font-medium">Search Doctor</p>
+                    <div className="relative">
+                      <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 transform text-muted-foreground" />
+                      <Input
+                        id="doctor-search"
+                        type="text"
+                        placeholder="Search by doctor name or specialty..."
+                        value={doctorSearch}
+                        onChange={(e) => setDoctorSearch(e.target.value)}
+                        className="h-11 pl-10"
+                      />
+                    </div>
+                  </div>
+
+                  <p className="text-sm font-medium">
+                    Available Doctors Today
+                    {doctors.length !== allDoctors.length ? ` (${doctors.length} found)` : ''}:
+                  </p>
 
                   {isLoadingDoctors ? (
                     <div className="py-4 text-center">
@@ -813,6 +881,14 @@ const WalkInModal = ({ isOpen, onClose, onSubmit }) => {
                       })}
                     </div>
                   )}
+
+                  {!isLoadingDoctors && doctorSearch && doctors.length === 0 && (
+                    <div className="py-8 text-center text-muted-foreground">
+                      <Stethoscope className="mx-auto mb-4 h-12 w-12 opacity-50" />
+                      <p>No doctors found matching &quot;{doctorSearch}&quot;</p>
+                      <p className="text-sm">Try searching with a different name or specialty</p>
+                    </div>
+                  )}
                 </div>
               </motion.div>
             )}
@@ -829,6 +905,7 @@ const WalkInModal = ({ isOpen, onClose, onSubmit }) => {
               onClick={handleSubmit}
               disabled={
                 !selectedDoctor ||
+                !reasonForVisit.trim() ||
                 isSubmitting ||
                 isCheckingCapacity ||
                 (doctorCapacity && !doctorCapacity.canAccept) ||

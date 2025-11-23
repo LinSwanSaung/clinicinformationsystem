@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect } from 'react';
+import { useRef, useEffect } from 'react';
 import { Plus, X } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -119,7 +119,9 @@ export const MedicationForm = ({
 
   const handleMedicationChange = (index, field, value) => {
     const updatedMedications = medications.map((med, i) => {
-      if (i !== index) return med;
+      if (i !== index) {
+        return med;
+      }
 
       const updated = { ...med, [field]: value };
 
@@ -166,7 +168,9 @@ export const MedicationForm = ({
     <div className={`space-y-4 ${className}`}>
       {showLabel && (
         <div className="flex items-center justify-between">
-          <label className="block text-sm font-medium text-foreground">Prescribed Medications</label>
+          <label className="block text-sm font-medium text-foreground">
+            Prescribed Medications
+          </label>
           {canAdd && (
             <Button
               type="button"
@@ -184,7 +188,7 @@ export const MedicationForm = ({
 
       <div className="max-h-[500px] space-y-4 overflow-y-auto">
         {medications.map((medication, index) => (
-          <div key={index} className="space-y-3 rounded-lg border border-border bg-muted/50 p-4">
+          <div key={index} className="bg-muted/50 space-y-3 rounded-lg border border-border p-4">
             {/* Header with remove button */}
             <div className="flex items-center justify-between">
               <span className="text-sm font-semibold text-foreground">Medication #{index + 1}</span>
@@ -211,7 +215,9 @@ export const MedicationForm = ({
                   <div className="flex gap-2">
                     <Input
                       ref={(el) => {
-                        if (el) customInputRefs.current[index] = el;
+                        if (el) {
+                          customInputRefs.current[index] = el;
+                        }
                       }}
                       placeholder="Enter custom medication name..."
                       value={medication.name || ''}
@@ -420,7 +426,9 @@ export const MedicationForm = ({
       </div>
 
       {medications.length === 0 && (
-        <div className="py-4 text-center text-sm text-muted-foreground">No medications prescribed</div>
+        <div className="py-4 text-center text-sm text-muted-foreground">
+          No medications prescribed
+        </div>
       )}
     </div>
   );

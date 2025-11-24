@@ -221,7 +221,7 @@ const NotificationBell = () => {
             {unreadCount > 0 && (
               <button
                 onClick={handleMarkAllAsRead}
-                className="hover:text-primary/80 text-sm font-medium text-primary"
+                className="bg-primary/10 hover:bg-primary/20 dark:bg-primary/20 dark:hover:bg-primary/30 rounded-md px-2 py-1 text-sm font-medium text-primary transition-colors"
               >
                 Mark all as read
               </button>
@@ -265,7 +265,7 @@ const NotificationBell = () => {
                           {!notification.is_read && (
                             <button
                               onClick={() => handleMarkAsRead(notification.id)}
-                              className="hover:text-primary/80 flex-shrink-0 text-xs text-primary"
+                              className="bg-primary/10 hover:bg-primary/20 dark:bg-primary/20 dark:hover:bg-primary/30 flex-shrink-0 rounded-md px-2 py-1 text-xs font-medium text-primary transition-colors"
                             >
                               Mark read
                             </button>
@@ -284,15 +284,6 @@ const NotificationBell = () => {
               </ul>
             )}
           </div>
-
-          {/* Footer */}
-          {notifications.length > 0 && (
-            <div className="border-t border-border p-3 text-center">
-              <button className="hover:text-primary/80 text-sm font-medium text-primary">
-                View all notifications
-              </button>
-            </div>
-          )}
         </div>
       )}
     </div>

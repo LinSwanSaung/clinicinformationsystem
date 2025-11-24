@@ -399,11 +399,14 @@ class VisitModel extends BaseModel {
     const servicesTotal = this.calculateServicesTotal(visit.services);
     const totalCost = consultationFee + servicesTotal;
 
+    // Filter out fields that don't exist on visits table (like completed_by which is only on invoices)
+    const { completed_by: _completed_by, ...validCompletionData } = completionData;
+
     const updateData = {
       status: 'completed',
       total_cost: totalCost,
       payment_status: completionData.payment_status || visit.payment_status || 'pending',
-      ...completionData,
+      ...validCompletionData,
       updated_at: new Date().toISOString(),
     };
 
@@ -415,7 +418,22 @@ class VisitModel extends BaseModel {
       .single();
 
     if (error) {
-      throw new Error(`Failed to complete visit: ${error.message}`);
+      // Supabase errors might not have a message property, so handle both cases
+      const errorMessage =
+        error.message ||
+        error.details ||
+        error.hint ||
+        JSON.stringify(error) ||
+        'Unknown database error';
+      const errorCode = error.code || 'UNKNOWN';
+      logger.error(
+        `[VISIT MODEL] Failed to complete visit ${visitId}. Error code: ${errorCode}, Message: ${errorMessage}`
+      );
+      throw new Error(`Failed to complete visit: ${errorMessage} (code: ${errorCode})`);
+    }
+
+    if (!data) {
+      throw new Error(`Visit ${visitId} update returned no data`);
     }
 
     return data;

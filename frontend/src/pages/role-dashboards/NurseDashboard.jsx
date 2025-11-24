@@ -242,18 +242,10 @@ const NurseDashboard = () => {
         );
 
         // Fetch vitals for each patient using the new per-visit logic
-        // OPTIMIZATION: Skip vitals fetch for completed patients (they won't change)
-        // This reduces API calls significantly
+        // On initial load: Fetch vitals for ALL patients (including completed) to display historical data
+        // On auto-refresh: Skip completed patients (they won't change) - handled in auto-refresh logic
         const patientsWithVitals = await Promise.all(
           allPatients.map(async (patient) => {
-            // Skip vitals fetch for completed/missed patients - they won't change
-            if (patient.status === 'completed' || patient.status === 'missed') {
-              return {
-                ...patient,
-                latestVitals: null, // Completed patients don't need fresh vitals
-              };
-            }
-
             try {
               const vitals = await fetchTokenVitals(patient);
 
@@ -265,6 +257,7 @@ const NurseDashboard = () => {
               logger.debug(`[NURSE] Patient #${patient.token_number} after vitals fetch:`, {
                 token_number: patient.token_number,
                 visit_id: patient.visit_id,
+                status: patient.status,
                 hasLatestVitals: !!patientWithVitals.latestVitals,
                 latestVitals: patientWithVitals.latestVitals,
               });
@@ -331,12 +324,18 @@ const NurseDashboard = () => {
               });
 
               // Fetch vitals and update state silently
-              // OPTIMIZATION: Skip vitals for completed/missed patients
+              // OPTIMIZATION: Skip vitals for completed/missed patients (preserve existing vitals)
               Promise.all(
                 allPatients.map(async (patient) => {
-                  // Skip vitals fetch for completed/missed patients
+                  // Skip vitals fetch for completed/missed patients - preserve existing vitals
+                  // They won't change, so no need to refetch
                   if (patient.status === 'completed' || patient.status === 'missed') {
-                    return { ...patient, latestVitals: null };
+                    // Preserve existing vitals from state if available
+                    const existingPatient = patients.find((p) => p.id === patient.id);
+                    return {
+                      ...patient,
+                      latestVitals: existingPatient?.latestVitals || null,
+                    };
                   }
                   try {
                     const vitals = await fetchTokenVitals(patient);
@@ -553,8 +552,17 @@ const NurseDashboard = () => {
                 });
 
                 // Fetch vitals and update silently
+                // OPTIMIZATION: Preserve vitals for completed/missed patients
                 Promise.all(
                   allPatients.map(async (patient) => {
+                    // Preserve existing vitals for completed/missed patients
+                    if (patient.status === 'completed' || patient.status === 'missed') {
+                      const existingPatient = patients.find((p) => p.id === patient.id);
+                      return {
+                        ...patient,
+                        latestVitals: existingPatient?.latestVitals || null,
+                      };
+                    }
                     try {
                       const vitals = await fetchTokenVitals(patient);
                       return { ...patient, latestVitals: vitals };
@@ -647,8 +655,17 @@ const NurseDashboard = () => {
                 });
 
                 // Fetch vitals and update silently
+                // OPTIMIZATION: Preserve vitals for completed/missed patients
                 Promise.all(
                   allPatients.map(async (patient) => {
+                    // Preserve existing vitals for completed/missed patients
+                    if (patient.status === 'completed' || patient.status === 'missed') {
+                      const existingPatient = patients.find((p) => p.id === patient.id);
+                      return {
+                        ...patient,
+                        latestVitals: existingPatient?.latestVitals || null,
+                      };
+                    }
                     try {
                       const vitals = await fetchTokenVitals(patient);
                       return { ...patient, latestVitals: vitals };
@@ -752,8 +769,17 @@ const NurseDashboard = () => {
                 });
 
                 // Fetch vitals and update silently
+                // OPTIMIZATION: Preserve vitals for completed/missed patients
                 Promise.all(
                   allPatients.map(async (patient) => {
+                    // Preserve existing vitals for completed/missed patients
+                    if (patient.status === 'completed' || patient.status === 'missed') {
+                      const existingPatient = patients.find((p) => p.id === patient.id);
+                      return {
+                        ...patient,
+                        latestVitals: existingPatient?.latestVitals || null,
+                      };
+                    }
                     try {
                       const vitals = await fetchTokenVitals(patient);
                       return { ...patient, latestVitals: vitals };
@@ -1303,22 +1329,26 @@ const NurseDashboard = () => {
                             return 'N/A';
                           })(),
                           vitals: token.latestVitals
-                            ? {
-                                bp:
+                            ? (() => {
+                                const bp =
                                   token.latestVitals.blood_pressure_systolic &&
                                   token.latestVitals.blood_pressure_diastolic
                                     ? `${token.latestVitals.blood_pressure_systolic}/${token.latestVitals.blood_pressure_diastolic}`
-                                    : '',
-                                temp: token.latestVitals.temperature
+                                    : null;
+                                const temp = token.latestVitals.temperature
                                   ? token.latestVitals.temperature.toString()
-                                  : '',
-                                weight: token.latestVitals.weight
+                                  : null;
+                                const weight = token.latestVitals.weight
                                   ? token.latestVitals.weight.toString()
-                                  : '',
-                                heartRate: token.latestVitals.heart_rate
+                                  : null;
+                                const heartRate = token.latestVitals.heart_rate
                                   ? token.latestVitals.heart_rate.toString()
-                                  : '',
-                              }
+                                  : null;
+
+                                // Always return vitals object (even if all null) so PatientCard can access latestVitals
+                                // PatientCard will check latestVitals directly for display
+                                return { bp, temp, weight, heartRate };
+                              })()
                             : {},
                           latestVitals: token.latestVitals, // Pass the raw vitals data for button logic
                           conditions: token.conditions || [],

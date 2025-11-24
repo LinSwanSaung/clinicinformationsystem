@@ -126,7 +126,7 @@ const AppointmentCard = ({
             </DropdownMenu>
           )}
 
-          {appointment.status === 'ready' && (
+          {(appointment.status === 'waiting' || appointment.status === 'ready_for_doctor') && (
             <Badge className="border-green-200 bg-green-50 text-xs text-green-700 dark:border-green-800 dark:bg-green-900/30 dark:text-green-200">
               <span className="hidden sm:inline">✓ Ready/Checked In</span>
               <span className="sm:hidden">✓ Ready</span>

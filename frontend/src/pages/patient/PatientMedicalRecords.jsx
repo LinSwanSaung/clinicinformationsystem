@@ -225,7 +225,7 @@ const PatientMedicalRecords = () => {
               <MedicalInformationPanel
                 patient={{
                   ...patientData,
-                  allergies: allergies.map((a) => a.allergy_name || a.allergen),
+                  allergies: allergies.filter((a) => a.allergy_name || a.allergen),
                   diagnosisHistory: diagnoses.map((d) => ({
                     condition: d.diagnosis_name,
                     date: d.diagnosed_date

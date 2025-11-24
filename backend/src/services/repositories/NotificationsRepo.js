@@ -162,6 +162,24 @@ export async function getCashierIds() {
 }
 
 /**
+ * Get all admin user IDs
+ * @returns {Promise<string[]>}
+ */
+export async function getAdminIds() {
+  const { data, error } = await supabase
+    .from('users')
+    .select('id')
+    .eq('role', 'admin')
+    .eq('is_active', true);
+
+  if (error) {
+    throw error;
+  }
+
+  return (data || []).map((a) => a.id);
+}
+
+/**
  * Get doctor user ID by doctor ID (for queue tokens)
  * @param {string} doctorId - The doctor's user ID
  * @returns {Promise<string|null>}

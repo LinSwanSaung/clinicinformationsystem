@@ -123,8 +123,8 @@ class QueueTokenModel extends BaseModel {
       .eq('doctor_id', doctorId)
       .eq('issued_date', queueDate)
       .in('status', ['called']) // Only patients marked as ready by nurse (status changed from 'waiting' to 'called')
-      .order('token_number', { ascending: true }) // Primary sort: token number order
-      .order('priority', { ascending: false }) // Secondary sort: priority (fallback)
+      .order('priority', { ascending: false }) // Primary sort: priority (higher priority first - urgent/priority patients)
+      .order('token_number', { ascending: true }) // Secondary sort: token number (lower number first when same priority)
       .limit(1)
       .single();
 

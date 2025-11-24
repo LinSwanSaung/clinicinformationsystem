@@ -245,13 +245,14 @@ const ReceptionistDashboard = () => {
         const appointmentTime = new Date();
         appointmentTime.setHours(parseInt(hours), parseInt(minutes), 0, 0);
         const timeDiff = now - appointmentTime; // Positive = late, Negative = early
-        const tenMinutes = 10 * 60 * 1000;
-        const thirtyMinutes = 30 * 60 * 1000;
+
+        // Use clinic settings late threshold (default: 7 minutes)
+        const lateThresholdMs = lateThreshold * 60 * 1000; // Convert minutes to milliseconds
 
         // Determine priority:
-        // - Arrived early (up to 30 mins before) OR within 10 mins after = priority 4 (orange)
-        // - More than 10 mins late = priority 3 (normal - no highlight)
-        const isOnTime = timeDiff >= -thirtyMinutes && timeDiff <= tenMinutes;
+        // - Arrived on time or early (within late threshold) = priority 4 (priority queue)
+        // - Over late threshold = priority 3 (normal queue - no priority)
+        const isOnTime = timeDiff <= lateThresholdMs; // Allow early arrivals and on-time arrivals
         priority = isOnTime ? 4 : 3;
       }
 

@@ -244,8 +244,8 @@ const DoctorAvailability = () => {
                               const stateClasses = !isActive
                                 ? 'bg-muted text-muted-foreground border-border cursor-not-allowed opacity-50'
                                 : isSelected
-                                  ? 'bg-primary/20 text-primary border-primary/30 shadow-sm'
-                                  : 'bg-primary/10 text-primary border-primary/20 hover:bg-primary/20';
+                                  ? 'bg-emerald-600 dark:bg-emerald-700 text-white dark:text-emerald-100 border-emerald-700 dark:border-emerald-600 shadow-sm'
+                                  : 'bg-emerald-600 dark:bg-emerald-700 text-white dark:text-emerald-100 border-emerald-700 dark:border-emerald-600 hover:bg-emerald-700 dark:hover:bg-emerald-600';
 
                               return (
                                 <button
@@ -270,13 +270,13 @@ const DoctorAvailability = () => {
                           </div>
 
                           {selectedDay && sortedSelectedSlots.length > 0 && (
-                            <div className="border-primary/20 bg-primary/10 mt-3 rounded-lg border p-3">
-                              <div className="flex items-center justify-between text-sm font-medium text-primary">
+                            <div className="border-primary/20 dark:border-primary/40 bg-primary/10 dark:bg-primary/20 mt-3 rounded-lg border p-3">
+                              <div className="flex items-center justify-between text-sm font-medium text-emerald-700 dark:text-emerald-300">
                                 <div className="flex items-center gap-2">
                                   <Calendar className="h-4 w-4" />
                                   <span>{selectedDay}</span>
                                 </div>
-                                <span className="text-xs text-primary">
+                                <span className="text-xs text-emerald-700 dark:text-emerald-300">
                                   {sortedSelectedSlots.length}{' '}
                                   {sortedSelectedSlots.length === 1 ? 'slot' : 'slots'}
                                 </span>
@@ -285,7 +285,7 @@ const DoctorAvailability = () => {
                                 {sortedSelectedSlots.map((slot, index) => (
                                   <span
                                     key={slot.id || `${slot.start_time}-${slot.end_time}-${index}`}
-                                    className="border-primary/30 rounded-full border bg-card px-3 py-1 text-sm text-primary shadow-sm"
+                                    className="rounded-full border border-emerald-700 bg-emerald-600 px-3 py-1 text-sm text-white shadow-sm dark:border-emerald-600 dark:bg-emerald-700 dark:text-emerald-100"
                                   >
                                     {formatTimeRange(slot.start_time, slot.end_time)}
                                   </span>

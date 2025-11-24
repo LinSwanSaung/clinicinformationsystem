@@ -42,6 +42,7 @@ import { testConnection } from './config/database.js';
 import tokenScheduler from './services/TokenScheduler.service.js';
 import appointmentAutoCancel from './jobs/autoCancelAppointments.js';
 import { startAppointmentReminders } from './jobs/appointmentReminders.js';
+import { startPendingItemsNotifications } from './jobs/pendingItemsNotifications.js';
 
 // Load environment variables
 dotenv.config();
@@ -245,6 +246,7 @@ if (process.env.VERCEL !== '1' && !process.env.VERCEL_ENV) {
 
     // Start appointment reminder job (runs every 5 minutes)
     startAppointmentReminders();
+    startPendingItemsNotifications();
   });
 } else {
   // Running on Vercel - log that we're in serverless mode

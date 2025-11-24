@@ -1,4 +1,4 @@
-import { useState, memo } from 'react';
+import { useState, useEffect, memo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Card } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -18,6 +18,8 @@ import {
   User,
 } from 'lucide-react';
 import { FormModal } from '@/components/library';
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { allergyService } from '@/features/medical';
 import logger from '@/utils/logger';
 import { useFeedback } from '@/contexts/FeedbackContext';
 
@@ -49,12 +51,45 @@ const PatientCard = memo(
       urgency: patient.urgency || 'Normal',
     });
 
+    // Allergy states
+    const [allergies, setAllergies] = useState([]);
+    const [loadingAllergies, setLoadingAllergies] = useState(false);
+    const [selectedAllergy, setSelectedAllergy] = useState(null);
+    const [isAllergyModalOpen, setIsAllergyModalOpen] = useState(false);
+
     // Modal states
     const [isVitalsModalOpen, setIsVitalsModalOpen] = useState(false);
     const [isDelayModalOpen, setIsDelayModalOpen] = useState(false);
     const [delayReason, setDelayReason] = useState(patient.delayReason || '');
     const [_urgency, _setUrgency] = useState(patient.urgency || 'Normal');
     const [notes, setNotes] = useState(patient.notes || '');
+
+    // Fetch allergies when patient changes (for nurse and doctor roles)
+    useEffect(() => {
+      const loadAllergies = async () => {
+        const patientId = patient?.patientId || patient?.patient?.id || patient?.id;
+        if (patientId && (userRole === 'nurse' || userRole === 'doctor')) {
+          try {
+            setLoadingAllergies(true);
+            const allergiesData = await allergyService.getAllergiesByPatient(patientId);
+            setAllergies(Array.isArray(allergiesData) ? allergiesData : []);
+          } catch (error) {
+            logger.error('Error loading allergies:', error);
+            setAllergies([]);
+          } finally {
+            setLoadingAllergies(false);
+          }
+        }
+      };
+
+      loadAllergies();
+    }, [patient?.patientId, patient?.patient?.id, patient?.id, userRole]);
+
+    // Handle allergy badge click
+    const handleAllergyClick = (allergy) => {
+      setSelectedAllergy(allergy);
+      setIsAllergyModalOpen(true);
+    };
 
     // Role-based navigation handler
     const handleViewFullPatientData = () => {
@@ -305,7 +340,11 @@ const PatientCard = memo(
         )}
         <div
           className={`flex flex-1 flex-col p-5 md:p-6 ${
-            isUrgent ? 'bg-red-50/30' : isHighPriority ? 'bg-orange-50/30' : ''
+            isUrgent
+              ? 'bg-red-50/30 dark:bg-red-950/20 dark:text-foreground'
+              : isHighPriority
+                ? 'bg-orange-50/30 dark:bg-orange-950/20 dark:text-foreground'
+                : ''
           }`}
         >
           {/* Header section */}
@@ -355,43 +394,59 @@ const PatientCard = memo(
 
           {/* Patient info grid */}
           <div className="mb-4 grid grid-cols-2 gap-x-4 gap-y-3 text-base">
-            <div className="flex items-center text-muted-foreground">
+            <div className="flex items-center text-foreground">
               <User size={18} className="mr-2" />
               <span>{`${patient.age || patient.patient?.age || '-'} years, ${patient.gender || patient.patient?.gender || '-'}`}</span>
             </div>
-            <div className="flex items-center text-muted-foreground">
+            <div className="flex items-center text-foreground">
               <Heart size={18} className="mr-2" />
               <span>
-                {patient.latestVitals?.heart_rate || patient.vitals?.heartRate || '-'} bpm
+                {(() => {
+                  const heartRate =
+                    patient.latestVitals?.heart_rate ||
+                    patient.vitals?.heart_rate ||
+                    patient.vitals?.heartRate;
+                  return heartRate && heartRate !== '' ? `${heartRate} bpm` : '-';
+                })()}
               </span>
             </div>
-            <div className="flex items-center text-muted-foreground">
+            <div className="flex items-center text-foreground">
               <Activity size={18} className="mr-2" />
               <span>
-                {patient.latestVitals?.blood_pressure_systolic &&
-                patient.latestVitals?.blood_pressure_diastolic
-                  ? `${patient.latestVitals.blood_pressure_systolic}/${patient.latestVitals.blood_pressure_diastolic}`
-                  : patient.vitals?.bp || '-'}
+                {(() => {
+                  if (
+                    patient.latestVitals?.blood_pressure_systolic &&
+                    patient.latestVitals?.blood_pressure_diastolic
+                  ) {
+                    return `${patient.latestVitals.blood_pressure_systolic}/${patient.latestVitals.blood_pressure_diastolic}`;
+                  }
+                  const bp = patient.vitals?.bp;
+                  return bp && bp !== '' ? bp : '-';
+                })()}
               </span>
             </div>
-            <div className="flex items-center text-gray-600">
+            <div className="flex items-center text-foreground">
               <ThermometerSnowflake size={18} className="mr-2" />
               <span>
-                {patient.latestVitals?.temperature
-                  ? `${patient.latestVitals.temperature}°${patient.latestVitals.temperature_unit || 'C'}`
-                  : patient.vitals?.temp
-                    ? `${patient.vitals.temp}°F`
-                    : '-'}
+                {(() => {
+                  if (patient.latestVitals?.temperature) {
+                    return `${patient.latestVitals.temperature}°${patient.latestVitals.temperature_unit || 'C'}`;
+                  }
+                  const temp = patient.vitals?.temp;
+                  return temp && temp !== '' ? `${temp}°F` : '-';
+                })()}
               </span>
             </div>
-            <div className="flex items-center text-gray-600">
+            <div className="flex items-center text-foreground">
               <Scale size={18} className="mr-2" />
               <span>
-                {patient.latestVitals?.weight
-                  ? `${patient.latestVitals.weight} ${patient.latestVitals.weight_unit || 'kg'}`
-                  : patient.vitals?.weight
-                    ? `${patient.vitals.weight} kg`
-                    : '-'}
+                {(() => {
+                  if (patient.latestVitals?.weight) {
+                    return `${patient.latestVitals.weight} ${patient.latestVitals.weight_unit || 'kg'}`;
+                  }
+                  const weight = patient.vitals?.weight;
+                  return weight && weight !== '' ? `${weight} kg` : '-';
+                })()}
               </span>
             </div>
           </div>
@@ -418,6 +473,49 @@ const PatientCard = memo(
                   <div className="mb-1 text-sm font-medium text-blue-800">Clinical Notes:</div>
                   <div className="text-sm text-blue-700">{patient.notes}</div>
                 </div>
+              </div>
+            </div>
+          )}
+
+          {/* Show allergies if available (for nurse and doctor) */}
+          {!loadingAllergies && allergies && allergies.length > 0 && (
+            <div className="mb-4">
+              <div className="mb-2 flex items-center gap-2">
+                <AlertCircle size={16} className="text-red-600 dark:text-red-400" />
+                <span className="text-sm font-medium text-foreground">Allergies:</span>
+              </div>
+              <div className="flex flex-wrap gap-2">
+                {allergies.map((allergy, index) => {
+                  const severity = allergy.severity || 'mild';
+                  let badgeClasses =
+                    'cursor-pointer px-2 py-1 text-xs font-medium transition-colors hover:opacity-90 ';
+
+                  if (severity === 'life-threatening') {
+                    badgeClasses +=
+                      'border-2 border-red-700 bg-red-600 text-white hover:bg-red-700 dark:border-red-500 dark:bg-red-700 dark:text-white';
+                  } else if (severity === 'severe') {
+                    badgeClasses +=
+                      'border-2 border-red-600 bg-red-500 text-white hover:bg-red-600 dark:border-red-500 dark:bg-red-600 dark:text-white';
+                  } else if (severity === 'moderate') {
+                    badgeClasses +=
+                      'border-2 border-orange-600 bg-orange-500 text-white hover:bg-orange-600 dark:border-orange-500 dark:bg-orange-600 dark:text-white';
+                  } else {
+                    // Mild - use lighter red with dark text for contrast
+                    badgeClasses +=
+                      'border-2 border-red-400 bg-red-200 text-red-900 hover:bg-red-300 dark:border-red-600 dark:bg-red-800 dark:text-red-100';
+                  }
+
+                  return (
+                    <Badge
+                      key={allergy.id || index}
+                      variant="destructive"
+                      className={badgeClasses}
+                      onClick={() => handleAllergyClick(allergy)}
+                    >
+                      {allergy.allergy_name} ({severity})
+                    </Badge>
+                  );
+                })}
               </div>
             </div>
           )}
@@ -581,6 +679,85 @@ const PatientCard = memo(
               </div>
             </FormModal>
           </>
+        )}
+
+        {/* Allergy Details Modal - Available for both nurse and doctor */}
+        {selectedAllergy && (
+          <Dialog open={isAllergyModalOpen} onOpenChange={setIsAllergyModalOpen}>
+            <DialogContent className="max-w-2xl">
+              <DialogHeader>
+                <DialogTitle className="flex items-center gap-2">
+                  <AlertCircle className="h-5 w-5 text-red-600" />
+                  Allergy Details
+                </DialogTitle>
+              </DialogHeader>
+              <div className="space-y-4">
+                <div>
+                  <label className="text-sm font-medium text-muted-foreground">Allergy Name</label>
+                  <p className="mt-1 text-lg font-semibold text-foreground">
+                    {selectedAllergy.allergy_name}
+                  </p>
+                </div>
+
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <label className="text-sm font-medium text-muted-foreground">Severity</label>
+                    <div className="mt-1">
+                      <Badge
+                        variant="destructive"
+                        className={
+                          selectedAllergy.severity === 'life-threatening'
+                            ? 'bg-red-600'
+                            : selectedAllergy.severity === 'severe'
+                              ? 'bg-red-500'
+                              : selectedAllergy.severity === 'moderate'
+                                ? 'bg-orange-500'
+                                : 'bg-red-400'
+                        }
+                      >
+                        {selectedAllergy.severity || 'mild'}
+                      </Badge>
+                    </div>
+                  </div>
+
+                  <div>
+                    <label className="text-sm font-medium text-muted-foreground">
+                      Allergen Type
+                    </label>
+                    <p className="mt-1 capitalize text-foreground">
+                      {selectedAllergy.allergen_type || 'Not specified'}
+                    </p>
+                  </div>
+                </div>
+
+                {selectedAllergy.reaction && (
+                  <div>
+                    <label className="text-sm font-medium text-muted-foreground">
+                      Reaction Description
+                    </label>
+                    <p className="bg-muted/50 mt-1 rounded-md border border-border p-3 text-foreground">
+                      {selectedAllergy.reaction}
+                    </p>
+                  </div>
+                )}
+
+                {selectedAllergy.diagnosed_date && (
+                  <div>
+                    <label className="text-sm font-medium text-muted-foreground">
+                      Diagnosed Date
+                    </label>
+                    <p className="mt-1 text-foreground">
+                      {new Date(selectedAllergy.diagnosed_date).toLocaleDateString('en-US', {
+                        year: 'numeric',
+                        month: 'long',
+                        day: 'numeric',
+                      })}
+                    </p>
+                  </div>
+                )}
+              </div>
+            </DialogContent>
+          </Dialog>
         )}
       </Card>
     );

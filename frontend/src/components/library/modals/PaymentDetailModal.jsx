@@ -24,19 +24,23 @@ export function PaymentDetailModal({
   children,
 }) {
   // Prevent form auto-submission when invoice updates (e.g., after adding a service)
-  // Only call onPay when explicitly triggered by button click, not on form submission
+  // Only call onPay when explicitly triggered by the "Process Payment" button, not on form submission
   const handleSubmit = async (e) => {
     e.preventDefault();
     e.stopPropagation();
 
-    // Only call onPay if this is an explicit button click (not auto-submit from form changes)
-    // Check if the event was triggered by a button click
-    const isButtonClick =
-      e.nativeEvent?.submitter?.type === 'submit' ||
-      e.target?.querySelector('button[type="submit"]:focus');
+    // Only call onPay if this is an explicit submit button click
+    // Check if the event was triggered by a submit button (not just any button)
+    const submitter = e.nativeEvent?.submitter;
+    const isSubmitButton =
+      submitter?.type === 'submit' || submitter?.getAttribute('data-submit') === 'true';
 
-    if (isButtonClick && typeof onPay === 'function' && invoice?.id) {
-      // This is an explicit button click - safe to call onPay
+    // Do NOT call onPay for form submissions - only the "Process Payment" button should trigger it
+    // The onPay callback is called directly from handleApproveInvoice, not from form submission
+    // This prevents accidental triggers from Enter key presses or other form interactions
+    if (isSubmitButton && typeof onPay === 'function' && invoice?.id) {
+      // This should not happen in normal flow - onPay is called from handleApproveInvoice
+      // But if it does, we'll call it
       onPay();
     }
     // Otherwise, do nothing (prevents auto-submit when invoice updates)

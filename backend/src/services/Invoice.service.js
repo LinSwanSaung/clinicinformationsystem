@@ -406,7 +406,10 @@ class InvoiceService {
         updates.total_price = quantity * unitPrice;
       }
 
-      const updatedItem = await InvoiceItemModel.updateItem(itemId, updates);
+      // Remove version from updates - version only exists on invoices table, not invoice_items
+      const { version: _version, ...itemUpdates } = updates;
+
+      const updatedItem = await InvoiceItemModel.updateItem(itemId, itemUpdates);
 
       // Recalculate invoice totals
       await this.recalculateInvoiceTotal(updatedItem.invoice_id);
@@ -711,20 +714,32 @@ class InvoiceService {
             if (invoice.visit_id) {
               try {
                 const visitDetails = await this.visitService.getVisitDetails(invoice.visit_id);
-                if (visitDetails?.data?.status !== 'completed') {
-                  await this.visitService.completeVisit(invoice.visit_id, {
+                const visitStatus = visitDetails?.data?.status || visitDetails?.status;
+
+                if (visitStatus !== 'completed') {
+                  const completionResult = await this.visitService.completeVisit(invoice.visit_id, {
                     payment_status: 'paid',
                     completed_by: completedBy,
                   });
-                  logger.info(
-                    `[InvoiceService] Auto-completed visit ${invoice.visit_id} for already-paid invoice ${invoiceId} (version mismatch handled)`
-                  );
+
+                  if (completionResult?.success) {
+                    logger.info(
+                      `[InvoiceService] Auto-completed visit ${invoice.visit_id} for already-paid invoice ${invoiceId} (version mismatch handled)`
+                    );
+                  }
                 }
               } catch (visitError) {
-                logger.error(
-                  `[InvoiceService] Failed to complete visit ${invoice.visit_id} for already-paid invoice:`,
-                  visitError
-                );
+                // Handle "already completed" error gracefully
+                if (visitError.message?.includes('already completed')) {
+                  logger.debug(
+                    `[InvoiceService] Visit ${invoice.visit_id} is already completed (expected for idempotent call)`
+                  );
+                } else {
+                  logger.error(
+                    `[InvoiceService] Failed to complete visit ${invoice.visit_id} for already-paid invoice:`,
+                    visitError
+                  );
+                }
                 // Don't throw - invoice is already paid, just log the error
               }
             }
@@ -754,22 +769,44 @@ class InvoiceService {
         if (invoice.visit_id) {
           try {
             const visitDetails = await this.visitService.getVisitDetails(invoice.visit_id);
-            if (visitDetails?.data?.status !== 'completed') {
+            const visitStatus = visitDetails?.data?.status || visitDetails?.status;
+
+            if (visitStatus !== 'completed') {
               // Visit should be completed but isn't - complete it now
-              await this.visitService.completeVisit(invoice.visit_id, {
+              const completionResult = await this.visitService.completeVisit(invoice.visit_id, {
                 payment_status: 'paid',
                 completed_by: completedBy,
               });
-              logger.info(
-                `[InvoiceService] Auto-completed visit ${invoice.visit_id} for already-paid invoice ${invoiceId}`
+
+              // Verify visit was actually completed
+              if (completionResult?.success) {
+                logger.info(
+                  `[InvoiceService] Auto-completed visit ${invoice.visit_id} for already-paid invoice ${invoiceId}`
+                );
+              } else {
+                logger.warn(
+                  `[InvoiceService] Visit completion returned unsuccessful result for invoice ${invoiceId}, visit ${invoice.visit_id}`
+                );
+              }
+            } else {
+              // Visit is already completed - this is fine
+              logger.debug(
+                `[InvoiceService] Visit ${invoice.visit_id} is already completed for invoice ${invoiceId}`
               );
             }
           } catch (visitError) {
-            logger.error(
-              `[InvoiceService] Failed to complete visit ${invoice.visit_id} for already-paid invoice:`,
-              visitError
-            );
-            // Don't throw - invoice is already paid, just log the error
+            // Handle "already completed" error gracefully
+            if (visitError.message?.includes('already completed')) {
+              logger.debug(
+                `[InvoiceService] Visit ${invoice.visit_id} is already completed (expected for idempotent call)`
+              );
+            } else {
+              logger.error(
+                `[InvoiceService] Failed to complete visit ${invoice.visit_id} for already-paid invoice ${invoiceId}:`,
+                visitError
+              );
+              // Don't throw - invoice is already paid, but log prominently for debugging
+            }
           }
         }
         return invoice;
@@ -1137,6 +1174,10 @@ class InvoiceService {
             // Determine payment status based on invoice status
             const paymentStatus = updatedInvoice.status === 'paid' ? 'paid' : 'partial';
 
+            logger.debug(
+              `[InvoiceService] Attempting to complete visit ${updatedInvoice.visit_id} after partial payment. Current visit status: ${visitStatus}, invoice status: ${updatedInvoice.status}, payment status: ${paymentStatus}`
+            );
+
             // Complete the visit automatically when payment is made (allows new visits)
             const completionResult = await this.visitService.completeVisit(
               updatedInvoice.visit_id,
@@ -1150,27 +1191,81 @@ class InvoiceService {
             if (completionResult?.success && completionResult?.data) {
               visitCompleted = true;
               logger.info(
-                `[InvoiceService] Auto-completed visit ${updatedInvoice.visit_id} after payment (status: ${updatedInvoice.status})`
+                `[InvoiceService] Auto-completed visit ${updatedInvoice.visit_id} after partial payment (invoice status: ${updatedInvoice.status})`
               );
             } else {
-              throw new Error('Visit completion returned unsuccessful result');
+              // Visit completion didn't return success - try to verify status
+              const verifyVisit = await this.visitService.getVisitDetails(updatedInvoice.visit_id);
+              const verifyStatus = verifyVisit?.data?.status || verifyVisit?.status;
+              if (verifyStatus === 'completed') {
+                visitCompleted = true;
+                logger.info(
+                  `[InvoiceService] Visit ${updatedInvoice.visit_id} was completed (verified after completion call)`
+                );
+              } else {
+                throw new Error(
+                  `Visit completion returned unsuccessful result. Visit status is still: ${verifyStatus}`
+                );
+              }
             }
           } else {
             visitCompleted = true; // Visit was already completed
+            logger.debug(
+              `[InvoiceService] Visit ${updatedInvoice.visit_id} is already completed (expected for idempotent call)`
+            );
           }
         } catch (visitError) {
-          // Log error but don't fail payment - visit can be completed manually later
-          // However, this is a critical error - visit should be completed when payment is made
-          logger.error(
-            `[InvoiceService] CRITICAL: Failed to auto-complete visit ${updatedInvoice.visit_id} after payment:`,
-            visitError
-          );
-          logger.error(
-            `[InvoiceService] Visit ${updatedInvoice.visit_id} will remain in_progress even though invoice ${updatedInvoice.id} is ${updatedInvoice.status}. This may prevent patient from starting new visits.`
-          );
-          // Don't throw - payment was successful, but visit completion failed
-          // NOTE: Visit completion must be done manually by admin via Pending Items page
-          // Business rule: Active visits block new visits regardless of invoice status
+          // Handle "already completed" error gracefully (expected in race conditions)
+          const errorMessage = visitError?.message || visitError?.toString() || '';
+          if (
+            errorMessage.includes('already completed') ||
+            errorMessage.includes('Visit is already completed') ||
+            errorMessage.includes('is already completed')
+          ) {
+            visitCompleted = true;
+            logger.debug(
+              `[InvoiceService] Visit ${updatedInvoice.visit_id} is already completed (race condition handled)`
+            );
+          } else {
+            // For other errors, log prominently but don't fail payment
+            // However, try to verify if visit was actually completed despite the error
+            try {
+              const verifyVisit = await this.visitService.getVisitDetails(updatedInvoice.visit_id);
+              const verifyStatus = verifyVisit?.data?.status || verifyVisit?.status;
+              if (verifyStatus === 'completed') {
+                visitCompleted = true;
+                logger.info(
+                  `[InvoiceService] Visit ${updatedInvoice.visit_id} was completed despite error (verified)`
+                );
+              } else {
+                // Log error with full details
+                const errorMessage =
+                  visitError?.message ||
+                  visitError?.toString() ||
+                  JSON.stringify(visitError) ||
+                  'Unknown error';
+                const errorStack = visitError?.stack || 'No stack trace';
+
+                logger.error(
+                  `[InvoiceService] CRITICAL: Failed to auto-complete visit ${updatedInvoice.visit_id} after partial payment. Error message: ${errorMessage}`
+                );
+                if (errorStack !== 'No stack trace') {
+                  logger.error(`[InvoiceService] Error stack: ${errorStack}`);
+                }
+                logger.error(
+                  `[InvoiceService] Visit ${updatedInvoice.visit_id} status: ${verifyStatus}. Invoice ${updatedInvoice.id} status: ${updatedInvoice.status}. This may prevent patient from starting new visits.`
+                );
+              }
+            } catch (verifyError) {
+              const verifyErrorMessage =
+                verifyError?.message || verifyError?.toString() || 'Unknown error';
+              logger.error(
+                `[InvoiceService] CRITICAL: Failed to verify visit ${updatedInvoice.visit_id} status after completion error: ${verifyErrorMessage}`
+              );
+            }
+            // Don't throw - payment was successful, but visit completion failed
+            // NOTE: Visit completion must be done manually by admin via Pending Items page
+          }
         }
       }
 

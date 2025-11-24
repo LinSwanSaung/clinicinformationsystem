@@ -2,15 +2,24 @@ import { useState, useEffect } from 'react';
 import PageLayout from '@/components/layout/PageLayout';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Filter } from 'lucide-react';
+import { Filter, Eye, X } from 'lucide-react';
 import { auditLogService } from '@/features/admin';
 import { DataTable, StatusBadge } from '@/components/library';
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+} from '@/components/ui/dialog';
 import logger from '@/utils/logger';
 
 const AuditLogs = () => {
   const [logs, setLogs] = useState([]);
   const [loading, setLoading] = useState(true);
   const [total, setTotal] = useState(0);
+  const [selectedLog, setSelectedLog] = useState(null);
+  const [isDetailModalOpen, setIsDetailModalOpen] = useState(false);
   const [filters, setFilters] = useState({
     action: '',
     entity: '',
@@ -85,6 +94,72 @@ const AuditLogs = () => {
     const newOffset = (newPage - 1) * filters.limit;
     setFilters((prev) => ({ ...prev, offset: newOffset }));
     setTimeout(() => loadLogs(), 100);
+  };
+
+  // Helper function to format changes for display
+  const formatChanges = (oldValues, newValues) => {
+    if (!oldValues && !newValues) {
+      return null;
+    }
+
+    const changes = [];
+    const allKeys = new Set([
+      ...(oldValues ? Object.keys(oldValues) : []),
+      ...(newValues ? Object.keys(newValues) : []),
+    ]);
+
+    allKeys.forEach((key) => {
+      const oldVal = oldValues?.[key];
+      const newVal = newValues?.[key];
+
+      // Skip if values are the same
+      if (JSON.stringify(oldVal) === JSON.stringify(newVal)) {
+        return;
+      }
+
+      changes.push({
+        field: key,
+        oldValue: oldVal,
+        newValue: newVal,
+      });
+    });
+
+    return changes.length > 0 ? changes : null;
+  };
+
+  // Helper function to format value for display
+  const formatValue = (value) => {
+    if (value === null || value === undefined) {
+      return <span className="italic text-muted-foreground">null</span>;
+    }
+    if (typeof value === 'object') {
+      return <code className="text-xs">{JSON.stringify(value, null, 2)}</code>;
+    }
+    if (typeof value === 'boolean') {
+      return <span className="font-mono">{value.toString()}</span>;
+    }
+    return <span>{String(value)}</span>;
+  };
+
+  // Helper to get change summary text
+  const getChangeSummary = (row) => {
+    const changes = formatChanges(row.old_values, row.new_values);
+    if (!changes) {
+      if (row.action === 'CREATE') {
+        return 'Record created';
+      }
+      if (row.action === 'DELETE') {
+        return 'Record deleted';
+      }
+      if (row.action === 'LOGIN_SUCCESS' || row.action === 'LOGIN_FAILURE') {
+        return 'Authentication event';
+      }
+      return 'No field changes';
+    }
+    if (changes.length === 1) {
+      return `1 field changed: ${changes[0].field}`;
+    }
+    return `${changes.length} fields changed`;
   };
 
   const getActionBadgeVariant = (action) => {
@@ -220,7 +295,7 @@ const AuditLogs = () => {
                       {row.user ? `${row.user.first_name} ${row.user.last_name}` : 'System'}
                     </p>
                     <p className="text-xs text-muted-foreground">
-                      {row.new_values?.role || row.user?.role || 'N/A'}
+                      {row.actor_role || row.new_values?.role || row.user?.role || 'N/A'}
                     </p>
                   </div>
                 ),
@@ -240,6 +315,49 @@ const AuditLogs = () => {
                 render: (_, row) => (
                   <span className="text-foreground">{row.table_name || '—'}</span>
                 ),
+              },
+              {
+                key: 'record_id',
+                label: 'Record ID',
+                render: (_, row) => {
+                  const recordId = row.record_id;
+                  const isEmptyId =
+                    !recordId || recordId === '00000000-0000-0000-0000-000000000000';
+                  return (
+                    <span className="font-mono text-xs text-muted-foreground">
+                      {isEmptyId ? '—' : `${recordId.substring(0, 8)}...`}
+                    </span>
+                  );
+                },
+              },
+              {
+                key: 'changes',
+                label: 'Changes',
+                render: (_, row) => {
+                  const changes = formatChanges(row.old_values, row.new_values);
+                  const hasChanges = changes && changes.length > 0;
+                  const hasDetails = hasChanges || row.old_values || row.new_values || row.reason;
+
+                  return (
+                    <div className="flex items-center gap-2">
+                      <span className="text-sm text-muted-foreground">{getChangeSummary(row)}</span>
+                      {hasDetails && (
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          className="h-7 px-2"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setSelectedLog(row);
+                            setIsDetailModalOpen(true);
+                          }}
+                        >
+                          <Eye className="h-4 w-4" />
+                        </Button>
+                      )}
+                    </div>
+                  );
+                },
               },
               {
                 key: 'result',
@@ -271,6 +389,191 @@ const AuditLogs = () => {
           />
         </Card>
       </div>
+
+      {/* Detail Modal */}
+      <Dialog open={isDetailModalOpen} onOpenChange={setIsDetailModalOpen}>
+        <DialogContent className="max-h-[85vh] max-w-4xl overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle className="flex items-center justify-between">
+              <span>Audit Log Details</span>
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => setIsDetailModalOpen(false)}
+                className="h-6 w-6 p-0"
+              >
+                <X className="h-4 w-4" />
+              </Button>
+            </DialogTitle>
+            <DialogDescription>Detailed information about this audit log entry</DialogDescription>
+          </DialogHeader>
+
+          {selectedLog && (
+            <div className="mt-4 space-y-6">
+              {/* Basic Information */}
+              <div className="bg-muted/50 grid grid-cols-2 gap-4 rounded-lg p-4">
+                <div>
+                  <p className="text-sm font-medium text-muted-foreground">Timestamp</p>
+                  <p className="text-sm font-medium">
+                    {new Date(selectedLog.created_at).toLocaleString('en-US', {
+                      month: 'short',
+                      day: 'numeric',
+                      year: 'numeric',
+                      hour: '2-digit',
+                      minute: '2-digit',
+                      second: '2-digit',
+                    })}
+                  </p>
+                </div>
+                <div>
+                  <p className="text-sm font-medium text-muted-foreground">User</p>
+                  <p className="text-sm font-medium">
+                    {selectedLog.user
+                      ? `${selectedLog.user.first_name} ${selectedLog.user.last_name}`
+                      : 'System'}
+                  </p>
+                  <p className="text-xs text-muted-foreground">
+                    {selectedLog.actor_role || selectedLog.user?.role || 'N/A'}
+                  </p>
+                </div>
+                <div>
+                  <p className="text-sm font-medium text-muted-foreground">Action</p>
+                  <StatusBadge
+                    status={selectedLog.action}
+                    variant={getActionBadgeVariant(selectedLog.action)}
+                  >
+                    {selectedLog.action}
+                  </StatusBadge>
+                </div>
+                <div>
+                  <p className="text-sm font-medium text-muted-foreground">Entity</p>
+                  <p className="text-sm font-medium">{selectedLog.table_name || '—'}</p>
+                </div>
+                <div>
+                  <p className="text-sm font-medium text-muted-foreground">Record ID</p>
+                  <p className="break-all font-mono text-xs text-muted-foreground">
+                    {selectedLog.record_id || '—'}
+                  </p>
+                </div>
+                <div>
+                  <p className="text-sm font-medium text-muted-foreground">Status</p>
+                  <StatusBadge
+                    status={selectedLog.status || 'N/A'}
+                    variant={getStatusBadgeVariant(selectedLog.status)}
+                  >
+                    {selectedLog.status || 'N/A'}
+                  </StatusBadge>
+                </div>
+                {selectedLog.ip_address && (
+                  <div>
+                    <p className="text-sm font-medium text-muted-foreground">IP Address</p>
+                    <p className="font-mono text-sm">{selectedLog.ip_address}</p>
+                  </div>
+                )}
+                {selectedLog.user_agent && (
+                  <div>
+                    <p className="text-sm font-medium text-muted-foreground">User Agent</p>
+                    <p className="break-all text-xs text-muted-foreground">
+                      {selectedLog.user_agent}
+                    </p>
+                  </div>
+                )}
+              </div>
+
+              {/* Reason/Note */}
+              {selectedLog.reason && (
+                <div className="rounded-lg border border-blue-200 bg-blue-50 p-4 dark:border-blue-800 dark:bg-blue-950/20">
+                  <p className="mb-1 text-sm font-medium text-blue-900 dark:text-blue-100">
+                    Reason/Note
+                  </p>
+                  <p className="text-sm text-blue-800 dark:text-blue-200">{selectedLog.reason}</p>
+                </div>
+              )}
+
+              {/* Changes Detail */}
+              {(() => {
+                const changes = formatChanges(selectedLog.old_values, selectedLog.new_values);
+                if (!changes || changes.length === 0) {
+                  return (
+                    <div className="bg-muted/50 rounded-lg p-4">
+                      <p className="mb-2 text-sm font-medium">Field Changes</p>
+                      <p className="text-sm text-muted-foreground">
+                        {selectedLog.action === 'CREATE' && 'New record created'}
+                        {selectedLog.action === 'DELETE' && 'Record deleted'}
+                        {selectedLog.action === 'VIEW' && 'Record viewed'}
+                        {!['CREATE', 'DELETE', 'VIEW'].includes(selectedLog.action) &&
+                          'No field changes detected'}
+                      </p>
+                    </div>
+                  );
+                }
+
+                return (
+                  <div className="space-y-3">
+                    <p className="text-sm font-semibold">Field Changes ({changes.length})</p>
+                    <div className="space-y-3">
+                      {changes.map((change, idx) => (
+                        <div
+                          key={idx}
+                          className="hover:bg-muted/50 rounded-lg border bg-card p-4 transition-colors"
+                        >
+                          <div className="mb-2 flex items-center justify-between">
+                            <p className="text-sm font-medium text-foreground">{change.field}</p>
+                            <span className="bg-primary/10 rounded px-2 py-1 text-xs text-primary">
+                              Changed
+                            </span>
+                          </div>
+                          <div className="mt-3 grid grid-cols-2 gap-4">
+                            <div className="space-y-1">
+                              <p className="text-xs font-medium text-muted-foreground">Old Value</p>
+                              <div className="min-h-[40px] rounded border border-red-200 bg-red-50 p-2 dark:border-red-800 dark:bg-red-950/20">
+                                {formatValue(change.oldValue)}
+                              </div>
+                            </div>
+                            <div className="space-y-1">
+                              <p className="text-xs font-medium text-muted-foreground">New Value</p>
+                              <div className="min-h-[40px] rounded border border-green-200 bg-green-50 p-2 dark:border-green-800 dark:bg-green-950/20">
+                                {formatValue(change.newValue)}
+                              </div>
+                            </div>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                );
+              })()}
+
+              {/* Raw Data (for debugging) */}
+              {(selectedLog.old_values || selectedLog.new_values) && (
+                <details className="bg-muted/30 rounded-lg p-4">
+                  <summary className="cursor-pointer text-sm font-medium text-muted-foreground">
+                    Raw Data (JSON)
+                  </summary>
+                  <div className="mt-3 space-y-2">
+                    {selectedLog.old_values && (
+                      <div>
+                        <p className="mb-1 text-xs font-medium">Old Values:</p>
+                        <pre className="overflow-x-auto rounded border bg-background p-2 text-xs">
+                          {JSON.stringify(selectedLog.old_values, null, 2)}
+                        </pre>
+                      </div>
+                    )}
+                    {selectedLog.new_values && (
+                      <div>
+                        <p className="mb-1 text-xs font-medium">New Values:</p>
+                        <pre className="overflow-x-auto rounded border bg-background p-2 text-xs">
+                          {JSON.stringify(selectedLog.new_values, null, 2)}
+                        </pre>
+                      </div>
+                    )}
+                  </div>
+                </details>
+              )}
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
     </PageLayout>
   );
 };

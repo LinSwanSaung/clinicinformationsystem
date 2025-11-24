@@ -3,6 +3,7 @@ import {
   createNotification as repoCreateNotification,
   getReceptionistIds,
   getCashierIds,
+  getAdminIds,
   getDoctorId,
   getPortalUserIdByPatientId as repoGetPortalUserIdByPatientId,
   getUserDetailsForEmail,
@@ -164,6 +165,31 @@ class NotificationService {
     } catch (error) {
       logger.error('[NotificationService] Error notifying cashiers:', error);
       throw new Error(`Failed to notify cashiers: ${error.message}`);
+    }
+  }
+
+  /**
+   * Notify all admins
+   */
+  async notifyAdmins({ title, message, type = 'info', relatedEntityType, relatedEntityId }) {
+    try {
+      const adminIds = await getAdminIds();
+
+      if (adminIds.length === 0) {
+        return [];
+      }
+
+      return await this.createNotification({
+        userIds: adminIds,
+        title,
+        message,
+        type,
+        relatedEntityType,
+        relatedEntityId,
+      });
+    } catch (error) {
+      logger.error('[NotificationService] Error notifying admins:', error);
+      throw new Error(`Failed to notify admins: ${error.message}`);
     }
   }
 

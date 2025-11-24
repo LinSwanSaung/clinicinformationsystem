@@ -6,7 +6,7 @@ import PageLayout from '@/components/layout/PageLayout';
 import { Card } from '../../components/ui/card';
 import { SearchBar, LoadingSpinner } from '@/components/library';
 import { Button } from '../../components/ui/button';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '../../components/ui/tabs';
+import { Tabs, TabsContent } from '../../components/ui/tabs';
 import { UserCheck, UserCog, CheckCircle, RefreshCw, PlayCircle, XCircle } from 'lucide-react';
 import { PatientCard, PatientStats } from '@/features/patients';
 import { patientService } from '@/features/patients';
@@ -978,35 +978,60 @@ const DoctorDashboard = () => {
             {/* Patient tabs and cards */}
             <Card className="p-8">
               <Tabs value={selectedTab} onValueChange={setSelectedTab} className="w-full">
-                <TabsList className="mx-auto mb-8 grid h-12 w-full max-w-lg grid-cols-3">
-                  <TabsTrigger value="ready" className="py-3 text-base">
-                    <UserCheck className="mr-2 h-5 w-5" />
-                    Ready
-                    <span className="ml-2 rounded-full bg-blue-100 px-2 py-1 text-xs text-blue-600 dark:bg-blue-900/30 dark:text-blue-200">
-                      {
-                        queueData.filter((t) => ['ready', 'called', 'waiting'].includes(t.status))
-                          .length
-                      }
-                    </span>
-                  </TabsTrigger>
-                  <TabsTrigger value="consulting" className="py-3 text-base">
-                    <UserCog className="mr-2 h-5 w-5" />
-                    In Consultation
-                    <span className="ml-2 rounded-full bg-orange-100 px-2 py-1 text-xs text-orange-600 dark:bg-orange-900/30 dark:text-orange-200">
-                      {queueData.filter((t) => t.status === 'serving').length}
-                    </span>
-                  </TabsTrigger>
-                  <TabsTrigger value="completed" className="py-3 text-base">
-                    <CheckCircle className="mr-2 h-5 w-5" />
-                    Completed
-                    <span className="ml-2 rounded-full bg-green-100 px-2 py-1 text-xs text-green-600 dark:bg-green-900/30 dark:text-green-200">
-                      {
-                        queueData.filter((t) => ['completed', 'cancelled'].includes(t.status))
-                          .length
-                      }
-                    </span>
-                  </TabsTrigger>
-                </TabsList>
+                {/* Status Filter Tabs - Styled like Nurse Dashboard */}
+                <div className="mb-8 w-full rounded-lg border border-border bg-card p-2 shadow-sm">
+                  <div className="flex space-x-1 rounded-lg bg-muted p-1">
+                    <button
+                      onClick={() => setSelectedTab('ready')}
+                      className={`flex-1 rounded-md px-4 py-3 text-sm font-medium transition-colors ${
+                        selectedTab === 'ready'
+                          ? 'border border-border bg-card text-card-foreground shadow-sm'
+                          : 'bg-transparent text-muted-foreground hover:bg-accent hover:text-foreground'
+                      }`}
+                    >
+                      <div className="flex items-center justify-center gap-2">
+                        <UserCheck className="h-4 w-4" />
+                        Ready (
+                        {
+                          queueData.filter((t) => ['ready', 'called', 'waiting'].includes(t.status))
+                            .length
+                        }
+                        )
+                      </div>
+                    </button>
+                    <button
+                      onClick={() => setSelectedTab('consulting')}
+                      className={`flex-1 rounded-md px-4 py-3 text-sm font-medium transition-colors ${
+                        selectedTab === 'consulting'
+                          ? 'border border-border bg-card text-card-foreground shadow-sm'
+                          : 'bg-transparent text-muted-foreground hover:bg-accent hover:text-foreground'
+                      }`}
+                    >
+                      <div className="flex items-center justify-center gap-2">
+                        <UserCog className="h-4 w-4" />
+                        In Consultation ({queueData.filter((t) => t.status === 'serving').length})
+                      </div>
+                    </button>
+                    <button
+                      onClick={() => setSelectedTab('completed')}
+                      className={`flex-1 rounded-md px-4 py-3 text-sm font-medium transition-colors ${
+                        selectedTab === 'completed'
+                          ? 'border border-border bg-card text-card-foreground shadow-sm'
+                          : 'bg-transparent text-muted-foreground hover:bg-accent hover:text-foreground'
+                      }`}
+                    >
+                      <div className="flex items-center justify-center gap-2">
+                        <CheckCircle className="h-4 w-4" />
+                        Completed (
+                        {
+                          queueData.filter((t) => ['completed', 'cancelled'].includes(t.status))
+                            .length
+                        }
+                        )
+                      </div>
+                    </button>
+                  </div>
+                </div>
 
                 <TabsContent value="ready" className="mt-0">
                   <div className="grid grid-cols-1 gap-6 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5">

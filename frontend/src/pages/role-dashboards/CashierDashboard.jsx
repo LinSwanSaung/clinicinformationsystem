@@ -826,6 +826,9 @@ const CashierDashboard = () => {
       // Update selected invoice (refresh to get new version)
       const updatedInvoice = await invoiceService.getInvoiceById(selectedInvoice.id);
       setSelectedInvoice(updatedInvoice);
+
+      // Refresh pending invoices list to update the "No Services" badge
+      await refetchPending();
     } catch (error) {
       logger.error('Error removing service:', error);
       if (error.response?.data?.code === 'VERSION_MISMATCH' || error.code === 'VERSION_MISMATCH') {
@@ -867,6 +870,12 @@ const CashierDashboard = () => {
       // Reload invoice to get updated items and new version
       const updatedInvoice = await invoiceService.getInvoiceById(selectedInvoice.id);
       setSelectedInvoice(updatedInvoice);
+
+      // Refresh pending invoices list to update the "No Services" badge
+      await refetchPending();
+
+      // Refresh pending invoices list to update the "No Services" badge
+      await refetchPending();
 
       // Reset form
       setNewService({ name: '', price: '', description: '' });
@@ -920,6 +929,9 @@ const CashierDashboard = () => {
       // Reload invoice (refresh to get new version)
       const updatedInvoice = await invoiceService.getInvoiceById(selectedInvoice.id);
       setSelectedInvoice(updatedInvoice);
+
+      // Refresh pending invoices list to update the "No Services" badge
+      await refetchPending();
     } catch (error) {
       logger.error('Error updating service:', error);
       if (error.response?.data?.code === 'VERSION_MISMATCH' || error.code === 'VERSION_MISMATCH') {
@@ -1260,7 +1272,10 @@ const CashierDashboard = () => {
       const currentUser = JSON.parse(localStorage.getItem('user') || '{}');
 
       // Get current invoice version for optimistic locking
-      let currentVersion = selectedInvoice?.version || null;
+      // CRITICAL: Store the original version from when payment process started
+      // This is the version we'll check against to detect if another user modified the invoice
+      const originalVersion = selectedInvoice?.version || null;
+      let currentVersion = originalVersion;
 
       // Step 1: Update medication items in the invoice
       for (const med of medications) {
@@ -1329,8 +1344,20 @@ const CashierDashboard = () => {
       const refreshedInvoiceBeforePayment = await invoiceService.getInvoiceById(selectedInvoice.id);
       const latestVersion = refreshedInvoiceBeforePayment?.version || null;
 
-      // If version changed during medication updates, throw error immediately
-      if (currentVersion !== null && latestVersion !== currentVersion) {
+      // CRITICAL: Check against ORIGINAL version to detect if another user modified invoice before we started
+      // This catches cases where another user edited a service/item before we started processing payment
+      if (originalVersion !== null && latestVersion !== null && latestVersion !== originalVersion) {
+        const error = new Error(
+          `Invoice was modified by another user (service/item may have been edited). Current version: ${latestVersion}, Expected: ${originalVersion}. Please refresh the invoice and try again.`
+        );
+        error.code = 'VERSION_MISMATCH';
+        error.currentVersion = latestVersion;
+        error.expectedVersion = originalVersion;
+        throw error;
+      }
+
+      // Also check if version changed during our medication updates
+      if (currentVersion !== null && latestVersion !== null && latestVersion !== currentVersion) {
         const error = new Error(
           `Invoice was modified by another user during processing. Current version: ${latestVersion}, Expected: ${currentVersion}. Please refresh and try again.`
         );
@@ -1340,7 +1367,7 @@ const CashierDashboard = () => {
         throw error;
       }
 
-      // Update to latest version
+      // Update to latest version for subsequent operations
       currentVersion = latestVersion;
       setSelectedInvoice(refreshedInvoiceBeforePayment);
 
@@ -1527,6 +1554,40 @@ const CashierDashboard = () => {
         showSuccess(successMsg);
       } else {
         // Process full payment for non-zero invoices
+        // NOTE: recordPayment already calls completeInvoice internally when invoice is fully paid
+        // So we don't need to call completeInvoice again - it's redundant
+
+        // CRITICAL: Final version check before payment - refresh invoice to get absolute latest version
+        // This ensures we detect if another user edited services/items while we were processing
+        const finalInvoiceCheck = await invoiceService.getInvoiceById(selectedInvoice.id);
+        const finalVersion = finalInvoiceCheck?.version || null;
+
+        // Check against the ORIGINAL version from when payment process started
+        // This detects if another user modified the invoice (e.g., edited a service) before we started processing
+        if (originalVersion !== null && finalVersion !== null && finalVersion !== originalVersion) {
+          const error = new Error(
+            `Invoice was modified by another user (service/item may have been edited). Current version: ${finalVersion}, Expected: ${originalVersion}. Please refresh the invoice and try again.`
+          );
+          error.code = 'VERSION_MISMATCH';
+          error.currentVersion = finalVersion;
+          error.expectedVersion = originalVersion;
+          throw error;
+        }
+
+        // Also check if version changed during our processing (medication updates, etc.)
+        if (currentVersion !== null && finalVersion !== null && finalVersion !== currentVersion) {
+          const error = new Error(
+            `Invoice was modified by another user during processing. Current version: ${finalVersion}, Expected: ${currentVersion}. Please refresh and try again.`
+          );
+          error.code = 'VERSION_MISMATCH';
+          error.currentVersion = finalVersion;
+          error.expectedVersion = currentVersion;
+          throw error;
+        }
+
+        // Use the final version for payment
+        const paymentVersion = finalVersion || currentVersion;
+
         try {
           await invoiceService.recordPayment(
             selectedInvoice.id,
@@ -1535,16 +1596,26 @@ const CashierDashboard = () => {
               amount_paid: totals.total,
               notes: notes || 'Payment processed',
             },
-            currentVersion
+            paymentVersion
           );
 
-          // Refresh invoice after payment to get updated version
+          // Refresh invoice after payment to verify it's completed and visit is completed
           const refreshedAfterPayment = await invoiceService.getInvoiceById(selectedInvoice.id);
-          currentVersion = refreshedAfterPayment?.version || null;
           setSelectedInvoice(refreshedAfterPayment);
 
-          // Complete the invoice (this will also complete the visit)
-          await invoiceService.completeInvoice(selectedInvoice.id, currentUser?.id, currentVersion);
+          // Verify invoice is paid (recordPayment should have completed it)
+          if (refreshedAfterPayment?.status !== 'paid') {
+            // If invoice is not paid, complete it manually (shouldn't happen, but safety check)
+            await invoiceService.completeInvoice(
+              selectedInvoice.id,
+              currentUser?.id,
+              refreshedAfterPayment?.version
+            );
+            // Refresh again after manual completion
+            const finalInvoice = await invoiceService.getInvoiceById(selectedInvoice.id);
+            setSelectedInvoice(finalInvoice);
+          }
+          // If invoice is already paid, recordPayment should have completed the visit automatically
         } catch (paymentError) {
           // If recordPayment fails with version mismatch, re-throw to be caught by outer catch
           if (
@@ -2395,6 +2466,7 @@ const CashierDashboard = () => {
                     <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-3">
                       <CardTitle className="text-base">Services Provided</CardTitle>
                       <Button
+                        type="button"
                         size="sm"
                         variant="outline"
                         onClick={() => setShowAddServiceDialog(true)}
@@ -2455,6 +2527,7 @@ const CashierDashboard = () => {
                                   </div>
                                   <div className="flex gap-2">
                                     <Button
+                                      type="button"
                                       size="sm"
                                       onClick={() => handleUpdateService(service.id)}
                                       disabled={isProcessing}
@@ -2464,6 +2537,7 @@ const CashierDashboard = () => {
                                       Save
                                     </Button>
                                     <Button
+                                      type="button"
                                       size="sm"
                                       variant="outline"
                                       onClick={() => setIsEditingService(null)}
@@ -2499,6 +2573,7 @@ const CashierDashboard = () => {
                                   </div>
                                   <div className="flex gap-2 border-t pt-2">
                                     <Button
+                                      type="button"
                                       size="sm"
                                       variant="ghost"
                                       onClick={() => setIsEditingService(service.id)}
@@ -2509,6 +2584,7 @@ const CashierDashboard = () => {
                                       Edit
                                     </Button>
                                     <Button
+                                      type="button"
                                       size="sm"
                                       variant="ghost"
                                       onClick={() => {
@@ -2540,6 +2616,7 @@ const CashierDashboard = () => {
                       <div className="flex items-center justify-between">
                         <CardTitle className="text-base">Prescribed Medications</CardTitle>
                         <Button
+                          type="button"
                           size="sm"
                           variant="outline"
                           onClick={handleLoadPrescriptions}
@@ -2588,6 +2665,7 @@ const CashierDashboard = () => {
                               {/* Action Buttons */}
                               <div className="flex gap-2">
                                 <Button
+                                  type="button"
                                   size="sm"
                                   variant={med.action === 'dispense' ? 'default' : 'outline'}
                                   onClick={() => handleMedicationAction(med.id, 'dispense')}
@@ -2597,6 +2675,7 @@ const CashierDashboard = () => {
                                   Dispense
                                 </Button>
                                 <Button
+                                  type="button"
                                   size="sm"
                                   variant={med.action === 'write-out' ? 'default' : 'outline'}
                                   onClick={() => handleMedicationAction(med.id, 'write-out')}
@@ -2651,6 +2730,7 @@ const CashierDashboard = () => {
                                     </div>
                                     <div className="flex items-center gap-2">
                                       <Button
+                                        type="button"
                                         size="sm"
                                         variant="outline"
                                         onClick={() =>
@@ -2674,6 +2754,7 @@ const CashierDashboard = () => {
                                         max={med.quantity}
                                       />
                                       <Button
+                                        type="button"
                                         size="sm"
                                         variant="outline"
                                         onClick={() =>
@@ -3056,6 +3137,7 @@ const CashierDashboard = () => {
                       )}
 
                       <Button
+                        type="button"
                         onClick={handleApproveInvoice}
                         className="w-full gap-2"
                         disabled={
@@ -3216,13 +3298,19 @@ const CashierDashboard = () => {
 
             <DialogFooter>
               <Button
+                type="button"
                 variant="outline"
                 onClick={() => setShowPaymentDialog(false)}
                 disabled={isProcessing}
               >
                 Cancel
               </Button>
-              <Button onClick={handleProcessPayment} disabled={isProcessing} className="gap-2">
+              <Button
+                type="button"
+                onClick={handleProcessPayment}
+                disabled={isProcessing}
+                className="gap-2"
+              >
                 {isProcessing ? (
                   <>
                     <div className="h-4 w-4 animate-spin rounded-full border-b-2 border-white"></div>

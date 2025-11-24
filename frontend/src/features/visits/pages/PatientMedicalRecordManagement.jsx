@@ -653,9 +653,7 @@ const PatientMedicalRecordManagement = () => {
                     <MedicalInformationPanel
                       patient={{
                         ...selectedPatient,
-                        allergies: (allergies || [])
-                          .map((a) => a?.allergy_name || 'Unknown')
-                          .filter(Boolean),
+                        allergies: (allergies || []).filter((a) => a?.allergy_name),
                         diagnosisHistory: (diagnoses || [])
                           .map((d) => ({
                             condition: d?.diagnosis_name || 'Unknown',

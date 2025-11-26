@@ -1,7 +1,14 @@
 import { z } from 'zod';
 import { supabase } from '../../config/database.js';
 
-const SortByEnum = z.enum(['dispensedAt', 'medicineName', 'patientName', 'quantity']);
+const SortByEnum = z.enum([
+  'dispensedAt',
+  'medicineName',
+  'patientName',
+  'quantity',
+  'totalPrice',
+  'unitPrice',
+]);
 const SortDirEnum = z.enum(['asc', 'desc']);
 
 export const DispenseFiltersSchema = z.object({
@@ -33,7 +40,7 @@ export async function fetchDispenses(filters = {}) {
   // 1) Pull paid invoices within range (minimal columns)
   const { data: invoices, error: invErr } = await supabase
     .from('invoices')
-    .select('id, completed_at, completed_by, patient_id')
+    .select('id, invoice_number, completed_at, completed_by, patient_id')
     .eq('status', 'paid')
     .gte('completed_at', start)
     .lte('completed_at', end)
@@ -130,6 +137,7 @@ export async function fetchDispenses(filters = {}) {
             }
           : null,
         invoiceId: it.invoice_id,
+        invoiceNumber: inv?.invoice_number || it.invoice_id,
       };
     });
 
@@ -149,6 +157,14 @@ export async function fetchDispenses(filters = {}) {
       case 'quantity':
         valA = a.quantity || 0;
         valB = b.quantity || 0;
+        break;
+      case 'totalPrice':
+        valA = a.totalPrice || 0;
+        valB = b.totalPrice || 0;
+        break;
+      case 'unitPrice':
+        valA = a.unitPrice || 0;
+        valB = b.unitPrice || 0;
         break;
       case 'dispensedAt':
       default:

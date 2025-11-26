@@ -2,6 +2,7 @@ import { LoadingSpinner, EmptyState } from '@/components/library';
 /* eslint-disable react-hooks/exhaustive-deps */
 import { useState, useEffect, useRef } from 'react';
 import { useLocation } from 'react-router-dom';
+import { useTranslation } from 'react-i18next';
 import {
   Calendar as CalendarIcon,
   Clock,
@@ -31,6 +32,7 @@ import { useAppointments } from '../hooks/useAppointments';
 import { useCreateAppointment } from '../hooks/useCreateAppointment';
 import { useUpdateAppointmentStatus } from '../hooks/useUpdateAppointmentStatus';
 import { AlertModal } from '@/components/library';
+import { useFeedback } from '@/contexts/FeedbackContext';
 import logger from '@/utils/logger';
 import PageLayout from '@/components/layout/PageLayout';
 import AppointmentPatientCard from '../components/AppointmentPatientCard';
@@ -38,6 +40,8 @@ import AppointmentDetailModal from '../components/AppointmentDetailModal';
 
 const AppointmentsPage = () => {
   const location = useLocation();
+  const { showSuccess } = useFeedback();
+  const { t } = useTranslation();
 
   // Consultation duration in minutes (fetched from clinic_settings table)
   const [consultationDuration, setConsultationDuration] = useState(15); // Default fallback
@@ -269,17 +273,21 @@ const AppointmentsPage = () => {
     }
 
     const searchLower = searchTerm.toLowerCase();
-    const patient = patients.find((p) => p.id === appointment.patient_id);
-    const doctor = availableDoctors.find((d) => d.id === appointment.doctor_id);
+
+    // Use embedded patient/doctor data from appointment response (preferred)
+    // Fall back to looking up from separate arrays if embedded data not available
+    const patient = appointment.patient || patients.find((p) => p.id === appointment.patient_id);
+    const doctor =
+      appointment.doctor || availableDoctors.find((d) => d.id === appointment.doctor_id);
 
     const searchFields = [
-      `${patient?.first_name} ${patient?.last_name}`,
-      `${doctor?.first_name} ${doctor?.last_name}`,
+      `${patient?.first_name || ''} ${patient?.last_name || ''}`.trim(),
+      `${doctor?.first_name || ''} ${doctor?.last_name || ''}`.trim(),
       doctor?.specialty,
       appointment.appointment_type,
-      patient?.patient_number, // Added patient ID/number search
-      patient?.phone, // Added phone number search
-      patient?.email, // Added email search
+      patient?.patient_number, // Patient ID/number search
+      patient?.phone, // Phone number search
+      patient?.email, // Email search
     ]
       .filter(Boolean)
       .map((field) => field.toLowerCase());
@@ -581,6 +589,15 @@ const AppointmentsPage = () => {
       const result = await createAppointmentMutation.mutateAsync(appointmentData);
 
       if (result.success) {
+        // Show toast notification
+        const patient = patients.find((p) => p.id === newAppointment.patientId);
+        const doctor = availableDoctors.find((d) => d.id === newAppointment.doctorId);
+        const patientName = patient ? `${patient.first_name} ${patient.last_name}` : 'Patient';
+        const doctorName = doctor ? `Dr. ${doctor.first_name} ${doctor.last_name}` : 'Doctor';
+        showSuccess(
+          `Appointment scheduled for ${patientName} with ${doctorName} on ${localDateString} at ${newAppointment.time}`
+        );
+
         setShowAlert(true);
 
         // Reset all form states
@@ -645,7 +662,7 @@ const AppointmentsPage = () => {
     setShowDetailModal(true);
   };
 
-  const handleCancelAppointment = async (appointmentId) => {
+  const handleCancelAppointment = async (appointmentId, showSuccessAlert = true) => {
     try {
       const result = await updateAppointmentStatusMutation.mutateAsync({
         appointmentId,
@@ -653,9 +670,11 @@ const AppointmentsPage = () => {
       });
 
       if (result.success) {
-        // Show success message
-        setShowAlert(true);
-        setTimeout(() => setShowAlert(false), 3000);
+        // Show success message only if not part of reschedule flow
+        if (showSuccessAlert) {
+          setShowAlert(true);
+          setTimeout(() => setShowAlert(false), 3000);
+        }
       } else {
         logger.error('[AppointmentsPage] Cancel failed:', result);
         setError(result.message || 'Failed to cancel appointment. Please try again.');
@@ -695,9 +714,9 @@ const AppointmentsPage = () => {
         doctor.first_name
       );
 
-      // First cancel the existing appointment
+      // First cancel the existing appointment (silently, without showing success alert)
       logger.debug('[AppointmentsPage] Cancelling original appointment before rescheduling');
-      await handleCancelAppointment(appointment.id);
+      await handleCancelAppointment(appointment.id, false);
 
       // Then set up the form for new appointment
       setNewAppointment({
@@ -723,12 +742,16 @@ const AppointmentsPage = () => {
   };
 
   return (
-    <PageLayout title="Appointments" subtitle="Schedule and manage patient appointments" fullWidth>
+    <PageLayout
+      title={t('receptionist.appointments.title')}
+      subtitle={t('receptionist.appointments.subtitle')}
+      fullWidth
+    >
       <div className="space-y-4 p-3 sm:space-y-6 sm:p-4 md:space-y-8 md:p-8">
         {showAlert && (
           <AlertModal
             type="success"
-            message="Appointment scheduled successfully!"
+            message={t('receptionist.appointments.appointmentScheduled')}
             onClose={() => setShowAlert(false)}
           />
         )}
@@ -742,8 +765,10 @@ const AppointmentsPage = () => {
             className="hover:bg-primary/90 w-full bg-primary px-3 py-2 text-xs text-primary-foreground sm:w-auto sm:px-4 sm:py-3 sm:text-sm md:text-base"
           >
             <Plus className="mr-1 h-3 w-3 sm:mr-2 sm:h-4 sm:w-4 md:h-5 md:w-5" />
-            <span className="hidden sm:inline">New Appointment</span>
-            <span className="sm:hidden">New Appointment</span>
+            <span className="hidden sm:inline">
+              {t('receptionist.appointments.newAppointment')}
+            </span>
+            <span className="sm:hidden">{t('receptionist.appointments.newAppointment')}</span>
           </Button>
         </div>
 
@@ -752,10 +777,10 @@ const AppointmentsPage = () => {
             <CardHeader className="pb-3 sm:pb-4">
               <CardTitle className="mb-2 flex items-center gap-2 text-lg sm:text-xl">
                 <CalendarIcon className="h-5 w-5 text-primary sm:h-6 sm:w-6" />
-                Schedule New Appointment
+                {t('receptionist.appointments.scheduleNewAppointment')}
               </CardTitle>
               <CardDescription className="text-sm sm:text-base">
-                Select a doctor first to see their available dates
+                {t('receptionist.appointments.chooseDoctorToSeeDates')}
               </CardDescription>
             </CardHeader>
             <CardContent>
@@ -767,15 +792,15 @@ const AppointmentsPage = () => {
                       1
                     </div>
                     <h3 className="text-base font-medium text-primary sm:text-lg sm:font-semibold">
-                      Select Doctor
+                      {t('receptionist.appointments.selectDoctor')}
                     </h3>
                   </div>
                   <SearchableSelect
                     options={availableDoctors}
                     value={newAppointment.doctorId}
                     onValueChange={handleDoctorSelect}
-                    placeholder="Choose a doctor to see available dates..."
-                    searchPlaceholder="Search doctors..."
+                    placeholder={t('receptionist.appointments.chooseDoctorPlaceholder')}
+                    searchPlaceholder={t('receptionist.appointments.searchDoctorsPlaceholder')}
                     displayField="first_name"
                     secondaryField="last_name"
                     valueField="id"
@@ -810,11 +835,11 @@ const AppointmentsPage = () => {
 
                       {isLoadingAvailability ? (
                         <div className="mt-2 text-sm text-muted-foreground">
-                          Loading availability...
+                          {t('receptionist.appointments.loadingAvailability')}
                         </div>
                       ) : availableWeekdays.length > 0 ? (
                         <div className="mt-2 text-sm text-muted-foreground">
-                          Available:{' '}
+                          {t('receptionist.appointments.available')}:{' '}
                           {availableWeekdays
                             .map((day) => {
                               const days = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
@@ -824,7 +849,7 @@ const AppointmentsPage = () => {
                         </div>
                       ) : (
                         <div className="mt-2 text-sm text-amber-600">
-                          ⚠️ No availability schedule found - defaulting to Mon-Fri
+                          {t('receptionist.appointments.noAvailabilitySchedule')}
                         </div>
                       )}
                     </div>
@@ -839,13 +864,15 @@ const AppointmentsPage = () => {
                         <div className="flex h-6 w-6 items-center justify-center rounded-full bg-muted text-xs font-medium text-muted-foreground sm:h-8 sm:w-8 sm:text-sm">
                           2
                         </div>
-                        <h3 className="text-base font-medium sm:text-lg">Patient Details</h3>
+                        <h3 className="text-base font-medium sm:text-lg">
+                          {t('receptionist.appointments.patientDetails')}
+                        </h3>
                       </div>
 
                       <div className="space-y-3 sm:space-y-4">
                         <div>
                           <label className="mb-1 block text-xs font-medium sm:mb-2 sm:text-sm">
-                            Patient *
+                            {t('receptionist.appointments.patient')} *
                           </label>
                           <SearchableSelect
                             options={patients}
@@ -853,8 +880,10 @@ const AppointmentsPage = () => {
                             onValueChange={(value) =>
                               setNewAppointment((prev) => ({ ...prev, patientId: value }))
                             }
-                            placeholder="Select patient..."
-                            searchPlaceholder="Search patients..."
+                            placeholder={t('receptionist.appointments.selectPatientPlaceholder')}
+                            searchPlaceholder={t(
+                              'receptionist.appointments.searchPatientsPlaceholder'
+                            )}
                             displayField="first_name"
                             secondaryField="last_name"
                             valueField="id"
@@ -874,7 +903,7 @@ const AppointmentsPage = () => {
 
                         <div>
                           <label className="mb-1 block text-xs font-medium sm:mb-2 sm:text-sm">
-                            Appointment Type *
+                            {t('receptionist.appointments.appointmentType')} *
                           </label>
                           <Select
                             value={newAppointment.type}
@@ -883,20 +912,22 @@ const AppointmentsPage = () => {
                             }
                           >
                             <SelectTrigger className="h-9 text-xs sm:h-10 sm:text-sm">
-                              <SelectValue placeholder="Select type" />
+                              <SelectValue
+                                placeholder={t('receptionist.appointments.selectTypePlaceholder')}
+                              />
                             </SelectTrigger>
                             <SelectContent>
                               <SelectItem value="Regular Checkup" className="text-xs sm:text-sm">
-                                Regular Checkup
+                                {t('receptionist.appointments.regularCheckup')}
                               </SelectItem>
                               <SelectItem value="Follow-up" className="text-xs sm:text-sm">
-                                Follow-up
+                                {t('receptionist.appointments.followUp')}
                               </SelectItem>
                               <SelectItem value="Consultation" className="text-xs sm:text-sm">
-                                Consultation
+                                {t('receptionist.appointments.consultation')}
                               </SelectItem>
                               <SelectItem value="Emergency" className="text-xs sm:text-sm">
-                                Emergency
+                                {t('receptionist.appointments.emergency')}
                               </SelectItem>
                             </SelectContent>
                           </Select>
@@ -904,14 +935,14 @@ const AppointmentsPage = () => {
 
                         <div>
                           <label className="mb-1 block text-xs font-medium sm:mb-2 sm:text-sm">
-                            Notes
+                            {t('receptionist.appointments.notes')}
                           </label>
                           <Textarea
                             value={newAppointment.notes}
                             onChange={(e) =>
                               setNewAppointment((prev) => ({ ...prev, notes: e.target.value }))
                             }
-                            placeholder="Add any additional notes..."
+                            placeholder={t('receptionist.appointments.addNotes')}
                             className="min-h-[80px] p-2 text-xs sm:min-h-[100px] sm:p-3 sm:text-sm"
                           />
                         </div>
@@ -934,14 +965,20 @@ const AppointmentsPage = () => {
                         >
                           3
                         </div>
-                        <h3 className="text-base font-medium sm:text-lg">Date & Time</h3>
+                        <h3 className="text-base font-medium sm:text-lg">
+                          {t('receptionist.appointments.dateAndTime')}
+                        </h3>
                       </div>
 
                       {!selectedDoctor ? (
                         <div className="py-6 text-center text-muted-foreground sm:py-8">
                           <CalendarIcon className="mx-auto mb-2 h-8 w-8 opacity-50 sm:h-12 sm:w-12" />
-                          <p className="text-sm sm:text-base">Please select a doctor first</p>
-                          <p className="text-xs sm:text-sm">Available dates will be highlighted</p>
+                          <p className="text-sm sm:text-base">
+                            {t('receptionist.appointments.selectDoctorFirst')}
+                          </p>
+                          <p className="text-xs sm:text-sm">
+                            {t('receptionist.appointments.availableDatesHighlighted')}
+                          </p>
                         </div>
                       ) : (
                         <div className="space-y-4">
@@ -951,11 +988,10 @@ const AppointmentsPage = () => {
                               <CalendarIcon className="mt-0.5 h-4 w-4 flex-shrink-0 sm:h-5 sm:w-5" />
                               <div className="text-xs sm:text-sm">
                                 <p className="mb-1 font-medium text-blue-800 dark:text-blue-200">
-                                  Appointment Scheduling Policy
+                                  {t('receptionist.appointments.appointmentSchedulingPolicy')}
                                 </p>
                                 <p className="text-blue-700 dark:text-blue-300">
-                                  Same-day appointments are not allowed. Please schedule for
-                                  tomorrow or later for better management.
+                                  {t('receptionist.appointments.sameDayNotAllowed')}
                                 </p>
                               </div>
                             </div>
@@ -963,9 +999,9 @@ const AppointmentsPage = () => {
 
                           <div>
                             <label className="mb-1 block text-xs font-medium sm:mb-2 sm:text-sm">
-                              Date *
+                              {t('receptionist.appointments.date')} *
                               <span className="ml-1 text-[10px] text-muted-foreground sm:ml-2 sm:text-xs">
-                                (Highlighted days are available)
+                                {t('receptionist.appointments.highlightedDaysAvailable')}
                               </span>
                             </label>
                             <div className="rounded-lg border bg-background p-1 shadow-sm sm:p-2 md:p-3 lg:p-4">
@@ -982,8 +1018,8 @@ const AppointmentsPage = () => {
                                     className="hover:bg-primary/10 h-6 w-6 p-0 disabled:cursor-not-allowed disabled:opacity-50 sm:h-7 sm:w-7 md:h-8 md:w-8"
                                     title={
                                       !canNavigatePrevious()
-                                        ? 'Cannot go to past months'
-                                        : 'Previous month'
+                                        ? t('receptionist.appointments.cannotGoToPastMonths')
+                                        : t('receptionist.appointments.previousMonth')
                                     }
                                   >
                                     <ChevronLeft className="h-2.5 w-2.5 sm:h-3 sm:w-3 md:h-4 md:w-4" />
@@ -993,7 +1029,7 @@ const AppointmentsPage = () => {
                                       key={`month-${calendarMonth.getTime()}-${calendarMonthDisplay}`}
                                       className="text-xs font-medium leading-tight sm:text-sm md:text-base lg:text-lg"
                                     >
-                                      {calendarMonthDisplay || 'Loading...'}
+                                      {calendarMonthDisplay || t('common.loading')}
                                     </h3>
                                     <Button
                                       type="button"
@@ -1001,10 +1037,14 @@ const AppointmentsPage = () => {
                                       size="sm"
                                       onClick={goToToday}
                                       className="hover:bg-primary/90 h-5 bg-primary px-1.5 text-[10px] font-normal text-primary-foreground sm:h-6 sm:px-2 sm:text-xs md:h-7 md:px-3 md:text-sm"
-                                      title="Go to current month"
+                                      title={t('receptionist.appointments.currentMonth')}
                                     >
-                                      <span className="hidden sm:inline">Current Month</span>
-                                      <span className="sm:hidden">Now</span>
+                                      <span className="hidden sm:inline">
+                                        {t('receptionist.appointments.currentMonth')}
+                                      </span>
+                                      <span className="sm:hidden">
+                                        {t('receptionist.appointments.now')}
+                                      </span>
                                     </Button>
                                   </div>
                                   <Button
@@ -1013,7 +1053,7 @@ const AppointmentsPage = () => {
                                     size="sm"
                                     onClick={() => navigateMonth(1)}
                                     className="hover:bg-primary/10 h-6 w-6 p-0 sm:h-7 sm:w-7 md:h-8 md:w-8"
-                                    title="Next month"
+                                    title={t('receptionist.appointments.nextMonth')}
                                   >
                                     <ChevronRight className="h-2.5 w-2.5 sm:h-3 sm:w-3 md:h-4 md:w-4" />
                                   </Button>
@@ -1118,7 +1158,7 @@ const AppointmentsPage = () => {
                             {/* Legend */}
                             <div className="bg-muted/20 mt-2 rounded-md p-1.5 sm:mt-3 sm:p-2 md:p-3">
                               <div className="mb-1 text-[10px] font-medium text-muted-foreground sm:mb-2 sm:text-xs">
-                                Legend:
+                                {t('receptionist.appointments.legend')}:
                               </div>
                               <div className="grid grid-cols-1 gap-1 text-[10px] sm:grid-cols-2 sm:gap-1.5 sm:text-xs lg:flex lg:flex-wrap lg:gap-4">
                                 <div className="flex min-w-0 items-center gap-1 sm:gap-1.5">
@@ -1126,31 +1166,41 @@ const AppointmentsPage = () => {
                                     15
                                     <div className="absolute right-0 top-0 -mr-0.5 -mt-0.5 h-1.5 w-1.5 rounded-full bg-green-500"></div>
                                   </div>
-                                  <span className="text-muted-foreground">Available</span>
+                                  <span className="text-muted-foreground">
+                                    {t('receptionist.appointments.available')}
+                                  </span>
                                 </div>
                                 <div className="flex items-center gap-1.5">
                                   <div className="flex h-4 w-4 items-center justify-center rounded-md border-2 border-blue-400 bg-blue-200 text-[10px] font-bold text-blue-900 shadow-sm">
                                     15
                                   </div>
-                                  <span className="text-muted-foreground">Selected</span>
+                                  <span className="text-muted-foreground">
+                                    {t('receptionist.appointments.selected')}
+                                  </span>
                                 </div>
                                 <div className="flex items-center gap-1.5">
                                   <div className="flex h-4 w-4 items-center justify-center rounded-md border border-red-200 bg-red-50 text-[10px] font-medium text-red-600">
                                     15
                                   </div>
-                                  <span className="text-muted-foreground">Not Available</span>
+                                  <span className="text-muted-foreground">
+                                    {t('receptionist.appointments.notAvailable')}
+                                  </span>
                                 </div>
                                 <div className="flex items-center gap-1.5">
                                   <div className="relative flex h-4 w-4 items-center justify-center rounded-md border-2 border-orange-400 bg-orange-50/50 text-[10px] font-semibold text-orange-700 line-through">
                                     15
                                   </div>
-                                  <span className="text-muted-foreground">Today (Not Allowed)</span>
+                                  <span className="text-muted-foreground">
+                                    {t('receptionist.appointments.todayNotAllowed')}
+                                  </span>
                                 </div>
                                 <div className="flex items-center gap-1.5">
                                   <div className="flex h-4 w-4 items-center justify-center rounded-md border border-gray-300 bg-gray-100 text-[10px] text-gray-400">
                                     15
                                   </div>
-                                  <span className="text-muted-foreground">Past Date</span>
+                                  <span className="text-muted-foreground">
+                                    {t('receptionist.appointments.pastDate')}
+                                  </span>
                                 </div>
                               </div>
                             </div>
@@ -1158,7 +1208,7 @@ const AppointmentsPage = () => {
 
                           <div>
                             <label className="mb-1 block text-xs font-medium sm:mb-2 sm:text-sm">
-                              Time *
+                              {t('receptionist.appointments.time')} *
                             </label>
                             {selectedDoctor &&
                             selectedDate &&
@@ -1171,7 +1221,9 @@ const AppointmentsPage = () => {
                                 }
                                 className="flex h-9 w-full items-center justify-between rounded-md border border-border bg-background px-3 py-2 text-xs ring-offset-background focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50 sm:h-10 sm:text-sm"
                               >
-                                <option value="">Select time</option>
+                                <option value="">
+                                  {t('receptionist.appointments.selectTime')}
+                                </option>
                                 {availableTimeSlots.map((time) => (
                                   <option key={time} value={time}>
                                     {time}
@@ -1185,14 +1237,14 @@ const AppointmentsPage = () => {
                                 value=""
                                 placeholder={
                                   !selectedDoctor
-                                    ? 'Select a doctor first'
+                                    ? t('receptionist.appointments.selectDoctorFirst')
                                     : !selectedDate
-                                      ? 'Select a date first'
+                                      ? t('receptionist.appointments.selectDateFirst')
                                       : isLoadingTimeSlots
-                                        ? 'Loading available times...'
+                                        ? t('receptionist.appointments.loadingTimeSlots')
                                         : timeSlotError
-                                          ? 'Failed to load time slots'
-                                          : 'No available slots'
+                                          ? t('receptionist.appointments.timeSlotError')
+                                          : t('receptionist.appointments.noAvailableSlots')
                                 }
                                 className="h-9 text-xs sm:h-10 sm:text-sm"
                               />
@@ -1228,15 +1280,24 @@ const AppointmentsPage = () => {
                                             const [hour, minute] = time.split(':');
                                             return `${hour}:${minute}`;
                                           };
-                                          return `Dr. ${selectedDoctor.first_name} ${selectedDoctor.last_name} is available from ${formatTime(daySchedule.start_time)} to ${formatTime(daySchedule.end_time)}`;
+                                          return `Dr. ${selectedDoctor.first_name} ${selectedDoctor.last_name} ${t('receptionist.appointments.isAvailableFrom')} ${formatTime(daySchedule.start_time)} ${t('receptionist.appointments.to')} ${formatTime(daySchedule.end_time)}`;
                                         }
-                                        return 'Availability information not found';
+                                        return t(
+                                          'receptionist.appointments.availabilityInfoNotFound'
+                                        );
                                       })()}
                                     </span>
                                   </div>
                                   <div className="mt-1 space-y-0.5 text-[10px] leading-tight text-blue-600 sm:space-y-1 sm:text-xs">
-                                    <div>{availableTimeSlots.length} time slots available</div>
-                                    <div>Each consultation: {consultationDuration} minutes</div>
+                                    <div>
+                                      {availableTimeSlots.length}{' '}
+                                      {t('receptionist.appointments.timeSlotsAvailable')}
+                                    </div>
+                                    <div>
+                                      {t('receptionist.appointments.eachConsultation')}:{' '}
+                                      {consultationDuration}{' '}
+                                      {t('receptionist.appointments.minutes')}
+                                    </div>
                                   </div>
                                 </div>
                               )}
@@ -1250,19 +1311,20 @@ const AppointmentsPage = () => {
                                 <div className="flex items-center gap-1.5 text-green-800 sm:gap-2">
                                   <Clock className="h-3 w-3 flex-shrink-0 sm:h-4 sm:w-4" />
                                   <span className="text-xs font-medium leading-tight sm:text-sm">
-                                    Appointment scheduled for{' '}
+                                    {t('receptionist.appointments.appointmentScheduledFor')}{' '}
                                     {selectedDate.toLocaleDateString('en-US', {
                                       weekday: 'long',
                                       year: 'numeric',
                                       month: 'long',
                                       day: 'numeric',
                                     })}{' '}
-                                    at {newAppointment.time}
+                                    {t('receptionist.appointments.at')} {newAppointment.time}
                                   </span>
                                 </div>
                                 {selectedDoctor && (
                                   <div className="mt-1 text-xs leading-tight text-green-700 sm:text-sm">
-                                    with Dr. {selectedDoctor.first_name} {selectedDoctor.last_name}
+                                    {t('receptionist.appointments.with')} Dr.{' '}
+                                    {selectedDoctor.first_name} {selectedDoctor.last_name}
                                     {selectedDoctor.specialty && ` (${selectedDoctor.specialty})`}
                                   </div>
                                 )}
@@ -1278,7 +1340,7 @@ const AppointmentsPage = () => {
                                 <div className="flex items-center gap-1.5 text-amber-800 sm:gap-2">
                                   <Clock className="h-3 w-3 flex-shrink-0 sm:h-4 sm:w-4" />
                                   <span className="text-xs leading-tight sm:text-sm">
-                                    Please select an available time slot
+                                    {t('receptionist.appointments.selectTimeSlotWarning')}
                                   </span>
                                 </div>
                               </div>
@@ -1323,7 +1385,7 @@ const AppointmentsPage = () => {
                     }}
                     className="h-8 px-4 text-xs sm:h-9 sm:px-6 sm:text-sm"
                   >
-                    Cancel
+                    {t('common.cancel')}
                   </Button>
                   <Button
                     onClick={handleNewAppointment}
@@ -1338,8 +1400,10 @@ const AppointmentsPage = () => {
                       !availableTimeSlots.includes(newAppointment.time)
                     }
                   >
-                    <span className="hidden sm:inline">Schedule Appointment</span>
-                    <span className="sm:hidden">Schedule</span>
+                    <span className="hidden sm:inline">
+                      {t('receptionist.appointments.scheduleAppointment')}
+                    </span>
+                    <span className="sm:hidden">{t('receptionist.appointments.schedule')}</span>
                   </Button>
                 </div>
               </form>
@@ -1369,7 +1433,7 @@ const AppointmentsPage = () => {
                   <div className="relative">
                     <Search className="absolute left-2 top-1/2 h-4 w-4 -translate-y-1/2 transform text-muted-foreground sm:left-3 sm:h-5 sm:w-5 md:left-4 md:h-6 md:w-6" />
                     <Input
-                      placeholder="Search by patient name, patient ID, phone, doctor, or appointment type..."
+                      placeholder={t('receptionist.appointments.searchPlaceholder')}
                       value={searchTerm}
                       onChange={(e) => setSearchTerm(e.target.value)}
                       className="h-9 pl-8 text-xs sm:h-10 sm:pl-10 sm:text-sm md:h-14 md:pl-14 md:text-lg"
@@ -1391,15 +1455,19 @@ const AppointmentsPage = () => {
 
             {isLoading || isAppointmentsLoading ? (
               <div className="py-8">
-                <LoadingSpinner label="Loading appointments..." />
+                <LoadingSpinner label={t('receptionist.appointments.loadingAppointments')} />
               </div>
             ) : filteredAppointments.length === 0 ? (
               <EmptyState
-                title={searchTerm ? 'No appointments found' : 'No appointments'}
+                title={
+                  searchTerm
+                    ? t('receptionist.appointments.noAppointmentsFound')
+                    : t('receptionist.appointments.noAppointments')
+                }
                 description={
                   searchTerm
-                    ? 'No appointments found matching your search.'
-                    : 'No appointments scheduled for this date.'
+                    ? t('receptionist.appointments.noAppointmentsMatching')
+                    : t('receptionist.appointments.noAppointmentsForDate')
                 }
               />
             ) : (

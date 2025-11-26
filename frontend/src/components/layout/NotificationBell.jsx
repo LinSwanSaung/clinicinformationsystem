@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef } from 'react';
 import { Bell } from 'lucide-react';
 import notificationService from '@/services/notificationService';
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { isAuthenticated as isAuthed } from '@/features/auth';
 import { POLLING_INTERVALS } from '@/constants/polling';
 import { EmptyState } from '@/components/library';
@@ -14,6 +14,7 @@ const NotificationBell = () => {
   const [isOpen, setIsOpen] = useState(false);
   const [loading, setLoading] = useState(false);
   const dropdownRef = useRef(null);
+  const queryClient = useQueryClient();
 
   // React Query: unread count polling with auth guard
   const unreadQuery = useQuery({
@@ -108,15 +109,28 @@ const NotificationBell = () => {
     try {
       await notificationService.markAsRead(notificationId);
 
-      // Update local state
+      // Update local state immediately for better UX
       setNotifications((prev) =>
         prev.map((notif) => (notif.id === notificationId ? { ...notif, is_read: true } : notif))
       );
 
-      // Decrease unread count
+      // Decrease unread count optimistically
       setUnreadCount((prev) => Math.max(0, prev - 1));
+
+      // Invalidate and refetch unread count query to sync with server
+      await queryClient.invalidateQueries({ queryKey: ['notifications', 'unreadCount'] });
+
+      // Refetch notifications list to ensure UI is in sync
+      if (isOpen) {
+        await fetchNotifications();
+      }
     } catch (error) {
       logger.error('Error marking notification as read:', error);
+      // Revert optimistic update on error
+      await queryClient.invalidateQueries({ queryKey: ['notifications', 'unreadCount'] });
+      if (isOpen) {
+        await fetchNotifications();
+      }
     }
   };
 
@@ -125,12 +139,26 @@ const NotificationBell = () => {
     try {
       await notificationService.markAllAsRead();
 
-      // Update local state
+      // Update local state immediately for better UX
       setNotifications((prev) => prev.map((notif) => ({ ...notif, is_read: true })));
 
+      // Reset unread count optimistically
       setUnreadCount(0);
+
+      // Invalidate and refetch unread count query to sync with server
+      await queryClient.invalidateQueries({ queryKey: ['notifications', 'unreadCount'] });
+
+      // Refetch notifications list to ensure UI is in sync
+      if (isOpen) {
+        await fetchNotifications();
+      }
     } catch (error) {
       logger.error('Error marking all as read:', error);
+      // Revert optimistic update on error
+      await queryClient.invalidateQueries({ queryKey: ['notifications', 'unreadCount'] });
+      if (isOpen) {
+        await fetchNotifications();
+      }
     }
   };
 

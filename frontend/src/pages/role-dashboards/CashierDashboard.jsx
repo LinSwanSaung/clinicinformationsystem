@@ -262,7 +262,7 @@ const CashierDashboard = () => {
   const [priorityFilter, setPriorityFilter] = useState('all');
   const [_showFilters, setShowFilters] = useState(false);
   const [isRefreshing, setIsRefreshing] = useState(false);
-  const [_lastRefreshTime, setLastRefreshTime] = useState(new Date());
+  const [lastRefreshTime, setLastRefreshTime] = useState(new Date());
 
   // Invoice detail modal state
   const [selectedInvoice, setSelectedInvoice] = useState(null);
@@ -769,7 +769,17 @@ const CashierDashboard = () => {
 
   const handleMedicationAction = useCallback((medicationId, action) => {
     setMedications((prev) =>
-      prev.map((med) => (med.id === medicationId ? { ...med, action } : med))
+      prev.map((med) => {
+        if (med.id === medicationId) {
+          // When switching to dispense, default dispensedQuantity to full quantity if not set
+          const dispensedQuantity =
+            action === 'dispense' && med.dispensedQuantity === 0
+              ? med.quantity
+              : med.dispensedQuantity;
+          return { ...med, action, dispensedQuantity };
+        }
+        return med;
+      })
     );
   }, []);
 
@@ -1130,6 +1140,27 @@ const CashierDashboard = () => {
   ]);
 
   const handleApproveInvoice = useCallback(async () => {
+    // Validate that all medications have been actioned (dispense or write-out)
+    const pendingMeds = medications.filter((med) => med.action === 'pending');
+    if (pendingMeds.length > 0) {
+      showError(
+        `Please select "Dispense" or "Write Out" for all medications before processing payment. ${pendingMeds.length} medication(s) still pending.`
+      );
+      return;
+    }
+
+    // Validate that dispensed medications have prices set
+    const dispensedWithoutPrice = medications.filter(
+      (med) =>
+        med.action === 'dispense' && med.dispensedQuantity > 0 && (!med.price || med.price <= 0)
+    );
+    if (dispensedWithoutPrice.length > 0) {
+      showError(
+        `Please enter prices for all dispensed medications. ${dispensedWithoutPrice.length} medication(s) missing prices.`
+      );
+      return;
+    }
+
     // If partial payment is selected, check the 2-invoice limit
     if (isPartialPayment && partialAmount && parseFloat(partialAmount) < totals.total) {
       try {
@@ -1150,7 +1181,7 @@ const CashierDashboard = () => {
     }
 
     setShowPaymentDialog(true);
-  }, [isPartialPayment, partialAmount, totals.total, selectedInvoice, showError]);
+  }, [isPartialPayment, partialAmount, totals.total, selectedInvoice, medications, showError]);
 
   const handleLoadPrescriptions = async () => {
     if (!selectedInvoice) {
@@ -1160,10 +1191,16 @@ const CashierDashboard = () => {
     try {
       setIsProcessing(true);
 
-      // Add prescriptions to invoice (this will add new ones, not duplicate existing)
-      await invoiceService.addPrescriptionsToInvoice(selectedInvoice.id, selectedInvoice.visit_id);
+      // Get current medication count before loading
+      const previousMedCount = medications.length;
 
-      // Reload the invoice to get updated items
+      // Add prescriptions to invoice (this will add new ones, not duplicate existing)
+      const _result = await invoiceService.addPrescriptionsToInvoice(
+        selectedInvoice.id,
+        selectedInvoice.visit_id
+      );
+
+      // Reload the invoice to get updated items and latest version
       const updatedInvoice = await invoiceService.getInvoiceById(selectedInvoice.id);
       setSelectedInvoice(updatedInvoice);
 
@@ -1183,6 +1220,16 @@ const CashierDashboard = () => {
           action: 'pending', // pending, dispense, write-out
         }));
       setMedications(meds);
+
+      // Show appropriate message
+      const newCount = meds.length - previousMedCount;
+      if (newCount > 0) {
+        showSuccess(`Loaded ${newCount} new prescription(s)`);
+      } else if (meds.length > 0) {
+        showSuccess('Prescriptions are up to date');
+      } else {
+        showSuccess('No prescriptions found for this visit');
+      }
 
       // Reload the invoice list
       await refetchPending();
@@ -1340,23 +1387,12 @@ const CashierDashboard = () => {
 
       // Note: Discount should already be applied via handleApplyDiscount button
       // CRITICAL: Final version check before any payment operations
-      // Refresh invoice to get latest version and verify it hasn't changed
+      // Refresh invoice to get latest version and verify it hasn't changed since our last update
       const refreshedInvoiceBeforePayment = await invoiceService.getInvoiceById(selectedInvoice.id);
       const latestVersion = refreshedInvoiceBeforePayment?.version || null;
 
-      // CRITICAL: Check against ORIGINAL version to detect if another user modified invoice before we started
-      // This catches cases where another user edited a service/item before we started processing payment
-      if (originalVersion !== null && latestVersion !== null && latestVersion !== originalVersion) {
-        const error = new Error(
-          `Invoice was modified by another user (service/item may have been edited). Current version: ${latestVersion}, Expected: ${originalVersion}. Please refresh the invoice and try again.`
-        );
-        error.code = 'VERSION_MISMATCH';
-        error.currentVersion = latestVersion;
-        error.expectedVersion = originalVersion;
-        throw error;
-      }
-
-      // Also check if version changed during our medication updates
+      // Check if version changed during our medication updates by someone else
+      // We compare against currentVersion (which tracks our own updates) not originalVersion
       if (currentVersion !== null && latestVersion !== null && latestVersion !== currentVersion) {
         const error = new Error(
           `Invoice was modified by another user during processing. Current version: ${latestVersion}, Expected: ${currentVersion}. Please refresh and try again.`
@@ -1562,19 +1598,8 @@ const CashierDashboard = () => {
         const finalInvoiceCheck = await invoiceService.getInvoiceById(selectedInvoice.id);
         const finalVersion = finalInvoiceCheck?.version || null;
 
-        // Check against the ORIGINAL version from when payment process started
-        // This detects if another user modified the invoice (e.g., edited a service) before we started processing
-        if (originalVersion !== null && finalVersion !== null && finalVersion !== originalVersion) {
-          const error = new Error(
-            `Invoice was modified by another user (service/item may have been edited). Current version: ${finalVersion}, Expected: ${originalVersion}. Please refresh the invoice and try again.`
-          );
-          error.code = 'VERSION_MISMATCH';
-          error.currentVersion = finalVersion;
-          error.expectedVersion = originalVersion;
-          throw error;
-        }
-
-        // Also check if version changed during our processing (medication updates, etc.)
+        // Check if version changed during our processing (medication updates, etc.) by someone else
+        // We compare against currentVersion (which tracks our own updates) not originalVersion
         if (currentVersion !== null && finalVersion !== null && finalVersion !== currentVersion) {
           const error = new Error(
             `Invoice was modified by another user during processing. Current version: ${finalVersion}, Expected: ${currentVersion}. Please refresh and try again.`
@@ -1952,6 +1977,9 @@ const CashierDashboard = () => {
                   <RefreshCw className={`h-4 w-4 ${isRefreshing ? 'animate-spin' : ''}`} />
                   Refresh
                 </Button>
+                <div className="text-xs text-muted-foreground">
+                  Last updated: {lastRefreshTime.toLocaleTimeString()}
+                </div>
               </div>
             </div>
 
@@ -3233,7 +3261,9 @@ const CashierDashboard = () => {
                 </div>
                 <div className="flex justify-between">
                   <span>Invoice ID:</span>
-                  <span className="font-medium">{selectedInvoice?.id}</span>
+                  <span className="font-medium">
+                    {selectedInvoice?.invoice_number || selectedInvoice?.id}
+                  </span>
                 </div>
                 <div className="flex justify-between">
                   <span>Payment Method:</span>

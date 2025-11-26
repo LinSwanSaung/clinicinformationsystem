@@ -48,8 +48,9 @@ const NursePatientQueuePage = () => {
   const debouncedSearchTerm = useDebounce(searchTerm, 300);
 
   // React Query: doctors queue polling with auth/role guard
+  // OPTIMIZATION: Using shared query key ['queue', 'allDoctors'] to enable React Query deduplication
   const doctorsQuery = useQuery({
-    queryKey: ['nurse', 'queue', 'doctors'],
+    queryKey: ['queue', 'allDoctors'],
     queryFn: () => queueService.getAllDoctorsQueueStatus(),
     enabled: !!user && user.role === ROLES.NURSE,
     refetchInterval: POLLING_INTERVALS.NURSE_QUEUE,

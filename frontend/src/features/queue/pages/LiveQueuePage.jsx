@@ -1,5 +1,6 @@
 import { useState, useEffect, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { useTranslation } from 'react-i18next';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
   Users,
@@ -69,6 +70,7 @@ const itemVariants = {
 
 const LiveQueuePage = () => {
   const navigate = useNavigate();
+  const { t } = useTranslation();
 
   // State management
   const [doctors, setDoctors] = useState([]);
@@ -86,8 +88,9 @@ const LiveQueuePage = () => {
   const { user } = useAuth();
 
   // React Query: doctors + queue status polling with role/auth guard
+  // OPTIMIZATION: Using shared query key ['queue', 'allDoctors'] to enable React Query deduplication
   const doctorsQuery = useQuery({
-    queryKey: ['receptionist', 'doctorsQueue'],
+    queryKey: ['queue', 'allDoctors'],
     queryFn: () => queueService.getAllDoctorsQueueStatus(),
     enabled: !!user && user.role === ROLES.RECEPTIONIST,
     refetchInterval: autoRefresh ? POLLING_INTERVALS.QUEUE : false,
@@ -191,11 +194,11 @@ const LiveQueuePage = () => {
   if (isLoading) {
     return (
       <PageLayout
-        title="Live Queue Management"
-        subtitle="Monitor and manage patient queues in real-time"
+        title={t('receptionist.liveQueue.title')}
+        subtitle={t('receptionist.liveQueue.subtitle')}
       >
         <div className="py-12">
-          <LoadingSpinner label="Loading queue..." size="lg" />
+          <LoadingSpinner label={t('common.loading')} size="lg" />
         </div>
       </PageLayout>
     );
@@ -204,8 +207,8 @@ const LiveQueuePage = () => {
   return (
     <motion.div initial="initial" animate="animate" exit="exit" variants={pageVariants}>
       <PageLayout
-        title="Live Queue Management"
-        subtitle="Monitor and manage patient queues in real-time"
+        title={t('receptionist.liveQueue.title')}
+        subtitle={t('receptionist.liveQueue.subtitle')}
         fullWidth
       >
         <div className="space-y-6 p-4 md:p-6">
@@ -227,7 +230,7 @@ const LiveQueuePage = () => {
                       className="ml-2"
                       onClick={() => setError(null)}
                     >
-                      Dismiss
+                      {t('receptionist.liveQueue.dismiss')}
                     </Button>
                   </AlertDescription>
                 </Alert>
@@ -254,7 +257,9 @@ const LiveQueuePage = () => {
                         <p className="text-2xl font-bold text-blue-600">
                           {queueSummary.totalPatients || 0}
                         </p>
-                        <p className="text-sm text-muted-foreground">Total Patients</p>
+                        <p className="text-sm text-muted-foreground">
+                          {t('receptionist.liveQueue.totalPatients')}
+                        </p>
                       </div>
                     </div>
                   </CardContent>
@@ -272,7 +277,9 @@ const LiveQueuePage = () => {
                         <p className="text-2xl font-bold text-yellow-600">
                           {queueSummary.waitingPatients || 0}
                         </p>
-                        <p className="text-sm text-muted-foreground">Active Patients</p>
+                        <p className="text-sm text-muted-foreground">
+                          {t('receptionist.liveQueue.waitingPatients')}
+                        </p>
                       </div>
                     </div>
                   </CardContent>
@@ -290,7 +297,9 @@ const LiveQueuePage = () => {
                         <p className="text-2xl font-bold text-green-600">
                           {queueSummary.completedToday || 0}
                         </p>
-                        <p className="text-sm text-muted-foreground">Completed Today</p>
+                        <p className="text-sm text-muted-foreground">
+                          {t('receptionist.liveQueue.completedToday')}
+                        </p>
                       </div>
                     </div>
                   </CardContent>
@@ -308,7 +317,9 @@ const LiveQueuePage = () => {
                         <p className="text-2xl font-bold text-purple-600">
                           {queueSummary.activeDoctors || 0}
                         </p>
-                        <p className="text-sm text-muted-foreground">Active Doctors</p>
+                        <p className="text-sm text-muted-foreground">
+                          {t('receptionist.liveQueue.activeDoctors')}
+                        </p>
                       </div>
                     </div>
                   </CardContent>
@@ -324,7 +335,7 @@ const LiveQueuePage = () => {
                 <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 transform text-muted-foreground" />
                 <Input
                   type="text"
-                  placeholder="Search doctors..."
+                  placeholder={t('receptionist.liveQueue.searchDoctors')}
                   value={searchTerm}
                   onChange={(e) => setSearchTerm(e.target.value)}
                   className="w-64 pl-10"
@@ -335,7 +346,7 @@ const LiveQueuePage = () => {
                 <CollapsibleTrigger asChild>
                   <Button variant="outline" size="sm" className="gap-2">
                     <Filter className="h-4 w-4" />
-                    Filters
+                    {t('receptionist.liveQueue.showFilters')}
                     <ChevronDown
                       className={`h-4 w-4 transition-transform ${showFilters ? 'rotate-180' : ''}`}
                     />
@@ -346,14 +357,16 @@ const LiveQueuePage = () => {
               {(searchTerm || statusFilter !== 'all') && (
                 <Button onClick={clearFilters} variant="outline" size="sm" className="gap-2">
                   <X className="h-4 w-4" />
-                  Clear
+                  {t('common.cancel')}
                 </Button>
               )}
             </div>
 
             <div className="flex items-center gap-2">
               <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                <span>Last updated: {lastUpdated.toLocaleTimeString()}</span>
+                <span>
+                  {t('receptionist.liveQueue.lastUpdated')}: {lastUpdated.toLocaleTimeString()}
+                </span>
               </div>
 
               <Button
@@ -363,7 +376,9 @@ const LiveQueuePage = () => {
                 className="gap-2"
               >
                 {autoRefresh ? <Square className="h-4 w-4" /> : <Play className="h-4 w-4" />}
-                {autoRefresh ? 'Stop' : 'Start'} Auto-refresh
+                {autoRefresh
+                  ? t('receptionist.liveQueue.stopAutoRefresh')
+                  : t('receptionist.liveQueue.startAutoRefresh')}
               </Button>
 
               <Button
@@ -374,7 +389,7 @@ const LiveQueuePage = () => {
                 className="gap-2"
               >
                 <RefreshCw className={`h-4 w-4 ${isRefreshing ? 'animate-spin' : ''}`} />
-                Refresh
+                {t('receptionist.liveQueue.refresh')}
               </Button>
             </div>
           </div>
@@ -386,16 +401,24 @@ const LiveQueuePage = () => {
                 <CardContent className="p-4">
                   <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
                     <div>
-                      <label className="mb-2 block text-sm font-medium">Status</label>
+                      <label className="mb-2 block text-sm font-medium">
+                        {t('receptionist.liveQueue.status')}
+                      </label>
                       <Select value={statusFilter} onValueChange={setStatusFilter}>
                         <SelectTrigger>
                           <SelectValue />
                         </SelectTrigger>
                         <SelectContent>
-                          <SelectItem value="all">All Statuses</SelectItem>
-                          <SelectItem value="available">Available</SelectItem>
-                          <SelectItem value="busy">Busy</SelectItem>
-                          <SelectItem value="has-queue">Has Queue</SelectItem>
+                          <SelectItem value="all">
+                            {t('receptionist.liveQueue.allStatuses')}
+                          </SelectItem>
+                          <SelectItem value="available">
+                            {t('receptionist.liveQueue.available')}
+                          </SelectItem>
+                          <SelectItem value="busy">{t('receptionist.liveQueue.busy')}</SelectItem>
+                          <SelectItem value="has-queue">
+                            {t('receptionist.liveQueue.hasQueue')}
+                          </SelectItem>
                         </SelectContent>
                       </Select>
                     </div>
@@ -419,7 +442,7 @@ const LiveQueuePage = () => {
                   key={doctor.id}
                   doctor={doctor}
                   onClick={(doctor) => handleViewDoctorQueue(doctor.id)}
-                  buttonText="View Queue"
+                  buttonText={t('receptionist.liveQueue.viewQueue')}
                 />
               ))}
             </AnimatePresence>
@@ -428,11 +451,11 @@ const LiveQueuePage = () => {
           {/* Empty State */}
           {filteredDoctors.length === 0 && !isLoading && (
             <EmptyState
-              title="No doctors found"
-              description="Try adjusting your search criteria or filters"
+              title={t('receptionist.liveQueue.noDoctorsFound')}
+              description={t('receptionist.liveQueue.noDoctorsDescription')}
               action={
                 <Button onClick={clearFilters} variant="outline">
-                  Clear All Filters
+                  {t('receptionist.liveQueue.clearAllFilters')}
                 </Button>
               }
               className="py-12"

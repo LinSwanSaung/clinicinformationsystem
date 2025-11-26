@@ -41,6 +41,15 @@ function toFriendlyMessage(message = '', { endpoint: _endpoint, status, data } =
   if (status === 404 || lower.includes('not found')) {
     return 'Resource not found.';
   }
+  // For validation errors, extract the actual validation messages instead of making them generic
+  if (lower.includes('validation error:')) {
+    // Extract the part after "Validation Error: " to show specific field errors
+    const validationMsg = message.replace(/validation error:\s*/i, '').trim();
+    if (validationMsg) {
+      return validationMsg;
+    }
+    return 'Some inputs are invalid. Please check and try again.';
+  }
   if (lower.includes('validation')) {
     return 'Some inputs are invalid. Please check and try again.';
   }
@@ -61,7 +70,9 @@ class ApiService {
       base = base.slice(0, -4);
     }
     const res = await fetch(`${base}/health`);
-    if (!res.ok) throw new Error(`Health check failed: ${res.status}`);
+    if (!res.ok) {
+      throw new Error(`Health check failed: ${res.status}`);
+    }
     return res.json();
   }
 

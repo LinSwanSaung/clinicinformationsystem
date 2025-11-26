@@ -13,7 +13,7 @@ const CsvFields = [
   { label: 'Patient Number', value: 'patientNumber' },
   { label: 'Dispensed By', value: (row) => row.dispensedBy?.name || '' },
   { label: 'Dispensed By Role', value: (row) => row.dispensedBy?.role || '' },
-  { label: 'Invoice ID', value: 'invoiceId' },
+  { label: 'Invoice ID', value: 'invoiceNumber' },
 ];
 
 export const DispenseQuerySchema = DispenseFiltersSchema.extend({

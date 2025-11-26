@@ -170,6 +170,47 @@ class InvoiceService {
   }
 
   /**
+   * Update invoice status
+   * Used when completing a visit without payment (marks invoice as waived)
+   * @param {string} invoiceId - Invoice ID
+   * @param {string} status - New status ('waived', 'cancelled', etc.)
+   * @param {Object} options - Additional options (notes, etc.)
+   * @returns {Promise<Object>} Updated invoice
+   */
+  async updateInvoiceStatus(invoiceId, status, options = {}) {
+    try {
+      const invoice = await InvoiceModel.getInvoiceById(invoiceId);
+      if (!invoice) {
+        throw new Error('Invoice not found');
+      }
+
+      const updateData = {
+        status,
+        updated_at: new Date().toISOString(),
+      };
+
+      // If marking as waived, set completed_at timestamp
+      if (status === 'waived') {
+        updateData.completed_at = new Date().toISOString();
+      }
+
+      // Add notes if provided
+      if (options.notes) {
+        updateData.notes = options.notes;
+      }
+
+      await InvoiceModel.updateInvoice(invoiceId, updateData);
+
+      logger.info(`[InvoiceService] Invoice ${invoiceId} status updated to '${status}'`);
+
+      return await InvoiceModel.getInvoiceById(invoiceId);
+    } catch (error) {
+      logger.error(`[InvoiceService] Error updating invoice status: ${error.message}`);
+      throw new Error(`Failed to update invoice status: ${error.message}`);
+    }
+  }
+
+  /**
    * Add service item to invoice with version checking (optimistic locking)
    * @param {string} invoiceId - Invoice ID
    * @param {Object} serviceData - Service data
@@ -325,6 +366,7 @@ class InvoiceService {
 
   /**
    * Add prescriptions from visit to invoice
+   * Only adds prescriptions that don't already exist in the invoice
    */
   async addPrescriptionsToInvoice(invoiceId, visitId, addedBy) {
     try {
@@ -335,8 +377,21 @@ class InvoiceService {
         return [];
       }
 
+      // Get existing invoice items to check for duplicates
+      const existingItems = await InvoiceItemModel.getItemsByInvoice(invoiceId);
+      const existingPrescriptionIds = new Set(
+        existingItems
+          .filter((item) => item.item_type === 'medicine' && item.item_id)
+          .map((item) => item.item_id)
+      );
+
       const items = [];
       for (const rx of prescriptions) {
+        // Skip if this prescription is already in the invoice
+        if (existingPrescriptionIds.has(rx.id)) {
+          continue;
+        }
+
         const itemData = {
           invoice_id: invoiceId,
           item_type: 'medicine',
@@ -354,7 +409,11 @@ class InvoiceService {
         items.push(item);
       }
 
-      await this.recalculateInvoiceTotal(invoiceId);
+      // Only recalculate if new items were added
+      if (items.length > 0) {
+        await this.recalculateInvoiceTotal(invoiceId);
+      }
+
       return items;
     } catch (error) {
       throw new Error(`Failed to add prescriptions to invoice: ${error.message}`);

@@ -2,6 +2,7 @@ import QueueTokenModel from '../models/QueueToken.model.js';
 import AppointmentModel from '../models/Appointment.model.js';
 import patientModel from '../models/Patient.model.js';
 import VisitService from './Visit.service.js';
+import VitalsService from './Vitals.service.js';
 import clinicSettingsService from './ClinicSettings.service.js';
 import {
   getDoctorAvailabilityForDay,
@@ -21,6 +22,7 @@ class QueueService {
     this.queueTokenModel = new QueueTokenModel();
     this.appointmentModel = new AppointmentModel();
     this.visitService = new VisitService();
+    this.vitalsService = new VitalsService();
     this.patientModel = patientModel; // Use the exported instance
   }
 
@@ -1713,14 +1715,58 @@ class QueueService {
 
   /**
    * Get comprehensive queue status for a doctor
+   * @param {string} doctorId - Doctor ID
+   * @param {string|null} date - Optional date filter (defaults to today)
+   * @param {boolean} skipCompletedVitals - If true, skip fetching vitals for completed/missed tokens (default: false)
    */
-  async getQueueStatus(doctorId, date = null) {
+  async getQueueStatus(doctorId, date = null, skipCompletedVitals = false) {
     const queueDate = date || new Date().toISOString().split('T')[0];
 
     // Get token-based queue
     const tokens = await this.queueTokenModel.getByDoctorAndDate(doctorId, queueDate);
 
-    // Enhance tokens with visit chief_complaint - always fetch if visit_id exists
+    // OPTIMIZATION: Optionally skip fetching vitals for completed/missed tokens to reduce database load
+    // On initial load (skipCompletedVitals=false), fetch all vitals including completed/missed
+    // During polling (skipCompletedVitals=true), skip completed/missed since they won't change
+    const tokensForVitals = skipCompletedVitals
+      ? tokens.filter((t) => t.status !== 'completed' && t.status !== 'missed')
+      : tokens;
+    const visitIds = tokensForVitals.filter((t) => t.visit_id).map((t) => t.visit_id);
+
+    // Batch fetch vitals for all visits at once (reduces API calls from N to 1)
+    const vitalsMap = new Map();
+    if (visitIds.length > 0) {
+      try {
+        const vitalsPromises = visitIds.map(async (visitId) => {
+          try {
+            const vitals = await this.vitalsService.getVisitVitals(visitId);
+            // Return latest vitals (first item if array, or the object itself)
+            return {
+              visitId,
+              vitals: Array.isArray(vitals) && vitals.length > 0 ? vitals[0] : vitals || null,
+            };
+          } catch (error) {
+            logger.debug(`[QUEUE] Failed to fetch vitals for visit ${visitId}:`, error.message);
+            return { visitId, vitals: null };
+          }
+        });
+
+        const vitalsResults = await Promise.all(vitalsPromises);
+        vitalsResults.forEach(({ visitId, vitals }) => {
+          if (vitals) {
+            vitalsMap.set(visitId, vitals);
+          }
+        });
+
+        logger.debug(
+          `[QUEUE] Batch fetched vitals for ${vitalsMap.size} out of ${visitIds.length} visits`
+        );
+      } catch (error) {
+        logger.warn('[QUEUE] Error batch fetching vitals:', error.message);
+      }
+    }
+
+    // Enhance tokens with visit chief_complaint and vitals
     const enhancedTokens = await Promise.all(
       tokens.map(async (token) => {
         // Always fetch visit data if visit_id exists to ensure we have chief_complaint
@@ -1741,16 +1787,36 @@ class QueueService {
               if (token.visit.chief_complaint) {
                 token.chief_complaint = token.visit.chief_complaint;
               }
+
+              // Add vitals from batch fetch
+              const vitals = vitalsMap.get(token.visit_id);
+              if (vitals) {
+                token.patient = token.patient || {};
+                token.patient.vitals = vitals;
+                token.patient.vitalsRecorded = true;
+              } else {
+                token.patient = token.patient || {};
+                token.patient.vitals = null;
+                token.patient.vitalsRecorded = false;
+              }
+
               logger.debug(
-                `[QUEUE] Enhanced token ${token.id} (token #${token.token_number}) with visit data:`,
+                `[QUEUE] Enhanced token ${token.id} (token #${token.token_number}) with visit data and vitals:`,
                 {
                   visit_id: token.visit_id,
                   chief_complaint: token.visit.chief_complaint,
-                  visit_type: token.visit.visit_type,
+                  has_vitals: !!vitals,
                 }
               );
             } else {
               logger.warn(`[QUEUE] Visit details returned no data for visit_id ${token.visit_id}`);
+              // Still try to add vitals if available
+              const vitals = vitalsMap.get(token.visit_id);
+              if (vitals) {
+                token.patient = token.patient || {};
+                token.patient.vitals = vitals;
+                token.patient.vitalsRecorded = true;
+              }
             }
           } catch (error) {
             logger.warn(
@@ -1765,6 +1831,13 @@ class QueueService {
               };
               token.chief_complaint = token.appointment.reason_for_visit;
             }
+            // Still try to add vitals if available
+            const vitals = vitalsMap.get(token.visit_id);
+            if (vitals) {
+              token.patient = token.patient || {};
+              token.patient.vitals = vitals;
+              token.patient.vitalsRecorded = true;
+            }
           }
         } else if (token.appointment?.reason_for_visit) {
           // If no visit_id but we have appointment reason, use that
@@ -1774,6 +1847,16 @@ class QueueService {
           };
           token.chief_complaint = token.appointment.reason_for_visit;
         }
+
+        // Ensure patient object exists
+        if (!token.patient) {
+          token.patient = {};
+        }
+        if (token.patient.vitals === undefined) {
+          token.patient.vitals = null;
+          token.patient.vitalsRecorded = false;
+        }
+
         return token;
       })
     );
@@ -1805,6 +1888,316 @@ class QueueService {
         isAvailable: !activeConsultation,
       },
     };
+  }
+
+  /**
+   * OPTIMIZATION: Get all doctors' queue status in a single batch call
+   * This eliminates N+1 query pattern by fetching all data in parallel
+   * @param {string|null} date - Optional date filter (defaults to today)
+   * @param {boolean} skipCompletedVitals - If true, skip fetching vitals for completed/missed tokens (default: false)
+   * @returns {Promise<Array>} Array of doctors with their queue status and availability
+   */
+  async getAllDoctorsQueueStatusBatch(date = null, skipCompletedVitals = false) {
+    const queueDate = date || new Date().toISOString().split('T')[0];
+
+    try {
+      // Step 1: Get all doctors in one query
+      const { data: doctors, error: doctorsError } = await this.queueTokenModel.supabase
+        .from('users')
+        .select('id, first_name, last_name, email, specialty, is_active')
+        .eq('role', 'doctor')
+        .eq('is_active', true);
+
+      if (doctorsError) {
+        throw new Error(`Failed to fetch doctors: ${doctorsError.message}`);
+      }
+
+      if (!doctors || doctors.length === 0) {
+        return [];
+      }
+
+      const doctorIds = doctors.map((d) => d.id);
+
+      // Step 2: Get all availability records in one query
+      const { data: allAvailability, error: availabilityError } =
+        await this.queueTokenModel.supabase
+          .from('doctor_availability')
+          .select('*')
+          .in('doctor_id', doctorIds)
+          .eq('is_active', true);
+
+      if (availabilityError) {
+        logger.warn('[QUEUE BATCH] Failed to fetch availability:', availabilityError.message);
+      }
+
+      // Step 3: Get all queue tokens for all doctors in one query (batch)
+      const { data: allTokens, error: tokensError } = await this.queueTokenModel.supabase
+        .from('queue_tokens')
+        .select(
+          `
+          *,
+          patient:patients!patient_id (
+            id,
+            patient_number,
+            first_name,
+            last_name,
+            date_of_birth,
+            gender,
+            phone
+          ),
+          appointment:appointments!appointment_id (
+            id,
+            appointment_date,
+            appointment_time,
+            reason_for_visit,
+            status
+          )
+        `
+        )
+        .in('doctor_id', doctorIds)
+        .eq('issued_date', queueDate)
+        .neq('status', 'cancelled')
+        .order('token_number', { ascending: true });
+
+      if (tokensError) {
+        logger.warn('[QUEUE BATCH] Failed to fetch tokens:', tokensError.message);
+      }
+
+      // Step 4: Collect visit IDs for batch vitals fetching
+      // OPTIMIZATION: Optionally skip fetching vitals for completed/missed tokens to reduce database load
+      // On initial load (skipCompletedVitals=false), fetch all vitals including completed/missed
+      // During polling (skipCompletedVitals=true), skip completed/missed since they won't change
+      const tokensForVitals = skipCompletedVitals
+        ? (allTokens || []).filter((t) => t.status !== 'completed' && t.status !== 'missed')
+        : allTokens || [];
+      const visitIds = tokensForVitals.filter((t) => t.visit_id).map((t) => t.visit_id);
+
+      // Batch fetch vitals for all visits
+      const vitalsMap = new Map();
+      if (visitIds.length > 0) {
+        try {
+          const vitalsPromises = visitIds.map(async (visitId) => {
+            try {
+              const vitals = await this.vitalsService.getVisitVitals(visitId);
+              return {
+                visitId,
+                vitals: Array.isArray(vitals) && vitals.length > 0 ? vitals[0] : vitals || null,
+              };
+            } catch (error) {
+              logger.debug(
+                `[QUEUE BATCH] Failed to fetch vitals for visit ${visitId}:`,
+                error.message
+              );
+              return { visitId, vitals: null };
+            }
+          });
+
+          const vitalsResults = await Promise.all(vitalsPromises);
+          vitalsResults.forEach(({ visitId, vitals }) => {
+            if (vitals) {
+              vitalsMap.set(visitId, vitals);
+            }
+          });
+        } catch (error) {
+          logger.warn('[QUEUE BATCH] Error batch fetching vitals:', error.message);
+        }
+      }
+
+      // Step 5: Group tokens by doctor and process each doctor's queue
+      const tokensByDoctor = new Map();
+      (allTokens || []).forEach((token) => {
+        if (!tokensByDoctor.has(token.doctor_id)) {
+          tokensByDoctor.set(token.doctor_id, []);
+        }
+        tokensByDoctor.get(token.doctor_id).push(token);
+      });
+
+      // Step 6: Process each doctor's queue status
+      // Use Promise.allSettled to handle individual doctor failures gracefully
+      const doctorQueuePromises = doctors.map(async (doctor) => {
+        try {
+          const doctorTokens = tokensByDoctor.get(doctor.id) || [];
+
+          // Enhance tokens with vitals (visit details are optional and can be fetched lazily)
+          // OPTIMIZATION: Skip individual visit details fetching to avoid N+1 queries
+          // Visit details are not critical for queue status display
+          const enhancedTokens = doctorTokens.map((token) => {
+            // Ensure patient object exists
+            token.patient = token.patient || {};
+
+            // Add vitals if available (already batch fetched)
+            // NOTE: Completed/missed tokens won't have vitals in vitalsMap (we skip fetching them)
+            // Frontend will preserve existing vitals for these tokens from local state
+            if (token.visit_id) {
+              const vitals = vitalsMap.get(token.visit_id);
+              if (vitals) {
+                token.patient.vitals = vitals;
+                token.patient.vitalsRecorded = true;
+              } else {
+                token.patient.vitals = null;
+                token.patient.vitalsRecorded = false;
+              }
+
+              // Use appointment reason_for_visit as chief_complaint if available
+              // Visit details can be fetched on-demand when needed (not critical for queue list)
+              if (token.appointment?.reason_for_visit) {
+                token.visit = { chief_complaint: token.appointment.reason_for_visit };
+                token.chief_complaint = token.appointment.reason_for_visit;
+              }
+            } else if (token.appointment?.reason_for_visit) {
+              token.visit = { chief_complaint: token.appointment.reason_for_visit };
+              token.chief_complaint = token.appointment.reason_for_visit;
+            }
+
+            return token;
+          });
+
+          // Calculate statistics
+          const tokenStats = {
+            total: enhancedTokens.length,
+            waiting: enhancedTokens.filter((t) => t.status === 'waiting').length,
+            called: enhancedTokens.filter((t) => t.status === 'called').length,
+            serving: enhancedTokens.filter((t) => t.status === 'serving').length,
+            completed: enhancedTokens.filter((t) => t.status === 'completed').length,
+          };
+
+          // Get active consultation and next token
+          const activeConsultation = enhancedTokens.find((t) => t.status === 'serving') || null;
+          const nextToken =
+            enhancedTokens
+              .filter((t) => ['waiting', 'called'].includes(t.status))
+              .sort((a, b) => {
+                const priorityDiff = (b.priority || 3) - (a.priority || 3);
+                return priorityDiff !== 0 ? priorityDiff : a.token_number - b.token_number;
+              })[0] || null;
+
+          // Get availability for this doctor
+          const doctorAvailability = (allAvailability || []).filter(
+            (avail) => avail.doctor_id === doctor.id
+          );
+
+          // Calculate basic availability - frontend will enhance this with proper logic
+          // For now, return a structure that matches what frontend expects
+          const hasActiveConsultation = !!activeConsultation;
+          const waitingCount = tokenStats.waiting + tokenStats.called;
+
+          // Basic status calculation (frontend will refine with availability schedule)
+          let statusStatus = 'available';
+          if (hasActiveConsultation) {
+            statusStatus = 'consulting';
+          } else if (waitingCount > 0) {
+            statusStatus = 'busy';
+          }
+
+          return {
+            ...doctor,
+            queueStatus: {
+              doctor_id: doctor.id,
+              date: queueDate,
+              tokens: enhancedTokens,
+              appointments: [],
+              statistics: {
+                tokens: tokenStats,
+                appointments: { total: 0, queued: 0, completed: 0 },
+                combined: {
+                  totalPatients: tokenStats.total,
+                  waitingPatients: waitingCount,
+                  completedToday: tokenStats.completed,
+                },
+              },
+              currentStatus: {
+                activeConsultation: activeConsultation,
+                nextInQueue: nextToken,
+                isAvailable: !hasActiveConsultation,
+              },
+            },
+            availability: doctorAvailability,
+            // Return basic status - frontend will enhance with getDoctorStatus()
+            status: {
+              status: statusStatus,
+              canAcceptPatients: !hasActiveConsultation,
+            },
+          };
+        } catch (error) {
+          logger.error(`[QUEUE BATCH] Error processing doctor ${doctor.id}:`, error);
+          // Return doctor with empty queue status instead of failing entire request
+          const doctorAvailability = (allAvailability || []).filter(
+            (avail) => avail.doctor_id === doctor.id
+          );
+          return {
+            ...doctor,
+            queueStatus: {
+              doctor_id: doctor.id,
+              date: queueDate,
+              tokens: [],
+              appointments: [],
+              statistics: {
+                tokens: { total: 0, waiting: 0, completed: 0 },
+                appointments: { total: 0, queued: 0, completed: 0 },
+                combined: { totalPatients: 0, waitingPatients: 0, completedToday: 0 },
+              },
+              currentStatus: {
+                activeConsultation: null,
+                nextInQueue: null,
+                isAvailable: true,
+              },
+            },
+            availability: doctorAvailability,
+            status: {
+              status: 'available',
+              canAcceptPatients: true,
+            },
+          };
+        }
+      });
+
+      // Use allSettled to handle individual failures gracefully
+      const results = await Promise.allSettled(doctorQueuePromises);
+      const doctorQueues = results.map((result, index) => {
+        if (result.status === 'fulfilled') {
+          return result.value;
+        } else {
+          // If a doctor's processing failed, return empty queue status
+          logger.error(
+            `[QUEUE BATCH] Doctor ${doctors[index]?.id} processing failed:`,
+            result.reason
+          );
+          const doctor = doctors[index];
+          const doctorAvailability = (allAvailability || []).filter(
+            (avail) => avail.doctor_id === doctor.id
+          );
+          return {
+            ...doctor,
+            queueStatus: {
+              doctor_id: doctor.id,
+              date: queueDate,
+              tokens: [],
+              appointments: [],
+              statistics: {
+                tokens: { total: 0, waiting: 0, completed: 0 },
+                appointments: { total: 0, queued: 0, completed: 0 },
+                combined: { totalPatients: 0, waitingPatients: 0, completedToday: 0 },
+              },
+              currentStatus: {
+                activeConsultation: null,
+                nextInQueue: null,
+                isAvailable: true,
+              },
+            },
+            availability: doctorAvailability,
+            status: {
+              status: 'available',
+              canAcceptPatients: true,
+            },
+          };
+        }
+      });
+
+      return doctorQueues;
+    } catch (error) {
+      logger.error('[QUEUE BATCH] Error in getAllDoctorsQueueStatusBatch:', error);
+      throw new Error(`Failed to fetch all doctors queue status: ${error.message}`);
+    }
   }
 
   /**

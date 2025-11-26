@@ -1,4 +1,5 @@
 import { memo } from 'react';
+import { useTranslation } from 'react-i18next';
 import { motion } from 'framer-motion';
 import { Activity, Timer, AlertCircle, Eye } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -39,6 +40,7 @@ const QueueDoctorCard = memo(
     showNextInQueue = true,
     customStats = null,
   }) => {
+    const { t } = useTranslation();
     const queueStats = customStats || {
       waitingPatients:
         doctor.queueStatus?.tokens?.filter((token) => token.status === 'waiting').length || 0,
@@ -110,17 +112,19 @@ const QueueDoctorCard = memo(
                 <p className="text-2xl font-bold text-orange-600">
                   {queueStats.waitingPatients || 0}
                 </p>
-                <p className="text-xs text-muted-foreground">Waiting</p>
+                <p className="text-xs text-muted-foreground">
+                  {t('receptionist.liveQueue.waiting')}
+                </p>
               </div>
               <div>
                 <p className="text-2xl font-bold text-blue-600">{queueStats.readyPatients || 0}</p>
-                <p className="text-xs text-muted-foreground">Ready</p>
+                <p className="text-xs text-muted-foreground">{t('receptionist.liveQueue.ready')}</p>
               </div>
               <div>
                 <p className="text-2xl font-bold text-green-600">
                   {queueStats.completedToday || 0}
                 </p>
-                <p className="text-xs text-muted-foreground">Done</p>
+                <p className="text-xs text-muted-foreground">{t('receptionist.liveQueue.done')}</p>
               </div>
             </div>
 
@@ -133,7 +137,9 @@ const QueueDoctorCard = memo(
                   <Activity
                     className={`h-4 w-4 ${currentConsultation.priority >= 4 ? 'text-red-600' : 'text-blue-600'}`}
                   />
-                  <span className="text-sm font-medium">Currently Consulting:</span>
+                  <span className="text-sm font-medium">
+                    {t('receptionist.liveQueue.currentlyConsulting')}:
+                  </span>
                   {currentConsultation.priority >= 4 && <span className="text-lg">⭐</span>}
                 </div>
                 <p className="mt-1 text-sm">
@@ -152,7 +158,9 @@ const QueueDoctorCard = memo(
                   <Timer
                     className={`h-4 w-4 ${nextInQueue.priority >= 4 ? 'text-red-600' : 'text-yellow-600'}`}
                   />
-                  <span className="text-sm font-medium">Next in Queue:</span>
+                  <span className="text-sm font-medium">
+                    {t('receptionist.liveQueue.nextInQueue')}:
+                  </span>
                   {nextInQueue.priority >= 4 && <span className="text-lg">⭐</span>}
                 </div>
                 <p className="mt-1 text-sm">
@@ -168,7 +176,7 @@ const QueueDoctorCard = memo(
                 <div className="flex items-center gap-2">
                   <AlertCircle className="h-4 w-4 text-red-600" />
                   <span className="text-sm font-medium text-red-600">
-                    Queue Full - No more appointments today
+                    {t('receptionist.liveQueue.queueFull')}
                   </span>
                 </div>
               </div>

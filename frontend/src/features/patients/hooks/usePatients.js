@@ -1,27 +1,9 @@
 import { useQuery } from '@tanstack/react-query';
-import { z } from 'zod';
 import patientService from '../services/patientService';
-
-// Minimal response schema to keep behavior unchanged while asserting structure
-const Patient = z
-  .object({
-    id: z.any(),
-    first_name: z.string().optional(),
-    last_name: z.string().optional(),
-    patient_number: z.string().optional(),
-    phone: z.string().optional(),
-    email: z.string().optional(),
-  })
-  .passthrough();
-
-const ResponseSchema = z.object({
-  success: z.boolean().optional(),
-  data: z.array(Patient).optional(),
-});
 
 /**
  * usePatients - fetches patients list via API service
- * No behavioral change: returns the same shape the page expects (data array)
+ * Returns the data array that the page expects
  */
 export function usePatients(options = {}) {
   const queryKey = ['patients', options];
@@ -30,20 +12,26 @@ export function usePatients(options = {}) {
     queryKey,
     queryFn: async () => {
       const res = await patientService.getAllPatients();
-      const parsed = ResponseSchema.safeParse(res);
-      if (!parsed.success) {
-        // If API returns raw array, normalize to { data }
-        if (Array.isArray(res)) {
-          return { data: res };
-        }
+
+      // Handle different response formats
+      // API returns { success: true, data: [...] }
+      if (res && res.data && Array.isArray(res.data)) {
+        return res.data;
       }
-      return parsed.success ? parsed.data : { data: [] };
+
+      // If API returns raw array
+      if (Array.isArray(res)) {
+        return res;
+      }
+
+      // Fallback
+      return [];
     },
     staleTime: 30_000,
   });
 
   return {
-    data: query.data?.data || [],
+    data: query.data || [],
     isLoading: query.isLoading,
     error: query.error,
     refetch: query.refetch,

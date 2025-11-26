@@ -1,7 +1,8 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useFeedback } from '@/contexts/FeedbackContext';
 import clinicSettingsService from '@/services/clinicSettingsService';
+import { POLLING_INTERVALS } from '@/constants/polling';
 import {
   Calendar,
   Search,
@@ -10,6 +11,7 @@ import {
   XCircle,
   AlertCircle,
   UserPlus,
+  RefreshCw,
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Button } from '@/components/ui/button';
@@ -40,7 +42,7 @@ import logger from '@/utils/logger';
 
 const ReceptionistDashboard = () => {
   const { t } = useTranslation();
-  const { showError } = useFeedback();
+  const { showError, showSuccess } = useFeedback();
   const [isLoading, setIsLoading] = useState(true);
   const [todayAppointments, setTodayAppointments] = useState([]);
   const [filteredAppointments, setFilteredAppointments] = useState([]);
@@ -49,6 +51,10 @@ const ReceptionistDashboard = () => {
   const debouncedSearch = useDebounce(searchTerm, 300);
   const [isWalkInModalOpen, setIsWalkInModalOpen] = useState(false);
   const [processingAppointments, setProcessingAppointments] = useState(new Set()); // Track appointments being processed
+  const [isRefreshing, setIsRefreshing] = useState(false);
+  const [lastRefresh, setLastRefresh] = useState(new Date());
+  // Track previous appointments to prevent unnecessary re-processing
+  const prevAppointmentsRef = useRef(null);
   const [stats, setStats] = useState({
     todayAppointments: 0,
     availableDoctorCount: 0,
@@ -93,83 +99,151 @@ const ReceptionistDashboard = () => {
   };
 
   // Load doctors and patients; appointments are provided by React Query hook
+  // Auto-refresh appointments every 30 seconds to keep stats updated
   const {
     data: allAppointments,
     isLoading: _isAppointmentsLoading,
     refetch: refetchAppointments,
-  } = useAppointments();
+  } = useAppointments({ refetchInterval: POLLING_INTERVALS.QUEUE }); // 30 seconds
   const { mutateAsync: mutateAppointmentStatus } = useUpdateAppointmentStatus();
 
-  const loadDashboardData = async () => {
+  // Load doctors and patients - refresh periodically for doctor availability
+  const loadDoctorsAndPatients = async () => {
     try {
-      setIsLoading(true);
-
-      // Get required data (exclude appointments; provided by hook)
       const [doctorsResponse, patientsResponse] = await Promise.all([
         userService.getUsersByRole('doctor'),
         patientService.getAllPatients(),
       ]);
 
-      // Compute 'today appointments' from hook data
-      const today = new Date();
-      today.setHours(0, 0, 0, 0);
-      const rawAppointments = Array.isArray(allAppointments) ? allAppointments : [];
-      const todayAppts = rawAppointments
-        .filter((app) => {
-          const appDate = new Date(app.appointment_date);
-          appDate.setHours(0, 0, 0, 0);
-          return appDate.getTime() === today.getTime() && app.status !== 'cancelled';
-        })
-        .map((app) => ({
-          ...app,
-          patient_name: app.patient
-            ? `${app.patient.first_name} ${app.patient.last_name}`
-            : 'Unknown Patient',
-          doctor_name: app.doctor
-            ? `Dr. ${app.doctor.first_name} ${app.doctor.last_name}`
-            : 'Unknown Doctor',
-          patient_id: app.patient?.id || app.patient_id,
-          doctor_id: app.doctor?.id || app.doctor_id,
-        }));
-
-      logger.debug("[ReceptionistDashboard] Today's appointments:", todayAppts);
-
-      setTodayAppointments(todayAppts);
-      setFilteredAppointments(todayAppts);
-
-      // Calculate stats
-      const statusCounts = todayAppts.reduce((acc, app) => {
-        acc[app.status] = (acc[app.status] || 0) + 1;
-        return acc;
-      }, {});
-
-      // Count appointments that are overdue (more than 15 mins past time and still scheduled/pending)
-      const overdueCount = todayAppts.filter((app) => isAppointmentOverdue(app)).length;
-
-      setStats({
-        todayAppointments: todayAppts.length,
+      setStats((prev) => ({
+        ...prev,
         availableDoctorCount: doctorsResponse.success ? doctorsResponse.data.length : 0,
         totalPatients: patientsResponse.success ? patientsResponse.data.length : 0,
-        arrived: (statusCounts.waiting || 0) + (statusCounts.ready_for_doctor || 0),
-        delayed: statusCounts.late || 0,
-        noShow: statusCounts.no_show || 0,
-        scheduled: statusCounts.scheduled || 0,
-        overdue: overdueCount,
-      });
-
-      setIsLoading(false);
+      }));
     } catch (error) {
-      logger.error('Error loading dashboard data:', error);
-      setIsLoading(false);
+      logger.error('Error loading doctors/patients data:', error);
     }
   };
 
-  // Call loadDashboardData when allAppointments changes (from React Query)
+  // Load doctors and patients on mount
   useEffect(() => {
-    if (allAppointments) {
-      loadDashboardData();
+    const loadInitialData = async () => {
+      try {
+        setIsLoading(true);
+        await loadDoctorsAndPatients();
+      } finally {
+        setIsLoading(false);
+      }
+    };
+    loadInitialData();
+  }, []); // Only run once on mount
+
+  // Refresh doctor availability periodically (every 60 seconds)
+  // Note: Patient status comes from appointments, so we don't need to refresh patient list
+  useEffect(() => {
+    const interval = setInterval(() => {
+      loadDoctorsAndPatients(); // Refresh doctor availability
+    }, POLLING_INTERVALS.DASHBOARD); // 60 seconds
+
+    return () => clearInterval(interval);
+  }, []);
+
+  // Process appointments when they change (no API calls, just data processing)
+  useEffect(() => {
+    if (!allAppointments) {
+      return;
     }
-  }, [allAppointments]);
+
+    // Check if appointments actually changed by comparing IDs
+    const rawAppointments = Array.isArray(allAppointments) ? allAppointments : [];
+    const currentIds = JSON.stringify(rawAppointments.map((app) => app.id).sort());
+    const prevIds = prevAppointmentsRef.current
+      ? JSON.stringify(prevAppointmentsRef.current.map((app) => app.id).sort())
+      : null;
+
+    // Skip processing if appointments haven't actually changed
+    if (prevIds === currentIds && prevAppointmentsRef.current) {
+      // Check if any appointment status changed (quick check)
+      const hasStatusChange = rawAppointments.some((app, idx) => {
+        const prevApp = prevAppointmentsRef.current[idx];
+        return !prevApp || prevApp.status !== app.status;
+      });
+
+      if (!hasStatusChange) {
+        return; // No changes, skip processing
+      }
+    }
+
+    // Update ref with current appointments
+    prevAppointmentsRef.current = rawAppointments;
+
+    // Compute 'today appointments' from hook data
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    const todayAppts = rawAppointments
+      .filter((app) => {
+        const appDate = new Date(app.appointment_date);
+        appDate.setHours(0, 0, 0, 0);
+        return appDate.getTime() === today.getTime() && app.status !== 'cancelled';
+      })
+      .map((app) => ({
+        ...app,
+        patient_name: app.patient
+          ? `${app.patient.first_name} ${app.patient.last_name}`
+          : 'Unknown Patient',
+        doctor_name: app.doctor
+          ? `Dr. ${app.doctor.first_name} ${app.doctor.last_name}`
+          : 'Unknown Doctor',
+        patient_id: app.patient?.id || app.patient_id,
+        doctor_id: app.doctor?.id || app.doctor_id,
+      }));
+
+    // Only log when appointments actually change (not on every render)
+    if (prevIds !== currentIds) {
+      logger.debug("[ReceptionistDashboard] Today's appointments updated:", todayAppts.length);
+    }
+
+    setTodayAppointments(todayAppts);
+    setFilteredAppointments(todayAppts);
+
+    // Calculate stats
+    const statusCounts = todayAppts.reduce((acc, app) => {
+      acc[app.status] = (acc[app.status] || 0) + 1;
+      return acc;
+    }, {});
+
+    // Count appointments that are overdue (more than 15 mins past time and still scheduled/pending)
+    const overdueCount = todayAppts.filter((app) => isAppointmentOverdue(app)).length;
+
+    setStats((prev) => ({
+      ...prev,
+      todayAppointments: todayAppts.length,
+      arrived: (statusCounts.waiting || 0) + (statusCounts.ready_for_doctor || 0),
+      delayed: statusCounts.late || 0,
+      noShow: statusCounts.no_show || 0,
+      scheduled: statusCounts.scheduled || 0,
+      overdue: overdueCount,
+    }));
+
+    setLastRefresh(new Date());
+  }, [allAppointments, lateThreshold]); // Only depend on appointments and lateThreshold
+
+  // Manual refresh function - refreshes appointments AND doctor availability
+  const handleRefresh = async () => {
+    try {
+      setIsRefreshing(true);
+      // Refresh appointments (this also updates patient status since it comes from appointments)
+      await refetchAppointments();
+      // Refresh doctor availability
+      await loadDoctorsAndPatients();
+      setLastRefresh(new Date());
+    } catch (error) {
+      logger.error('Error refreshing dashboard data:', error);
+      showError('Failed to refresh dashboard data');
+    } finally {
+      setIsRefreshing(false);
+    }
+  };
 
   // Filter appointments based on search and status
   useEffect(() => {
@@ -268,8 +342,8 @@ const ReceptionistDashboard = () => {
 
       if (response.success) {
         logger.debug('[ReceptionistDashboard] Token created successfully:', response.data);
-        // Reload data to get updated appointment status
-        await loadDashboardData();
+        // Refetch appointments to get updated status (don't reload doctors/patients)
+        await refetchAppointments();
       } else {
         throw new Error(response.message || 'Failed to create queue token');
       }
@@ -307,7 +381,6 @@ const ReceptionistDashboard = () => {
       if (response.success) {
         logger.debug('[ReceptionistDashboard] Appointment marked as late (no token created yet)');
         await refetchAppointments();
-        await loadDashboardData();
       } else {
         throw new Error(response.message || 'Failed to mark as late');
       }
@@ -342,7 +415,6 @@ const ReceptionistDashboard = () => {
       if (response.success) {
         logger.debug('[ReceptionistDashboard] Appointment marked as no-show');
         await refetchAppointments();
-        await loadDashboardData();
       } else {
         throw new Error(response.message || 'Failed to mark as no-show');
       }
@@ -419,6 +491,11 @@ const ReceptionistDashboard = () => {
           todayAppointments: prev.todayAppointments + 1,
           arrived: prev.arrived + 1, // Walk-ins are marked as ready/arrived
         }));
+
+        // Show success message
+        const patientName = `${walkInData.patient.first_name} ${walkInData.patient.last_name}`;
+        const tokenNum = issuedToken?.token_number || tokenResult.token_number;
+        showSuccess(`Walk-in registered: ${patientName}${tokenNum ? ` (Token #${tokenNum})` : ''}`);
       } else {
         throw new Error(response.message || 'Failed to create walk-in appointment');
       }
@@ -548,19 +625,36 @@ const ReceptionistDashboard = () => {
 
             <div className="flex w-full flex-col items-start gap-3 sm:flex-row sm:items-center lg:w-auto">
               <div className="flex items-center gap-2">
+                <Button
+                  onClick={handleRefresh}
+                  variant="outline"
+                  size="sm"
+                  disabled={isRefreshing}
+                  className="gap-2"
+                >
+                  <RefreshCw className={`h-4 w-4 ${isRefreshing ? 'animate-spin' : ''}`} />
+                  {t('receptionist.dashboard.refresh')}
+                </Button>
+                <div className="text-xs text-muted-foreground">
+                  {t('receptionist.dashboard.lastUpdated')}: {lastRefresh.toLocaleTimeString()}
+                </div>
+              </div>
+              <div className="flex items-center gap-2">
                 <Filter className="h-4 w-4 flex-shrink-0 text-muted-foreground" />
                 <Select value={statusFilter} onValueChange={setStatusFilter}>
                   <SelectTrigger className="w-full sm:w-[140px]">
-                    <SelectValue placeholder="Filter status" />
+                    <SelectValue placeholder={t('receptionist.dashboard.filterStatus')} />
                   </SelectTrigger>
                   <SelectContent>
                     <SelectItem value="needs-action">
                       {t('receptionist.dashboard.needsAction')}
                     </SelectItem>
-                    <SelectItem value="all">All Status</SelectItem>
-                    <SelectItem value="ready">Ready/Checked In</SelectItem>
-                    <SelectItem value="late">Late</SelectItem>
-                    <SelectItem value="no-show">No Show</SelectItem>
+                    <SelectItem value="all">{t('receptionist.dashboard.allStatus')}</SelectItem>
+                    <SelectItem value="ready">
+                      {t('receptionist.dashboard.readyCheckedIn')}
+                    </SelectItem>
+                    <SelectItem value="late">{t('receptionist.dashboard.late')}</SelectItem>
+                    <SelectItem value="no-show">{t('receptionist.dashboard.noShow')}</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
@@ -572,7 +666,7 @@ const ReceptionistDashboard = () => {
                   onClick={() => setStatusFilter('needs-action')}
                   className="w-full text-xs sm:w-auto"
                 >
-                  ← Back to Actions
+                  ← {t('receptionist.dashboard.backToActions')}
                 </Button>
               )}
             </div>
@@ -591,28 +685,32 @@ const ReceptionistDashboard = () => {
                   <Calendar className="mx-auto mb-4 h-12 w-12 opacity-50" />
                   {statusFilter === 'needs-action' ? (
                     <>
-                      <p className="text-lg">No appointments need action</p>
-                      <p className="text-sm">All appointments are up to date</p>
+                      <p className="text-lg">
+                        {t('receptionist.dashboard.noAppointmentsNeedAction')}
+                      </p>
+                      <p className="text-sm">
+                        {t('receptionist.dashboard.allAppointmentsUpToDate')}
+                      </p>
                     </>
                   ) : statusFilter === 'late' ? (
                     <>
-                      <p className="text-lg">No late appointments</p>
-                      <p className="text-sm">Great! All appointments are on time</p>
+                      <p className="text-lg">{t('receptionist.dashboard.noLateAppointments')}</p>
+                      <p className="text-sm">{t('receptionist.dashboard.allOnTime')}</p>
                     </>
                   ) : statusFilter === 'no-show' ? (
                     <>
-                      <p className="text-lg">No no-show appointments</p>
-                      <p className="text-sm">Excellent attendance today</p>
+                      <p className="text-lg">{t('receptionist.dashboard.noNoShowAppointments')}</p>
+                      <p className="text-sm">{t('receptionist.dashboard.excellentAttendance')}</p>
                     </>
                   ) : statusFilter === 'ready' ? (
                     <>
-                      <p className="text-lg">No ready appointments</p>
-                      <p className="text-sm">No patients are currently checked in</p>
+                      <p className="text-lg">{t('receptionist.dashboard.noReadyAppointments')}</p>
+                      <p className="text-sm">{t('receptionist.dashboard.noPatientsCheckedIn')}</p>
                     </>
                   ) : (
                     <>
-                      <p className="text-lg">No appointments found</p>
-                      <p className="text-sm">Try adjusting your search or filter criteria</p>
+                      <p className="text-lg">{t('receptionist.dashboard.noAppointmentsFound')}</p>
+                      <p className="text-sm">{t('receptionist.dashboard.tryAdjustingSearch')}</p>
                     </>
                   )}
                 </motion.div>

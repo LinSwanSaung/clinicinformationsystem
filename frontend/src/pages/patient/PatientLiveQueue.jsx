@@ -210,19 +210,24 @@ const PatientLiveQueue = () => {
     );
   };
 
-  const getStatusLabel = (status, queueToken = null, allTokens = null) => {
+  const getStatusLabel = (status, queueToken = null, allTokens = null, isCurrentUser = false) => {
     // For 'called' status, check if this token is actually next in line
     if (status === 'called' && queueToken && allTokens) {
       const isNext = isTokenNextInLine(queueToken, allTokens);
-      return isNext ? t('patient.liveQueue.readyProceed') : t('patient.liveQueue.waitingInQueue');
+      // Only show "Ready - Please Proceed" if it's the current user's token AND they're next
+      if (isNext && isCurrentUser) {
+        return t('patient.liveQueue.readyProceed');
+      }
+      // For other patients or if not next, show "Called" or "Waiting"
+      return isNext ? t('patient.liveQueue.called') : t('patient.liveQueue.waitingInQueue');
     }
 
     switch (status) {
       case 'waiting':
         return t('patient.liveQueue.waitingInQueue');
       case 'called':
-        // Fallback: show ready if we can't determine
-        return t('patient.liveQueue.readyProceed');
+        // Fallback: show "Called" for non-current users, "Ready" only for current user
+        return isCurrentUser ? t('patient.liveQueue.readyProceed') : t('patient.liveQueue.called');
       case 'serving':
         return t('patient.liveQueue.inConsultation');
       case 'completed':
@@ -437,7 +442,7 @@ const PatientLiveQueue = () => {
                     {t('patient.liveQueue.yourQueueStatus')}
                   </CardTitle>
                   <Badge className={`${getStatusColor(token.status)} px-4 py-1 text-sm text-white`}>
-                    {getStatusLabel(token.status, token, doctorQueue?.tokens)}
+                    {getStatusLabel(token.status, token, doctorQueue?.tokens, true)}
                   </Badge>
                 </div>
               </CardHeader>
@@ -635,7 +640,8 @@ const PatientLiveQueue = () => {
                                   {getStatusLabel(
                                     queueToken.status,
                                     queueToken,
-                                    doctorQueue.tokens
+                                    doctorQueue.tokens,
+                                    isYourToken
                                   )}
                                 </Badge>
                                 {isYourToken && (

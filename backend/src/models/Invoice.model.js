@@ -94,6 +94,7 @@ class InvoiceModel extends BaseModel {
 
   /**
    * Get all pending invoices (for cashier dashboard)
+   * Only returns invoices where the doctor has completed consultation (visit_end_time is set)
    */
   async getPendingInvoices() {
     const { data, error } = await this.supabase
@@ -102,11 +103,12 @@ class InvoiceModel extends BaseModel {
         `
         *,
         patient:patients(id, first_name, last_name, phone, email),
-        visit:visits(id, visit_type, chief_complaint),
+        visit:visits!inner(id, visit_type, chief_complaint, visit_end_time),
         invoice_items(*)
       `
       )
       .in('status', ['pending', 'draft'])
+      .not('visit.visit_end_time', 'is', null)
       .order('created_at', { ascending: false });
 
     if (error) {

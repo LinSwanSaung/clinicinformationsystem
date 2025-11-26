@@ -356,7 +356,7 @@ class AnalyticsService {
       // Format reporting month as YYYY-MM
       const reportingMonth = `${year}-${String(month).padStart(2, '0')}`;
 
-      // Build CSV row
+      // Build CSV row (only include columns with actual data)
       const csvData = {
         Clinic_ID: clinicId,
         Clinic_Name: clinicName,
@@ -367,9 +367,6 @@ class AnalyticsService {
         Under5_Patients: under5Patients,
         Diagnoses_Recorded: diagnosesCount || 0,
         Drugs_Dispensed: drugsDispensedCount || 0,
-        Referrals_Made: 0, // Not available
-        Stockouts: 0, // Not available
-        Deaths_Recorded: 0, // Not available
       };
 
       return {

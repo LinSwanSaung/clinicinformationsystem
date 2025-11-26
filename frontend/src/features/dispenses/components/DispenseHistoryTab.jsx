@@ -52,9 +52,14 @@ export default function DispenseHistoryTab() {
       render: (_, row) => row.dispensedBy?.name || '-',
     },
     {
+      key: 'unitPrice',
+      label: 'Unit Price',
+      render: (v) => (v !== null && v !== undefined ? Number(v).toFixed(2) : '0.00'),
+    },
+    {
       key: 'totalPrice',
       label: 'Amount',
-      render: (v) => (v != null ? Number(v).toFixed(2) : '0.00'),
+      render: (v) => (v !== null && v !== undefined ? Number(v).toFixed(2) : '0.00'),
     },
   ];
 

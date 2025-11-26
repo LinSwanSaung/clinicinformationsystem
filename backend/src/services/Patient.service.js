@@ -61,7 +61,7 @@ class PatientService {
   /**
    * Update patient
    */
-  async updatePatient(patientId, updateData, updatedBy) {
+  async updatePatient(patientId, updateData, _updatedBy) {
     // Check if patient exists
     const existingPatient = await PatientModel.findById(patientId);
 
@@ -78,11 +78,8 @@ class PatientService {
       }
     }
 
-    // Update patient
-    const updatedPatient = await PatientModel.updateById(patientId, {
-      ...updateData,
-      updated_by: updatedBy,
-    });
+    // Update patient (patients table doesn't have updated_by column)
+    const updatedPatient = await PatientModel.updateById(patientId, updateData);
 
     return updatedPatient;
   }

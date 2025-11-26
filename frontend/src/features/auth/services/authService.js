@@ -109,10 +109,10 @@ class AuthService {
     }
   }
 
-  // Verify token
+  // Verify token by checking /auth/me endpoint
   async verifyToken() {
     try {
-      const response = await apiService.get('/auth/verify');
+      const response = await apiService.get('/auth/me');
       return response.success;
     } catch (error) {
       logger.error('Token verification failed:', error);

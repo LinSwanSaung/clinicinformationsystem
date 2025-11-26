@@ -11,12 +11,41 @@ export const AuthProvider = ({ children }) => {
   const navigate = useNavigate();
 
   useEffect(() => {
-    // Check for authentication on mount
-    const currentUser = authService.getCurrentUser();
-    if (currentUser && authService.isAuthenticated()) {
-      setUser(currentUser);
-    }
-    setLoading(false);
+    // Check for authentication on mount and validate token with server
+    const validateSession = async () => {
+      try {
+        const currentUser = authService.getCurrentUser();
+
+        if (currentUser && authService.isAuthenticated()) {
+          try {
+            // Validate token with server to ensure it's still valid
+            const isValid = await authService.verifyToken();
+
+            if (isValid) {
+              setUser(currentUser);
+              logger.debug('Session restored successfully');
+            } else {
+              // Token is invalid/expired - clear storage and redirect to login
+              logger.warn('Stored token is invalid or expired, clearing session');
+              await authService.logout();
+              setUser(null);
+            }
+          } catch (error) {
+            // Server unreachable or error - keep user logged in with cached data
+            // This allows offline usage and prevents logout on network issues
+            logger.warn('Token validation failed, using cached session:', error.message);
+            setUser(currentUser);
+          }
+        }
+      } catch (error) {
+        logger.error('Session validation error:', error);
+        setUser(null);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    validateSession();
   }, []);
 
   const login = async (email, password) => {

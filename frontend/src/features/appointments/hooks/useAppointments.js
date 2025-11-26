@@ -9,6 +9,8 @@ const ResponseSchema = z.object({
 });
 
 export function useAppointments(params = {}) {
+  const { refetchInterval } = params || {};
+
   const query = useQuery({
     queryKey: ['appointments', params],
     queryFn: async () => {
@@ -40,7 +42,10 @@ export function useAppointments(params = {}) {
       }
       return parsed.data;
     },
-    staleTime: 30_000,
+    staleTime: 30_000, // 30 seconds - data is fresh for 30 seconds
+    refetchInterval: refetchInterval !== undefined ? refetchInterval : false, // No auto-refresh by default
+    refetchIntervalInBackground: false, // Don't poll in background tabs
+    refetchOnWindowFocus: false, // Don't refetch on window focus to reduce API calls
   });
 
   return {

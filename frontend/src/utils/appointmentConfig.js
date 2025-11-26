@@ -10,7 +10,11 @@ export const STATUS_CONFIGS = {
       // Ready/Check In - for scheduled or late appointments
       if (['scheduled', 'late'].includes(appointment.status)) {
         actions.push({
-          label: appointment.status === 'late' ? 'Check In (Late)' : 'Ready/Check In',
+          label:
+            appointment.status === 'late'
+              ? 'receptionist.appointment.checkInLate'
+              : 'receptionist.appointment.checkIn',
+          labelKey: true, // Indicates this is a translation key
           value: 'mark-ready',
           icon: CheckCircle,
           className: 'text-green-600 focus:text-green-600',
@@ -20,7 +24,8 @@ export const STATUS_CONFIGS = {
       // Mark as Late - only for scheduled appointments (not already marked late)
       if (appointment.status === 'scheduled') {
         actions.push({
-          label: 'Mark as Late',
+          label: 'receptionist.appointment.markLate',
+          labelKey: true,
           value: 'mark-late',
           icon: AlertTriangle,
           className: 'text-yellow-600 focus:text-yellow-600',
@@ -34,7 +39,8 @@ export const STATUS_CONFIGS = {
         )
       ) {
         actions.push({
-          label: 'Mark as No Show',
+          label: 'receptionist.appointment.markNoShow',
+          labelKey: true,
           value: 'mark-no-show',
           icon: XCircle,
           className: 'text-red-600 focus:text-red-600',

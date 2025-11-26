@@ -1,4 +1,5 @@
 import { motion } from 'framer-motion';
+import { useTranslation } from 'react-i18next';
 import { Clock, User, Stethoscope, AlertCircle, MoreHorizontal, ChevronDown } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -21,6 +22,7 @@ const AppointmentCard = ({
   showActions = true,
   className = '',
 }) => {
+  const { t } = useTranslation();
   const StatusIcon = getStatusIcon(appointment.status);
   const isOverdue = isAppointmentOverdue ? isAppointmentOverdue(appointment) : false;
 
@@ -63,7 +65,7 @@ const AppointmentCard = ({
                   >
                     <Badge className="border-orange-200 bg-orange-100 text-xs text-orange-800 dark:border-orange-800 dark:bg-orange-900/30 dark:text-orange-200">
                       <AlertCircle className="mr-1 h-3 w-3" />
-                      Overdue
+                      {t('receptionist.appointment.overdue')}
                     </Badge>
                   </motion.div>
                 )}
@@ -80,12 +82,15 @@ const AppointmentCard = ({
                   </span>
                 </div>
                 <span className="truncate rounded-md border border-purple-200 bg-purple-50 px-2 py-1 text-xs font-medium text-purple-700 dark:border-purple-800 dark:bg-purple-900/30 dark:text-purple-200">
-                  {appointment.appointment_type || appointment.visit_type || 'Consultation'}
+                  {appointment.appointment_type ||
+                    appointment.visit_type ||
+                    t('receptionist.dashboard.consultation')}
                 </span>
               </div>
               {appointment.reason_for_visit && (
                 <div className="mt-2 text-xs text-muted-foreground">
-                  <span className="font-medium">Reason:</span> {appointment.reason_for_visit}
+                  <span className="font-medium">{t('receptionist.appointment.reason')}:</span>{' '}
+                  {appointment.reason_for_visit}
                 </div>
               )}
             </div>
@@ -107,7 +112,7 @@ const AppointmentCard = ({
                   className="flex h-7 items-center gap-1 px-2 text-xs"
                 >
                   <MoreHorizontal className="h-3 w-3" />
-                  <span className="hidden sm:inline">Actions</span>
+                  <span className="hidden sm:inline">{t('receptionist.dashboard.actions')}</span>
                   <ChevronDown className="h-3 w-3" />
                 </Button>
               </DropdownMenuTrigger>
@@ -119,7 +124,7 @@ const AppointmentCard = ({
                     className={`text-xs ${action.className}`}
                   >
                     <action.icon className="mr-2 h-3 w-3" />
-                    {action.label}
+                    {action.labelKey ? t(action.label) : action.label}
                   </DropdownMenuItem>
                 ))}
               </DropdownMenuContent>
@@ -128,8 +133,10 @@ const AppointmentCard = ({
 
           {(appointment.status === 'waiting' || appointment.status === 'ready_for_doctor') && (
             <Badge className="border-green-200 bg-green-50 text-xs text-green-700 dark:border-green-800 dark:bg-green-900/30 dark:text-green-200">
-              <span className="hidden sm:inline">✓ Ready/Checked In</span>
-              <span className="sm:hidden">✓ Ready</span>
+              <span className="hidden sm:inline">
+                ✓ {t('receptionist.appointment.readyCheckedIn')}
+              </span>
+              <span className="sm:hidden">✓ {t('receptionist.walkIn.available')}</span>
             </Badge>
           )}
         </div>

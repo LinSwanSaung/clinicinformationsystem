@@ -152,18 +152,18 @@ const QueueDoctorCard = memo(
 
             {showNextInQueue && nextInQueue && !currentConsultation && (
               <div
-                className={`rounded-lg p-3 ${nextInQueue.priority >= 4 ? 'border-2 border-red-300 bg-red-50' : 'bg-yellow-50'}`}
+                className={`rounded-lg p-3 ${nextInQueue.priority >= 4 ? 'border-2 border-red-300 bg-red-50 dark:border-red-700 dark:bg-red-900/30' : 'bg-yellow-50 dark:bg-yellow-900/30'}`}
               >
                 <div className="flex items-center gap-2">
                   <Timer
-                    className={`h-4 w-4 ${nextInQueue.priority >= 4 ? 'text-red-600' : 'text-yellow-600'}`}
+                    className={`h-4 w-4 ${nextInQueue.priority >= 4 ? 'text-red-600 dark:text-red-400' : 'text-yellow-600 dark:text-yellow-400'}`}
                   />
-                  <span className="text-sm font-medium">
+                  <span className="text-sm font-medium text-gray-900 dark:text-gray-100">
                     {t('receptionist.liveQueue.nextInQueue')}:
                   </span>
                   {nextInQueue.priority >= 4 && <span className="text-lg">⭐</span>}
                 </div>
-                <p className="mt-1 text-sm">
+                <p className="mt-1 text-sm text-gray-700 dark:text-gray-300">
                   {nextInQueue.patient?.first_name} {nextInQueue.patient?.last_name}(
                   {nextInQueue.priority >= 4 && '⭐ '}Token #{nextInQueue.token_number})
                 </p>
@@ -172,10 +172,10 @@ const QueueDoctorCard = memo(
 
             {/* Queue Full Notice */}
             {!status.canAcceptPatients && status.status === 'full' && (
-              <div className="rounded-lg bg-red-50 p-3">
+              <div className="rounded-lg bg-red-50 p-3 dark:bg-red-900/30">
                 <div className="flex items-center gap-2">
-                  <AlertCircle className="h-4 w-4 text-red-600" />
-                  <span className="text-sm font-medium text-red-600">
+                  <AlertCircle className="h-4 w-4 text-red-600 dark:text-red-400" />
+                  <span className="text-sm font-medium text-red-600 dark:text-red-400">
                     {t('receptionist.liveQueue.queueFull')}
                   </span>
                 </div>

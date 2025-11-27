@@ -178,36 +178,55 @@ const ElectronicMedicalRecords = () => {
                 const diagnosisMatch = content.match(/Diagnosis:\s*(.+?)(?:\n\n|$)/);
                 const notesMatch = content.match(/Clinical Notes:\s*(.+)/s);
                 let prescriptions = [];
-                if (note.visit_id) {
+                if (note.id) {
                   try {
-                    const visitPrescriptions = await prescriptionService.getPrescriptionsByVisit(
-                      note.visit_id
+                    // First try to get prescriptions directly linked to this note
+                    const notePrescriptions = await prescriptionService.getPrescriptionsByNoteId(
+                      note.id
                     );
-                    const noteTime = new Date(note.created_at).getTime();
-                    const timeWindow = 5 * 60 * 1000;
-                    prescriptions = Array.isArray(visitPrescriptions)
-                      ? visitPrescriptions
-                          .filter((p) => {
-                            if (p.doctor_id !== note.doctor_id) {
-                              return false;
-                            }
-                            const prescriptionTime = new Date(
-                              p.created_at || p.prescribed_date
-                            ).getTime();
-                            return Math.abs(noteTime - prescriptionTime) <= timeWindow;
-                          })
-                          .map((p) => ({
-                            name: p.medication_name,
-                            dosage: p.dosage,
-                            frequency: p.frequency,
-                            duration: p.duration,
-                            quantity: p.quantity,
-                            refills: p.refills,
-                            instructions: p.instructions,
-                          }))
-                      : [];
+
+                    if (Array.isArray(notePrescriptions) && notePrescriptions.length > 0) {
+                      // Use directly linked prescriptions
+                      prescriptions = notePrescriptions.map((p) => ({
+                        name: p.medication_name,
+                        dosage: p.dosage,
+                        frequency: p.frequency,
+                        duration: p.duration,
+                        quantity: p.quantity,
+                        refills: p.refills,
+                        instructions: p.instructions,
+                      }));
+                    } else if (note.visit_id) {
+                      // Fallback: Legacy prescriptions without doctor_note_id - use time-based matching
+                      const visitPrescriptions = await prescriptionService.getPrescriptionsByVisit(
+                        note.visit_id
+                      );
+                      const noteTime = new Date(note.created_at).getTime();
+                      const timeWindow = 5 * 60 * 1000;
+                      prescriptions = Array.isArray(visitPrescriptions)
+                        ? visitPrescriptions
+                            .filter((p) => {
+                              if (p.doctor_id !== note.doctor_id) {
+                                return false;
+                              }
+                              const prescriptionTime = new Date(
+                                p.created_at || p.prescribed_date
+                              ).getTime();
+                              return Math.abs(noteTime - prescriptionTime) <= timeWindow;
+                            })
+                            .map((p) => ({
+                              name: p.medication_name,
+                              dosage: p.dosage,
+                              frequency: p.frequency,
+                              duration: p.duration,
+                              quantity: p.quantity,
+                              refills: p.refills,
+                              instructions: p.instructions,
+                            }))
+                        : [];
+                    }
                   } catch (error) {
-                    logger.error('Error fetching prescriptions for visit:', note.visit_id, error);
+                    logger.error('Error fetching prescriptions for note:', note.id, error);
                   }
                 }
                 return {
@@ -472,7 +491,9 @@ const ElectronicMedicalRecords = () => {
                         diagnosisHistory: (diagnoses || [])
                           .map((d) => ({
                             condition: d?.diagnosis_name || 'Unknown',
-                            date: d?.diagnosed_date || 'Unknown',
+                            date: d?.diagnosed_date
+                              ? new Date(d.diagnosed_date).toLocaleDateString()
+                              : 'Unknown',
                           }))
                           .filter((item) => item.condition !== 'Unknown'),
                         currentMedications: (prescriptions || [])
@@ -483,6 +504,7 @@ const ElectronicMedicalRecords = () => {
                             frequency: p.frequency,
                           })),
                       }}
+                      fullDiagnoses={diagnoses || []}
                       showActionButtons={false}
                     />
                   </div>

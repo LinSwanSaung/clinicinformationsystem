@@ -60,6 +60,7 @@ const AppointmentsPage = () => {
   const [doctorAvailability, setDoctorAvailability] = useState([]);
   const [availableWeekdays, setAvailableWeekdays] = useState([]);
   const [isLoadingAvailability, setIsLoadingAvailability] = useState(false);
+  const [rescheduleFromAppointment, setRescheduleFromAppointment] = useState(null); // Track appointment being rescheduled
 
   // Smart time slots state
   const [availableTimeSlots, setAvailableTimeSlots] = useState([]);
@@ -589,13 +590,22 @@ const AppointmentsPage = () => {
       const result = await createAppointmentMutation.mutateAsync(appointmentData);
 
       if (result.success) {
+        // If this was a reschedule, cancel the old appointment now
+        if (rescheduleFromAppointment) {
+          logger.debug(
+            '[AppointmentsPage] Cancelling original appointment after successful reschedule'
+          );
+          await handleCancelAppointment(rescheduleFromAppointment.id, false);
+          setRescheduleFromAppointment(null);
+        }
+
         // Show toast notification
         const patient = patients.find((p) => p.id === newAppointment.patientId);
         const doctor = availableDoctors.find((d) => d.id === newAppointment.doctorId);
         const patientName = patient ? `${patient.first_name} ${patient.last_name}` : 'Patient';
         const doctorName = doctor ? `Dr. ${doctor.first_name} ${doctor.last_name}` : 'Doctor';
         showSuccess(
-          `Appointment scheduled for ${patientName} with ${doctorName} on ${localDateString} at ${newAppointment.time}`
+          `Appointment ${rescheduleFromAppointment ? 'rescheduled' : 'scheduled'} for ${patientName} with ${doctorName} on ${localDateString} at ${newAppointment.time}`
         );
 
         setShowAlert(true);
@@ -714,16 +724,15 @@ const AppointmentsPage = () => {
         doctor.first_name
       );
 
-      // First cancel the existing appointment (silently, without showing success alert)
-      logger.debug('[AppointmentsPage] Cancelling original appointment before rescheduling');
-      await handleCancelAppointment(appointment.id, false);
+      // Store the appointment being rescheduled - will be cancelled only when new appointment is confirmed
+      setRescheduleFromAppointment(appointment);
 
-      // Then set up the form for new appointment
+      // Set up the form for new appointment (don't cancel old one yet)
       setNewAppointment({
         patientId: appointment.patient_id,
         doctorId: appointment.doctor_id,
         date: new Date(appointment.appointment_date),
-        time: appointment.appointment_time,
+        time: '', // Clear time so user must select a new slot
         type: appointment.appointment_type || 'Regular Checkup',
         reason_for_visit: appointment.reason_for_visit || '',
         notes: appointment.notes || '',
@@ -777,7 +786,9 @@ const AppointmentsPage = () => {
             <CardHeader className="pb-3 sm:pb-4">
               <CardTitle className="mb-2 flex items-center gap-2 text-lg sm:text-xl">
                 <CalendarIcon className="h-5 w-5 text-primary sm:h-6 sm:w-6" />
-                {t('receptionist.appointments.scheduleNewAppointment')}
+                {rescheduleFromAppointment
+                  ? t('receptionist.appointments.rescheduleAppointment')
+                  : t('receptionist.appointments.scheduleNewAppointment')}
               </CardTitle>
               <CardDescription className="text-sm sm:text-base">
                 {t('receptionist.appointments.chooseDoctorToSeeDates')}
@@ -1374,6 +1385,7 @@ const AppointmentsPage = () => {
                       setAvailableTimeSlots([]);
                       setTimeSlotError('');
                       setIsLoadingTimeSlots(false);
+                      setRescheduleFromAppointment(null); // Clear reschedule state if user cancels
                       setNewAppointment({
                         patientId: '',
                         doctorId: '',

@@ -85,6 +85,25 @@ class VisitService {
   }
 
   /**
+   * Clear cache for a specific patient
+   */
+  clearPatientCache(patientId) {
+    // Clear all cache entries for this patient
+    for (const key of this.cache.keys()) {
+      if (key.includes(`visit_history_${patientId}`)) {
+        this.cache.delete(key);
+      }
+    }
+  }
+
+  /**
+   * Clear all cache entries
+   */
+  clearAllCache() {
+    this.cache.clear();
+  }
+
+  /**
    * Get single visit details
    */
   async getVisitDetails(visitId) {
@@ -166,10 +185,18 @@ class VisitService {
         offset: offset.toString(),
       });
 
-      if (status) params.append('status', status);
-      if (doctor_id) params.append('doctor_id', doctor_id);
-      if (start_date) params.append('start_date', start_date);
-      if (end_date) params.append('end_date', end_date);
+      if (status) {
+        params.append('status', status);
+      }
+      if (doctor_id) {
+        params.append('doctor_id', doctor_id);
+      }
+      if (start_date) {
+        params.append('start_date', start_date);
+      }
+      if (end_date) {
+        params.append('end_date', end_date);
+      }
 
       const response = await api.get(`/visits?${params}`);
       return response.data.data || [];
@@ -187,9 +214,15 @@ class VisitService {
       const { doctor_id, start_date, end_date } = options;
 
       const params = new URLSearchParams();
-      if (doctor_id) params.append('doctor_id', doctor_id);
-      if (start_date) params.append('start_date', start_date);
-      if (end_date) params.append('end_date', end_date);
+      if (doctor_id) {
+        params.append('doctor_id', doctor_id);
+      }
+      if (start_date) {
+        params.append('start_date', start_date);
+      }
+      if (end_date) {
+        params.append('end_date', end_date);
+      }
 
       const response = await api.get(`/visits/statistics?${params}`);
       // API returns { success, data: {...} }
@@ -236,7 +269,9 @@ class VisitService {
    * Format date for display
    */
   formatDate(dateString) {
-    if (!dateString) return 'N/A';
+    if (!dateString) {
+      return 'N/A';
+    }
     return new Date(dateString).toLocaleDateString('en-US', {
       year: 'numeric',
       month: 'short',
@@ -250,7 +285,9 @@ class VisitService {
    * Format currency for display
    */
   formatCurrency(amount) {
-    if (!amount) return 'N/A';
+    if (!amount) {
+      return 'N/A';
+    }
     return new Intl.NumberFormat('en-US', {
       style: 'currency',
       currency: 'USD',
@@ -289,26 +326,6 @@ class VisitService {
       default:
         return 'bg-muted text-muted-foreground border-border';
     }
-  }
-
-  /**
-   * Clear cache for specific patient
-   */
-  clearPatientCache(patientId) {
-    const keysToDelete = [];
-    for (const key of this.cache.keys()) {
-      if (key.includes(`visit_history_${patientId}`)) {
-        keysToDelete.push(key);
-      }
-    }
-    keysToDelete.forEach((key) => this.cache.delete(key));
-  }
-
-  /**
-   * Clear all cached data
-   */
-  clearAllCache() {
-    this.cache.clear();
   }
 }
 

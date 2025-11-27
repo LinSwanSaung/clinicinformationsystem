@@ -162,9 +162,15 @@ class QueueService {
       logger.error('🚨 QueueService startConsultation error:', error);
       logger.error('🚨 Error response:', error.response);
       logger.error('🚨 Error data:', error.response?.data);
-      throw new Error(
+
+      // Preserve error details for proper handling in UI
+      const enhancedError = new Error(
         error.response?.data?.message || error.message || 'Failed to start consultation'
       );
+      enhancedError.code = error.response?.data?.code;
+      enhancedError.details = error.response?.data?.details;
+      enhancedError.response = error.response;
+      throw enhancedError;
     }
   }
 

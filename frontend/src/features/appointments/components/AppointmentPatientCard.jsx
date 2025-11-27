@@ -291,10 +291,10 @@ const AppointmentPatientCard = ({
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
               <XCircle className="h-5 w-5 text-red-600" />
-              {t('receptionist.appointment.cancelAppointment')}
+              {t('receptionist.appointments.cancelAppointment')}
             </DialogTitle>
             <DialogDescription>
-              {t('receptionist.appointment.cancelConfirmation', {
+              {t('receptionist.appointments.cancelConfirmation', {
                 name: `${patient.first_name} ${patient.last_name}`,
               })}
             </DialogDescription>
@@ -323,10 +323,10 @@ const AppointmentPatientCard = ({
                 onClick={() => setShowCancelDialog(false)}
                 className="flex-1"
               >
-                {t('receptionist.appointment.keepAppointment')}
+                {t('receptionist.appointments.keepAppointment')}
               </Button>
               <Button variant="destructive" onClick={handleCancel} className="flex-1">
-                {t('receptionist.appointment.cancelAppointment')}
+                {t('receptionist.appointments.cancelAppointment')}
               </Button>
             </div>
           </div>

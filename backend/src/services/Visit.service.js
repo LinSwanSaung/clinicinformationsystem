@@ -158,10 +158,13 @@ class VisitService {
       }
 
       // Validate visit status before completion
-      const visit = await this.getVisitDetails(visitId);
-      if (!visit) {
+      const visitResult = await this.getVisitDetails(visitId);
+      if (!visitResult || !visitResult.data) {
         throw new Error('Visit not found');
       }
+
+      // Extract the actual visit data from the result wrapper
+      const visit = visitResult.data;
 
       if (visit.status === 'completed') {
         throw new Error('Visit is already completed');

@@ -162,6 +162,24 @@ export async function getCashierIds() {
 }
 
 /**
+ * Get all nurse user IDs
+ * @returns {Promise<string[]>}
+ */
+export async function getNurseIds() {
+  const { data, error } = await supabase
+    .from('users')
+    .select('id')
+    .eq('role', 'nurse')
+    .eq('is_active', true);
+
+  if (error) {
+    throw error;
+  }
+
+  return (data || []).map((n) => n.id);
+}
+
+/**
  * Get all admin user IDs
  * @returns {Promise<string[]>}
  */

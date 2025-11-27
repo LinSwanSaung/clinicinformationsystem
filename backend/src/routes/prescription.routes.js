@@ -75,6 +75,22 @@ router.get(
 );
 
 /**
+ * @route   GET /api/prescriptions/note/:noteId
+ * @desc    Get all prescriptions for a doctor note
+ * @access  Doctor, Nurse, Receptionist
+ */
+router.get(
+  '/note/:noteId',
+  authenticate,
+  authorize('doctor', 'nurse', 'receptionist'),
+  asyncHandler(async (req, res) => {
+    const { noteId } = req.params;
+    const result = await PrescriptionService.getPrescriptionsByDoctorNoteId(noteId);
+    res.json(result);
+  })
+);
+
+/**
  * @route   PATCH /api/prescriptions/:prescriptionId/status
  * @desc    Update prescription status
  * @access  Doctor only

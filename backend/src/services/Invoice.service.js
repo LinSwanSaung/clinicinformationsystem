@@ -860,11 +860,14 @@ class InvoiceService {
                 `[InvoiceService] Visit ${invoice.visit_id} is already completed (expected for idempotent call)`
               );
             } else {
+              // CRITICAL: Log this prominently - visit completion failed for a paid invoice
+              // This creates data integrity issues (paid invoice but active visit)
               logger.error(
-                `[InvoiceService] Failed to complete visit ${invoice.visit_id} for already-paid invoice ${invoiceId}:`,
-                visitError
+                `[InvoiceService] CRITICAL: Failed to complete visit ${invoice.visit_id} for already-paid invoice ${invoiceId}. ` +
+                  `Error: ${visitError.message}. This requires manual intervention via admin panel.`
               );
-              // Don't throw - invoice is already paid, but log prominently for debugging
+              // Still don't throw - invoice is already paid, payment should not be reversed
+              // But the admin should be notified about this data integrity issue
             }
           }
         }

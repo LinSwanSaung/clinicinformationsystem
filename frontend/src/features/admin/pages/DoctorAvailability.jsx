@@ -19,6 +19,7 @@ import logger from '@/utils/logger';
 import {
   validateTimeFormat,
   convert12HrTo24Hr,
+  convert24HrTo12Hr,
   compareTimes12Hr,
   formatTimeRange,
 } from '@/utils/timeUtils';
@@ -33,6 +34,7 @@ const DoctorAvailability = () => {
   const [error, setError] = useState('');
   const [showScheduleDialog, setShowScheduleDialog] = useState(false);
   const [selectedDoctor, setSelectedDoctor] = useState(null);
+  const [selectedSlot, setSelectedSlot] = useState(null); // For editing existing slot
   const [expandedDayByDoctor, setExpandedDayByDoctor] = useState({});
 
   const loadDoctorsAndAvailability = async () => {
@@ -90,6 +92,13 @@ const DoctorAvailability = () => {
 
   const handleAddSchedule = (doctor) => {
     setSelectedDoctor(doctor);
+    setSelectedSlot(null); // Clear any previously selected slot
+    setShowScheduleDialog(true);
+  };
+
+  const handleEditSlot = (doctor, slot) => {
+    setSelectedDoctor(doctor);
+    setSelectedSlot(slot);
     setShowScheduleDialog(true);
   };
 
@@ -285,7 +294,9 @@ const DoctorAvailability = () => {
                                 {sortedSelectedSlots.map((slot, index) => (
                                   <span
                                     key={slot.id || `${slot.start_time}-${slot.end_time}-${index}`}
-                                    className="rounded-full border border-emerald-700 bg-emerald-600 px-3 py-1 text-sm text-white shadow-sm dark:border-emerald-600 dark:bg-emerald-700 dark:text-emerald-100"
+                                    onClick={() => handleEditSlot(doctor, slot)}
+                                    className="cursor-pointer rounded-full border border-emerald-700 bg-emerald-600 px-3 py-1 text-sm text-white shadow-sm transition-all hover:bg-emerald-700 hover:shadow-md dark:border-emerald-600 dark:bg-emerald-700 dark:text-emerald-100 dark:hover:bg-emerald-800"
+                                    title="Click to edit this time slot"
                                   >
                                     {formatTimeRange(slot.start_time, slot.end_time)}
                                   </span>
@@ -341,13 +352,16 @@ const DoctorAvailability = () => {
           onClose={() => {
             setShowScheduleDialog(false);
             setSelectedDoctor(null);
+            setSelectedSlot(null);
           }}
           doctor={selectedDoctor}
+          editingSlot={selectedSlot}
           onScheduleAdded={() => {
             // Refresh availability data
             loadDoctorsAndAvailability();
             setShowScheduleDialog(false);
             setSelectedDoctor(null);
+            setSelectedSlot(null);
           }}
         />
       </div>
@@ -356,7 +370,7 @@ const DoctorAvailability = () => {
 };
 
 // Schedule Dialog Component
-const ScheduleDialog = ({ isOpen, onClose, doctor, onScheduleAdded }) => {
+const ScheduleDialog = ({ isOpen, onClose, doctor, editingSlot, onScheduleAdded }) => {
   const [formData, setFormData] = useState({
     day_of_week: '',
     start_time: '',
@@ -365,9 +379,69 @@ const ScheduleDialog = ({ isOpen, onClose, doctor, onScheduleAdded }) => {
     end_period: 'AM',
   });
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [isDeleting, setIsDeleting] = useState(false);
   const [formError, setFormError] = useState('');
 
   const daysOfWeek = DAYS_OF_WEEK;
+
+  // Prefill form when editing an existing slot
+  useEffect(() => {
+    if (editingSlot && isOpen) {
+      // Convert 24hr times to 12hr format for the form
+      const startTime12 = convert24HrTo12Hr(editingSlot.start_time);
+      const endTime12 = convert24HrTo12Hr(editingSlot.end_time);
+
+      // Parse "9:00 AM" format to get time and period separately
+      const parseTime12Hr = (time12) => {
+        const parts = time12.split(' ');
+        return {
+          time: parts[0],
+          period: parts[1] || 'AM',
+        };
+      };
+
+      const startParsed = parseTime12Hr(startTime12);
+      const endParsed = parseTime12Hr(endTime12);
+
+      setFormData({
+        day_of_week: editingSlot.day_of_week,
+        start_time: startParsed.time,
+        start_period: startParsed.period,
+        end_time: endParsed.time,
+        end_period: endParsed.period,
+      });
+    } else if (!editingSlot && isOpen) {
+      // Reset form for adding new slot
+      setFormData({
+        day_of_week: '',
+        start_time: '',
+        start_period: 'AM',
+        end_time: '',
+        end_period: 'AM',
+      });
+    }
+    setFormError('');
+  }, [editingSlot, isOpen]);
+
+  const handleDelete = async () => {
+    if (!editingSlot?.id) {
+      return;
+    }
+
+    setIsDeleting(true);
+    setFormError('');
+
+    try {
+      await doctorAvailabilityService.deleteAvailability(editingSlot.id);
+      logger.debug('✓ Availability deleted successfully');
+      onScheduleAdded();
+    } catch (error) {
+      logger.error('Error deleting availability:', error);
+      setFormError('Failed to delete availability. Please try again.');
+    } finally {
+      setIsDeleting(false);
+    }
+  };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -411,11 +485,20 @@ const ScheduleDialog = ({ isOpen, onClose, doctor, onScheduleAdded }) => {
 
       // Try to save to backend
       try {
-        await doctorAvailabilityService.createAvailability(availabilityData);
-        logger.debug('Γ£à Availability saved successfully');
+        if (editingSlot?.id) {
+          // Update existing slot
+          await doctorAvailabilityService.updateAvailability(editingSlot.id, availabilityData);
+          logger.debug('✓ Availability updated successfully');
+        } else {
+          // Create new slot
+          await doctorAvailabilityService.createAvailability(availabilityData);
+          logger.debug('✓ Availability created successfully');
+        }
       } catch (backendError) {
         logger.error('Backend error:', backendError);
-        throw new Error('Failed to save availability. Please try again.');
+        throw new Error(
+          `Failed to ${editingSlot ? 'update' : 'save'} availability. Please try again.`
+        );
       }
 
       // Reset form and close dialog
@@ -441,19 +524,20 @@ const ScheduleDialog = ({ isOpen, onClose, doctor, onScheduleAdded }) => {
       <DialogContent className="max-w-lg">
         <DialogHeader>
           <DialogTitle>
-            Set Availability for Dr. {doctor?.first_name} {doctor?.last_name}
+            {editingSlot ? 'Edit' : 'Set'} Availability for Dr. {doctor?.first_name}{' '}
+            {doctor?.last_name}
           </DialogTitle>
         </DialogHeader>
 
         <form onSubmit={handleSubmit} className="space-y-4">
           {formError && (
-            <div className="rounded-md border border-red-200 bg-red-50 p-3">
-              <p className="text-sm text-red-600">{formError}</p>
+            <div className="rounded-md border border-red-200 bg-red-50 p-3 dark:border-red-800 dark:bg-red-900/50">
+              <p className="text-sm text-red-600 dark:text-red-400">{formError}</p>
             </div>
           )}
 
           <div>
-            <label className="mb-2 block text-sm font-medium text-gray-700">Day of Week</label>
+            <label className="mb-2 block text-sm font-medium text-foreground">Day of Week</label>
             <Select
               value={formData.day_of_week}
               onValueChange={(value) => setFormData({ ...formData, day_of_week: value })}
@@ -473,7 +557,7 @@ const ScheduleDialog = ({ isOpen, onClose, doctor, onScheduleAdded }) => {
 
           <div className="grid grid-cols-2 gap-4">
             <div>
-              <label className="mb-2 block text-sm font-medium text-gray-700">Start Time</label>
+              <label className="mb-2 block text-sm font-medium text-foreground">Start Time</label>
               <div className="flex gap-2">
                 <Input
                   type="text"
@@ -526,10 +610,31 @@ const ScheduleDialog = ({ isOpen, onClose, doctor, onScheduleAdded }) => {
           </div>
 
           <div className="flex gap-2 pt-4">
-            <Button type="submit" disabled={isSubmitting} className="flex-1">
-              {isSubmitting ? 'Setting...' : 'Set Availability'}
+            {editingSlot && (
+              <Button
+                type="button"
+                variant="destructive"
+                onClick={handleDelete}
+                disabled={isSubmitting || isDeleting}
+              >
+                {isDeleting ? 'Deleting...' : 'Delete'}
+              </Button>
+            )}
+            <Button type="submit" disabled={isSubmitting || isDeleting} className="flex-1">
+              {isSubmitting
+                ? editingSlot
+                  ? 'Updating...'
+                  : 'Setting...'
+                : editingSlot
+                  ? 'Update'
+                  : 'Set Availability'}
             </Button>
-            <Button type="button" variant="outline" onClick={onClose} disabled={isSubmitting}>
+            <Button
+              type="button"
+              variant="outline"
+              onClick={onClose}
+              disabled={isSubmitting || isDeleting}
+            >
               Cancel
             </Button>
           </div>

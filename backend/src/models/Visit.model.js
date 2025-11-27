@@ -182,10 +182,14 @@ class VisitModel extends BaseModel {
           diagnosis_name,
           diagnosis_code,
           diagnosis_type,
+          category,
           status,
           severity,
           diagnosed_date,
-          diagnosed_by
+          diagnosed_by,
+          notes,
+          symptoms,
+          treatment_plan
         `
         )
         .eq('visit_id', visitId);

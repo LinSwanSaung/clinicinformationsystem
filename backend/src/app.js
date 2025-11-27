@@ -4,6 +4,9 @@ import dotenv from 'dotenv';
 import helmet from 'helmet';
 import compression from 'compression';
 
+// Load environment variables FIRST - before any config imports
+dotenv.config();
+
 // Import middleware
 import { errorHandler } from './middleware/errorHandler.js';
 import { authenticate } from './middleware/auth.js';
@@ -43,9 +46,6 @@ import tokenScheduler from './services/TokenScheduler.service.js';
 import appointmentAutoCancel from './jobs/autoCancelAppointments.js';
 import { startAppointmentReminders } from './jobs/appointmentReminders.js';
 import { startPendingItemsNotifications } from './jobs/pendingItemsNotifications.js';
-
-// Load environment variables
-dotenv.config();
 
 const app = express();
 const PORT = process.env.PORT || 3001;

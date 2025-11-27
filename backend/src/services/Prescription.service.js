@@ -110,6 +110,23 @@ class PrescriptionService {
       message: 'Prescription cancelled successfully',
     };
   }
+
+  /**
+   * Get prescriptions by doctor note ID
+   */
+  async getPrescriptionsByDoctorNoteId(doctorNoteId) {
+    if (!doctorNoteId) {
+      throw new Error('Doctor note ID is required');
+    }
+
+    const prescriptions = await this.prescriptionModel.getByDoctorNoteId(doctorNoteId);
+
+    return {
+      success: true,
+      data: prescriptions,
+      total: prescriptions.length,
+    };
+  }
 }
 
 export default new PrescriptionService();

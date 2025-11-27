@@ -452,11 +452,13 @@ const DoctorDashboard = () => {
         (selectedTab === 'consulting' && token.status === 'serving') ||
         (selectedTab === 'completed' && ['completed', 'cancelled'].includes(token.status));
 
-      // Time filter
-      const matchesTime =
-        timeFilter === 'all' ||
-        (timeFilter === 'morning' && new Date(token.created_at).getHours() < 12) ||
-        (timeFilter === 'afternoon' && new Date(token.created_at).getHours() >= 12);
+      // Time filter - based on when the token was issued/created
+      let matchesTime = timeFilter === 'all';
+      if (!matchesTime && token.created_at) {
+        const hour = new Date(token.created_at).getHours();
+        matchesTime =
+          (timeFilter === 'morning' && hour < 12) || (timeFilter === 'afternoon' && hour >= 12);
+      }
 
       return matchesSearch && matchesTab && matchesTime;
     })
@@ -876,20 +878,40 @@ const DoctorDashboard = () => {
         });
         setSelectedTab('ready');
 
-        // Handle different error types
-        if (error.message && error.message.includes('currently in consultation')) {
-          const message = error.message;
+        // Extract error details from response or enhanced error
+        const errorCode = error.code || error.response?.data?.code;
+        const errorMessage = error.response?.data?.message || error.message;
+        const errorDetails = error.details || error.response?.data?.details;
+
+        // Handle queue priority/order violations with specific messages
+        if (errorCode === 'QUEUE_PRIORITY_VIOLATION') {
+          const priorityType = errorDetails?.priorityType || 'higher priority';
+          const waitingToken = errorDetails?.waitingTokenNumber || '?';
+          showNotification(
+            'warning',
+            `⚠️ ${priorityType.toUpperCase()} Patient Waiting!\n${errorMessage}`,
+            `Token #${waitingToken} Priority`
+          );
+        } else if (errorCode === 'QUEUE_ORDER_VIOLATION') {
+          const waitingToken = errorDetails?.waitingTokenNumber || '?';
+          showNotification(
+            'warning',
+            `📋 Please Follow Queue Order\n${errorMessage}`,
+            `Token #${waitingToken} First`
+          );
+        } else if (errorMessage && errorMessage.includes('currently in consultation')) {
+          // Handle different error types
           const confirmAction = window.confirm(
-            `${message}\n\n` + t('doctor.dashboard.dialogs.currentlyInConsultation')
+            `${errorMessage}\n\n` + t('doctor.dashboard.dialogs.currentlyInConsultation')
           );
           if (confirmAction) {
             // Switch to the "In Consultation" tab and refresh
             setSelectedTab('consulting');
             await refreshQueue(false);
           }
-        } else if (error.message && error.message.includes("should be 'called'")) {
+        } else if (errorMessage && errorMessage.includes("should be 'called'")) {
           const confirmAction = window.confirm(
-            t('doctor.dashboard.dialogs.patientNeedsCalling', { message: error.message })
+            t('doctor.dashboard.dialogs.patientNeedsCalling', { message: errorMessage })
           );
           if (confirmAction) {
             await handleCallNextPatient();
@@ -897,7 +919,7 @@ const DoctorDashboard = () => {
         } else {
           showNotification(
             'error',
-            t('doctor.dashboard.notifications.consultationFailed', { message: error.message })
+            t('doctor.dashboard.notifications.consultationFailed', { message: errorMessage })
           );
         }
       } finally {

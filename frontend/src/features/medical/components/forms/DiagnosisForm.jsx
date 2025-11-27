@@ -71,7 +71,7 @@ const DiagnosisForm = ({ diagnosis, onChange, disabled = false }) => {
         <label className="mb-2 block text-sm font-medium text-gray-700">Diagnosis Date</label>
         <input
           type="date"
-          value={diagnosis.diagnosis_date}
+          value={diagnosis.diagnosis_date || ''}
           onChange={(e) => handleChange('diagnosis_date', e.target.value)}
           disabled={disabled}
           className="w-full rounded-md border border-input bg-background px-3 py-2 text-foreground focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary disabled:bg-muted"
@@ -79,11 +79,26 @@ const DiagnosisForm = ({ diagnosis, onChange, disabled = false }) => {
       </div>
 
       <div>
+        <label className="mb-2 block text-sm font-medium text-gray-700">Severity</label>
+        <select
+          value={diagnosis.severity || 'mild'}
+          onChange={(e) => handleChange('severity', e.target.value)}
+          disabled={disabled}
+          className="w-full rounded-md border border-input bg-background px-3 py-2 text-foreground focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary disabled:bg-muted"
+        >
+          <option value="mild">Mild</option>
+          <option value="moderate">Moderate</option>
+          <option value="severe">Severe</option>
+          <option value="critical">Critical</option>
+        </select>
+      </div>
+
+      <div>
         <label className="mb-2 block text-sm font-medium text-gray-700">Clinical Notes</label>
         <textarea
           placeholder="Additional clinical observations, symptoms, or treatment notes..."
-          value={diagnosis.clinical_notes}
-          onChange={(e) => handleChange('clinical_notes', e.target.value)}
+          value={diagnosis.notes || ''}
+          onChange={(e) => handleChange('notes', e.target.value)}
           disabled={disabled}
           rows={3}
           className="w-full rounded-md border border-input bg-background px-3 py-2 text-foreground focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary disabled:bg-muted"

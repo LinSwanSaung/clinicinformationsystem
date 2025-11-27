@@ -689,6 +689,36 @@ const CashierDashboard = () => {
       setPaymentDueDate('');
       setShowQRCode(false);
       setQrScannedConfirmed(false);
+
+      // Auto-load prescriptions to invoice
+      if (freshInvoice.visit_id) {
+        try {
+          await invoiceService.addPrescriptionsToInvoice(freshInvoice.id, freshInvoice.visit_id);
+          // Reload invoice to get updated items
+          const updatedInvoice = await invoiceService.getInvoiceById(freshInvoice.id);
+          setSelectedInvoice(updatedInvoice);
+
+          // Extract medications from updated invoice
+          const meds = (updatedInvoice.invoice_items || [])
+            .filter((item) => item.item_type === 'medicine')
+            .map((item) => ({
+              id: item.id,
+              name: item.item_name,
+              quantity: item.quantity || 1,
+              price: parseFloat(item.unit_price || 0),
+              status: updatedInvoice.status,
+              dosage: item.notes || '',
+              instructions: item.notes || '',
+              inStock: 100,
+              dispensedQuantity: 0,
+              action: 'pending',
+            }));
+          setMedications(meds);
+        } catch (prescriptionError) {
+          logger.error('Error auto-loading prescriptions:', prescriptionError);
+          // Don't show error - prescriptions might just not exist
+        }
+      }
     } catch (error) {
       logger.error('Error loading invoice:', error);
       showError('Failed to load invoice details');
@@ -1182,64 +1212,6 @@ const CashierDashboard = () => {
 
     setShowPaymentDialog(true);
   }, [isPartialPayment, partialAmount, totals.total, selectedInvoice, medications, showError]);
-
-  const handleLoadPrescriptions = async () => {
-    if (!selectedInvoice) {
-      return;
-    }
-
-    try {
-      setIsProcessing(true);
-
-      // Get current medication count before loading
-      const previousMedCount = medications.length;
-
-      // Add prescriptions to invoice (this will add new ones, not duplicate existing)
-      const _result = await invoiceService.addPrescriptionsToInvoice(
-        selectedInvoice.id,
-        selectedInvoice.visit_id
-      );
-
-      // Reload the invoice to get updated items and latest version
-      const updatedInvoice = await invoiceService.getInvoiceById(selectedInvoice.id);
-      setSelectedInvoice(updatedInvoice);
-
-      // Extract medications from updated invoice
-      const meds = (updatedInvoice.invoice_items || [])
-        .filter((item) => item.item_type === 'medicine')
-        .map((item) => ({
-          id: item.id,
-          name: item.item_name,
-          quantity: item.quantity || 1,
-          price: parseFloat(item.unit_price || 0),
-          status: updatedInvoice.status,
-          dosage: item.notes || '',
-          instructions: item.notes || '',
-          inStock: 100, // Mock value - would come from inventory system
-          dispensedQuantity: 0,
-          action: 'pending', // pending, dispense, write-out
-        }));
-      setMedications(meds);
-
-      // Show appropriate message
-      const newCount = meds.length - previousMedCount;
-      if (newCount > 0) {
-        showSuccess(`Loaded ${newCount} new prescription(s)`);
-      } else if (meds.length > 0) {
-        showSuccess('Prescriptions are up to date');
-      } else {
-        showSuccess('No prescriptions found for this visit');
-      }
-
-      // Reload the invoice list
-      await refetchPending();
-    } catch (error) {
-      logger.error('Error loading prescriptions:', error);
-      showError('Failed to load prescriptions');
-    } finally {
-      setIsProcessing(false);
-    }
-  };
 
   // Browser refresh handling for payment processing
   useEffect(() => {
@@ -2641,29 +2613,13 @@ const CashierDashboard = () => {
                   {/* Medications */}
                   <Card>
                     <CardHeader>
-                      <div className="flex items-center justify-between">
-                        <CardTitle className="text-base">Prescribed Medications</CardTitle>
-                        <Button
-                          type="button"
-                          size="sm"
-                          variant="outline"
-                          onClick={handleLoadPrescriptions}
-                          disabled={isProcessing}
-                          className="gap-2"
-                        >
-                          <Pill className="h-4 w-4" />
-                          {medications.length > 0 ? 'Refresh Prescriptions' : 'Load Prescriptions'}
-                        </Button>
-                      </div>
+                      <CardTitle className="text-base">Prescribed Medications</CardTitle>
                     </CardHeader>
                     <CardContent>
                       {medications.length === 0 ? (
                         <div className="py-8 text-center text-muted-foreground">
                           <Pill className="mx-auto mb-2 h-12 w-12 opacity-50" />
-                          <p>No medications added yet</p>
-                          <p className="mt-1 text-sm">
-                            Click &quot;Load Prescriptions&quot; to add prescribed medications
-                          </p>
+                          <p>No medications prescribed for this visit</p>
                         </div>
                       ) : (
                         <div className="space-y-4">
@@ -2730,13 +2686,13 @@ const CashierDashboard = () => {
                                       </span>
                                       <Input
                                         type="number"
-                                        value={med.price / med.quantity}
-                                        onChange={(e) =>
-                                          handlePriceChange(
-                                            med.id,
-                                            parseFloat(e.target.value || 0) * med.quantity
-                                          )
-                                        }
+                                        value={med.price > 0 ? med.price / med.quantity : ''}
+                                        onChange={(e) => {
+                                          const inputValue = e.target.value;
+                                          const unitPrice =
+                                            inputValue === '' ? 0 : parseFloat(inputValue);
+                                          handlePriceChange(med.id, unitPrice * med.quantity);
+                                        }}
                                         className="pl-7"
                                         min="0"
                                         step="0.01"

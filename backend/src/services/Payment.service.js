@@ -134,9 +134,21 @@ class PaymentService {
 
       // Check if invoice is fully paid and complete it if needed
       const updatedInvoice = atomicResult.invoice;
-      if (parseFloat(updatedInvoice.balance_due || updatedInvoice.balance || 0) <= 0) {
-        // Invoice is fully paid - complete it
-        await InvoiceService.completeInvoice(invoiceId, receivedBy);
+      const balanceDue = parseFloat(updatedInvoice?.balance_due ?? updatedInvoice?.balance ?? 0);
+
+      if (balanceDue <= 0) {
+        // Invoice is fully paid - complete it (which also completes the visit)
+        try {
+          await InvoiceService.completeInvoice(invoiceId, receivedBy);
+        } catch (completeError) {
+          // Critical: Payment was recorded but visit completion failed
+          // Log prominently but don't fail the payment (it was already recorded atomically)
+          logger.error(
+            `[PaymentService] CRITICAL: Payment recorded but invoice/visit completion failed for invoice ${invoiceId}:`,
+            completeError.message
+          );
+          // The idempotency handling in completeInvoice should fix this on next call
+        }
       }
 
       return atomicResult.payment;

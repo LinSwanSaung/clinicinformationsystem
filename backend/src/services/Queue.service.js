@@ -404,6 +404,31 @@ class QueueService {
         // Don't fail the operation if audit logging fails
       }
 
+      // Notify nurses that a new patient has joined the queue
+      try {
+        const { default: NotificationService } = await import('./Notification.service.js');
+        const patientName = newToken.patient
+          ? `${newToken.patient.first_name} ${newToken.patient.last_name}`.trim()
+          : 'A patient';
+        const doctorName = newToken.doctor
+          ? `Dr. ${newToken.doctor.first_name} ${newToken.doctor.last_name}`.trim()
+          : 'a doctor';
+
+        await NotificationService.notifyNurses({
+          title: 'New Patient in Queue',
+          message: `${patientName} (Token #${newToken.token_number}) has joined ${doctorName}'s queue. Please prepare for vitals check.`,
+          type: 'info',
+          relatedEntityType: 'queue_token',
+          relatedEntityId: newToken.id,
+        });
+        logger.info(
+          `[QUEUE] ✅ Notified nurses about new patient ${patientName} in ${doctorName}'s queue`
+        );
+      } catch (notifyError) {
+        logger.warn('[QUEUE] Failed to notify nurses about new patient:', notifyError.message);
+        // Don't fail the operation if notification fails
+      }
+
       return {
         success: true,
         token: newToken,
@@ -1045,6 +1070,7 @@ class QueueService {
 
   /**
    * Start consultation with a patient
+   * Validates queue priority rules before allowing consultation to start
    */
   async startConsultation(tokenId) {
     try {
@@ -1064,6 +1090,59 @@ class QueueService {
         throw new Error(
           `Cannot start consultation. Token status is '${currentToken.status}' but should be 'called'`
         );
+      }
+
+      // QUEUE PRIORITY VALIDATION: Check if there's a patient who should be seen first
+      // Get the next token in queue according to priority rules (highest priority first, then lowest token number)
+      const nextInPriorityOrder = await this.queueTokenModel.getNextToken(currentToken.doctor_id);
+
+      if (nextInPriorityOrder && nextInPriorityOrder.id !== tokenId) {
+        // There's another patient who should be seen first
+        const currentPriority = currentToken.priority || 1;
+        const nextPriority = nextInPriorityOrder.priority || 1;
+        const nextPatientName = nextInPriorityOrder.patient
+          ? `${nextInPriorityOrder.patient.first_name} ${nextInPriorityOrder.patient.last_name}`.trim()
+          : 'Another patient';
+
+        // Check if it's a priority/emergency case
+        if (nextPriority > currentPriority) {
+          // Higher priority patient is waiting (emergency/urgent)
+          let priorityLabel = 'higher priority';
+          if (nextPriority >= 3) {
+            priorityLabel = 'EMERGENCY';
+          } else if (nextPriority === 2) {
+            priorityLabel = 'URGENT';
+          }
+
+          throw new ApplicationError(
+            `Cannot skip queue. ${priorityLabel} patient "${nextPatientName}" (Token #${nextInPriorityOrder.token_number}) is waiting and must be seen first.`,
+            400,
+            'QUEUE_PRIORITY_VIOLATION',
+            {
+              waitingTokenId: nextInPriorityOrder.id,
+              waitingTokenNumber: nextInPriorityOrder.token_number,
+              waitingPriority: nextPriority,
+              currentPriority: currentPriority,
+              priorityType: priorityLabel,
+            }
+          );
+        } else if (
+          nextPriority === currentPriority &&
+          nextInPriorityOrder.token_number < currentToken.token_number
+        ) {
+          // Same priority but earlier token number
+          throw new ApplicationError(
+            `Please follow queue order. Patient "${nextPatientName}" (Token #${nextInPriorityOrder.token_number}) is ahead in the queue and should be seen first.`,
+            400,
+            'QUEUE_ORDER_VIOLATION',
+            {
+              waitingTokenId: nextInPriorityOrder.id,
+              waitingTokenNumber: nextInPriorityOrder.token_number,
+              currentTokenNumber: currentToken.token_number,
+              priority: currentPriority,
+            }
+          );
+        }
       }
 
       // Use atomic function with advisory locks to prevent race conditions

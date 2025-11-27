@@ -203,6 +203,7 @@ CREATE TABLE IF NOT EXISTS prescriptions (
     visit_id UUID REFERENCES visits(id) ON DELETE CASCADE,
     patient_id UUID NOT NULL REFERENCES patients(id) ON DELETE CASCADE,
     doctor_id UUID NOT NULL REFERENCES users(id),
+    doctor_note_id UUID REFERENCES doctor_notes(id) ON DELETE SET NULL,
     medication_name VARCHAR(200) NOT NULL,
     dosage VARCHAR(100) NOT NULL,
     frequency VARCHAR(100) NOT NULL,
@@ -452,6 +453,7 @@ CREATE INDEX IF NOT EXISTS idx_vitals_recorded_at ON vitals(recorded_at);
 CREATE INDEX IF NOT EXISTS idx_prescriptions_patient_id ON prescriptions(patient_id);
 CREATE INDEX IF NOT EXISTS idx_prescriptions_doctor_id ON prescriptions(doctor_id);
 CREATE INDEX IF NOT EXISTS idx_prescriptions_status ON prescriptions(status);
+CREATE INDEX IF NOT EXISTS idx_prescriptions_doctor_note_id ON prescriptions(doctor_note_id);
 
 -- Doctor Availability indexes
 CREATE INDEX IF NOT EXISTS idx_doctor_availability_doctor_id ON doctor_availability(doctor_id);

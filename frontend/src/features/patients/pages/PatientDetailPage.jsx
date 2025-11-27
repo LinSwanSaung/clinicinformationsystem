@@ -7,6 +7,7 @@ import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import {
   ArrowLeft,
   UserCircle,
@@ -21,6 +22,10 @@ import {
   ClipboardList,
   AlertCircle,
   Edit,
+  Info,
+  Stethoscope,
+  FileText,
+  CalendarDays,
 } from 'lucide-react';
 import { patientService } from '@/features/patients';
 import { allergyService, diagnosisService } from '@/features/medical';
@@ -41,6 +46,8 @@ const PatientDetailPage = () => {
   const [error, setError] = useState('');
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
+  const [selectedDiagnosis, setSelectedDiagnosis] = useState(null);
+  const [isDiagnosisModalOpen, setIsDiagnosisModalOpen] = useState(false);
   const [editFormData, setEditFormData] = useState({
     first_name: '',
     last_name: '',
@@ -167,6 +174,12 @@ const PatientDetailPage = () => {
     } finally {
       setIsSaving(false);
     }
+  };
+
+  // Handle opening diagnosis detail modal
+  const handleDiagnosisClick = (diagnosis) => {
+    setSelectedDiagnosis(diagnosis);
+    setIsDiagnosisModalOpen(true);
   };
 
   useEffect(() => {
@@ -472,17 +485,25 @@ const PatientDetailPage = () => {
                         {diagnoses.map((diagnosis, index) => (
                           <div
                             key={diagnosis.id || index}
-                            className="border-b border-blue-200 pb-3 last:border-0 last:pb-0"
+                            className="cursor-pointer rounded-md border-b border-blue-200 pb-3 transition-colors last:border-0 last:pb-0 hover:bg-blue-100 dark:hover:bg-blue-900/50"
+                            onClick={() => handleDiagnosisClick(diagnosis)}
+                            role="button"
+                            tabIndex={0}
+                            onKeyDown={(e) => {
+                              if (e.key === 'Enter' || e.key === ' ') {
+                                handleDiagnosisClick(diagnosis);
+                              }
+                            }}
                           >
-                            <div className="mb-1 flex items-start justify-between">
+                            <div className="mb-1 flex items-start justify-between p-2">
                               <div className="flex-1">
                                 <div className="mb-1 flex items-center gap-2">
-                                  <span className="font-medium text-gray-900">
+                                  <span className="font-medium text-gray-900 dark:text-gray-100">
                                     {diagnosis.diagnosis_name}
                                   </span>
-                                  {diagnosis.diagnosis_code && (
+                                  {(diagnosis.diagnosis_code || diagnosis.icd_10_code) && (
                                     <Badge variant="outline" className="text-xs">
-                                      {diagnosis.diagnosis_code}
+                                      {diagnosis.icd_10_code || diagnosis.diagnosis_code}
                                     </Badge>
                                   )}
                                   {diagnosis.status && (
@@ -501,8 +522,9 @@ const PatientDetailPage = () => {
                                       {diagnosis.status}
                                     </Badge>
                                   )}
+                                  <Info className="ml-auto h-4 w-4 text-blue-500" />
                                 </div>
-                                <div className="flex flex-wrap gap-3 text-sm text-gray-600">
+                                <div className="flex flex-wrap gap-3 text-sm text-gray-600 dark:text-gray-400">
                                   {diagnosis.diagnosed_date && (
                                     <span>
                                       {t('receptionist.patients.diagnosedOn')}:{' '}
@@ -515,12 +537,6 @@ const PatientDetailPage = () => {
                                     </span>
                                   )}
                                 </div>
-                                {diagnosis.notes && (
-                                  <p className="mt-2 text-sm text-gray-600">
-                                    <strong>{t('receptionist.appointments.notes')}:</strong>{' '}
-                                    {diagnosis.notes}
-                                  </p>
-                                )}
                               </div>
                             </div>
                           </div>
@@ -861,6 +877,195 @@ const PatientDetailPage = () => {
             </p>
           </div>
         </FormModal>
+
+        {/* Diagnosis Detail Modal */}
+        <Dialog open={isDiagnosisModalOpen} onOpenChange={setIsDiagnosisModalOpen}>
+          <DialogContent className="max-w-lg">
+            <DialogHeader>
+              <DialogTitle className="flex items-center gap-2">
+                <Stethoscope className="h-5 w-5 text-blue-500" />
+                {t('receptionist.patients.diagnosisDetails', 'Diagnosis Details')}
+              </DialogTitle>
+            </DialogHeader>
+            {selectedDiagnosis && (
+              <div className="space-y-4">
+                {/* Diagnosis Name & Code */}
+                <div className="rounded-lg bg-blue-50 p-4 dark:bg-blue-950/30">
+                  <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100">
+                    {selectedDiagnosis.diagnosis_name}
+                  </h3>
+                  <div className="mt-2 flex flex-wrap gap-2">
+                    {(selectedDiagnosis.icd_10_code || selectedDiagnosis.diagnosis_code) && (
+                      <Badge className="bg-blue-600">
+                        ICD-10: {selectedDiagnosis.icd_10_code || selectedDiagnosis.diagnosis_code}
+                      </Badge>
+                    )}
+                    {selectedDiagnosis.status && (
+                      <Badge
+                        variant="outline"
+                        className={
+                          selectedDiagnosis.status === 'active'
+                            ? 'border-green-600 text-green-600'
+                            : selectedDiagnosis.status === 'resolved'
+                              ? 'border-blue-600 text-blue-600'
+                              : selectedDiagnosis.status === 'chronic'
+                                ? 'border-purple-600 text-purple-600'
+                                : 'border-gray-600 text-gray-600'
+                        }
+                      >
+                        {selectedDiagnosis.status}
+                      </Badge>
+                    )}
+                    {selectedDiagnosis.severity && (
+                      <Badge
+                        variant="outline"
+                        className={
+                          selectedDiagnosis.severity === 'critical'
+                            ? 'border-red-600 text-red-600'
+                            : selectedDiagnosis.severity === 'severe'
+                              ? 'border-orange-600 text-orange-600'
+                              : selectedDiagnosis.severity === 'moderate'
+                                ? 'border-yellow-600 text-yellow-600'
+                                : 'border-green-600 text-green-600'
+                        }
+                      >
+                        {selectedDiagnosis.severity}
+                      </Badge>
+                    )}
+                  </div>
+                </div>
+
+                {/* Classification */}
+                <div className="grid grid-cols-2 gap-4">
+                  {selectedDiagnosis.diagnosis_type && (
+                    <div>
+                      <Label className="text-muted-foreground">
+                        {t('receptionist.patients.diagnosisType', 'Diagnosis Type')}
+                      </Label>
+                      <p className="mt-1 font-medium capitalize">
+                        {selectedDiagnosis.diagnosis_type}
+                      </p>
+                    </div>
+                  )}
+                  {selectedDiagnosis.category && (
+                    <div>
+                      <Label className="text-muted-foreground">
+                        {t('receptionist.patients.category', 'Category')}
+                      </Label>
+                      <p className="mt-1 font-medium capitalize">{selectedDiagnosis.category}</p>
+                    </div>
+                  )}
+                </div>
+
+                {/* Dates */}
+                <div className="rounded-lg border p-3">
+                  <div className="mb-2 flex items-center gap-2">
+                    <CalendarDays className="h-4 w-4 text-muted-foreground" />
+                    <span className="font-medium">
+                      {t('receptionist.patients.dates', 'Important Dates')}
+                    </span>
+                  </div>
+                  <div className="grid grid-cols-2 gap-3 text-sm">
+                    {selectedDiagnosis.diagnosed_date && (
+                      <div>
+                        <span className="text-muted-foreground">
+                          {t('receptionist.patients.diagnosedOn')}:
+                        </span>
+                        <p className="font-medium">
+                          {new Date(selectedDiagnosis.diagnosed_date).toLocaleDateString()}
+                        </p>
+                      </div>
+                    )}
+                    {selectedDiagnosis.onset_date && (
+                      <div>
+                        <span className="text-muted-foreground">
+                          {t('receptionist.patients.onsetDate', 'Onset Date')}:
+                        </span>
+                        <p className="font-medium">
+                          {new Date(selectedDiagnosis.onset_date).toLocaleDateString()}
+                        </p>
+                      </div>
+                    )}
+                    {selectedDiagnosis.resolved_date && (
+                      <div>
+                        <span className="text-muted-foreground">
+                          {t('receptionist.patients.resolvedDate', 'Resolved Date')}:
+                        </span>
+                        <p className="font-medium">
+                          {new Date(selectedDiagnosis.resolved_date).toLocaleDateString()}
+                        </p>
+                      </div>
+                    )}
+                  </div>
+                </div>
+
+                {/* Clinical Notes */}
+                {(selectedDiagnosis.notes ||
+                  selectedDiagnosis.symptoms ||
+                  selectedDiagnosis.treatment_plan) && (
+                  <div className="space-y-3">
+                    {selectedDiagnosis.symptoms && (
+                      <div>
+                        <div className="mb-1 flex items-center gap-2">
+                          <AlertCircle className="h-4 w-4 text-orange-500" />
+                          <Label>{t('receptionist.patients.symptoms', 'Symptoms')}</Label>
+                        </div>
+                        <p className="rounded bg-muted p-2 text-sm">{selectedDiagnosis.symptoms}</p>
+                      </div>
+                    )}
+                    {selectedDiagnosis.notes && (
+                      <div>
+                        <div className="mb-1 flex items-center gap-2">
+                          <FileText className="h-4 w-4 text-blue-500" />
+                          <Label>{t('receptionist.appointments.notes', 'Notes')}</Label>
+                        </div>
+                        <p className="rounded bg-muted p-2 text-sm">{selectedDiagnosis.notes}</p>
+                      </div>
+                    )}
+                    {selectedDiagnosis.treatment_plan && (
+                      <div>
+                        <div className="mb-1 flex items-center gap-2">
+                          <ClipboardList className="h-4 w-4 text-green-500" />
+                          <Label>
+                            {t('receptionist.patients.treatmentPlan', 'Treatment Plan')}
+                          </Label>
+                        </div>
+                        <p className="rounded bg-muted p-2 text-sm">
+                          {selectedDiagnosis.treatment_plan}
+                        </p>
+                      </div>
+                    )}
+                  </div>
+                )}
+
+                {/* Follow-up */}
+                {selectedDiagnosis.follow_up_required && (
+                  <div className="rounded-lg border border-yellow-300 bg-yellow-50 p-3 dark:border-yellow-700 dark:bg-yellow-950/30">
+                    <div className="flex items-center gap-2">
+                      <Calendar className="h-4 w-4 text-yellow-600" />
+                      <span className="font-medium text-yellow-800 dark:text-yellow-200">
+                        {t('receptionist.patients.followUpRequired', 'Follow-up Required')}
+                      </span>
+                    </div>
+                    {selectedDiagnosis.follow_up_date && (
+                      <p className="mt-1 text-sm text-yellow-700 dark:text-yellow-300">
+                        {t('receptionist.patients.scheduledFor', 'Scheduled for')}:{' '}
+                        {new Date(selectedDiagnosis.follow_up_date).toLocaleDateString()}
+                      </p>
+                    )}
+                  </div>
+                )}
+
+                {/* Close Button */}
+                <div className="flex justify-end pt-2">
+                  <Button variant="outline" onClick={() => setIsDiagnosisModalOpen(false)}>
+                    {t('common.close', 'Close')}
+                  </Button>
+                </div>
+              </div>
+            )}
+          </DialogContent>
+        </Dialog>
       </PageLayout>
     </div>
   );

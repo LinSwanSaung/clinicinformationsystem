@@ -7,7 +7,6 @@ import { Button } from '@/components/ui/button';
 import {
   LogOut,
   UserCircle,
-  Settings,
   ChevronDown,
   Heart,
   UserPlus,
@@ -20,7 +19,6 @@ import {
   Stethoscope,
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { employeeService } from '@/features/admin';
 import NotificationBell from './NotificationBell';
 import ThemeToggle from './ThemeToggle';
 import LanguageSwitcher from './LanguageSwitcher';
@@ -54,30 +52,17 @@ const Navbar = () => {
         return;
       }
 
-      // Only fetch employee details for roles that have permission (admin, receptionist, nurse)
-      // Cashiers, pharmacists, doctors, and patients should use user data from auth context
-      const allowedRoles = [ROLES.ADMIN, ROLES.RECEPTIONIST, ROLES.NURSE];
+      // Use user data from auth context directly
+      // The user object from login includes first_name and last_name
+      const firstName = user.first_name || '';
+      const lastName = user.last_name || '';
+      const fullName = `${firstName} ${lastName}`.trim();
 
-      if (allowedRoles.includes(user.role)) {
-        try {
-          const employees = await employeeService.getEmployeesByRole(user.role);
-          const userDetail = employees.find((emp) => emp.email.includes(user?.role.toLowerCase()));
-          setUserDetails(userDetail);
-        } catch (error) {
-          logger.error('Error loading user details:', error);
-          // Fallback: use user from auth context
-          setUserDetails({
-            name:
-              `${user.first_name || ''} ${user.last_name || ''}`.trim() || user.email || user.role,
-          });
-        }
-      } else {
-        // For other roles, use user data from auth context directly
-        setUserDetails({
-          name:
-            `${user.first_name || ''} ${user.last_name || ''}`.trim() || user.email || user.role,
-        });
-      }
+      setUserDetails({
+        name: fullName || user.email || user.role,
+        firstName: firstName,
+        lastName: lastName,
+      });
     };
 
     loadUserDetails();
@@ -450,11 +435,6 @@ const Navbar = () => {
               </Button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end" className="w-[200px]">
-              <DropdownMenuItem className="py-3 text-base">
-                <Settings className="mr-2 h-5 w-5" />
-                {t('nav.settings')}
-              </DropdownMenuItem>
-              <DropdownMenuSeparator />
               <DropdownMenuItem
                 className="py-3 text-base text-red-500 focus:text-red-500"
                 onClick={handleLogout}

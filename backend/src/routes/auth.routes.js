@@ -153,7 +153,7 @@ router.post(
   authenticate,
   asyncHandler(async (req, res) => {
     // In a stateless JWT system, logout is handled client-side
-    // But we can add token blacklisting logic here if needed
+    // Token blacklisting can be added here if needed
 
     // Log logout
     try {

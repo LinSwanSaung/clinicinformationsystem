@@ -30,7 +30,7 @@ const getCSSVariable = (varName, fallback) => {
     return fallback;
   }
 
-  // If it's oklch, we need to get the computed color
+  // Handle oklch color format
   if (value.startsWith('oklch')) {
     // Create a temporary element to get the computed RGB value
     const tempEl = document.createElement('div');
@@ -216,7 +216,7 @@ const VitalCard = memo(({ title, value, unit, delta, chartData, dataKey, color: 
   const chartColor = useMemo(() => getPrimaryChartColor(), []);
   const titleColor = useMemo(() => getComputedColor('--card-foreground'), []);
   const axisColor = useMemo(() => getComputedColor('--foreground'), []);
-  // Check if we have enough data points
+  // Check for sufficient data points
   const validValues = useMemo(() => {
     if (!chartData || chartData.length < 1) {
       return [];
@@ -228,7 +228,7 @@ const VitalCard = memo(({ title, value, unit, delta, chartData, dataKey, color: 
   }, [chartData, dataKey, title]);
 
   const hasValidData = validValues.length >= 1;
-  const showDots = validValues.length <= 3; // Show dots when we have 3 or fewer points
+  const showDots = validValues.length <= 3; // Show dots for 3 or fewer points
 
   const computedDomain = useMemo(() => {
     if (!hasValidData) {
@@ -414,7 +414,7 @@ const BloodPressureCard = memo(({ chartData, latest, previous }) => {
   }, [chartData]);
 
   const hasValidData = validValues.length >= 1;
-  const showDots = validValues.length <= 6; // Show dots when we have 3 or fewer readings (6 values max for 2 lines)
+  const showDots = validValues.length <= 6; // Show dots for 3 or fewer readings
 
   logger.debug(
     '[BloodPressureCard] hasValidData:',

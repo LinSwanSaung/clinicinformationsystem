@@ -1,5 +1,6 @@
 import api from '@/services/api';
 import logger from '@/utils/logger';
+import { visitService } from '@/features/visits';
 
 /**
  * Enhanced Allergy Service with caching and performance optimizations
@@ -76,6 +77,8 @@ class AllergyService {
       // Invalidate cache for this patient
       if (allergyData.patient_id) {
         this.clearPatientCache(allergyData.patient_id);
+        // Also clear visit cache so visit history shows the new allergy
+        visitService.clearPatientCache(allergyData.patient_id);
       }
 
       return response.data.data;
@@ -95,6 +98,8 @@ class AllergyService {
       // Invalidate cache for this patient
       if (allergyData.patient_id) {
         this.clearPatientCache(allergyData.patient_id);
+        // Also clear visit cache so visit history reflects the update
+        visitService.clearPatientCache(allergyData.patient_id);
       }
 
       return response.data.data;
@@ -114,6 +119,8 @@ class AllergyService {
       // Invalidate cache for this patient if provided
       if (patientId) {
         this.clearPatientCache(patientId);
+        // Also clear visit cache so visit history reflects the deletion
+        visitService.clearPatientCache(patientId);
       }
 
       return response.data;

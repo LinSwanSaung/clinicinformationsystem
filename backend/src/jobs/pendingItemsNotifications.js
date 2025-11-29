@@ -166,7 +166,7 @@ export function startPendingItemsNotifications() {
         }
       }
 
-      // Check if we should notify (throttle to avoid spam)
+      // Check notification throttle to avoid spam
       const now = Date.now();
       const timeSinceLastNotification = now - lastNotificationTime;
       const shouldNotify = timeSinceLastNotification >= NOTIFICATION_THROTTLE_MS;

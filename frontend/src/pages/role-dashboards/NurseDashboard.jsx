@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { useTranslation } from 'react-i18next';
 import { motion } from 'framer-motion';
 import PageLayout from '@/components/layout/PageLayout';
 import { QueueDoctorCard } from '@/features/queue';
@@ -21,67 +22,31 @@ import {
   CheckCircle,
 } from 'lucide-react';
 import { queueService } from '@/features/queue';
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useAuth } from '@/contexts/AuthContext';
 import { useFeedback } from '@/contexts/FeedbackContext';
 import { ROLES } from '@/constants/roles';
 import { POLLING_INTERVALS } from '@/constants/polling';
 import logger from '@/utils/logger';
+import browserNotifications from '@/utils/browserNotifications';
 
 /**
- * Helper function to fetch appropriate vitals for a token
- * Uses the token's visit_id to get vitals for that specific visit only
+ * Get vitals from token (included in queue response)
  */
-const fetchTokenVitals = async (token) => {
-  try {
-    const patientId = token.patient?.id || token.patient_id;
-    const visitId = token.visit_id || token.current_visit_id;
-
-    logger.debug(
-      `🔍 [NURSE] Fetching vitals - Token #${token.token_number}, PatientID: ${patientId}, VisitID: ${visitId}`
-    );
-    logger.debug(`🔍 [NURSE] Token object keys:`, Object.keys(token));
-    logger.debug(
-      `🔍 [NURSE] Has visit_id property?`,
-      'visit_id' in token,
-      'Value:',
-      token.visit_id
-    );
-
-    if (!visitId) {
-      logger.debug(
-        `❌ [NURSE] Token #${token.token_number} has no visit_id - treating as fresh visit`
-      );
-      return null;
-    }
-
-    // Fetch vitals for this specific visit only
-    try {
-      const vitalsResponse = await vitalsService.getVisitVitals(visitId);
-      logger.debug(`📊 [NURSE] Vitals API response for visit ${visitId}:`, vitalsResponse);
-
-      // Check if we have actual vitals data (not empty array)
-      if (vitalsResponse.success && vitalsResponse.data && vitalsResponse.data.length > 0) {
-        logger.debug(`✅ [NURSE] Found vitals for visit ${visitId}:`, vitalsResponse.data[0]);
-        return vitalsResponse.data[0]; // Return first vitals record
-      }
-      logger.debug(
-        `❌ [NURSE] No vitals found for visit ${visitId} - showing "Add Vitals & Notes"`
-      );
-    } catch (error) {
-      logger.error('[NURSE] Failed to fetch visit vitals:', error);
-    }
-
-    // No vitals for this visit - return null to show "Add Vitals & Notes"
-    return null;
-  } catch (error) {
-    logger.error('[NURSE] Failed to fetch vitals for token:', token.id, error);
-    return null;
+const getTokenVitals = (token) => {
+  if (token.patient?.vitals) {
+    logger.debug(`✅ [NURSE] Token #${token.token_number} has vitals from queue response`);
+    return token.patient.vitals;
   }
+  logger.debug(
+    `❌ [NURSE] Token #${token.token_number} has no vitals - showing "Add Vitals & Notes"`
+  );
+  return null;
 };
 
 const NurseDashboard = () => {
   const navigate = useNavigate();
+  const { t } = useTranslation();
   const { user } = useAuth();
   const [doctors, setDoctors] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -91,7 +56,8 @@ const NurseDashboard = () => {
   const [patientSearchTerm, setPatientSearchTerm] = useState('');
   const [selectedStatus, setSelectedStatus] = useState('all'); // New status filter state
   const [lastRefresh, setLastRefresh] = useState(new Date());
-  const [isUserActive, setIsUserActive] = useState(false); // Track user activity
+  const [isModalOpen, setIsModalOpen] = useState(false); // Track if any modal is open
+  const [isSaving, setIsSaving] = useState(false); // Track if any save operation is in progress
 
   // Use feedback system for notifications
   const { showSuccess, showError, showWarning } = useFeedback();
@@ -102,14 +68,22 @@ const NurseDashboard = () => {
     waitingPatients: 0,
   });
 
-  // React Query: Poll doctors queue with auth/role guard and pause on activity
+  // Track previous token IDs to detect new patients joining queue
+  const previousTokenIdsRef = useRef(new Set());
+  const isInitialLoadRef = useRef(true);
+
+  const queryClient = useQueryClient();
+
+  // React Query: Poll doctors queue
+  const shouldPausePolling = isModalOpen || isSaving;
   const doctorsQuery = useQuery({
-    queryKey: ['nurse', 'doctorsQueue'],
+    queryKey: ['queue', 'allDoctors'],
     queryFn: () => queueService.getAllDoctorsQueueStatus(),
-    enabled: !!user && user.role === ROLES.NURSE && !isUserActive,
-    refetchInterval: isUserActive ? false : POLLING_INTERVALS.NURSE_QUEUE, // 30 seconds (reduced from 15s to reduce DB load)
+    enabled: !!user && user.role === ROLES.NURSE && !shouldPausePolling,
+    refetchInterval: shouldPausePolling ? false : POLLING_INTERVALS.NURSE_QUEUE, // 30 seconds
     refetchIntervalInBackground: false,
     refetchOnWindowFocus: false,
+    staleTime: 20000, // Consider data fresh for 20 seconds - reduces unnecessary DB calls
   });
 
   useEffect(() => {
@@ -120,62 +94,155 @@ const NurseDashboard = () => {
     if (doctorsQuery.error) {
       logger.error('Failed to load doctors and queues:', doctorsQuery.error);
       setDoctors([]);
+      setQueueStats({ totalDoctors: 0, activeDoctors: 0, totalPatients: 0, waitingPatients: 0 });
       setLoading(false);
       return;
     }
     const list = doctorsQuery.data?.data || [];
     setDoctors(list);
-    const availableDoctors = list.filter((d) => d.status?.status !== 'unavailable');
+
+    // Defensive filtering: Check status structure carefully
+    // Status can be: { status: 'available'|'unavailable'|'consulting'|'busy'|'full', canAcceptPatients: boolean }
+    const availableDoctors = list.filter((d) => {
+      // Check if status exists and is not 'unavailable'
+      if (!d.status) {
+        return false;
+      }
+      // Handle both old format (status.status) and new format (status.status)
+      const statusValue = d.status?.status || d.status;
+      return statusValue !== 'unavailable';
+    });
+
     const totalDoctors = availableDoctors.length;
-    const activeDoctors = availableDoctors.filter((d) => d.queueStatus?.tokens?.length > 0).length;
-    const totalPatients = availableDoctors.reduce(
-      (sum, d) => sum + (d.queueStatus?.tokens?.length || 0),
-      0
-    );
-    const waitingPatients = availableDoctors.reduce(
-      (sum, d) => sum + (d.queueStatus?.tokens?.filter((t) => t.status === 'waiting').length || 0),
-      0
-    );
+    const activeDoctors = availableDoctors.filter((d) => {
+      // Check if doctor has any tokens (active queue)
+      const tokens = d.queueStatus?.tokens || [];
+      return tokens.length > 0;
+    }).length;
+
+    const totalPatients = availableDoctors.reduce((sum, d) => {
+      const tokens = d.queueStatus?.tokens || [];
+      return sum + tokens.length;
+    }, 0);
+
+    const waitingPatients = availableDoctors.reduce((sum, d) => {
+      const tokens = d.queueStatus?.tokens || [];
+      const waiting = tokens.filter((t) => t && t.status === 'waiting').length;
+      return sum + waiting;
+    }, 0);
+
+    logger.debug('[NURSE] Stats calculated:', {
+      totalDoctors,
+      activeDoctors,
+      totalPatients,
+      waitingPatients,
+      doctorsListLength: list.length,
+    });
+
     setQueueStats({ totalDoctors, activeDoctors, totalPatients, waitingPatients });
     setLastRefresh(new Date());
     setLoading(false);
   }, [doctorsQuery.isLoading, doctorsQuery.error, doctorsQuery.data]);
 
-  // Track user activity to pause auto-refresh during interactions
+  // Detect new patients joining the queue and show browser notifications
   useEffect(() => {
-    let activityTimer;
+    if (!doctorsQuery.data?.data) {
+      return;
+    }
 
-    const handleUserActivity = () => {
-      setIsUserActive(true);
-      clearTimeout(activityTimer);
-      // Reset activity flag after 10 seconds of inactivity
-      activityTimer = setTimeout(() => {
-        setIsUserActive(false);
-      }, 10000);
-    };
+    const list = doctorsQuery.data.data;
 
-    // Add event listeners for user activity
-    const events = ['mousedown', 'mousemove', 'keypress', 'scroll', 'touchstart', 'click'];
-    events.forEach((event) => {
-      document.addEventListener(event, handleUserActivity, true);
+    // Collect all current token IDs with their patient info
+    const currentTokens = new Map();
+    list.forEach((doctor) => {
+      const tokens = doctor.queueStatus?.tokens || [];
+      tokens.forEach((token) => {
+        if (token.id && token.status === 'waiting') {
+          currentTokens.set(token.id, {
+            patientName: token.patient
+              ? `${token.patient.first_name || ''} ${token.patient.last_name || ''}`.trim()
+              : 'Unknown Patient',
+            patientId: token.patient?.patient_number || 'N/A',
+            doctorName: `Dr. ${doctor.first_name || ''} ${doctor.last_name || ''}`.trim(),
+            tokenNumber: token.token_number,
+          });
+        }
+      });
     });
 
-    return () => {
-      events.forEach((event) => {
-        document.removeEventListener(event, handleUserActivity, true);
+    // Skip notification on initial load
+    if (isInitialLoadRef.current) {
+      isInitialLoadRef.current = false;
+      previousTokenIdsRef.current = new Set(currentTokens.keys());
+      return;
+    }
+
+    // Find new tokens (patients who just joined the queue)
+    const newPatients = [];
+    currentTokens.forEach((info, tokenId) => {
+      if (!previousTokenIdsRef.current.has(tokenId)) {
+        newPatients.push(info);
+      }
+    });
+
+    // Show notification for new patients
+    if (newPatients.length > 0) {
+      newPatients.forEach((patient) => {
+        const title = t('nurse.dashboard.newPatientInQueue');
+        const body = `${patient.patientName} (${patient.patientId}) - Token #${patient.tokenNumber}\nAssigned to: ${patient.doctorName}`;
+
+        // Show browser notification
+        browserNotifications.show(title, {
+          body,
+          tag: `new-patient-${patient.tokenNumber}`,
+          requireInteraction: false,
+        });
+
+        // Also show in-app toast notification
+        showSuccess(
+          t('nurse.dashboard.newPatientJoined', {
+            name: patient.patientName,
+            token: patient.tokenNumber,
+          })
+        );
+
+        logger.info(
+          `[NURSE] New patient notification: ${patient.patientName} joined ${patient.doctorName}'s queue`
+        );
       });
-      clearTimeout(activityTimer);
-    };
+    }
+
+    // Update previous token IDs for next comparison
+    previousTokenIdsRef.current = new Set(currentTokens.keys());
+  }, [doctorsQuery.data, showSuccess]);
+
+  // Request notification permission on component mount
+  useEffect(() => {
+    browserNotifications.requestPermission().then((permission) => {
+      if (permission === 'granted') {
+        logger.info('[NURSE] Browser notifications enabled');
+      } else if (permission === 'denied') {
+        logger.warn('[NURSE] Browser notifications denied by user');
+      }
+    });
+  }, []);
+
+  // Track modal state from PatientCard components
+  const handleModalStateChange = useCallback((hasOpenModal) => {
+    setIsModalOpen(hasOpenModal);
   }, []);
 
   // Manual refresh function
   const handleManualRefresh = useCallback(async () => {
     if (selectedDoctor) {
       await handleViewPatients(selectedDoctor);
+      setLastRefresh(new Date());
     } else {
-      await doctorsQuery.refetch();
+      // Invalidate and refetch - respects staleTime and prevents duplicate calls
+      await queryClient.invalidateQueries({ queryKey: ['queue', 'allDoctors'] });
+      setLastRefresh(new Date());
     }
-  }, [selectedDoctor, doctorsQuery]);
+  }, [selectedDoctor, queryClient]);
 
   // Handle viewing doctor's patients
   const handleViewPatients = useCallback(
@@ -208,8 +275,6 @@ const NurseDashboard = () => {
         }, {});
         logger.debug(`📊 [NURSE] Token status breakdown:`, statusBreakdown);
 
-        // Filter out cancelled appointments - include ALL other statuses (waiting, called, serving, completed, missed)
-        // This ensures we show all patients for the day, including completed consultations
         const activeTokens = queueTokens.filter((token) => token.status !== 'cancelled');
         logger.debug(
           `📋 [NURSE] Filtered to ${activeTokens.length} tokens (excluded ${queueTokens.length - activeTokens.length} cancelled). Statuses included: ${Object.keys(
@@ -219,14 +284,9 @@ const NurseDashboard = () => {
             .join(', ')}`
         );
 
-        // Use only queue tokens (no appointment queue)
-        // Show ALL tokens for the day - each token represents a visit, so patients with multiple visits will show multiple entries
         const allPatients = activeTokens.map((t) => ({ ...t, queueType: 'token' }));
 
-        // Sort by token number (ascending) to show patients in order they were seen
-        // This ensures all patients for the day are visible, including completed ones
         allPatients.sort((a, b) => {
-          // First sort by status: serving > called > waiting > completed > missed
           const statusOrder = { serving: 0, called: 1, waiting: 2, completed: 3, missed: 4 };
           const statusDiff = (statusOrder[a.status] ?? 5) - (statusOrder[b.status] ?? 5);
           if (statusDiff !== 0) {
@@ -241,41 +301,28 @@ const NurseDashboard = () => {
           `📋 [NURSE] Showing ${allPatients.length} tokens (all patients for the day, including completed)`
         );
 
-        // Fetch vitals for each patient using the new per-visit logic
-        // On initial load: Fetch vitals for ALL patients (including completed) to display historical data
-        // On auto-refresh: Skip completed patients (they won't change) - handled in auto-refresh logic
-        const patientsWithVitals = await Promise.all(
-          allPatients.map(async (patient) => {
-            try {
-              const vitals = await fetchTokenVitals(patient);
+        const patientsWithVitals = allPatients.map((patient) => {
+          const vitals = getTokenVitals(patient);
+          const patientWithVitals = {
+            ...patient,
+            latestVitals: vitals,
+          };
 
-              const patientWithVitals = {
-                ...patient,
-                latestVitals: vitals,
-              };
+          logger.debug(`[NURSE] Patient #${patient.token_number} after vitals fetch:`, {
+            token_number: patient.token_number,
+            visit_id: patient.visit_id,
+            status: patient.status,
+            hasLatestVitals: !!patientWithVitals.latestVitals,
+            latestVitals: patientWithVitals.latestVitals,
+          });
 
-              logger.debug(`[NURSE] Patient #${patient.token_number} after vitals fetch:`, {
-                token_number: patient.token_number,
-                visit_id: patient.visit_id,
-                status: patient.status,
-                hasLatestVitals: !!patientWithVitals.latestVitals,
-                latestVitals: patientWithVitals.latestVitals,
-              });
-
-              return patientWithVitals;
-            } catch (error) {
-              logger.debug(`No vitals found for patient ${patient.patient?.id}`);
-              return {
-                ...patient,
-                latestVitals: null,
-              };
-            }
-          })
-        );
+          return patientWithVitals;
+        });
 
         logger.debug('✅ [NURSE] Patient list updated with fresh vitals and appointments');
         logger.debug('[NURSE] Total patients with vitals data:', patientsWithVitals.length);
         setPatients(patientsWithVitals);
+        setLastRefresh(new Date());
       } catch (error) {
         logger.error('Failed to load patients:', error);
         setPatients([]);
@@ -306,7 +353,7 @@ const NurseDashboard = () => {
           selectedDoctorRef.current.id
         );
         queueService
-          .getDoctorQueueStatus(selectedDoctorRef.current.id)
+          .getDoctorQueueStatus(selectedDoctorRef.current.id, null, true) // skipCompletedVitals=true for polling
           .then((queueResponse) => {
             if (queueResponse.success && queueResponse.data) {
               const queueTokens = queueResponse.data.tokens || [];
@@ -323,72 +370,77 @@ const NurseDashboard = () => {
                 return (a.token_number || 0) - (b.token_number || 0);
               });
 
-              // Fetch vitals and update state silently
-              // OPTIMIZATION: Skip vitals for completed/missed patients (preserve existing vitals)
-              Promise.all(
-                allPatients.map(async (patient) => {
-                  // Skip vitals fetch for completed/missed patients - preserve existing vitals
-                  // They won't change, so no need to refetch
-                  if (patient.status === 'completed' || patient.status === 'missed') {
-                    // Preserve existing vitals from state if available
-                    const existingPatient = patients.find((p) => p.id === patient.id);
-                    return {
-                      ...patient,
-                      latestVitals: existingPatient?.latestVitals || null,
-                    };
-                  }
-                  try {
-                    const vitals = await fetchTokenVitals(patient);
-                    return { ...patient, latestVitals: vitals };
-                  } catch {
-                    return { ...patient, latestVitals: null };
-                  }
-                })
-              ).then((patientsWithVitals) => {
+              // Vitals are included in the queue response from backend
+              const patientsWithVitals = allPatients.map((patient) => {
+                // Preserve existing vitals for completed/missed patients
+                if (patient.status === 'completed' || patient.status === 'missed') {
+                  // Preserve existing vitals from state if available
+                  const existingPatient = patients.find((p) => p.id === patient.id);
+                  return {
+                    ...patient,
+                    latestVitals: existingPatient?.latestVitals || null,
+                  };
+                }
+                const vitals = getTokenVitals(patient);
+                return { ...patient, latestVitals: vitals };
+              });
+
+              // Update state synchronously (no Promise.all needed)
+              (() => {
                 // Update state silently (no loading spinner)
                 setPatients((prevPatients) => {
                   // Merge with existing to preserve optimistic updates
                   const merged = patientsWithVitals.map((newPatient) => {
                     const existing = prevPatients.find((p) => p.id === newPatient.id);
-                    // Preserve optimistic status updates (if status was changed locally)
-                    // But prioritize server status if it's more advanced (e.g., 'serving' or 'completed' from doctor)
-                    if (existing && existing.status !== newPatient.status) {
-                      // If server says 'serving' (doctor started consultation), use that
-                      if (newPatient.status === 'serving') {
-                        return newPatient; // Server status is authoritative
+                    if (existing) {
+                      // Always use latest vitals from server (newPatient.latestVitals)
+                      // But preserve optimistic status updates if needed
+                      const mergedPatient = {
+                        ...newPatient,
+                        latestVitals: newPatient.latestVitals || existing.latestVitals, // Prefer server vitals, fallback to existing
+                      };
+
+                      // Preserve optimistic status updates (if status was changed locally)
+                      // But prioritize server status if it's more advanced (e.g., 'serving' or 'completed' from doctor)
+                      if (existing.status !== newPatient.status) {
+                        // If server says 'serving' (doctor started consultation), use that
+                        if (newPatient.status === 'serving') {
+                          return mergedPatient; // Server status is authoritative
+                        }
+                        // If server says 'completed' (doctor finished consultation), use that
+                        if (newPatient.status === 'completed') {
+                          return mergedPatient; // Server status is authoritative
+                        }
+                        // If existing is 'serving' but server says 'called', keep 'serving' (doctor just started)
+                        if (existing.status === 'serving' && newPatient.status === 'called') {
+                          return { ...mergedPatient, status: existing.status };
+                        }
+                        // If existing is 'completed' but server says something else, keep 'completed' (consultation finished)
+                        if (existing.status === 'completed' && newPatient.status !== 'completed') {
+                          return { ...mergedPatient, status: existing.status };
+                        }
+                        // For other optimistic updates (like 'called' from mark ready), preserve temporarily
+                        if (existing.status === 'called' && newPatient.status === 'waiting') {
+                          return { ...mergedPatient, status: existing.status };
+                        }
+                        // Default: use server status
+                        return mergedPatient;
                       }
-                      // If server says 'completed' (doctor finished consultation), use that
-                      if (newPatient.status === 'completed') {
-                        return newPatient; // Server status is authoritative
-                      }
-                      // If existing is 'serving' but server says 'called', keep 'serving' (doctor just started)
-                      if (existing.status === 'serving' && newPatient.status === 'called') {
-                        return { ...newPatient, status: existing.status };
-                      }
-                      // If existing is 'completed' but server says something else, keep 'completed' (consultation finished)
-                      if (existing.status === 'completed' && newPatient.status !== 'completed') {
-                        return { ...newPatient, status: existing.status };
-                      }
-                      // For other optimistic updates (like 'called' from mark ready), preserve temporarily
-                      if (existing.status === 'called' && newPatient.status === 'waiting') {
-                        return { ...newPatient, status: existing.status };
-                      }
-                      // Default: use server status
-                      return newPatient;
+                      return mergedPatient;
                     }
                     return newPatient;
                   });
                   return merged;
                 });
                 logger.debug('[NURSE] Auto-refresh completed, updated patient list');
-              });
+              })();
             }
           })
           .catch((error) => {
             logger.error('Auto-refresh failed:', error);
           });
       }
-    }, POLLING_INTERVALS.QUEUE); // Refresh every 30 seconds (reduced from 10s to reduce DB load)
+    }, POLLING_INTERVALS.QUEUE); // Refresh every 30 seconds (optimized for real-time monitoring)
 
     return () => clearInterval(refreshInterval);
   }, [selectedDoctor]);
@@ -404,10 +456,11 @@ const NurseDashboard = () => {
   // Patient action handlers - memoized to prevent unnecessary re-renders of PatientCard
   const handleSaveVitals = useCallback(
     async (patientId, vitalsForm, notes, visitId = null) => {
+      setIsSaving(true); // Pause polling while saving
       try {
         if (!patientId || typeof patientId !== 'string') {
           logger.error('[NURSE] Invalid patient ID provided when saving vitals:', patientId);
-          showError('Unable to determine the patient record. Please refresh and try again.');
+          showError(t('nurse.dashboard.unableToDeterminePatient'));
           return;
         }
 
@@ -418,20 +471,20 @@ const NurseDashboard = () => {
 
         if (vitalsForm.bp && vitalsForm.bp.trim()) {
           if (!vitalsForm.bp.includes('/')) {
-            bpError = 'Blood pressure must be in format "120/80"';
+            bpError = t('nurse.dashboard.invalidBpFormat');
           } else {
             const bpParts = vitalsForm.bp.trim().split('/');
             if (bpParts.length !== 2) {
-              bpError = 'Blood pressure must be in format "120/80"';
+              bpError = t('nurse.dashboard.invalidBpFormat');
             } else {
               const sys = parseInt(bpParts[0].trim());
               const dia = parseInt(bpParts[1].trim());
               if (isNaN(sys) || isNaN(dia)) {
-                bpError = 'Blood pressure values must be valid numbers';
+                bpError = t('nurse.dashboard.invalidBpValues');
               } else if (sys < 60 || sys > 250) {
-                bpError = 'Systolic pressure must be between 60 and 250 mmHg';
+                bpError = t('nurse.dashboard.systolicRange');
               } else if (dia < 30 || dia > 150) {
-                bpError = 'Diastolic pressure must be between 30 and 150 mmHg';
+                bpError = t('nurse.dashboard.diastolicRange');
               } else {
                 systolic = sys;
                 diastolic = dia;
@@ -453,7 +506,7 @@ const NurseDashboard = () => {
         if (vitalsForm.temp && vitalsForm.temp.trim()) {
           const tempValue = parseFloat(vitalsForm.temp.trim());
           if (isNaN(tempValue)) {
-            tempError = 'Temperature must be a valid number';
+            tempError = t('nurse.dashboard.invalidTemperature');
           } else {
             if (tempValue >= 30 && tempValue <= 45) {
               temperature = tempValue;
@@ -462,7 +515,7 @@ const NurseDashboard = () => {
               temperature = tempValue;
               temperatureUnit = 'F';
             } else {
-              tempError = 'Temperature must be between 30-45°C or 86-113°F';
+              tempError = t('nurse.dashboard.temperatureRange');
             }
           }
         }
@@ -519,7 +572,7 @@ const NurseDashboard = () => {
           );
         }
 
-        showSuccess('Vitals saved successfully!');
+        showSuccess(t('nurse.dashboard.vitalsSaved'));
 
         // Then save to server (in background)
         await vitalsService.saveVitals(patientId, vitalsData);
@@ -551,31 +604,27 @@ const NurseDashboard = () => {
                   return (a.token_number || 0) - (b.token_number || 0);
                 });
 
-                // Fetch vitals and update silently
-                // OPTIMIZATION: Preserve vitals for completed/missed patients
-                Promise.all(
-                  allPatients.map(async (patient) => {
-                    // Preserve existing vitals for completed/missed patients
-                    if (patient.status === 'completed' || patient.status === 'missed') {
-                      const existingPatient = patients.find((p) => p.id === patient.id);
-                      return {
-                        ...patient,
-                        latestVitals: existingPatient?.latestVitals || null,
-                      };
-                    }
-                    try {
-                      const vitals = await fetchTokenVitals(patient);
-                      return { ...patient, latestVitals: vitals };
-                    } catch {
-                      return { ...patient, latestVitals: null };
-                    }
-                  })
-                ).then((patientsWithVitals) => {
+                // Vitals are included in the queue response from backend
+                const patientsWithVitals = allPatients.map((patient) => {
+                  // Preserve existing vitals for completed/missed patients
+                  if (patient.status === 'completed' || patient.status === 'missed') {
+                    const existingPatient = patients.find((p) => p.id === patient.id);
+                    return {
+                      ...patient,
+                      latestVitals: existingPatient?.latestVitals || null,
+                    };
+                  }
+                  const vitals = getTokenVitals(patient);
+                  return { ...patient, latestVitals: vitals };
+                });
+
+                // Update state synchronously (no Promise.all needed)
+                (() => {
                   // Merge with existing to preserve optimistic updates
                   setPatients((prevPatients) => {
                     return patientsWithVitals.map((newPatient) => {
                       const existing = prevPatients.find((p) => p.id === newPatient.id);
-                      // If we just saved vitals optimistically, keep them if server hasn't updated yet
+                      // Keep optimistic vitals if server hasn't returned them yet
                       if (existing && existing.latestVitals && !newPatient.latestVitals) {
                         // Keep optimistic vitals if server hasn't returned them yet
                         return { ...newPatient, latestVitals: existing.latestVitals };
@@ -584,7 +633,7 @@ const NurseDashboard = () => {
                       return newPatient;
                     });
                   });
-                });
+                })();
               }
             })
             .catch((error) => {
@@ -594,12 +643,12 @@ const NurseDashboard = () => {
       } catch (error) {
         logger.error('Failed to save vitals:', error);
         if (error.response?.data?.code === 'NO_ACTIVE_VISIT') {
-          showWarning(
-            'Security Check Failed: Cannot record vitals. Patient does not have an active visit.'
-          );
+          showWarning(t('nurse.dashboard.noActiveVisit'));
         } else {
           showError(`Failed to save vitals: ${error.response?.data?.message || error.message}`);
         }
+      } finally {
+        setIsSaving(false); // Resume polling after save completes
       }
     },
     [selectedDoctor, handleViewPatients, showError, showSuccess, showWarning]
@@ -622,7 +671,7 @@ const NurseDashboard = () => {
           prevPatients.map((p) => (p.id === token.id ? { ...p, status: 'called' } : p))
         );
 
-        showSuccess('Patient marked as ready');
+        showSuccess(t('nurse.dashboard.patientMarkedReady'));
 
         // Then update on server (in background)
         await queueService.markPatientReady(token.id);
@@ -654,26 +703,22 @@ const NurseDashboard = () => {
                   return (a.token_number || 0) - (b.token_number || 0);
                 });
 
-                // Fetch vitals and update silently
-                // OPTIMIZATION: Preserve vitals for completed/missed patients
-                Promise.all(
-                  allPatients.map(async (patient) => {
-                    // Preserve existing vitals for completed/missed patients
-                    if (patient.status === 'completed' || patient.status === 'missed') {
-                      const existingPatient = patients.find((p) => p.id === patient.id);
-                      return {
-                        ...patient,
-                        latestVitals: existingPatient?.latestVitals || null,
-                      };
-                    }
-                    try {
-                      const vitals = await fetchTokenVitals(patient);
-                      return { ...patient, latestVitals: vitals };
-                    } catch {
-                      return { ...patient, latestVitals: null };
-                    }
-                  })
-                ).then((patientsWithVitals) => {
+                // Vitals are included in the queue response from backend
+                const patientsWithVitals = allPatients.map((patient) => {
+                  // Preserve existing vitals for completed/missed patients
+                  if (patient.status === 'completed' || patient.status === 'missed') {
+                    const existingPatient = patients.find((p) => p.id === patient.id);
+                    return {
+                      ...patient,
+                      latestVitals: existingPatient?.latestVitals || null,
+                    };
+                  }
+                  const vitals = getTokenVitals(patient);
+                  return { ...patient, latestVitals: vitals };
+                });
+
+                // Update state synchronously (no Promise.all needed)
+                (() => {
                   // Merge with existing to preserve optimistic updates
                   setPatients((prevPatients) => {
                     return patientsWithVitals.map((newPatient) => {
@@ -699,7 +744,7 @@ const NurseDashboard = () => {
                       return newPatient;
                     });
                   });
-                });
+                })();
               }
             })
             .catch((error) => {
@@ -708,14 +753,14 @@ const NurseDashboard = () => {
         }
       } catch (error) {
         logger.error('Failed to mark patient ready:', error);
-        showError('Failed to mark patient ready. Please try again.');
+        showError(t('nurse.dashboard.failedMarkReady'));
         // Revert optimistic update on error
         setPatients((prevPatients) =>
           prevPatients.map((p) => (p.id === token?.id ? { ...p, status: 'waiting' } : p))
         );
       }
     },
-    [patients, selectedDoctor, showError, showSuccess]
+    [patients, selectedDoctor, showError, showSuccess, t]
   );
 
   const handleUnmarkReady = useCallback(
@@ -737,7 +782,7 @@ const NurseDashboard = () => {
           prevPatients.map((p) => (p.id === token.id ? { ...p, status: 'waiting' } : p))
         );
 
-        showSuccess('Patient status reverted to waiting');
+        showSuccess(t('nurse.dashboard.patientUnmarkedReady'));
 
         // Then update on server (in background)
         await queueService.markPatientWaiting(token.id);
@@ -768,26 +813,22 @@ const NurseDashboard = () => {
                   return (a.token_number || 0) - (b.token_number || 0);
                 });
 
-                // Fetch vitals and update silently
-                // OPTIMIZATION: Preserve vitals for completed/missed patients
-                Promise.all(
-                  allPatients.map(async (patient) => {
-                    // Preserve existing vitals for completed/missed patients
-                    if (patient.status === 'completed' || patient.status === 'missed') {
-                      const existingPatient = patients.find((p) => p.id === patient.id);
-                      return {
-                        ...patient,
-                        latestVitals: existingPatient?.latestVitals || null,
-                      };
-                    }
-                    try {
-                      const vitals = await fetchTokenVitals(patient);
-                      return { ...patient, latestVitals: vitals };
-                    } catch {
-                      return { ...patient, latestVitals: null };
-                    }
-                  })
-                ).then((patientsWithVitals) => {
+                // Vitals are included in the queue response from backend
+                const patientsWithVitals = allPatients.map((patient) => {
+                  // Preserve existing vitals for completed/missed patients
+                  if (patient.status === 'completed' || patient.status === 'missed') {
+                    const existingPatient = patients.find((p) => p.id === patient.id);
+                    return {
+                      ...patient,
+                      latestVitals: existingPatient?.latestVitals || null,
+                    };
+                  }
+                  const vitals = getTokenVitals(patient);
+                  return { ...patient, latestVitals: vitals };
+                });
+
+                // Update state synchronously (no Promise.all needed)
+                () => {
                   // Merge with existing to preserve optimistic updates
                   setPatients((prevPatients) => {
                     return patientsWithVitals.map((newPatient) => {
@@ -801,7 +842,7 @@ const NurseDashboard = () => {
                       return newPatient;
                     });
                   });
-                });
+                };
               }
             })
             .catch((error) => {
@@ -810,7 +851,7 @@ const NurseDashboard = () => {
         }
       } catch (error) {
         logger.error('Failed to unmark patient ready:', error);
-        showError('Failed to unmark patient ready. Please try again.');
+        showError(t('nurse.dashboard.failedUnmarkReady'));
         // Revert optimistic update on error
         setPatients((prevPatients) =>
           prevPatients.map((p) => (p.id === token.id ? { ...p, status: 'called' } : p))
@@ -846,10 +887,10 @@ const NurseDashboard = () => {
           });
         }
 
-        showSuccess('Patient has been marked as delayed');
+        showSuccess(t('nurse.dashboard.patientDelayed'));
       } catch (error) {
         logger.error('Failed to delay patient:', error);
-        showError('Failed to delay patient: ' + (error.message || 'Please try again.'));
+        showError(t('nurse.dashboard.failedDelay'));
         // Revert optimistic update on error
         if (selectedDoctor) {
           handleViewPatients(selectedDoctor);
@@ -881,13 +922,11 @@ const NurseDashboard = () => {
             });
           }
 
-          showSuccess(
-            `Patient has been added back to the queue with token #${result.newTokenNumber}`
-          );
+          showSuccess(t('nurse.dashboard.delayRemoved', { token: result.newTokenNumber }));
         }
       } catch (error) {
         logger.error('Failed to remove delay:', error);
-        showError('Failed to remove delay. Please try again.');
+        showError(t('nurse.dashboard.failedRemoveDelay'));
         // Revert optimistic update on error
         if (selectedDoctor) {
           handleViewPatients(selectedDoctor);
@@ -906,7 +945,9 @@ const NurseDashboard = () => {
       doctor.specialty?.toLowerCase().includes(searchLower);
 
     // Only show available doctors (exclude 'unavailable' status)
-    const isAvailable = doctor.status?.status !== 'unavailable';
+    // Defensive check: handle both old and new status formats
+    const statusValue = doctor.status?.status || doctor.status;
+    const isAvailable = statusValue !== 'unavailable';
 
     return matchesSearch && isAvailable;
   });
@@ -918,6 +959,7 @@ const NurseDashboard = () => {
     const matchesSearch =
       patient?.first_name?.toLowerCase().includes(searchLower) ||
       patient?.last_name?.toLowerCase().includes(searchLower) ||
+      patient?.patient_number?.toLowerCase().includes(searchLower) ||
       patient?.phone?.toLowerCase().includes(searchLower) ||
       token.token_number?.toString().includes(searchLower);
 
@@ -942,19 +984,19 @@ const NurseDashboard = () => {
     <PageLayout
       title={
         selectedDoctor
-          ? `${selectedDoctor.first_name} ${selectedDoctor.last_name}'s Patients`
-          : 'Patient Care Management'
+          ? t('nurse.dashboard.doctorPatientsTitle', {
+              doctorName: `${selectedDoctor.first_name} ${selectedDoctor.last_name}`,
+            })
+          : t('nurse.dashboard.title')
       }
       subtitle={
-        selectedDoctor
-          ? 'Monitor and provide nursing care'
-          : "Monitor doctors' queues and provide nursing care"
+        selectedDoctor ? t('nurse.dashboard.doctorSubtitle') : t('nurse.dashboard.subtitle')
       }
       fullWidth
     >
       <div className="space-y-6 p-6">
         {loading ? (
-          <LoadingSpinner label="Loading..." />
+          <LoadingSpinner label={t('nurse.dashboard.loading')} />
         ) : (
           <>
             {!selectedDoctor ? (
@@ -964,47 +1006,61 @@ const NurseDashboard = () => {
                 <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-4">
                   <Card>
                     <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                      <CardTitle className="text-sm font-medium">Total Doctors</CardTitle>
+                      <CardTitle className="text-sm font-medium">
+                        {t('nurse.dashboard.totalDoctors')}
+                      </CardTitle>
                       <Users className="h-4 w-4 text-muted-foreground" />
                     </CardHeader>
                     <CardContent>
                       <div className="text-2xl font-bold">{queueStats.totalDoctors}</div>
                       <p className="text-xs text-muted-foreground">
-                        {queueStats.activeDoctors} active today
+                        {queueStats.activeDoctors} {t('nurse.dashboard.activeToday')}
                       </p>
                     </CardContent>
                   </Card>
 
                   <Card>
                     <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                      <CardTitle className="text-sm font-medium">Active Doctors</CardTitle>
+                      <CardTitle className="text-sm font-medium">
+                        {t('nurse.dashboard.activeDoctors')}
+                      </CardTitle>
                       <Activity className="h-4 w-4 text-muted-foreground" />
                     </CardHeader>
                     <CardContent>
                       <div className="text-2xl font-bold">{queueStats.activeDoctors}</div>
-                      <p className="text-xs text-muted-foreground">Currently available</p>
+                      <p className="text-xs text-muted-foreground">
+                        {t('nurse.dashboard.currentlyAvailable')}
+                      </p>
                     </CardContent>
                   </Card>
 
                   <Card>
                     <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                      <CardTitle className="text-sm font-medium">Total Patients</CardTitle>
+                      <CardTitle className="text-sm font-medium">
+                        {t('nurse.dashboard.totalPatients')}
+                      </CardTitle>
                       <UserCog className="h-4 w-4 text-muted-foreground" />
                     </CardHeader>
                     <CardContent>
                       <div className="text-2xl font-bold">{queueStats.totalPatients}</div>
-                      <p className="text-xs text-muted-foreground">In all queues</p>
+                      <p className="text-xs text-muted-foreground">
+                        {t('nurse.dashboard.inAllQueues')}
+                      </p>
                     </CardContent>
                   </Card>
 
                   <Card>
                     <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                      <CardTitle className="text-sm font-medium">Waiting Patients</CardTitle>
+                      <CardTitle className="text-sm font-medium">
+                        {t('nurse.dashboard.waitingPatients')}
+                      </CardTitle>
                       <Clock className="h-4 w-4 text-muted-foreground" />
                     </CardHeader>
                     <CardContent>
                       <div className="text-2xl font-bold">{queueStats.waitingPatients}</div>
-                      <p className="text-xs text-muted-foreground">Need attention</p>
+                      <p className="text-xs text-muted-foreground">
+                        {t('nurse.dashboard.needAttention')}
+                      </p>
                     </CardContent>
                   </Card>
                 </div>
@@ -1015,8 +1071,8 @@ const NurseDashboard = () => {
                     <SearchBar
                       value={searchTerm}
                       onChange={(e) => setSearchTerm(e.target.value)}
-                      placeholder="Search doctors by name or specialty..."
-                      ariaLabel="Search doctors"
+                      placeholder={t('nurse.dashboard.searchDoctorsPlaceholder')}
+                      ariaLabel={t('nurse.dashboard.searchDoctorsPlaceholder')}
                     />
                   </div>
 
@@ -1028,7 +1084,7 @@ const NurseDashboard = () => {
                       disabled={loading}
                     >
                       <Activity size={18} className={loading ? 'animate-spin' : ''} />
-                      <span>Refresh</span>
+                      <span>{t('nurse.dashboard.refresh')}</span>
                     </Button>
 
                     <Button
@@ -1037,11 +1093,11 @@ const NurseDashboard = () => {
                       onClick={() => navigate('/nurse/emr')}
                     >
                       <FileText size={18} />
-                      <span>Patient Records</span>
+                      <span>{t('nurse.dashboard.patientRecords')}</span>
                     </Button>
 
                     <div className="text-xs text-muted-foreground">
-                      Last updated: {lastRefresh.toLocaleTimeString()}
+                      {t('nurse.dashboard.lastUpdated')} {lastRefresh.toLocaleTimeString()}
                     </div>
                   </div>
                 </div>
@@ -1049,11 +1105,11 @@ const NurseDashboard = () => {
                 {/* Doctor Cards Grid */}
                 {filteredDoctors.length === 0 ? (
                   <EmptyState
-                    title="No doctors found"
+                    title={t('nurse.dashboard.noDoctorsFound')}
                     description={
                       searchTerm
-                        ? 'Try adjusting your search terms'
-                        : 'No doctors are currently available'
+                        ? t('nurse.dashboard.tryAdjustingSearch')
+                        : t('nurse.dashboard.noDoctorsAvailable')
                     }
                     icon={Users}
                   />
@@ -1069,7 +1125,7 @@ const NurseDashboard = () => {
                         key={doctor.id}
                         doctor={doctor}
                         onClick={handleViewPatients}
-                        buttonText="View Patients"
+                        buttonText={t('nurse.dashboard.viewPatients')}
                         buttonIcon={Eye}
                         showCurrentConsultation={true}
                         showNextInQueue={false}
@@ -1090,7 +1146,7 @@ const NurseDashboard = () => {
                       className="flex items-center gap-2"
                     >
                       <ArrowLeft className="h-4 w-4" />
-                      Back to Doctors
+                      {t('nurse.dashboard.backToDoctors')}
                     </Button>
 
                     <div className="flex items-center gap-3">
@@ -1116,11 +1172,11 @@ const NurseDashboard = () => {
                       className="flex items-center gap-2"
                     >
                       <Activity size={16} className={loading ? 'animate-spin' : ''} />
-                      <span>Refresh Patients</span>
+                      <span>{t('nurse.dashboard.refreshPatients')}</span>
                     </Button>
 
                     <div className="text-xs text-muted-foreground">
-                      Updated: {lastRefresh.toLocaleTimeString()}
+                      {t('nurse.dashboard.updated')} {lastRefresh.toLocaleTimeString()}
                     </div>
                   </div>
                 </div>
@@ -1129,7 +1185,9 @@ const NurseDashboard = () => {
                 <div className="mb-6 grid grid-cols-1 gap-4 md:grid-cols-4">
                   <Card>
                     <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                      <CardTitle className="text-sm font-medium">Total Patients</CardTitle>
+                      <CardTitle className="text-sm font-medium">
+                        {t('nurse.dashboard.totalPatients')}
+                      </CardTitle>
                       <Users className="h-4 w-4 text-muted-foreground" />
                     </CardHeader>
                     <CardContent>
@@ -1139,7 +1197,9 @@ const NurseDashboard = () => {
 
                   <Card>
                     <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                      <CardTitle className="text-sm font-medium">Waiting</CardTitle>
+                      <CardTitle className="text-sm font-medium">
+                        {t('nurse.dashboard.waiting')}
+                      </CardTitle>
                       <Clock className="h-4 w-4 text-muted-foreground" />
                     </CardHeader>
                     <CardContent>
@@ -1151,7 +1211,9 @@ const NurseDashboard = () => {
 
                   <Card>
                     <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                      <CardTitle className="text-sm font-medium">In Consultation</CardTitle>
+                      <CardTitle className="text-sm font-medium">
+                        {t('nurse.dashboard.inConsultation')}
+                      </CardTitle>
                       <Activity className="h-4 w-4 text-muted-foreground" />
                     </CardHeader>
                     <CardContent>
@@ -1163,7 +1225,9 @@ const NurseDashboard = () => {
 
                   <Card>
                     <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                      <CardTitle className="text-sm font-medium">Completed</CardTitle>
+                      <CardTitle className="text-sm font-medium">
+                        {t('nurse.dashboard.completed')}
+                      </CardTitle>
                       <CheckCircle className="h-4 w-4 text-muted-foreground" />
                     </CardHeader>
                     <CardContent>
@@ -1184,7 +1248,7 @@ const NurseDashboard = () => {
                     />
                     <Input
                       type="search"
-                      placeholder="Search patients..."
+                      placeholder={t('nurse.dashboard.searchPatientsPlaceholder')}
                       className="h-12 pl-10 text-base"
                       value={patientSearchTerm}
                       onChange={(e) => setPatientSearchTerm(e.target.value)}
@@ -1202,7 +1266,7 @@ const NurseDashboard = () => {
                             : 'bg-transparent text-muted-foreground hover:bg-accent hover:text-foreground'
                         }`}
                       >
-                        All ({patients.length})
+                        {t('nurse.dashboard.all')} ({patients.length})
                       </button>
                       <button
                         onClick={() => setSelectedStatus('waiting')}
@@ -1212,7 +1276,8 @@ const NurseDashboard = () => {
                             : 'bg-transparent text-muted-foreground hover:bg-accent hover:text-foreground'
                         }`}
                       >
-                        Waiting ({patients.filter((token) => token.status === 'waiting').length})
+                        {t('nurse.dashboard.waiting')} (
+                        {patients.filter((token) => token.status === 'waiting').length})
                       </button>
                       <button
                         onClick={() => setSelectedStatus('ready')}
@@ -1222,7 +1287,7 @@ const NurseDashboard = () => {
                             : 'bg-transparent text-muted-foreground hover:bg-accent hover:text-foreground'
                         }`}
                       >
-                        Waiting for Doctor (
+                        {t('nurse.dashboard.waitingForDoctor')} (
                         {
                           patients.filter(
                             (token) => token.status === 'ready' || token.status === 'called'
@@ -1238,7 +1303,7 @@ const NurseDashboard = () => {
                             : 'bg-transparent text-muted-foreground hover:bg-accent hover:text-foreground'
                         }`}
                       >
-                        In Consultation (
+                        {t('nurse.dashboard.inConsultation')} (
                         {patients.filter((token) => token.status === 'serving').length})
                       </button>
                       <button
@@ -1249,8 +1314,8 @@ const NurseDashboard = () => {
                             : 'bg-transparent text-muted-foreground hover:bg-accent hover:text-foreground'
                         }`}
                       >
-                        Completed ({patients.filter((token) => token.status === 'completed').length}
-                        )
+                        {t('nurse.dashboard.completed')} (
+                        {patients.filter((token) => token.status === 'completed').length})
                       </button>
                     </div>
                   </div>
@@ -1259,11 +1324,11 @@ const NurseDashboard = () => {
                 {/* Patient Cards */}
                 {filteredPatients.length === 0 ? (
                   <EmptyState
-                    title="No patients found"
+                    title={t('nurse.dashboard.noPatientsFound')}
                     description={
                       patientSearchTerm
-                        ? 'Try adjusting your search terms'
-                        : "No patients in this doctor's queue"
+                        ? t('nurse.dashboard.tryAdjustingSearch')
+                        : t('nurse.dashboard.noPatientsInQueue')
                     }
                     icon={Users}
                   />
@@ -1280,6 +1345,7 @@ const NurseDashboard = () => {
                         patient={{
                           id: token.id, // Use token/queue ID for operations
                           patientId: token.patient?.id, // Store actual patient ID separately
+                          patient_number: token.patient?.patient_number, // Include patient_number for display
                           visit_id: token.visit_id, // Add visit_id for vitals linking
                           chief_complaint:
                             token.visit?.chief_complaint ||
@@ -1295,6 +1361,9 @@ const NurseDashboard = () => {
                               : 'N/A',
                           gender: token.patient?.gender || 'N/A',
                           phone: token.patient?.phone || 'N/A',
+                          blood_group: token.patient?.blood_group,
+                          date_of_birth: token.patient?.date_of_birth,
+                          email: token.patient?.email,
                           tokenNumber: token.token_number,
                           status: token.status,
                           priority: token.priority || 3, // Include priority for visual highlighting
@@ -1364,6 +1433,7 @@ const NurseDashboard = () => {
                         onUnmarkReady={handleUnmarkReady}
                         onDelayPatient={handleDelayPatient}
                         onRemoveDelay={handleRemoveDelay}
+                        onModalStateChange={handleModalStateChange}
                         readOnly={false}
                       />
                     ))}

@@ -4,9 +4,6 @@ import { FeedbackProvider } from '../contexts/FeedbackContext';
 import { ThemeProvider } from '../contexts/ThemeContext';
 
 export function AppProviders({ children }) {
-  // Currency cache will be initialized lazily when first needed
-  // This prevents API calls before authentication is established
-
   return (
     <AuthProvider>
       <ThemeProvider>

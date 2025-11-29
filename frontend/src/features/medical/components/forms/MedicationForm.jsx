@@ -1,4 +1,4 @@
-import { useRef, useEffect } from 'react';
+import { useRef, useCallback } from 'react';
 import { Plus, X } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -78,17 +78,13 @@ export const MedicationForm = ({
 }) => {
   const customInputRefs = useRef({});
 
-  // Focus custom input when it becomes visible
-  useEffect(() => {
-    medications.forEach((med, index) => {
-      if (med.customName && customInputRefs.current[index]) {
-        // Small delay to ensure DOM is updated
-        setTimeout(() => {
-          customInputRefs.current[index]?.focus();
-        }, 0);
-      }
-    });
-  }, [medications]);
+  // Focus custom input when switching to custom mode (called imperatively)
+  const focusCustomInput = useCallback((index) => {
+    // Small delay to ensure DOM is updated
+    setTimeout(() => {
+      customInputRefs.current[index]?.focus();
+    }, 0);
+  }, []);
 
   const handleAddMedication = () => {
     if (canAdd) {
@@ -264,8 +260,7 @@ export const MedicationForm = ({
                       const value = e.target.value;
                       if (value === 'CUSTOM') {
                         handleMedicationChange(index, 'customName', true);
-                        // Don't clear name immediately - let user type in custom input
-                        // This ensures the medication isn't filtered out during validation
+                        focusCustomInput(index);
                       } else if (value !== '') {
                         handleMedicationChange(index, 'customName', false);
                         handleMedicationChange(index, 'name', value);

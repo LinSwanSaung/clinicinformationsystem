@@ -63,10 +63,22 @@ export const cancelPrescription = async (prescriptionId) => {
   }
 };
 
+// Get prescriptions by doctor note ID
+export const getPrescriptionsByNoteId = async (noteId) => {
+  try {
+    const response = await api.get(`/prescriptions/note/${noteId}`);
+    return response.data?.data || response.data;
+  } catch (error) {
+    logger.error('Error fetching prescriptions by note ID:', error);
+    throw error;
+  }
+};
+
 export default {
   createPrescription,
   getPrescriptionsByPatient,
   getPrescriptionsByVisit,
+  getPrescriptionsByNoteId,
   updatePrescriptionStatus,
   cancelPrescription,
 };

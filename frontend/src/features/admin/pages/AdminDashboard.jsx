@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { useTranslation } from 'react-i18next';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import {
@@ -12,6 +13,7 @@ import {
   ClipboardList,
   Building2,
   BarChart3,
+  RefreshCw,
 } from 'lucide-react';
 import PageLayout from '@/components/layout/PageLayout';
 import api from '@/services/api';
@@ -24,17 +26,27 @@ import logger from '@/utils/logger';
 
 const AdminDashboard = () => {
   const navigate = useNavigate();
+  const { i18n } = useTranslation();
   const [health, setHealth] = useState({ status: 'UNKNOWN', db: { connected: false } });
   const [healthLoading, setHealthLoading] = useState(true);
   const [healthError, setHealthError] = useState('');
   const [statsLoading, setStatsLoading] = useState(true);
   const [statsError, setStatsError] = useState('');
+  const [isRefreshing, setIsRefreshing] = useState(false);
+  const [lastRefresh, setLastRefresh] = useState(new Date());
   const [statsData, setStatsData] = useState({
     totalEmployees: 0,
     availableDoctorsCount: 0,
     monthlyVisits: 0,
     availableDoctors: [],
   });
+
+  // Force English language for admin dashboard
+  useEffect(() => {
+    if (i18n.language !== 'en') {
+      i18n.changeLanguage('en');
+    }
+  }, [i18n]);
 
   useEffect(() => {
     let mounted = true;
@@ -178,6 +190,129 @@ const AdminDashboard = () => {
     };
   }, []);
 
+  // Manual refresh function
+  const handleRefresh = async () => {
+    try {
+      setIsRefreshing(true);
+
+      // Refresh health check
+      try {
+        const h = await api.health();
+        setHealth(h);
+        setHealthError('');
+      } catch (e) {
+        setHealthError(e.message || 'Health check failed');
+      } finally {
+        setHealthLoading(false);
+      }
+
+      // Refresh stats
+      setStatsLoading(true);
+      setStatsError('');
+      try {
+        const startOfMonth = new Date();
+        startOfMonth.setDate(1);
+        startOfMonth.setHours(0, 0, 0, 0);
+        const now = new Date();
+
+        const [usersRes, availabilityRes, visitStatsRes] = await Promise.all([
+          userService.getAllUsers({ params: { includeDeleted: false } }),
+          doctorAvailabilityService.getAllDoctorAvailability(),
+          visitService.getVisitStatistics({
+            start_date: startOfMonth.toISOString(),
+            end_date: now.toISOString(),
+          }),
+        ]);
+
+        const users = Array.isArray(usersRes?.data)
+          ? usersRes.data
+          : Array.isArray(usersRes)
+            ? usersRes
+            : [];
+        const activeEmployees = users.filter(
+          (user) => user?.is_active !== false && !user?.deleted_at
+        );
+        const totalEmployees = activeEmployees.length;
+
+        const availabilityRaw = Array.isArray(availabilityRes?.data)
+          ? availabilityRes.data
+          : Array.isArray(availabilityRes)
+            ? availabilityRes
+            : availabilityRes?.data?.data || [];
+
+        const today = new Date();
+        const todayName = today.toLocaleDateString('en-US', { weekday: 'long' });
+        const currentTime = today.toTimeString().slice(0, 5);
+
+        const doctorMap = new Map();
+        availabilityRaw.forEach((slot) => {
+          if (!slot || slot.is_active === false) {
+            return;
+          }
+          if (slot.day_of_week !== todayName) {
+            return;
+          }
+          if (!slot.doctor_id) {
+            return;
+          }
+
+          const startTime = (slot.start_time || '').slice(0, 5);
+          const endTime = (slot.end_time || '').slice(0, 5);
+          if (!startTime || !endTime) {
+            return;
+          }
+
+          if (!doctorMap.has(slot.doctor_id)) {
+            doctorMap.set(slot.doctor_id, {
+              doctor_id: slot.doctor_id,
+              doctor: slot.users || slot.doctor || null,
+              slots: [],
+              isAvailableNow: false,
+            });
+          }
+
+          const record = doctorMap.get(slot.doctor_id);
+          record.slots.push({ start: startTime, end: endTime });
+          if (currentTime >= startTime && currentTime <= endTime) {
+            record.isAvailableNow = true;
+          }
+        });
+
+        const availableDoctors = Array.from(doctorMap.values()).map((doc) => {
+          const formattedSlots = doc.slots
+            .sort((a, b) => a.start.localeCompare(b.start))
+            .map((slot) => formatTimeRange(slot.start, slot.end));
+          return {
+            ...doc,
+            formattedSlots,
+          };
+        });
+
+        const visitStatsData = visitStatsRes?.data || visitStatsRes || {};
+        const monthlyVisits = visitStatsData.total_visits ?? visitStatsData.totalVisits ?? 0;
+
+        setStatsData({
+          totalEmployees,
+          availableDoctorsCount: availableDoctors.length,
+          monthlyVisits,
+          availableDoctors,
+        });
+        setStatsError('');
+      } catch (error) {
+        logger.error('Failed to refresh dashboard stats', error);
+        setStatsError(error.message || 'Failed to load dashboard statistics.');
+      } finally {
+        setStatsLoading(false);
+      }
+
+      setLastRefresh(new Date());
+    } catch (error) {
+      logger.error('Error refreshing dashboard:', error);
+    } finally {
+      setIsRefreshing(false);
+    }
+  };
+
   const statsCards = [
     {
       title: 'Total Employees',
@@ -268,11 +403,28 @@ const AdminDashboard = () => {
     <div className="min-h-screen bg-background">
       <PageLayout title="Admin Dashboard" subtitle="System overview and quick actions" fullWidth>
         <div className="space-y-8 p-8">
-          {statsError && (
-            <div className="border-destructive/20 bg-destructive/10 rounded-lg border px-4 py-3 text-sm text-destructive">
-              {statsError}
+          <div className="flex items-center justify-between">
+            {statsError && (
+              <div className="border-destructive/20 bg-destructive/10 rounded-lg border px-4 py-3 text-sm text-destructive">
+                {statsError}
+              </div>
+            )}
+            <div className="ml-auto flex items-center gap-2">
+              <Button
+                onClick={handleRefresh}
+                variant="outline"
+                size="sm"
+                disabled={isRefreshing}
+                className="gap-2"
+              >
+                <RefreshCw className={`h-4 w-4 ${isRefreshing ? 'animate-spin' : ''}`} />
+                Refresh
+              </Button>
+              <div className="text-xs text-muted-foreground">
+                Last updated: {lastRefresh.toLocaleTimeString()}
+              </div>
             </div>
-          )}
+          </div>
 
           {/* Stats Cards */}
           <div className="grid grid-cols-1 gap-8 md:grid-cols-2 lg:grid-cols-4">

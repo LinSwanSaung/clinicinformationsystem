@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { motion } from 'framer-motion';
+import { useTranslation } from 'react-i18next';
 import {
   Clock,
   Stethoscope,
@@ -35,6 +36,7 @@ const AppointmentPatientCard = ({
   className = '',
   index = 0,
 }) => {
+  const { t } = useTranslation();
   const [showCancelDialog, setShowCancelDialog] = useState(false);
 
   // Get status color and icon
@@ -107,7 +109,7 @@ const AppointmentPatientCard = ({
       <Card className="border-border p-4">
         <div className="text-center text-muted-foreground">
           <AlertCircle className="mx-auto mb-2 h-8 w-8" />
-          <p>Patient or doctor information not found</p>
+          <p>{t('receptionist.appointment.patientDoctorNotFound')}</p>
         </div>
       </Card>
     );
@@ -211,7 +213,7 @@ const AppointmentPatientCard = ({
                       variant="outline"
                       className="border-red-200 bg-red-50 text-xs text-red-700 dark:border-red-800 dark:bg-red-900/30 dark:text-red-200"
                     >
-                      Blood: {patient.blood_group}
+                      {t('receptionist.appointment.blood')}: {patient.blood_group}
                     </Badge>
                   )}
                   {patient.allergies && (
@@ -220,7 +222,7 @@ const AppointmentPatientCard = ({
                       className="border-orange-200 bg-orange-50 text-orange-700 dark:border-orange-800 dark:bg-orange-900/30 dark:text-orange-200"
                     >
                       <AlertCircle className="mr-1 h-3 w-3" />
-                      Allergies: {patient.allergies}
+                      {t('receptionist.appointment.allergies')}: {patient.allergies}
                     </Badge>
                   )}
                 </div>
@@ -245,7 +247,9 @@ const AppointmentPatientCard = ({
                   className="w-full sm:flex-1"
                 >
                   <FileText className="mr-2 h-3 w-3 sm:h-4 sm:w-4" />
-                  <span className="text-xs sm:text-sm">View Details</span>
+                  <span className="text-xs sm:text-sm">
+                    {t('receptionist.appointments.viewDetails')}
+                  </span>
                 </Button>
 
                 {appointment.status !== 'cancelled' && appointment.status !== 'completed' && (
@@ -257,7 +261,9 @@ const AppointmentPatientCard = ({
                       className="w-full sm:flex-1"
                     >
                       <RotateCcw className="mr-2 h-3 w-3 sm:h-4 sm:w-4" />
-                      <span className="text-xs sm:text-sm">Reschedule</span>
+                      <span className="text-xs sm:text-sm">
+                        {t('receptionist.appointments.reschedule')}
+                      </span>
                     </Button>
 
                     <Button
@@ -267,8 +273,9 @@ const AppointmentPatientCard = ({
                       className="w-full text-red-600 hover:bg-red-50 hover:text-red-700 dark:text-red-400 dark:hover:bg-red-900/30 dark:hover:text-red-300 sm:flex-1"
                     >
                       <XCircle className="mr-2 h-3 w-3 sm:h-4 sm:w-4" />
-                      <span className="text-xs sm:text-sm">Cancel</span>
-                      Cancel
+                      <span className="text-xs sm:text-sm">
+                        {t('receptionist.appointments.cancelAppointment')}
+                      </span>
                     </Button>
                   </>
                 )}
@@ -284,11 +291,15 @@ const AppointmentPatientCard = ({
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
               <XCircle className="h-5 w-5 text-red-600" />
-              Cancel Appointment
+              {t('receptionist.appointments.cancelAppointment')}
             </DialogTitle>
             <DialogDescription>
-              Are you sure you want to cancel this appointment for {patient.first_name}{' '}
-              {patient.last_name}?
+              {t('receptionist.appointments.cancelConfirmation', {
+                name:
+                  patient?.first_name && patient?.last_name
+                    ? `${patient.first_name} ${patient.last_name}`
+                    : 'this patient',
+              })}
             </DialogDescription>
           </DialogHeader>
 
@@ -315,10 +326,10 @@ const AppointmentPatientCard = ({
                 onClick={() => setShowCancelDialog(false)}
                 className="flex-1"
               >
-                Keep Appointment
+                {t('receptionist.appointments.keepAppointment')}
               </Button>
               <Button variant="destructive" onClick={handleCancel} className="flex-1">
-                Cancel Appointment
+                {t('receptionist.appointments.cancelAppointment')}
               </Button>
             </div>
           </div>

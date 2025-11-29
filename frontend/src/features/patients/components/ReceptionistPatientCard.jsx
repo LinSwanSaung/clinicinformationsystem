@@ -1,4 +1,5 @@
 import { useState, useEffect, memo } from 'react';
+import { useTranslation } from 'react-i18next';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -9,6 +10,7 @@ import logger from '@/utils/logger';
 
 const ReceptionistPatientCard = memo(({ patient, onBookAppointment }) => {
   const navigate = useNavigate();
+  const { t } = useTranslation();
   const [allergies, setAllergies] = useState([]);
   const [loadingAllergies, setLoadingAllergies] = useState(false);
 
@@ -55,13 +57,15 @@ const ReceptionistPatientCard = memo(({ patient, onBookAppointment }) => {
             </h3>
             <div className="space-y-1 sm:space-y-1.5 md:space-y-2">
               <p className="break-all text-xs text-muted-foreground sm:text-sm md:text-lg">
-                Patient #: {patient.patient_number}
+                {t('receptionist.receptionistPatientCard.patientNumber')}: {patient.patient_number}
               </p>
               <p className="break-all text-xs text-muted-foreground sm:text-sm md:text-lg">
-                Phone: {patient.phone || 'N/A'}
+                {t('receptionist.receptionistPatientCard.phone')}:{' '}
+                {patient.phone || t('receptionist.receptionistPatientCard.na')}
               </p>
               <p className="break-all text-xs text-muted-foreground sm:text-sm md:text-lg">
-                Email: {patient.email || 'N/A'}
+                {t('receptionist.receptionistPatientCard.email')}:{' '}
+                {patient.email || t('receptionist.receptionistPatientCard.na')}
               </p>
               <div className="mt-2 flex flex-wrap gap-1 sm:mt-2.5 sm:gap-1.5 md:mt-3 md:gap-2">
                 {patient.blood_group && (
@@ -69,7 +73,7 @@ const ReceptionistPatientCard = memo(({ patient, onBookAppointment }) => {
                     variant="secondary"
                     className="bg-secondary px-2 py-0.5 text-xs text-secondary-foreground sm:px-3 sm:py-0.5 sm:text-sm md:px-4 md:py-1 md:text-base"
                   >
-                    Blood: {patient.blood_group}
+                    {t('receptionist.receptionistPatientCard.blood')}: {patient.blood_group}
                   </Badge>
                 )}
 
@@ -90,7 +94,8 @@ const ReceptionistPatientCard = memo(({ patient, onBookAppointment }) => {
                                 : 'bg-red-400 hover:bg-red-500'
                         }`}
                       >
-                        Allergies: {allergy.allergy_name} ({allergy.severity || 'mild'})
+                        {t('receptionist.receptionistPatientCard.allergies')}:{' '}
+                        {allergy.allergy_name} ({allergy.severity || 'mild'})
                       </Badge>
                     ))}
                   </>
@@ -100,7 +105,7 @@ const ReceptionistPatientCard = memo(({ patient, onBookAppointment }) => {
                     variant="destructive"
                     className="px-2 py-0.5 text-xs sm:px-3 sm:py-0.5 sm:text-sm md:px-4 md:py-1 md:text-base"
                   >
-                    Allergies: {patient.allergies}
+                    {t('receptionist.receptionistPatientCard.allergies')}: {patient.allergies}
                   </Badge>
                 ) : null}
               </div>
@@ -116,8 +121,10 @@ const ReceptionistPatientCard = memo(({ patient, onBookAppointment }) => {
             onClick={handleBookAppointment}
           >
             <Calendar className="h-3 w-3 text-primary sm:h-4 sm:w-4 md:h-6 md:w-6" />
-            <span className="sm:hidden">Book</span>
-            <span className="hidden sm:inline">Book Appointment</span>
+            <span className="sm:hidden">{t('receptionist.receptionistPatientCard.book')}</span>
+            <span className="hidden sm:inline">
+              {t('receptionist.receptionistPatientCard.bookAppointment')}
+            </span>
           </Button>
           <Button
             variant="outline"
@@ -126,21 +133,27 @@ const ReceptionistPatientCard = memo(({ patient, onBookAppointment }) => {
             onClick={handleViewRecords}
           >
             <FileText className="h-3 w-3 text-primary sm:h-4 sm:w-4 md:h-6 md:w-6" />
-            <span className="sm:hidden">Records</span>
-            <span className="hidden sm:inline">View Records</span>
+            <span className="sm:hidden">{t('receptionist.receptionistPatientCard.records')}</span>
+            <span className="hidden sm:inline">
+              {t('receptionist.receptionistPatientCard.viewRecords')}
+            </span>
           </Button>
         </div>
 
         <div className="flex flex-col gap-2 border-t border-border pt-2 sm:flex-row sm:flex-wrap sm:gap-x-6 sm:gap-y-1 sm:pt-3 md:gap-x-8 md:gap-y-2 md:pt-4">
           <p className="text-xs text-muted-foreground sm:text-sm md:text-lg">
-            DOB:{' '}
-            {patient.date_of_birth ? new Date(patient.date_of_birth).toLocaleDateString() : 'N/A'}
+            {t('receptionist.receptionistPatientCard.dob')}:{' '}
+            {patient.date_of_birth
+              ? new Date(patient.date_of_birth).toLocaleDateString()
+              : t('receptionist.receptionistPatientCard.na')}
           </p>
           <p className="text-xs text-muted-foreground sm:text-sm md:text-lg">
-            Gender: {patient.gender || 'N/A'}
+            {t('receptionist.receptionistPatientCard.gender')}:{' '}
+            {patient.gender || t('receptionist.receptionistPatientCard.na')}
           </p>
           <p className="break-words text-xs text-muted-foreground sm:text-sm md:text-lg">
-            Address: {patient.address || 'N/A'}
+            {t('receptionist.receptionistPatientCard.address')}:{' '}
+            {patient.address || t('receptionist.receptionistPatientCard.na')}
           </p>
         </div>
       </div>

@@ -117,19 +117,19 @@ const AdminLogin = () => {
                   <strong>Admin:</strong> admin@clinic.com / admin123
                 </div>
                 <div>
-                  <strong>Doctor:</strong> dr.smith@clinic.com / doctor123
+                  <strong>Receptionist:</strong> lin@gmail.com / Lin260702
                 </div>
                 <div>
-                  <strong>Nurse:</strong> nurse.williams@clinic.com / nurse123
+                  <strong>Nurse:</strong> chue@gmail.com / Lin260702
                 </div>
                 <div>
-                  <strong>Receptionist:</strong> reception@clinic.com / reception123
+                  <strong>Doctor:</strong> zawoo@gmail.com / Lin260702
                 </div>
                 <div>
-                  <strong>Cashier:</strong> cashier@clinic.com / cashier123
+                  <strong>Cashier/Pharmacist:</strong> cashier1@gmail.com / cashier123
                 </div>
                 <div>
-                  <strong>Pharmacist:</strong> pharmacy@clinic.com / pharmacy123
+                  <strong>Patient:</strong> adamthegreat169@gmail.com / Lin260702
                 </div>
               </div>
             </div>

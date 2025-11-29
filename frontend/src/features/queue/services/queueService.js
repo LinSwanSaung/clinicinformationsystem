@@ -51,9 +51,15 @@ class QueueService {
   /**
    * Get comprehensive queue status for a doctor
    */
-  async getDoctorQueueStatus(doctorId, date = null) {
+  async getDoctorQueueStatus(doctorId, date = null, skipCompletedVitals = false) {
     try {
-      const params = date ? { date } : {};
+      const params = {};
+      if (date) {
+        params.date = date;
+      }
+      if (skipCompletedVitals) {
+        params.skipCompletedVitals = 'true';
+      }
       const response = await api.get(`${this.baseURL}/doctor/${doctorId}/status`, { params });
       return response; // Return the full response, not response.data
     } catch (error) {
@@ -156,9 +162,15 @@ class QueueService {
       logger.error('🚨 QueueService startConsultation error:', error);
       logger.error('🚨 Error response:', error.response);
       logger.error('🚨 Error data:', error.response?.data);
-      throw new Error(
+
+      // Preserve error details for proper handling in UI
+      const enhancedError = new Error(
         error.response?.data?.message || error.message || 'Failed to start consultation'
       );
+      enhancedError.code = error.response?.data?.code;
+      enhancedError.details = error.response?.data?.details;
+      enhancedError.response = error.response;
+      throw enhancedError;
     }
   }
 
@@ -287,7 +299,106 @@ class QueueService {
   /**
    * Get all active doctors with their current queue status and availability
    */
-  async getAllDoctorsQueueStatus(date = null) {
+  async getAllDoctorsQueueStatus(date = null, skipCompletedVitals = false) {
+    try {
+      const params = {};
+      if (date) {
+        params.date = date;
+      }
+      if (skipCompletedVitals) {
+        params.skipCompletedVitals = 'true';
+      }
+
+      // Try batch endpoint first
+      try {
+        const [batchResponse, allAvailabilityResponse] = await Promise.all([
+          api.get(`${this.baseURL}/all-doctors-status`, { params }),
+          doctorAvailabilityService.getAllDoctorAvailability(),
+        ]);
+
+        // Handle both response formats:
+        // 1. { success: true, data: [...] } - standard format
+        // 2. [...] - direct array (in case backend returns array directly)
+        let doctorQueues = [];
+        if (Array.isArray(batchResponse.data)) {
+          // Backend returned array directly
+          doctorQueues = batchResponse.data;
+        } else if (
+          batchResponse.data?.success === true &&
+          Array.isArray(batchResponse.data?.data)
+        ) {
+          // Backend returned wrapped format
+          doctorQueues = batchResponse.data.data;
+        } else {
+          // Invalid response format
+          throw new Error(
+            `Invalid batch response format: ${JSON.stringify(batchResponse.data).substring(0, 100)}`
+          );
+        }
+
+        const allAvailability = allAvailabilityResponse.data || [];
+
+        // Enhance each doctor with proper availability status using frontend logic
+        const enhancedDoctors = doctorQueues.map((doctor) => {
+          // Get availability for this doctor
+          const doctorAvailability = allAvailability.filter(
+            (avail) => avail.doctor_id === doctor.id
+          );
+
+          // Get comprehensive status including availability (uses frontend logic for accurate status)
+          const status = doctorAvailabilityService.getDoctorStatus(
+            doctor,
+            doctorAvailability,
+            doctor.queueStatus
+          );
+
+          return {
+            ...doctor,
+            availability: doctorAvailability,
+            status: status,
+          };
+        });
+
+        logger.debug('[QUEUE SERVICE] Successfully used batch endpoint');
+        return { success: true, data: enhancedDoctors };
+      } catch (batchError) {
+        // If batch endpoint fails (404, 500, etc.), fallback to legacy method
+        if (batchError.response?.status === 404 || batchError.response?.status >= 500) {
+          logger.warn(
+            '[QUEUE SERVICE] Batch endpoint not available (404/500), falling back to individual calls...',
+            {
+              status: batchError.response?.status,
+              message: batchError.response?.data?.message || batchError.message,
+            }
+          );
+        } else {
+          logger.warn('[QUEUE SERVICE] Batch endpoint error, falling back to individual calls:', {
+            message: batchError.message,
+            response: batchError.response?.data,
+            status: batchError.response?.status,
+          });
+        }
+        return this.getAllDoctorsQueueStatusLegacy(date);
+      }
+    } catch (error) {
+      logger.error('[QUEUE SERVICE] Critical error in getAllDoctorsQueueStatus:', error);
+      // Final fallback to legacy method
+      try {
+        return await this.getAllDoctorsQueueStatusLegacy(date);
+      } catch (legacyError) {
+        logger.error('[QUEUE SERVICE] Legacy method also failed:', legacyError);
+        throw new Error(
+          error.response?.data?.message || 'Failed to fetch all doctors queue status'
+        );
+      }
+    }
+  }
+
+  /**
+   * Legacy method: Get all doctors queue status using individual calls
+   * Kept as fallback if batch endpoint fails
+   */
+  async getAllDoctorsQueueStatusLegacy(date = null) {
     try {
       // First get all doctors and their availability
       const [doctorsResponse, allAvailabilityResponse] = await Promise.all([

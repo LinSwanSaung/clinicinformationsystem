@@ -1,5 +1,6 @@
 import { Fragment } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
+import { useTranslation } from 'react-i18next';
 import { ChevronRight, Home } from 'lucide-react';
 import { motion } from 'framer-motion';
 import { useAuth } from '@/contexts/AuthContext';
@@ -8,6 +9,7 @@ const Breadcrumbs = () => {
   const navigate = useNavigate();
   const location = useLocation();
   const { user } = useAuth();
+  const { t } = useTranslation();
 
   // Generate breadcrumb items based on current path
   const generateBreadcrumbs = () => {
@@ -17,7 +19,7 @@ const Breadcrumbs = () => {
     // Add home/dashboard as first item
     if (user?.role) {
       breadcrumbs.push({
-        label: 'Dashboard',
+        label: t('breadcrumbs.dashboard'),
         path: `/${user.role}/dashboard`,
         icon: Home,
       });
@@ -25,15 +27,15 @@ const Breadcrumbs = () => {
 
     // Map path segments to readable labels
     const pathMap = {
-      'register-patient': 'Register Patient',
-      appointments: 'Appointments',
-      patients: 'Patient Records',
-      employees: 'Employee Management',
-      schedules: 'Doctor Schedules',
-      emr: 'Medical Records',
-      'patient-record': 'Patient Medical Record',
-      queue: 'Queue',
-      'live-queue': 'Live Queue',
+      'register-patient': t('breadcrumbs.registerPatient'),
+      appointments: t('breadcrumbs.appointments'),
+      patients: t('breadcrumbs.patients'),
+      employees: t('breadcrumbs.employees'),
+      schedules: t('breadcrumbs.schedules'),
+      emr: t('breadcrumbs.emr'),
+      'patient-record': t('breadcrumbs.patientRecord'),
+      queue: t('breadcrumbs.queue'),
+      'live-queue': t('breadcrumbs.liveQueue'),
     };
 
     // Add subsequent breadcrumbs
@@ -42,11 +44,13 @@ const Breadcrumbs = () => {
         const label =
           pathMap[segment] || segment.replace('-', ' ').replace(/\b\w/g, (l) => l.toUpperCase());
 
-        // Special handling for doctor queue routes
-        if (pathSegments[index - 1] === 'queue' && segment.length > 20) {
-          // This is likely a doctor UUID, try to get doctor name from context
-          // For now, we'll skip this segment and let the page title handle it
-          return;
+        // Skip UUID segments in breadcrumbs (doctor IDs, patient IDs, etc.)
+        // UUIDs are 36 characters with dashes or 32 characters without
+        const isUUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(
+          segment
+        );
+        if (isUUID) {
+          return; // Skip UUID segments - let page title handle specific names
         }
 
         const path = '/' + pathSegments.slice(0, index + 1).join('/');

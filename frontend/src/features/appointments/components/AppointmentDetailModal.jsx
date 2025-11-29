@@ -1,9 +1,12 @@
+import { useTranslation } from 'react-i18next';
 import { X, User, Stethoscope, Clock, FileText, Phone, Mail } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 
 const AppointmentDetailModal = ({ appointment, patient, doctor, isOpen, onClose }) => {
+  const { t } = useTranslation();
+
   if (!isOpen || !appointment) {
     return null;
   }
@@ -22,12 +25,12 @@ const AppointmentDetailModal = ({ appointment, patient, doctor, isOpen, onClose 
 
   const getStatusLabel = (status) => {
     const labels = {
-      scheduled: 'Scheduled',
-      waiting: 'Waiting',
-      in_progress: 'Seeing Doctor',
-      completed: 'Completed',
-      cancelled: 'Cancelled',
-      no_show: 'No Show',
+      scheduled: t('receptionist.appointmentDetailModal.statusScheduled'),
+      waiting: t('receptionist.appointmentDetailModal.statusWaiting'),
+      in_progress: t('receptionist.appointmentDetailModal.statusSeeingDoctor'),
+      completed: t('receptionist.appointmentDetailModal.statusCompleted'),
+      cancelled: t('receptionist.appointmentDetailModal.statusCancelled'),
+      no_show: t('receptionist.appointmentDetailModal.statusNoShow'),
     };
     return labels[status] || status;
   };
@@ -45,7 +48,9 @@ const AppointmentDetailModal = ({ appointment, patient, doctor, isOpen, onClose 
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50 p-4">
       <Card className="max-h-[90vh] w-full max-w-2xl overflow-y-auto">
         <CardHeader className="flex flex-row items-center justify-between">
-          <CardTitle className="text-2xl">Appointment Details</CardTitle>
+          <CardTitle className="text-2xl">
+            {t('receptionist.appointmentDetailModal.title')}
+          </CardTitle>
           <Button variant="ghost" size="sm" onClick={onClose}>
             <X className="h-5 w-5" />
           </Button>
@@ -55,7 +60,9 @@ const AppointmentDetailModal = ({ appointment, patient, doctor, isOpen, onClose 
           {/* Appointment Info */}
           <div className="space-y-4">
             <div className="flex items-center justify-between">
-              <h3 className="text-lg font-semibold">Appointment Information</h3>
+              <h3 className="text-lg font-semibold">
+                {t('receptionist.appointmentDetailModal.appointmentInfo')}
+              </h3>
               <Badge className={getStatusColor(appointment.status)}>
                 {getStatusLabel(appointment.status)}
               </Badge>
@@ -73,9 +80,13 @@ const AppointmentDetailModal = ({ appointment, patient, doctor, isOpen, onClose 
               </div>
 
               <div>
-                <p className="font-medium">Type: {appointment.appointment_type}</p>
+                <p className="font-medium">
+                  {t('receptionist.appointmentDetailModal.type')}: {appointment.appointment_type}
+                </p>
                 <p className="text-sm text-muted-foreground">
-                  Duration: {appointment.duration_minutes || 30} minutes
+                  {t('receptionist.appointmentDetailModal.duration')}:{' '}
+                  {appointment.duration_minutes || 30}{' '}
+                  {t('receptionist.appointmentDetailModal.minutes')}
                 </p>
               </div>
             </div>
@@ -85,7 +96,7 @@ const AppointmentDetailModal = ({ appointment, patient, doctor, isOpen, onClose 
           <div className="space-y-4">
             <h3 className="flex items-center space-x-2 text-lg font-semibold">
               <User className="h-5 w-5" />
-              <span>Patient Information</span>
+              <span>{t('receptionist.appointmentDetailModal.patientInfo')}</span>
             </h3>
 
             {patient ? (
@@ -107,12 +118,14 @@ const AppointmentDetailModal = ({ appointment, patient, doctor, isOpen, onClose 
                 )}
                 {patient.patient_number && (
                   <p className="text-sm text-muted-foreground">
-                    Patient ID: {patient.patient_number}
+                    {t('receptionist.appointmentDetailModal.patientId')}: {patient.patient_number}
                   </p>
                 )}
               </div>
             ) : (
-              <p className="text-muted-foreground">Patient information not available</p>
+              <p className="text-muted-foreground">
+                {t('receptionist.appointmentDetailModal.patientNotAvailable')}
+              </p>
             )}
           </div>
 
@@ -120,7 +133,7 @@ const AppointmentDetailModal = ({ appointment, patient, doctor, isOpen, onClose 
           <div className="space-y-4">
             <h3 className="flex items-center space-x-2 text-lg font-semibold">
               <Stethoscope className="h-5 w-5" />
-              <span>Doctor Information</span>
+              <span>{t('receptionist.appointmentDetailModal.doctorInfo')}</span>
             </h3>
 
             {doctor ? (
@@ -137,7 +150,9 @@ const AppointmentDetailModal = ({ appointment, patient, doctor, isOpen, onClose 
                 )}
               </div>
             ) : (
-              <p className="text-muted-foreground">Doctor information not available</p>
+              <p className="text-muted-foreground">
+                {t('receptionist.appointmentDetailModal.doctorNotAvailable')}
+              </p>
             )}
           </div>
 
@@ -146,7 +161,7 @@ const AppointmentDetailModal = ({ appointment, patient, doctor, isOpen, onClose 
             <div className="space-y-4">
               <h3 className="flex items-center space-x-2 text-lg font-semibold">
                 <FileText className="h-5 w-5" />
-                <span>Notes</span>
+                <span>{t('receptionist.appointmentDetailModal.notes')}</span>
               </h3>
 
               <div className="bg-muted/50 rounded-lg p-4">
@@ -157,7 +172,7 @@ const AppointmentDetailModal = ({ appointment, patient, doctor, isOpen, onClose 
 
           {/* Close Button */}
           <div className="flex justify-end border-t pt-4">
-            <Button onClick={onClose}>Close</Button>
+            <Button onClick={onClose}>{t('common.close')}</Button>
           </div>
         </CardContent>
       </Card>

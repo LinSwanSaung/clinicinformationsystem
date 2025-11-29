@@ -256,14 +256,6 @@ For backend monitoring, consider:
 2. Via GitHub Actions: Use "workflow_dispatch" trigger
 3. Via CLI: `vercel --prod`
 
-### Database Migrations
-
-Run migrations manually after deployment:
-```bash
-cd backend
-npm run db:migrate
-```
-
 ## Support
 
 For issues or questions:

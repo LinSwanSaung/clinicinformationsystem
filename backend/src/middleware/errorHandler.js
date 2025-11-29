@@ -34,7 +34,7 @@ export const errorHandler = (error, req, res, _next) => {
     });
   }
 
-  // Handle ApplicationError (structured errors from our services)
+  // Handle ApplicationError (structured errors from services)
   if (error.name === 'ApplicationError' || error.code) {
     const statusCode = error.statusCode || 500;
     const response = {

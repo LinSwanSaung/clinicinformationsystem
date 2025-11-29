@@ -53,6 +53,7 @@ const PatientMedicalRecordManagement = () => {
   const [loading, setLoading] = useState(false);
   const [_uploadingFiles, setUploadingFiles] = useState(false);
   const [hasActiveVisit, setHasActiveVisit] = useState(false);
+  const [activeVisitId, setActiveVisitId] = useState(null);
 
   // Modal states for add functionality (DOCTOR ONLY)
   const [isAllergyModalOpen, setIsAllergyModalOpen] = useState(false);
@@ -113,6 +114,11 @@ const PatientMedicalRecordManagement = () => {
       // Use patientId if available, otherwise fall back to id
       const patientIdToUse = selectedPatient.patientId || selectedPatient.id;
 
+      // Clear caches before reloading to ensure fresh data
+      visitService.clearPatientCache(patientIdToUse);
+      allergyService.clearPatientCache(patientIdToUse);
+      diagnosisService.clearPatientCache(patientIdToUse);
+
       // Load allergies, diagnoses, and visit history in parallel
       const [patientAllergies, patientDiagnoses, patientVisitHistory] = await Promise.all([
         allergyService.getAllergiesByPatient(patientIdToUse),
@@ -134,6 +140,7 @@ const PatientMedicalRecordManagement = () => {
         : null;
 
       setHasActiveVisit(!!activeVisit);
+      setActiveVisitId(activeVisit?.id || null);
       logger.debug('🔍 [DOCTOR EMR] Active visit check:', {
         hasActiveVisit: !!activeVisit,
         activeVisitId: activeVisit?.id,
@@ -168,46 +175,65 @@ const PatientMedicalRecordManagement = () => {
               const diagnosisMatch = content.match(/Diagnosis:\s*(.+?)(?:\n\n|$)/);
               const notesMatch = content.match(/Clinical Notes:\s*(.+)/s);
 
-              // Fetch prescriptions for this note's visit and doctor
+              // Fetch prescriptions for this note - first try by note ID, then fallback to time-based
               let prescriptions = [];
-              if (note.visit_id) {
+              if (note.id) {
                 try {
-                  const visitPrescriptions = await prescriptionService.getPrescriptionsByVisit(
-                    note.visit_id
+                  // First try to get prescriptions directly linked to this note
+                  const notePrescriptions = await prescriptionService.getPrescriptionsByNoteId(
+                    note.id
                   );
 
-                  // Filter prescriptions to only those by the same doctor and around the same time
-                  const noteTime = new Date(note.created_at).getTime();
-                  const timeWindow = 5 * 60 * 1000; // 5 minutes window
+                  if (Array.isArray(notePrescriptions) && notePrescriptions.length > 0) {
+                    // Use directly linked prescriptions
+                    prescriptions = notePrescriptions.map((p) => ({
+                      name: p.medication_name,
+                      dosage: p.dosage,
+                      frequency: p.frequency,
+                      duration: p.duration,
+                      quantity: p.quantity,
+                      refills: p.refills,
+                      instructions: p.instructions,
+                    }));
+                  } else if (note.visit_id) {
+                    // Fallback: Legacy prescriptions without doctor_note_id - use time-based matching
+                    const visitPrescriptions = await prescriptionService.getPrescriptionsByVisit(
+                      note.visit_id
+                    );
 
-                  prescriptions = Array.isArray(visitPrescriptions)
-                    ? visitPrescriptions
-                        .filter((p) => {
-                          // Match by doctor ID
-                          if (p.doctor_id !== note.doctor_id) {
-                            return false;
-                          }
+                    // Filter prescriptions to only those by the same doctor and around the same time
+                    const noteTime = new Date(note.created_at).getTime();
+                    const timeWindow = 5 * 60 * 1000; // 5 minutes window
 
-                          // Match by time window (prescriptions created within 5 minutes of note)
-                          const prescriptionTime = new Date(
-                            p.created_at || p.prescribed_date
-                          ).getTime();
-                          const timeDiff = Math.abs(noteTime - prescriptionTime);
+                    prescriptions = Array.isArray(visitPrescriptions)
+                      ? visitPrescriptions
+                          .filter((p) => {
+                            // Match by doctor ID
+                            if (p.doctor_id !== note.doctor_id) {
+                              return false;
+                            }
 
-                          return timeDiff <= timeWindow;
-                        })
-                        .map((p) => ({
-                          name: p.medication_name,
-                          dosage: p.dosage,
-                          frequency: p.frequency,
-                          duration: p.duration,
-                          quantity: p.quantity,
-                          refills: p.refills,
-                          instructions: p.instructions,
-                        }))
-                    : [];
+                            // Match by time window (prescriptions created within 5 minutes of note)
+                            const prescriptionTime = new Date(
+                              p.created_at || p.prescribed_date
+                            ).getTime();
+                            const timeDiff = Math.abs(noteTime - prescriptionTime);
+
+                            return timeDiff <= timeWindow;
+                          })
+                          .map((p) => ({
+                            name: p.medication_name,
+                            dosage: p.dosage,
+                            frequency: p.frequency,
+                            duration: p.duration,
+                            quantity: p.quantity,
+                            refills: p.refills,
+                            instructions: p.instructions,
+                          }))
+                      : [];
+                  }
                 } catch (error) {
-                  logger.error('Error fetching prescriptions for visit:', note.visit_id, error);
+                  logger.error('Error fetching prescriptions for note:', note.id, error);
                 }
               }
 
@@ -344,6 +370,7 @@ const PatientMedicalRecordManagement = () => {
       const patientIdToUse = selectedPatient.patientId || selectedPatient.id;
       const allergyData = {
         patient_id: patientIdToUse,
+        visit_id: activeVisitId,
         allergy_name: newAllergy.allergy_name.trim(),
         allergen_type: newAllergy.allergen_type,
         severity: newAllergy.severity,
@@ -411,6 +438,7 @@ const PatientMedicalRecordManagement = () => {
       const patientIdToUse = selectedPatient.patientId || selectedPatient.id;
       const diagnosisData = {
         patient_id: patientIdToUse,
+        visit_id: activeVisitId,
         diagnosis_name: newDiagnosis.diagnosis_name.trim(),
         diagnosed_date: newDiagnosis.diagnosed_date,
         status: newDiagnosis.status,
@@ -657,7 +685,9 @@ const PatientMedicalRecordManagement = () => {
                         diagnosisHistory: (diagnoses || [])
                           .map((d) => ({
                             condition: d?.diagnosis_name || 'Unknown',
-                            date: d?.diagnosed_date || 'Unknown',
+                            date: d?.diagnosed_date
+                              ? new Date(d.diagnosed_date).toLocaleDateString()
+                              : 'Unknown',
                           }))
                           .filter((item) => item.condition !== 'Unknown'),
                         currentMedications: (prescriptions || [])
@@ -668,6 +698,7 @@ const PatientMedicalRecordManagement = () => {
                             frequency: p.frequency,
                           })),
                       }}
+                      fullDiagnoses={diagnoses || []}
                       onAddAllergy={hasActiveVisit ? handleAddAllergy : undefined}
                       onAddDiagnosis={hasActiveVisit ? handleAddDiagnosis : undefined}
                       showActionButtons={hasActiveVisit}

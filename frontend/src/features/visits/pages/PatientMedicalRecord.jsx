@@ -7,7 +7,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/u
 import { DoctorNotesForm, DiagnosisForm, AllergyForm } from '@/features/medical';
 import { User, Activity, Calendar, FileText, DollarSign, AlertCircle } from 'lucide-react';
 
-// Import our reusable medical components
+// Reusable medical components
 import { PatientInformationHeader } from '@/features/patients';
 import { NavigationTabs } from '@/components/library';
 import { ServiceSelector } from '@/features/appointments';
@@ -44,25 +44,7 @@ const PatientMedicalRecord = () => {
   const [_uploadingFiles, setUploadingFiles] = useState(false);
 
   // Doctor notes management
-  const [doctorNotesList, setDoctorNotesList] = useState([
-    {
-      date: '2024-01-15',
-      note: 'Patient presents with mild symptoms of seasonal allergies. No significant changes since last visit. Vital signs stable and within normal range. Continue current medication regimen. Patient reports good adherence to treatment plan.',
-      diagnosis: 'Seasonal Allergies',
-      prescribedMedications: [
-        { name: 'Loratadine', dosage: '10mg', reason: 'Seasonal allergies' },
-        { name: 'Nasal spray', dosage: '2 sprays daily', reason: 'Congestion relief' },
-      ],
-    },
-    {
-      date: '2023-12-10',
-      note: 'Routine follow-up visit. Patient feeling well overall. Blood pressure slightly elevated, will monitor closely. Recommended lifestyle modifications including diet and exercise.',
-      diagnosis: 'Hypertension (mild)',
-      prescribedMedications: [
-        { name: 'Lisinopril', dosage: '5mg', reason: 'Blood pressure management' },
-      ],
-    },
-  ]);
+  const [doctorNotesList, setDoctorNotesList] = useState([]);
 
   // Modal states
   const [isAddNoteModalOpen, setIsAddNoteModalOpen] = useState(false);
@@ -70,6 +52,7 @@ const PatientMedicalRecord = () => {
   const [editingNote, setEditingNote] = useState(null);
   const [isAddDiagnosisModalOpen, setIsAddDiagnosisModalOpen] = useState(false);
   const [isAddAllergyModalOpen, setIsAddAllergyModalOpen] = useState(false);
+  const [patientDiagnoses, setPatientDiagnoses] = useState([]);
 
   // Form state for diagnosis and allergy
   const [diagnosisFormData, setDiagnosisFormData] = useState({
@@ -119,6 +102,128 @@ const PatientMedicalRecord = () => {
     { id: 'files', label: 'Files & Images', icon: Calendar },
   ];
 
+  /**
+   * Refresh medical data (allergies, diagnoses, visit history) without full page reload
+   */
+  const refreshMedicalData = async () => {
+    if (!selectedPatient?.id) {
+      return;
+    }
+
+    try {
+      // Clear caches first to ensure fresh data
+      allergyService.clearPatientCache(selectedPatient.id);
+      diagnosisService.clearPatientCache(selectedPatient.id);
+      visitService.clearPatientCache(selectedPatient.id);
+
+      // Fetch fresh data in parallel
+      const [allergies, diagnoses, visits] = await Promise.all([
+        allergyService.getAllergiesByPatient(selectedPatient.id),
+        diagnosisService.getDiagnosesByPatient(selectedPatient.id, true),
+        visitService.getPatientVisitHistory(selectedPatient.id, {
+          includeCompleted: true,
+          includeInProgress: true,
+          limit: 50,
+        }),
+      ]);
+
+      // Get prescriptions from most recent visit
+      const mostRecentVisit = Array.isArray(visits) && visits.length > 0 ? visits[0] : null;
+      const recentPrescriptions = mostRecentVisit?.prescriptions || [];
+
+      // Update patient data state
+      setFullPatientData((prev) => ({
+        ...prev,
+        allergies: Array.isArray(allergies) ? allergies : [],
+        diagnosisHistory: Array.isArray(diagnoses)
+          ? diagnoses.map((d) => ({
+              condition: d.diagnosis_name,
+              date: new Date(d.diagnosed_date).toLocaleDateString(),
+            }))
+          : [],
+        visits: Array.isArray(visits) ? visits : [],
+        currentMedications: recentPrescriptions.map((p) => ({
+          name: p.medication_name,
+          dosage: p.dosage,
+          frequency: p.frequency,
+        })),
+      }));
+
+      // Update diagnoses for the modal
+      setPatientDiagnoses(Array.isArray(diagnoses) ? diagnoses : []);
+
+      logger.debug('🔄 [DOCTOR PMR] Medical data refreshed successfully');
+    } catch (error) {
+      logger.error('Failed to refresh medical data:', error);
+    }
+  };
+
+  /**
+   * Refresh doctor notes list
+   */
+  const refreshDoctorNotes = async () => {
+    if (!selectedPatient?.id) {
+      return;
+    }
+
+    try {
+      const notes = await doctorNotesService.getNotesByPatient(selectedPatient.id);
+
+      if (Array.isArray(notes) && notes.length > 0) {
+        const formattedNotes = await Promise.all(
+          notes.map(async (note) => {
+            // Parse note content - use 'content' field from API
+            const content = note.content || '';
+
+            // Parse diagnosis and clinical notes from content
+            const diagnosisMatch = content.match(/Diagnosis:\s*(.+?)(?:\n\n|$)/);
+            const notesMatch = content.match(/Clinical Notes:\s*(.+)/s);
+
+            // Fetch linked prescriptions
+            let prescriptions = [];
+            if (note.id) {
+              try {
+                // Try to get prescriptions linked to this note
+                const linkedPrescriptions = await prescriptionService.getPrescriptionsByNoteId(
+                  note.id
+                );
+                prescriptions = Array.isArray(linkedPrescriptions)
+                  ? linkedPrescriptions.map((p) => ({
+                      id: p.id,
+                      name: p.medication_name,
+                      dosage: p.dosage,
+                      frequency: p.frequency,
+                      duration: p.duration,
+                      quantity: p.quantity,
+                      refills: p.refills,
+                      instructions: p.instructions,
+                    }))
+                  : [];
+              } catch (error) {
+                logger.error('Error fetching prescriptions for note:', note.id, error);
+              }
+            }
+
+            return {
+              id: note.id,
+              visit_id: note.visit_id,
+              doctor_id: note.doctor_id,
+              date: new Date(note.created_at).toLocaleDateString(),
+              note: notesMatch ? notesMatch[1].trim() : content,
+              diagnosis: diagnosisMatch ? diagnosisMatch[1].trim() : 'N/A',
+              prescribedMedications: prescriptions,
+            };
+          })
+        );
+        setDoctorNotesList(formattedNotes);
+      }
+
+      logger.debug('🔄 [DOCTOR PMR] Doctor notes refreshed successfully');
+    } catch (error) {
+      logger.error('Failed to refresh doctor notes:', error);
+    }
+  };
+
   // Fetch full patient data including allergies and diagnoses
   useEffect(() => {
     const fetchPatientData = async () => {
@@ -141,7 +246,6 @@ const PatientMedicalRecord = () => {
             limit: 50,
           });
 
-          // Ensure we have an array
           const visitsArray = Array.isArray(visitHistory) ? visitHistory : [];
 
           // Find active visit (status === 'in_progress' exactly)
@@ -207,6 +311,7 @@ const PatientMedicalRecord = () => {
 
         // Fetch diagnoses
         const diagnoses = await diagnosisService.getDiagnosesByPatient(selectedPatient.id, true);
+        setPatientDiagnoses(Array.isArray(diagnoses) ? diagnoses : []);
 
         // Fetch visit history (include in-progress visits for consistency)
         const visits = await visitService.getPatientVisitHistory(selectedPatient.id, {
@@ -227,46 +332,67 @@ const PatientMedicalRecord = () => {
                 const diagnosisMatch = content.match(/Diagnosis:\s*(.+?)(?:\n\n|$)/);
                 const notesMatch = content.match(/Clinical Notes:\s*(.+)/s);
 
-                // Fetch prescriptions for this note's visit and doctor
+                // Fetch prescriptions for this note - first try by note ID, then fallback to time-based
                 let prescriptions = [];
-                if (note.visit_id) {
+                if (note.id) {
                   try {
-                    const visitPrescriptions = await prescriptionService.getPrescriptionsByVisit(
-                      note.visit_id
+                    // Try to get prescriptions directly linked to this note
+                    const notePrescriptions = await prescriptionService.getPrescriptionsByNoteId(
+                      note.id
                     );
 
-                    // Filter prescriptions to only those by the same doctor and around the same time
-                    const noteTime = new Date(note.created_at).getTime();
-                    const timeWindow = 5 * 60 * 1000; // 5 minutes window
+                    if (Array.isArray(notePrescriptions) && notePrescriptions.length > 0) {
+                      // Use directly linked prescriptions
+                      prescriptions = notePrescriptions.map((p) => ({
+                        id: p.id,
+                        name: p.medication_name,
+                        dosage: p.dosage,
+                        frequency: p.frequency,
+                        duration: p.duration,
+                        quantity: p.quantity,
+                        refills: p.refills,
+                        instructions: p.instructions,
+                      }));
+                    } else if (note.visit_id) {
+                      // Fallback: Legacy prescriptions without doctor_note_id - use time-based matching
+                      const visitPrescriptions = await prescriptionService.getPrescriptionsByVisit(
+                        note.visit_id
+                      );
 
-                    prescriptions = Array.isArray(visitPrescriptions)
-                      ? visitPrescriptions
-                          .filter((p) => {
-                            // Match by doctor ID
-                            if (p.doctor_id !== note.doctor_id) {
-                              return false;
-                            }
+                      // Filter prescriptions to only those by the same doctor and around the same time
+                      const noteTime = new Date(note.created_at).getTime();
+                      const timeWindow = 5 * 60 * 1000; // 5 minutes window
 
-                            // Match by time window (prescriptions created within 5 minutes of note)
-                            const prescriptionTime = new Date(
-                              p.created_at || p.prescribed_date
-                            ).getTime();
-                            const timeDiff = Math.abs(noteTime - prescriptionTime);
+                      prescriptions = Array.isArray(visitPrescriptions)
+                        ? visitPrescriptions
+                            .filter((p) => {
+                              // Match by doctor ID
+                              if (p.doctor_id !== note.doctor_id) {
+                                return false;
+                              }
 
-                            return timeDiff <= timeWindow;
-                          })
-                          .map((p) => ({
-                            name: p.medication_name,
-                            dosage: p.dosage,
-                            frequency: p.frequency,
-                            duration: p.duration,
-                            quantity: p.quantity,
-                            refills: p.refills,
-                            instructions: p.instructions,
-                          }))
-                      : [];
+                              // Match by time window (prescriptions created within 5 minutes of note)
+                              const prescriptionTime = new Date(
+                                p.created_at || p.prescribed_date
+                              ).getTime();
+                              const timeDiff = Math.abs(noteTime - prescriptionTime);
+
+                              return timeDiff <= timeWindow;
+                            })
+                            .map((p) => ({
+                              id: p.id,
+                              name: p.medication_name,
+                              dosage: p.dosage,
+                              frequency: p.frequency,
+                              duration: p.duration,
+                              quantity: p.quantity,
+                              refills: p.refills,
+                              instructions: p.instructions,
+                            }))
+                        : [];
+                    }
                   } catch (error) {
-                    logger.error('Error fetching prescriptions for visit:', note.visit_id, error);
+                    logger.error('Error fetching prescriptions for note:', note.id, error);
                   }
                 }
 
@@ -325,7 +451,7 @@ const PatientMedicalRecord = () => {
         // Combine all data
         const enrichedPatient = {
           ...selectedPatient,
-          allergies: Array.isArray(allergies) ? allergies.map((a) => a.allergy_name) : [],
+          allergies: Array.isArray(allergies) ? allergies : [],
           diagnosisHistory: Array.isArray(diagnoses)
             ? diagnoses.map((d) => ({
                 condition: d.diagnosis_name,
@@ -436,8 +562,7 @@ const PatientMedicalRecord = () => {
         }))
         .filter((med) => med.name && med.name.length > 0 && med.dosage && med.frequency);
 
-      // Step 1: Mark previous active prescriptions as completed
-      // This ensures old medications don't remain "active" when new ones are prescribed
+      // Mark previous active prescriptions as completed
       try {
         // Get ALL prescriptions including inactive ones to find active ones
         const allPatientPrescriptions = await prescriptionService.getPrescriptionsByPatient(
@@ -461,7 +586,7 @@ const PatientMedicalRecord = () => {
         logger.error('Error fetching/updating previous prescriptions:', error);
       }
 
-      // Step 2: Save the doctor note to the database
+      // Save the doctor note
       const noteData = {
         visit_id: activeVisitId,
         patient_id: displayPatient.id,
@@ -471,9 +596,10 @@ const PatientMedicalRecord = () => {
         is_private: false,
       };
 
-      await doctorNotesService.createNote(noteData);
+      const savedNote = await doctorNotesService.createNote(noteData);
+      const doctorNoteId = savedNote?.data?.id || savedNote?.id;
 
-      // Step 3: Save new prescriptions to database (with status: 'active')
+      // Save new prescriptions
       const savedPrescriptions = [];
       for (const med of validMedications) {
         try {
@@ -481,6 +607,7 @@ const PatientMedicalRecord = () => {
             patient_id: displayPatient.id,
             doctor_id: JSON.parse(localStorage.getItem('user'))?.id,
             visit_id: activeVisitId,
+            doctor_note_id: doctorNoteId, // Link prescription to doctor note
             medication_name: med.name,
             dosage: med.dosage,
             frequency: med.frequency,
@@ -511,8 +638,9 @@ const PatientMedicalRecord = () => {
       // Close modal
       closeAllModals();
 
-      // Refresh the page to show updated data
-      window.location.reload();
+      // Refresh data gracefully without page reload
+      await refreshDoctorNotes();
+      await refreshMedicalData();
     } catch (error) {
       logger.error('Error saving note:', error);
       showError('Failed to save note: ' + (error.message || 'Unknown error'));
@@ -567,33 +695,49 @@ const PatientMedicalRecord = () => {
         }))
         .filter((med) => med.name && med.name.length > 0 && med.dosage && med.frequency);
 
-      // Step 1: Update the doctor note in the backend
+      // Update the doctor note
       const noteContent = `Diagnosis: ${noteFormData.diagnosis}\n\nClinical Notes: ${noteFormData.note}`;
       await doctorNotesService.updateNote(editingNote.id, {
         content: noteContent,
       });
 
-      // Step 2: Update prescriptions if visit_id exists
+      // Update prescriptions if visit_id exists
       if (editingNote.visit_id) {
-        // Get existing prescriptions for this visit
-        const existingPrescriptions = await prescriptionService.getPrescriptionsByVisit(
-          editingNote.visit_id
-        );
+        // Get existing prescriptions - try by note ID first, then fallback to time-based
+        let notePrescriptions = [];
 
-        // Filter to prescriptions from this note (by doctor and time window)
-        const noteTime = new Date(editingNote.date).getTime();
-        const timeWindow = 5 * 60 * 1000; // 5 minutes window
+        try {
+          // First try to get prescriptions directly linked to this note
+          const linkedPrescriptions = await prescriptionService.getPrescriptionsByNoteId(
+            editingNote.id
+          );
 
-        const notePrescriptions = Array.isArray(existingPrescriptions)
-          ? existingPrescriptions.filter((p) => {
-              if (p.doctor_id !== editingNote.doctor_id) {
-                return false;
-              }
-              const prescriptionTime = new Date(p.created_at || p.prescribed_date).getTime();
-              const timeDiff = Math.abs(noteTime - prescriptionTime);
-              return timeDiff <= timeWindow;
-            })
-          : [];
+          if (Array.isArray(linkedPrescriptions) && linkedPrescriptions.length > 0) {
+            notePrescriptions = linkedPrescriptions;
+          } else {
+            // Fallback: Legacy prescriptions without doctor_note_id - use time-based matching
+            const existingPrescriptions = await prescriptionService.getPrescriptionsByVisit(
+              editingNote.visit_id
+            );
+
+            // Filter to prescriptions from this note (by doctor and time window)
+            const noteTime = new Date(editingNote.date).getTime();
+            const timeWindow = 5 * 60 * 1000; // 5 minutes window
+
+            notePrescriptions = Array.isArray(existingPrescriptions)
+              ? existingPrescriptions.filter((p) => {
+                  if (p.doctor_id !== editingNote.doctor_id) {
+                    return false;
+                  }
+                  const prescriptionTime = new Date(p.created_at || p.prescribed_date).getTime();
+                  const timeDiff = Math.abs(noteTime - prescriptionTime);
+                  return timeDiff <= timeWindow;
+                })
+              : [];
+          }
+        } catch (error) {
+          logger.error('Error fetching prescriptions for note update:', error);
+        }
 
         // Cancel old prescriptions that are no longer in the updated medications
         const updatedMedNames = validMedications.map((m) => m.name.toLowerCase().trim());
@@ -613,11 +757,12 @@ const PatientMedicalRecord = () => {
         for (const med of validMedications) {
           const medName = med.name.toLowerCase().trim();
           if (!existingMedNames.includes(medName)) {
-            // Create new prescription
+            // Create new prescription with doctor_note_id
             await prescriptionService.createPrescription({
               patient_id: selectedPatient.id,
               doctor_id: currentUser.id || editingNote.doctor_id,
               visit_id: editingNote.visit_id,
+              doctor_note_id: editingNote.id, // Link prescription to doctor note
               medication_name: med.name,
               dosage: med.dosage,
               frequency: med.frequency,
@@ -632,7 +777,7 @@ const PatientMedicalRecord = () => {
         }
       }
 
-      // Step 3: Update local state
+      // Update local state
       const updatedNote = {
         ...editingNote,
         date: editingNote.date,
@@ -645,7 +790,7 @@ const PatientMedicalRecord = () => {
         prev.map((note, index) => (index === editingNote.index ? updatedNote : note))
       );
 
-      // Step 4: Refresh patient data to update current medications
+      // Refresh patient data
       if (selectedPatient?.id) {
         const visits = await visitService.getPatientVisitHistory(selectedPatient.id, {
           includeCompleted: true,
@@ -735,8 +880,8 @@ const PatientMedicalRecord = () => {
       // Show success message
       showSuccess('Diagnosis added successfully!');
 
-      // Refresh the page to show new diagnosis
-      window.location.reload();
+      // Refresh data gracefully without page reload
+      await refreshMedicalData();
     } catch (error) {
       logger.error('Error adding diagnosis:', error);
 
@@ -805,8 +950,8 @@ const PatientMedicalRecord = () => {
       // Show success message
       showSuccess('Allergy added successfully!');
 
-      // Refresh the page to show new allergy
-      window.location.reload();
+      // Refresh data gracefully without page reload
+      await refreshMedicalData();
     } catch (error) {
       logger.error('Error adding allergy:', error);
 
@@ -929,6 +1074,7 @@ const PatientMedicalRecord = () => {
                   onAddDiagnosis={activeVisitId ? handleAddDiagnosis : undefined}
                   onAddAllergy={activeVisitId ? handleAddAllergy : undefined}
                   showActionButtons={!!activeVisitId}
+                  fullDiagnoses={patientDiagnoses}
                 />
               </div>
             </>
@@ -982,7 +1128,16 @@ const PatientMedicalRecord = () => {
               <ClinicalNotesDisplay
                 notes={doctorNotesList}
                 userRole="doctor"
-                onAddNote={activeVisitId ? handleAddNote : undefined}
+                onAddNote={
+                  activeVisitId &&
+                  // Hide "Add Note" button if doctor already has a note for this visit
+                  !doctorNotesList.some((note) => {
+                    const currentUserId = JSON.parse(localStorage.getItem('user') || '{}')?.id;
+                    return note.visit_id === activeVisitId && note.doctor_id === currentUserId;
+                  })
+                    ? handleAddNote
+                    : undefined
+                }
                 onEditNote={activeVisitId ? handleEditNote : undefined}
               />
             </>

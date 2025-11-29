@@ -6,7 +6,7 @@ export default {
   // JWT Configuration
   jwt: {
     secret: process.env.JWT_SECRET || 'fallback-secret-key-change-in-production',
-    expiresIn: process.env.JWT_EXPIRES_IN || '7d',
+    expiresIn: process.env.JWT_EXPIRES_IN || '8h',
   },
 
   // CORS Configuration
@@ -48,7 +48,7 @@ export default {
       user: process.env.SMTP_USER || null,
       pass: process.env.SMTP_PASS || null,
     },
-    from: process.env.EMAIL_FROM || 'no-reply@realcis.local',
+    from: process.env.EMAIL_FROM || 'no-reply@thrivecare.local',
   },
 
   // Portal URL for CTAs in emails

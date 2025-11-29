@@ -126,8 +126,6 @@ const PatientPortalDashboard = () => {
 
     logger.debug('[lastVisit] All visits:', visitsState.data);
 
-    // Include both completed and in-progress visits
-    // This allows patients to see their ongoing visit and measured vitals
     const relevantVisits = visitsState.data.filter((v) => {
       logger.debug('[lastVisit] Visit status:', v.status, 'for visit:', v);
       return v.status === 'completed' || v.status === 'in-progress' || v.status === 'in_progress';
@@ -135,7 +133,9 @@ const PatientPortalDashboard = () => {
 
     logger.debug('[lastVisit] Relevant visits:', relevantVisits);
 
-    if (relevantVisits.length === 0) return null;
+    if (relevantVisits.length === 0) {
+      return null;
+    }
 
     // Sort by date, most recent first
     const sorted = relevantVisits.sort((a, b) => new Date(b.visit_date) - new Date(a.visit_date));
@@ -144,7 +144,9 @@ const PatientPortalDashboard = () => {
   }, [visitsState.data]);
 
   const vitalsVisits = useMemo(() => {
-    if (!Array.isArray(visitsState.data)) return [];
+    if (!Array.isArray(visitsState.data)) {
+      return [];
+    }
     return visitsState.data.filter((v) => v.vitals && Object.keys(v.vitals).length > 0);
   }, [visitsState.data]);
 
@@ -161,14 +163,17 @@ const PatientPortalDashboard = () => {
         const res = await patientPortalService.getOutstandingBalance();
         // Get totalBalance from outstanding balance response
         const value = Number(res?.data?.totalBalance ?? res?.totalBalance ?? 0);
-        if (mounted) setCreditState({ value, loading: false, error: null });
+        if (mounted) {
+          setCreditState({ value, loading: false, error: null });
+        }
       } catch (e) {
-        if (mounted)
+        if (mounted) {
           setCreditState({
             value: 0,
             loading: false,
             error: e.message || 'Failed to load outstanding balance',
           });
+        }
       }
     })();
     return () => {

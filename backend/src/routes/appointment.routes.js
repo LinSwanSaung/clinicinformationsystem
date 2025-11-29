@@ -61,8 +61,6 @@ router.get(
 
     const appointment = await appointmentService.getAppointmentById(id);
 
-    // Note: Viewing is not logged to avoid excessive audit log entries
-
     res.status(200).json({
       success: true,
       message: 'Appointment retrieved successfully',

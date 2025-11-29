@@ -338,8 +338,8 @@ const VisitHistoryCard = ({ visit, isExpanded = false, onToggleExpand, onDownloa
                             {t('patient.visit.diagnosed')}: {formatDate(diagnosis.diagnosed_date)}
                           </p>
                         )}
-                        {diagnosis.clinical_notes && (
-                          <p className="mt-2 text-xs text-purple-600">{diagnosis.clinical_notes}</p>
+                        {diagnosis.notes && (
+                          <p className="mt-2 text-xs text-purple-600">{diagnosis.notes}</p>
                         )}
                       </div>
                     </div>

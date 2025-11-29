@@ -1,4 +1,5 @@
-import { useState, useEffect } from 'react';
+import { useState, useMemo } from 'react';
+import { useTranslation } from 'react-i18next';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { usePatients, ReceptionistPatientCard } from '@/features/patients';
@@ -7,9 +8,8 @@ import PageLayout from '@/components/layout/PageLayout';
 import { SearchBar, EmptyState, LoadingSpinner } from '@/components/library';
 
 export default function PatientListPage() {
+  const { t } = useTranslation();
   const [searchTerm, setSearchTerm] = useState('');
-  const [filteredPatients, setFilteredPatients] = useState([]);
-  const [allPatients, setAllPatients] = useState([]);
   const { data, isLoading, error, refetch } = usePatients();
   const navigate = useNavigate();
 
@@ -36,25 +36,16 @@ export default function PatientListPage() {
     return { message: msg };
   })();
 
-  useEffect(() => {
-    if (data && Array.isArray(data)) {
-      setAllPatients(data);
-      setFilteredPatients(data);
+  // Filter patients based on search term using useMemo
+  const filteredPatients = useMemo(() => {
+    const patients = Array.isArray(data) ? data : [];
+
+    if (!searchTerm.trim()) {
+      return patients;
     }
-  }, []);
 
-  useEffect(() => {
-    if (data && Array.isArray(data)) {
-      setAllPatients(data);
-      setFilteredPatients(data);
-    }
-  }, [data]);
-
-  const handleSearch = (e) => {
-    const term = e.target.value.toLowerCase();
-    setSearchTerm(term);
-
-    const filtered = allPatients.filter(
+    const term = searchTerm.toLowerCase();
+    return patients.filter(
       (patient) =>
         patient.first_name?.toLowerCase().includes(term) ||
         patient.last_name?.toLowerCase().includes(term) ||
@@ -62,7 +53,10 @@ export default function PatientListPage() {
         patient.phone?.includes(term) ||
         patient.email?.toLowerCase().includes(term)
     );
-    setFilteredPatients(filtered);
+  }, [data, searchTerm]);
+
+  const handleSearch = (e) => {
+    setSearchTerm(e.target.value);
   };
 
   const handleBookAppointment = (patient) => {
@@ -74,15 +68,19 @@ export default function PatientListPage() {
   };
 
   return (
-    <PageLayout title="Patient Records" subtitle="Search and manage patient information" fullWidth>
+    <PageLayout
+      title={t('receptionist.patients.title')}
+      subtitle={t('receptionist.patients.subtitle')}
+      fullWidth
+    >
       <div className="space-y-4 p-3 sm:space-y-6 sm:p-6 md:space-y-8 md:p-8">
         <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between sm:gap-0">
           <h2 className="text-lg font-semibold text-foreground sm:text-xl md:text-2xl">
-            Patient List
+            {t('receptionist.patients.patientList')}
           </h2>
           <Link to="/receptionist/register-patient">
             <Button className="hover:bg-primary/90 flex w-full items-center gap-2 bg-primary px-4 py-3 text-sm text-primary-foreground sm:w-auto sm:gap-3 sm:px-6 sm:py-4 sm:text-base md:px-8 md:py-6 md:text-lg">
-              New Patient
+              {t('receptionist.patients.newPatient')}
             </Button>
           </Link>
         </div>
@@ -90,44 +88,43 @@ export default function PatientListPage() {
         <SearchBar
           value={searchTerm}
           onChange={handleSearch}
-          placeholder="Search patients by name, ID, contact, or email..."
-          ariaLabel="Search patients"
+          placeholder={t('receptionist.patients.searchPlaceholder')}
+          ariaLabel={t('receptionist.patients.title')}
         />
 
         <div className="grid gap-3 sm:gap-4 md:gap-6">
           {isLoading ? (
-            <LoadingSpinner label="Loading patients..." size="lg" />
+            <LoadingSpinner label={t('receptionist.patients.loadingPatients')} size="lg" />
           ) : normalizedError ? (
             <Card className="bg-card p-6 text-center sm:p-8 md:p-12">
               <p className="mb-3 text-base text-destructive sm:mb-4 sm:text-lg md:text-xl">
                 {normalizedError.isAuthError
-                  ? 'Authentication Required'
+                  ? t('receptionist.patients.authRequired')
                   : normalizedError.isRateLimit
-                    ? 'Rate Limit Exceeded'
+                    ? t('receptionist.patients.rateLimitExceeded')
                     : normalizedError.isNetworkError
-                      ? 'Connection Error'
-                      : 'Error loading patients'}
+                      ? t('receptionist.patients.connectionError')
+                      : t('receptionist.patients.errorLoading')}
               </p>
               <p className="mb-4 text-sm text-muted-foreground sm:mb-6 sm:text-base md:text-lg">
                 {normalizedError.message}
               </p>
               {normalizedError.isAuthError ? (
                 <Button onClick={() => navigate('/')} className="mr-4">
-                  Go to Login
+                  {t('receptionist.patients.goToLogin')}
                 </Button>
               ) : normalizedError.isRateLimit ? (
                 <div>
                   <p className="mb-4 text-xs text-muted-foreground sm:text-sm">
-                    Please wait 15 minutes before trying again, or clear your browser cache and
-                    refresh the page.
+                    {t('receptionist.patients.rateLimitMessage')}
                   </p>
                   <Button onClick={() => window.location.reload()} className="mr-4">
-                    Refresh Page
+                    {t('receptionist.patients.refreshPage')}
                   </Button>
                 </div>
               ) : null}
               <Button onClick={() => refetch()} variant="outline">
-                Try Again
+                {t('receptionist.patients.tryAgain')}
               </Button>
             </Card>
           ) : filteredPatients.length > 0 ? (
@@ -140,8 +137,8 @@ export default function PatientListPage() {
             ))
           ) : (
             <EmptyState
-              title="No patients found"
-              description="No patients found matching your search criteria."
+              title={t('receptionist.patients.noPatients')}
+              description={t('receptionist.patients.noPatientsMatch')}
             />
           )}
         </div>

@@ -37,9 +37,7 @@ backend/
 │   ├── validators/            # Input validation schemas
 │   └── utils/                # Utility functions
 ├── database/
-│   ├── schema.sql            # Single source of truth for schema
-│   ├── verify-schema.js      # Schema verification script
-│   └── seeds/                # Sample data
+│   └── schema.sql            # Database schema (single source of truth)
 └── docs/                     # Production documentation
 ```
 
@@ -83,7 +81,6 @@ npm run test:coverage # With coverage
 ## 📊 Database
 
 - **Schema**: `database/schema.sql` (single source of truth)
-- **Verification**: `npm run db:verify-schema`
 - **Provider**: Supabase (PostgreSQL)
 
 ## 🔧 Development
@@ -95,7 +92,6 @@ npm run dev           # Start development server
 npm run lint          # Run ESLint
 npm run lint:fix      # Fix ESLint issues
 npm run format        # Format code with Prettier
-npm run db:verify-schema  # Verify schema matches database
 ```
 
 ### Environment Variables

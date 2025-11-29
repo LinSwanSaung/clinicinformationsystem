@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
+import { useTranslation } from 'react-i18next';
 import PageLayout from '@/components/layout/PageLayout';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -28,6 +29,7 @@ import { useFeedback } from '@/contexts/FeedbackContext';
 const ElectronicMedicalRecords = () => {
   const location = useLocation();
   const navigate = useNavigate();
+  const { t } = useTranslation();
   const { showSuccess, showError, showInfo } = useFeedback();
 
   // State management
@@ -51,10 +53,10 @@ const ElectronicMedicalRecords = () => {
 
   // Tab configuration: include Doctor's Notes for nurse access
   const tabs = [
-    { id: 'overview', label: 'Overview', icon: User },
-    { id: 'history', label: 'Visit History', icon: Activity },
-    { id: 'notes', label: "Doctor's Orders", icon: FileText },
-    { id: 'files', label: 'Files & Images', icon: Calendar },
+    { id: 'overview', label: t('nurse.emr.tabs.overview'), icon: User },
+    { id: 'history', label: t('nurse.emr.tabs.history'), icon: Activity },
+    { id: 'notes', label: t('nurse.emr.tabs.notes'), icon: FileText },
+    { id: 'files', label: t('nurse.emr.tabs.files'), icon: Calendar },
   ];
 
   // Load patients data on component mount
@@ -108,7 +110,6 @@ const ElectronicMedicalRecords = () => {
       setAllergies(Array.isArray(patientAllergies) ? patientAllergies : []);
       setDiagnoses(Array.isArray(patientDiagnoses) ? patientDiagnoses : []);
 
-      // Ensure we have an array
       const visitsArray = Array.isArray(patientVisitHistory) ? patientVisitHistory : [];
       setVisitHistory(visitsArray);
 
@@ -176,36 +177,55 @@ const ElectronicMedicalRecords = () => {
                 const diagnosisMatch = content.match(/Diagnosis:\s*(.+?)(?:\n\n|$)/);
                 const notesMatch = content.match(/Clinical Notes:\s*(.+)/s);
                 let prescriptions = [];
-                if (note.visit_id) {
+                if (note.id) {
                   try {
-                    const visitPrescriptions = await prescriptionService.getPrescriptionsByVisit(
-                      note.visit_id
+                    // First try to get prescriptions directly linked to this note
+                    const notePrescriptions = await prescriptionService.getPrescriptionsByNoteId(
+                      note.id
                     );
-                    const noteTime = new Date(note.created_at).getTime();
-                    const timeWindow = 5 * 60 * 1000;
-                    prescriptions = Array.isArray(visitPrescriptions)
-                      ? visitPrescriptions
-                          .filter((p) => {
-                            if (p.doctor_id !== note.doctor_id) {
-                              return false;
-                            }
-                            const prescriptionTime = new Date(
-                              p.created_at || p.prescribed_date
-                            ).getTime();
-                            return Math.abs(noteTime - prescriptionTime) <= timeWindow;
-                          })
-                          .map((p) => ({
-                            name: p.medication_name,
-                            dosage: p.dosage,
-                            frequency: p.frequency,
-                            duration: p.duration,
-                            quantity: p.quantity,
-                            refills: p.refills,
-                            instructions: p.instructions,
-                          }))
-                      : [];
+
+                    if (Array.isArray(notePrescriptions) && notePrescriptions.length > 0) {
+                      // Use directly linked prescriptions
+                      prescriptions = notePrescriptions.map((p) => ({
+                        name: p.medication_name,
+                        dosage: p.dosage,
+                        frequency: p.frequency,
+                        duration: p.duration,
+                        quantity: p.quantity,
+                        refills: p.refills,
+                        instructions: p.instructions,
+                      }));
+                    } else if (note.visit_id) {
+                      // Fallback: Legacy prescriptions without doctor_note_id - use time-based matching
+                      const visitPrescriptions = await prescriptionService.getPrescriptionsByVisit(
+                        note.visit_id
+                      );
+                      const noteTime = new Date(note.created_at).getTime();
+                      const timeWindow = 5 * 60 * 1000;
+                      prescriptions = Array.isArray(visitPrescriptions)
+                        ? visitPrescriptions
+                            .filter((p) => {
+                              if (p.doctor_id !== note.doctor_id) {
+                                return false;
+                              }
+                              const prescriptionTime = new Date(
+                                p.created_at || p.prescribed_date
+                              ).getTime();
+                              return Math.abs(noteTime - prescriptionTime) <= timeWindow;
+                            })
+                            .map((p) => ({
+                              name: p.medication_name,
+                              dosage: p.dosage,
+                              frequency: p.frequency,
+                              duration: p.duration,
+                              quantity: p.quantity,
+                              refills: p.refills,
+                              instructions: p.instructions,
+                            }))
+                        : [];
+                    }
                   } catch (error) {
-                    logger.error('Error fetching prescriptions for visit:', note.visit_id, error);
+                    logger.error('Error fetching prescriptions for note:', note.id, error);
                   }
                 }
                 return {
@@ -245,12 +265,6 @@ const ElectronicMedicalRecords = () => {
       setLoading(false);
     }
   };
-
-  const patientFiles = [
-    { name: 'Blood Test Results - Jan 2024', type: 'PDF', size: '2.1 MB' },
-    { name: 'Chest X-Ray - Dec 2023', type: 'DICOM', size: '15.8 MB' },
-    { name: 'Prescription History', type: 'PDF', size: '1.2 MB' },
-  ];
 
   // Event handlers
   const handlePatientSelect = (patient) => {
@@ -331,11 +345,11 @@ const ElectronicMedicalRecords = () => {
 
         // TODO: Implement actual file upload to backend
         showSuccess(
-          `Successfully selected ${files.length} file(s) for upload:\n${files.map((f) => f.name).join('\n')}\n\nFile upload API integration pending.`
+          `${t('nurse.emr.fileUploadSuccess', { count: files.length })}:\n${files.map((f) => f.name).join('\n')}\n\n${t('nurse.emr.fileUploadPending')}`
         );
       } catch (error) {
         logger.error('Error uploading files:', error);
-        showError('Failed to upload files. Please try again.');
+        showError(t('nurse.emr.fileUploadFailed'));
       } finally {
         setLoading(false);
       }
@@ -346,14 +360,12 @@ const ElectronicMedicalRecords = () => {
 
   const handleViewFile = (file) => {
     logger.debug('View file:', file);
-    showInfo(
-      `File viewing functionality will open: ${file.name}\n\nThis requires backend integration.`
-    );
+    showInfo(t('nurse.emr.fileViewPending', { name: file.name }));
   };
 
   const handleDownloadFile = (file) => {
     logger.debug('Download file:', file);
-    showInfo(`File download functionality for: ${file.name}\n\nThis requires backend integration.`);
+    showInfo(t('nurse.emr.fileDownloadPending', { name: file.name }));
   };
 
   // Render visit history tab content
@@ -361,11 +373,11 @@ const ElectronicMedicalRecords = () => {
     <Card className="p-6">
       <div className="mb-6 flex items-center space-x-3">
         <Activity size={24} className="text-green-600" />
-        <h3 className="text-xl font-bold">Patient Visit History</h3>
+        <h3 className="text-xl font-bold">{t('nurse.emr.visitHistory')}</h3>
       </div>
 
       {loading ? (
-        <LoadingSpinner label="Loading visit history..." />
+        <LoadingSpinner label={t('nurse.emr.loadingVisitHistory')} />
       ) : visitHistory && visitHistory.length > 0 ? (
         <div className="space-y-4">
           {visitHistory.map((visit, index) => (
@@ -380,10 +392,8 @@ const ElectronicMedicalRecords = () => {
       ) : (
         <div className="py-12 text-center">
           <Activity size={48} className="mx-auto mb-4 text-muted-foreground" />
-          <p className="text-base text-muted-foreground">No visit history available</p>
-          <p className="mt-2 text-sm text-muted-foreground">
-            Visit history will appear here once the patient completes visits
-          </p>
+          <p className="text-base text-muted-foreground">{t('nurse.emr.noVisitHistory')}</p>
+          <p className="mt-2 text-sm text-muted-foreground">{t('nurse.emr.noVisitHistoryDesc')}</p>
         </div>
       )}
     </Card>
@@ -396,21 +406,16 @@ const ElectronicMedicalRecords = () => {
         <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-full bg-muted">
           <FileText size={32} className="text-muted-foreground" />
         </div>
-        <h3 className="text-lg font-medium text-foreground">No Patient Selected</h3>
+        <h3 className="text-lg font-medium text-foreground">{t('nurse.emr.noPatientSelected')}</h3>
         <p className="mx-auto max-w-md text-sm text-muted-foreground">
-          Use the search bar above to find a patient and view their complete electronic medical
-          record.
+          {t('nurse.emr.noPatientSelectedDesc')}
         </p>
       </div>
     </Card>
   );
 
   return (
-    <PageLayout
-      title="Electronic Medical Records"
-      subtitle="Patient medical record viewing (Nurse Access - View Only)"
-      fullWidth={true}
-    >
+    <PageLayout title={t('nurse.emr.title')} subtitle={t('nurse.emr.subtitle')} fullWidth={true}>
       <div className="w-full space-y-6">
         {/* Patient Search */}
         {!selectedPatient && (
@@ -423,7 +428,7 @@ const ElectronicMedicalRecords = () => {
                 className="flex h-12 items-center space-x-2 px-6 text-base"
               >
                 <ArrowLeft size={18} />
-                <span>Back to Dashboard</span>
+                <span>{t('nurse.emr.backToDashboard')}</span>
               </Button>
             </div>
 
@@ -447,7 +452,7 @@ const ElectronicMedicalRecords = () => {
             {/* Tab Content */}
             <div className="min-h-[400px]">
               {/* Loading State */}
-              {loading && <LoadingSpinner label="Loading patient medical data..." />}
+              {loading && <LoadingSpinner label={t('nurse.emr.loading')} />}
 
               {/* Overview Tab */}
               {!loading && activeTab === 'overview' && (
@@ -457,11 +462,8 @@ const ElectronicMedicalRecords = () => {
                       <div className="flex items-center space-x-3 text-amber-800 dark:text-amber-200">
                         <AlertCircle size={20} />
                         <div>
-                          <p className="font-semibold">No Active Consultation</p>
-                          <p className="text-sm">
-                            Patient does not have an active consultation session. Vitals can only be
-                            recorded during active consultations.
-                          </p>
+                          <p className="font-semibold">{t('nurse.emr.noActiveConsultation')}</p>
+                          <p className="text-sm">{t('nurse.emr.noActiveConsultationDesc')}</p>
                         </div>
                       </div>
                     </Card>
@@ -482,7 +484,9 @@ const ElectronicMedicalRecords = () => {
                         diagnosisHistory: (diagnoses || [])
                           .map((d) => ({
                             condition: d?.diagnosis_name || 'Unknown',
-                            date: d?.diagnosed_date || 'Unknown',
+                            date: d?.diagnosed_date
+                              ? new Date(d.diagnosed_date).toLocaleDateString()
+                              : 'Unknown',
                           }))
                           .filter((item) => item.condition !== 'Unknown'),
                         currentMedications: (prescriptions || [])
@@ -493,6 +497,7 @@ const ElectronicMedicalRecords = () => {
                             frequency: p.frequency,
                           })),
                       }}
+                      fullDiagnoses={diagnoses || []}
                       showActionButtons={false}
                     />
                   </div>
@@ -507,8 +512,7 @@ const ElectronicMedicalRecords = () => {
                 <>
                   {notesAuthError && (
                     <div className="mb-3 rounded-md border border-yellow-200 bg-yellow-50 p-3 text-sm text-yellow-800 dark:border-yellow-800 dark:bg-yellow-950/30 dark:text-yellow-200">
-                      Unable to load doctor&apos;s notes due to authorization. If your role should
-                      have access, please contact an administrator.
+                      {t('nurse.emr.authError')}
                     </div>
                   )}
                   {!loading && visitCheckComplete && !hasActiveVisit && (
@@ -516,11 +520,8 @@ const ElectronicMedicalRecords = () => {
                       <div className="flex items-center space-x-3 text-amber-800 dark:text-amber-200">
                         <AlertCircle size={20} />
                         <div>
-                          <p className="font-semibold">No Active Consultation</p>
-                          <p className="text-sm">
-                            Patient does not have an active consultation session. Medical data can
-                            only be added/edited during active consultations.
-                          </p>
+                          <p className="font-semibold">{t('nurse.emr.noActiveConsultation')}</p>
+                          <p className="text-sm">{t('nurse.emr.noActiveConsultationMedical')}</p>
                         </div>
                       </div>
                     </Card>
@@ -537,7 +538,7 @@ const ElectronicMedicalRecords = () => {
               {/* Files & Images Tab */}
               {activeTab === 'files' && (
                 <PatientDocumentManager
-                  files={patientFiles}
+                  files={[]}
                   onUploadFile={handleUploadFile}
                   onViewFile={handleViewFile}
                   onDownloadFile={handleDownloadFile}

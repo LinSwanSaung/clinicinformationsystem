@@ -4,6 +4,9 @@ import dotenv from 'dotenv';
 import helmet from 'helmet';
 import compression from 'compression';
 
+// Load environment variables FIRST - before any config imports
+dotenv.config();
+
 // Import middleware
 import { errorHandler } from './middleware/errorHandler.js';
 import { authenticate } from './middleware/auth.js';
@@ -44,9 +47,6 @@ import appointmentAutoCancel from './jobs/autoCancelAppointments.js';
 import { startAppointmentReminders } from './jobs/appointmentReminders.js';
 import { startPendingItemsNotifications } from './jobs/pendingItemsNotifications.js';
 
-// Load environment variables
-dotenv.config();
-
 const app = express();
 const PORT = process.env.PORT || 3001;
 
@@ -54,8 +54,7 @@ const PORT = process.env.PORT || 3001;
 // MIDDLEWARE ORDER (CRITICAL - Order matters!)
 // ============================================================================
 
-// 1. Trust proxy - Must be first if behind reverse proxy (nginx, load balancer)
-// This ensures rate limiting and IP detection work correctly
+// Trust proxy (for reverse proxy/load balancer)
 app.set('trust proxy', process.env.TRUST_PROXY === 'true' ? true : 1);
 
 // 2. Security headers - Protect against common vulnerabilities
@@ -74,7 +73,7 @@ app.use(
 );
 
 // 3. CORS - Configure properly based on environment
-// For Vercel deployments, we need to be more permissive with CORS
+// Vercel deployments require permissive CORS
 const corsOptions = {
   origin: (origin, callback) => {
     // Allow requests with no origin (mobile apps, curl, etc.)
@@ -82,9 +81,7 @@ const corsOptions = {
       return callback(null, true);
     }
 
-    // CRITICAL: Always allow Vercel preview URLs first (before other checks)
-    // This ensures CORS headers are set for all Vercel deployments
-    // Check for any Vercel domain pattern (works for both local testing and Vercel deployment)
+    // Allow Vercel preview URLs
     if (origin && (origin.includes('.vercel.app') || origin.includes('vercel.app'))) {
       return callback(null, true);
     }
@@ -104,13 +101,10 @@ const corsOptions = {
       }
     }
 
-    // If we're on Vercel (detected by VERCEL environment variable), allow all origins
-    // This is safe because Vercel preview URLs are from the same project
     if (process.env.VERCEL || process.env.VERCEL_ENV) {
       return callback(null, true);
     }
 
-    // In production, allow configured origins
     if (allowedOrigins.includes(origin)) {
       return callback(null, true);
     }
@@ -133,8 +127,6 @@ const corsOptions = {
   optionsSuccessStatus: 204,
 };
 
-// Explicit OPTIONS handler for preflight requests (needed for Vercel serverless functions)
-// This ensures OPTIONS requests are handled before other middleware
 app.options('*', cors(corsOptions));
 
 app.use(cors(corsOptions));

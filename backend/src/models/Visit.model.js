@@ -182,10 +182,14 @@ class VisitModel extends BaseModel {
           diagnosis_name,
           diagnosis_code,
           diagnosis_type,
+          category,
           status,
           severity,
           diagnosed_date,
-          diagnosed_by
+          diagnosed_by,
+          notes,
+          symptoms,
+          treatment_plan
         `
         )
         .eq('visit_id', visitId);
@@ -284,13 +288,7 @@ class VisitModel extends BaseModel {
     }
   }
 
-  /**
-   * Get services provided during the visit
-   * Note: This assumes you'll add a visit_services table
-   */
   async getVisitServices(_visitId) {
-    // This is a placeholder - you may need to create this table
-    // For now, we'll return basic services based on visit type
     return [
       {
         service_name: 'Consultation',
@@ -550,7 +548,6 @@ class VisitModel extends BaseModel {
    */
   async getPatientActiveVisit(patientId) {
     // Get visits with in_progress status
-    // Business Rule: If visit status is 'in_progress', block new visits regardless of invoice status
     const { data: visits, error } = await this.supabase
       .from(this.tableName)
       .select(
@@ -577,10 +574,8 @@ class VisitModel extends BaseModel {
       return null;
     }
 
-    // Business Rule: If visit status is 'in_progress', block new visits regardless of invoice status
-    // This ensures only one visit can be active at a time
-    // Data integrity issues (paid invoice but visit still in_progress) must be resolved by admin
-    const activeVisit = visits[0]; // Get the most recent in_progress visit
+    // Return the most recent in_progress visit
+    const activeVisit = visits[0];
     logger.warn(
       `[VISIT MODEL] Patient ${patientId} has active visit ${activeVisit.id} (status: ${activeVisit.status}, created: ${activeVisit.created_at}) - blocking new visits`
     );

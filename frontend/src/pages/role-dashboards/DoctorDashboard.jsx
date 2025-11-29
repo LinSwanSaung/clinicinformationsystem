@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { useTranslation } from 'react-i18next';
 import { useAuth } from '../../contexts/AuthContext';
 import { useFeedback } from '@/contexts/FeedbackContext';
 import PageLayout from '@/components/layout/PageLayout';
@@ -11,52 +12,27 @@ import { UserCheck, UserCog, CheckCircle, RefreshCw, PlayCircle, XCircle } from 
 import { PatientCard, PatientStats } from '@/features/patients';
 import { patientService } from '@/features/patients';
 import { queueService } from '@/features/queue';
-import { vitalsService } from '@/features/medical';
 import { visitService } from '@/features/visits';
 import { POLLING_INTERVALS } from '@/constants/polling';
 import logger from '@/utils/logger';
 
 /**
- * Helper function to fetch appropriate vitals for a token
- * Uses the token's visit_id to get vitals for that specific visit only
+ * Get vitals from token (included in queue response)
  */
-const fetchTokenVitals = async (token) => {
-  try {
-    if (!token.visit_id) {
-      logger.debug(`❌ Token #${token.token_number} has no visit_id - treating as fresh visit`);
-      return null;
-    }
-
-    logger.debug(
-      `🔍 Fetching vitals for token #${token.token_number} - visit_id: ${token.visit_id}`
-    );
-
-    // Fetch vitals for this specific visit only
-    try {
-      const vitalsResponse = await vitalsService.getVisitVitals(token.visit_id);
-      // Check if we have actual vitals data (not empty array)
-      if (vitalsResponse.success && vitalsResponse.data && vitalsResponse.data.length > 0) {
-        logger.debug(`✅ Found vitals for visit ${token.visit_id}:`, vitalsResponse.data[0]);
-        return vitalsResponse.data[0]; // Return first vitals record
-      }
-      logger.debug(`❌ No vitals found for visit ${token.visit_id} - showing "Add Vitals & Notes"`);
-    } catch (error) {
-      console.warn('Failed to fetch visit vitals:', error);
-    }
-
-    // No vitals for this visit - return null to show "Add Vitals & Notes"
-    return null;
-  } catch (error) {
-    console.warn('Failed to fetch vitals for token:', token.id, error);
-    return null;
+const getTokenVitals = (token) => {
+  if (token.patient?.vitals) {
+    logger.debug(`✅ Token #${token.token_number} has vitals from queue response`);
+    return token.patient.vitals;
   }
+  logger.debug(`❌ Token #${token.token_number} has no vitals - showing "Add Vitals & Notes"`);
+  return null;
 };
 
 /**
  * Helper function to transform token data to patient data format
  */
 const transformTokenToPatientData = (token) => {
-  // Construct blood pressure string only if we have valid values
+  // Construct blood pressure string if valid values exist
   let bloodPressure = null;
   if (
     token.patient?.vitals?.blood_pressure_systolic &&
@@ -75,12 +51,16 @@ const transformTokenToPatientData = (token) => {
 
   return {
     id: token.patient?.id || token.id,
+    patient_number: token.patient?.patient_number || null,
     name:
       `${token.patient?.first_name || ''} ${token.patient?.last_name || ''}`.trim() ||
       'Unknown Patient',
     age: age,
     gender: token.patient?.gender || 'N/A',
     phone: token.patient?.phone || 'N/A',
+    blood_group: token.patient?.blood_group || null,
+    date_of_birth: token.patient?.date_of_birth || null,
+    email: token.patient?.email || null,
     tokenNumber: token.token_number,
     status: token.status,
     priority: token.priority || 3, // Include priority for visual highlighting
@@ -131,6 +111,7 @@ const transformTokenToPatientData = (token) => {
 const DoctorDashboard = () => {
   const navigate = useNavigate();
   const { user } = useAuth();
+  const { t } = useTranslation();
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedTab, setSelectedTab] = useState('ready'); // ready, consulting, completed
   const [timeFilter, setTimeFilter] = useState('all');
@@ -183,7 +164,6 @@ const DoctorDashboard = () => {
                 if (activeToken) {
                   // Consultation is still active, restore state
                   logger.info('Recovered active consultation from session:', tokenId);
-                  // The queue data will be loaded by loadDoctorData, so we just need to switch tab
                   setSelectedTab('consulting');
                 } else {
                   // Consultation completed or cancelled, clear session
@@ -230,20 +210,17 @@ const DoctorDashboard = () => {
         // Check if there's an active consultation
         const hasActiveConsultation = activeTokens.some((token) => token.status === 'serving');
 
-        // Fetch vitals for each patient in the queue
-        const tokensWithVitals = await Promise.all(
-          activeTokens.map(async (token) => {
-            const vitals = await fetchTokenVitals(token);
-            if (vitals) {
-              token.patient.vitals = vitals;
-              token.patient.vitalsRecorded = true;
-            } else {
-              token.patient.vitals = null;
-              token.patient.vitalsRecorded = false;
-            }
-            return token;
-          })
-        );
+        const tokensWithVitals = activeTokens.map((token) => {
+          const vitals = getTokenVitals(token);
+          if (vitals) {
+            token.patient.vitals = vitals;
+            token.patient.vitalsRecorded = true;
+          } else {
+            token.patient.vitals = null;
+            token.patient.vitalsRecorded = false;
+          }
+          return token;
+        });
 
         // Update state with merge logic to preserve any optimistic updates
         setQueueData((prevQueueData) => {
@@ -310,7 +287,6 @@ const DoctorDashboard = () => {
     try {
       setLoading(true);
 
-      // Only proceed if we have a valid doctor ID
       if (!currentDoctorId) {
         setQueueData([]);
         setPatients([]);
@@ -329,39 +305,32 @@ const DoctorDashboard = () => {
           `📋 [DOCTOR] Filtered to ${activeTokens.length} active tokens (excluded ${tokens.length - activeTokens.length} cancelled)`
         );
 
-        // Fetch vitals for each patient in the queue
-        const tokensWithVitals = await Promise.all(
-          activeTokens.map(async (token) => {
-            const vitals = await fetchTokenVitals(token);
-            if (vitals) {
-              token.patient.vitals = vitals;
-              token.patient.vitalsRecorded = true;
-              logger.debug(
-                `✅ [DOCTOR] ${token.patient.first_name} - vitalsRecorded: true, vitals:`,
-                vitals
-              );
-            } else {
-              // No vitals found - this should trigger "Add Vitals & Notes" button
-              token.patient.vitals = null;
-              token.patient.vitalsRecorded = false;
-              logger.debug(
-                `❌ [DOCTOR] ${token.patient.first_name} - vitalsRecorded: false, should show "Add Vitals & Notes"`
-              );
-            }
-            return token;
-          })
-        );
+        const tokensWithVitals = activeTokens.map((token) => {
+          const vitals = getTokenVitals(token);
+          if (vitals) {
+            token.patient.vitals = vitals;
+            token.patient.vitalsRecorded = true;
+            logger.debug(
+              `✅ [DOCTOR] ${token.patient.first_name} - vitalsRecorded: true, vitals:`,
+              vitals
+            );
+          } else {
+            // No vitals found - this should trigger "Add Vitals & Notes" button
+            token.patient.vitals = null;
+            token.patient.vitalsRecorded = false;
+            logger.debug(
+              `❌ [DOCTOR] ${token.patient.first_name} - vitalsRecorded: false, should show "Add Vitals & Notes"`
+            );
+          }
+          return token;
+        });
 
         setQueueData(tokensWithVitals);
       } else {
         setQueueData([]);
       }
 
-      // Load general patients data (backup/fallback)
-      const patientsResponse = await patientService.getDoctorPatients();
-      if (patientsResponse.success) {
-        setPatients(patientsResponse.data);
-      }
+      setPatients([]);
     } catch (error) {
       logger.error('Failed to load doctor data:', error);
       // Fallback to empty data
@@ -390,20 +359,17 @@ const DoctorDashboard = () => {
         // Check if there's an active consultation (status === 'serving')
         const hasActiveConsultation = activeTokens.some((token) => token.status === 'serving');
 
-        // Fetch vitals for each patient in the queue
-        const tokensWithVitals = await Promise.all(
-          activeTokens.map(async (token) => {
-            const vitals = await fetchTokenVitals(token);
-            if (vitals) {
-              token.patient.vitals = vitals;
-              token.patient.vitalsRecorded = true;
-            } else {
-              token.patient.vitals = null;
-              token.patient.vitalsRecorded = false;
-            }
-            return token;
-          })
-        );
+        const tokensWithVitals = activeTokens.map((token) => {
+          const vitals = getTokenVitals(token);
+          if (vitals) {
+            token.patient.vitals = vitals;
+            token.patient.vitalsRecorded = true;
+          } else {
+            token.patient.vitals = null;
+            token.patient.vitalsRecorded = false;
+          }
+          return token;
+        });
 
         // Update state with merge logic to preserve optimistic updates
         setQueueData((prevQueueData) => {
@@ -413,10 +379,7 @@ const DoctorDashboard = () => {
           // Merge new data with existing, preserving optimistic status updates
           const merged = tokensWithVitals.map((newToken) => {
             const existing = existingMap.get(newToken.id);
-            // If status was optimistically updated and differs, preserve it temporarily
-            // This handles cases where user just clicked start/complete but server hasn't confirmed yet
             if (existing && existing.status !== newToken.status) {
-              // Preserve optimistic 'serving' or 'completed' status if it was just set
               if (
                 (existing.status === 'serving' && newToken.status === 'called') ||
                 (existing.status === 'completed' && newToken.status === 'serving')
@@ -437,16 +400,19 @@ const DoctorDashboard = () => {
         }
 
         if (!silent) {
-          showNotification('success', 'Queue data refreshed successfully');
+          showNotification('success', t('doctor.dashboard.notifications.refreshSuccess'));
         }
       } else {
         if (!silent) {
-          showNotification('error', 'Failed to refresh queue data');
+          showNotification('error', t('doctor.dashboard.notifications.refreshFailed'));
         }
       }
     } catch (error) {
       if (!silent) {
-        showNotification('error', `Failed to refresh: ${error.message}`);
+        showNotification(
+          'error',
+          t('doctor.dashboard.notifications.refreshError', { message: error.message })
+        );
       }
     } finally {
       setRefreshing(false);
@@ -470,11 +436,13 @@ const DoctorDashboard = () => {
         (selectedTab === 'consulting' && token.status === 'serving') ||
         (selectedTab === 'completed' && ['completed', 'cancelled'].includes(token.status));
 
-      // Time filter
-      const matchesTime =
-        timeFilter === 'all' ||
-        (timeFilter === 'morning' && new Date(token.created_at).getHours() < 12) ||
-        (timeFilter === 'afternoon' && new Date(token.created_at).getHours() >= 12);
+      // Time filter - based on when the token was issued/created
+      let matchesTime = timeFilter === 'all';
+      if (!matchesTime && token.created_at) {
+        const hour = new Date(token.created_at).getHours();
+        matchesTime =
+          (timeFilter === 'morning' && hour < 12) || (timeFilter === 'afternoon' && hour >= 12);
+      }
 
       return matchesSearch && matchesTab && matchesTime;
     })
@@ -491,7 +459,10 @@ const DoctorDashboard = () => {
 
   // Fallback to regular patients if no queue data
   const filteredPatients = patients.filter((patient) => {
-    const matchesSearch = patient.name?.toLowerCase().includes(searchQuery.toLowerCase());
+    const searchLower = searchQuery.toLowerCase();
+    const matchesSearch =
+      patient.name?.toLowerCase().includes(searchLower) ||
+      patient.patient_number?.toLowerCase().includes(searchLower);
     const matchesTab =
       (selectedTab === 'ready' && (patient.status === 'ready' || patient.status === 'delayed')) ||
       (selectedTab === 'consulting' && patient.status === 'seeing_doctor') ||
@@ -533,12 +504,15 @@ const DoctorDashboard = () => {
         );
       } catch (error) {
         logger.error('Failed to start consultation:', error);
-        showNotification('error', `Failed to start consultation: ${error.message}`);
+        showNotification(
+          'error',
+          t('doctor.dashboard.notifications.consultationFailed', { message: error.message })
+        );
       } finally {
         setRefreshing(false);
       }
     },
-    [patients, refreshQueue, showNotification]
+    [patients, refreshQueue, showNotification, t]
   );
 
   const handleCompleteVisit = useCallback(
@@ -552,20 +526,13 @@ const DoctorDashboard = () => {
           throw new Error('Patient not found');
         }
 
-        // Get visit_id from patient data (could be visit_id, current_visit_id, or active_visit_id)
         const visitId = patient.visit_id || patient.current_visit_id || patient.active_visit_id;
 
         if (!visitId) {
-          // If no visit_id, this patient doesn't have an active visit
-          // This shouldn't happen in normal flow, but handle gracefully
-          showNotification(
-            'error',
-            'No active visit found for this patient. Please use the queue system.'
-          );
+          showNotification('error', t('doctor.dashboard.notifications.noActiveVisit'));
           return;
         }
 
-        // Validate visit status before completion
         try {
           const visitDetails = await visitService.getVisitDetails(visitId);
           if (!visitDetails) {
@@ -574,30 +541,23 @@ const DoctorDashboard = () => {
 
           // Check if visit is already completed
           if (visitDetails.status === 'completed') {
-            showNotification('warning', 'This visit is already completed.');
+            showNotification('warning', t('doctor.dashboard.notifications.visitAlreadyCompleted'));
             await refreshQueue(false);
             return;
           }
 
           // Check if visit is cancelled
           if (visitDetails.status === 'cancelled') {
-            showNotification('error', 'Cannot complete a cancelled visit.');
+            showNotification('error', t('doctor.dashboard.notifications.visitCancelled'));
             return;
           }
 
-          // Check if visit has an invoice and its status
-          // Note: Visits should be completed through invoice payment, not directly
-          // This is a fallback for edge cases
           if (visitDetails.invoice_id) {
             try {
               const { invoiceService } = await import('@/features/billing');
               const invoice = await invoiceService.getInvoiceById(visitDetails.invoice_id);
               if (invoice && invoice.status === 'paid') {
-                // Invoice is paid, visit should be completed through invoice flow
-                showNotification(
-                  'info',
-                  'Visit should be completed through invoice payment. Checking status...'
-                );
+                showNotification('info', t('doctor.dashboard.notifications.visitInvoicePaid'));
                 await refreshQueue(false);
                 return;
               }
@@ -608,7 +568,12 @@ const DoctorDashboard = () => {
           }
         } catch (validationError) {
           logger.error('Error validating visit status:', validationError);
-          showNotification('error', `Failed to validate visit: ${validationError.message}`);
+          showNotification(
+            'error',
+            t('doctor.dashboard.notifications.validateVisitFailed', {
+              message: validationError.message,
+            })
+          );
           return;
         }
 
@@ -623,15 +588,18 @@ const DoctorDashboard = () => {
         // Update local patients state as fallback
         setPatients(patients.map((p) => (p.id === patientId ? { ...p, status: 'completed' } : p)));
 
-        showNotification('success', 'Visit completed successfully');
+        showNotification('success', t('doctor.dashboard.notifications.visitCompleted'));
       } catch (error) {
         logger.error('Failed to complete visit:', error);
-        showNotification('error', `Failed to complete visit: ${error.message}`);
+        showNotification(
+          'error',
+          t('doctor.dashboard.notifications.visitCompleteFailed', { message: error.message })
+        );
       } finally {
         setRefreshing(false);
       }
     },
-    [patients, refreshQueue, showNotification, currentDoctorId]
+    [patients, refreshQueue, showNotification, currentDoctorId, t]
   );
 
   // Complete token consultation (for queue-based patients)
@@ -650,7 +618,7 @@ const DoctorDashboard = () => {
 
         // Immediately switch to completed tab
         setSelectedTab('completed');
-        showNotification('success', 'Consultation completed successfully!');
+        showNotification('success', t('doctor.dashboard.notifications.consultationCompleted'));
 
         // Then make API call
         const response = await queueService.completeConsultation(tokenId);
@@ -678,7 +646,10 @@ const DoctorDashboard = () => {
             return reverted;
           });
           setSelectedTab('consulting');
-          showNotification('error', response?.message || 'Failed to complete consultation');
+          showNotification(
+            'error',
+            response?.message || t('doctor.dashboard.notifications.completeFailed')
+          );
         }
       } catch (error) {
         logger.error('Failed to complete consultation:', error);
@@ -690,12 +661,15 @@ const DoctorDashboard = () => {
           return reverted;
         });
         setSelectedTab('consulting');
-        showNotification('error', `Failed to complete consultation: ${error.message}`);
+        showNotification(
+          'error',
+          t('doctor.dashboard.notifications.completeError', { message: error.message })
+        );
       } finally {
         setRefreshing(false);
       }
     },
-    [refreshQueue, showNotification]
+    [refreshQueue, showNotification, t]
   );
 
   // Queue-specific action handlers
@@ -706,11 +680,14 @@ const DoctorDashboard = () => {
       if (response.success) {
         // Refresh queue to show updated status
         await refreshQueue();
-        showNotification('success', 'Next patient called successfully!');
+        showNotification('success', t('doctor.dashboard.notifications.nextPatientCalled'));
       }
     } catch (error) {
       logger.error('Failed to call next patient:', error);
-      showNotification('error', `Failed to call next patient: ${error.message}`);
+      showNotification(
+        'error',
+        t('doctor.dashboard.notifications.nextPatientFailed', { message: error.message })
+      );
     } finally {
       setRefreshing(false);
     }
@@ -726,7 +703,7 @@ const DoctorDashboard = () => {
 
       // Check if response exists
       if (!response) {
-        showNotification('error', 'No response from server. Please check your connection.');
+        showNotification('error', t('doctor.dashboard.notifications.noServerResponse'));
         return;
       }
 
@@ -739,8 +716,12 @@ const DoctorDashboard = () => {
         logger.debug('[UI] Active consultation detected:', activePatient);
 
         const confirmed = window.confirm(
-          `You have an active consultation with ${activePatient} (Token #${response.activeToken?.token_number}).\n\n` +
-            `Would you like to end this consultation and start with the next patient?`
+          t('doctor.dashboard.dialogs.activeConsultationTitle', {
+            patient: activePatient,
+            token: response.activeToken?.token_number,
+          }) +
+            '\n\n' +
+            t('doctor.dashboard.dialogs.activeConsultationMessage')
         );
 
         if (confirmed) {
@@ -787,23 +768,26 @@ const DoctorDashboard = () => {
 
       // Check if response exists
       if (!response) {
-        showNotification('error', 'No response from server. Please check your connection.');
+        showNotification('error', t('doctor.dashboard.notifications.noServerResponse'));
         return;
       }
 
       if (response.success) {
         logger.debug('[UI] ✅ Consultation ended successfully');
         await refreshQueue();
-        showNotification('success', response.message);
+        showNotification('success', t('doctor.dashboard.notifications.endConsultationSuccess'));
       } else {
         logger.debug('[UI] ℹ️ No active consultation to end:', response.message);
-        showNotification('info', response.message);
+        showNotification('info', t('doctor.dashboard.notifications.noActiveConsultation'));
       }
     } catch (error) {
       logger.error('[UI] ❌ Failed to end consultation:', error);
       const errorMsg = error.response?.data?.message || error.message || 'Unknown error occurred';
       logger.error('[UI] Error message:', errorMsg);
-      showNotification('error', errorMsg);
+      showNotification(
+        'error',
+        t('doctor.dashboard.notifications.endConsultationFailed', { message: errorMsg })
+      );
     }
   };
 
@@ -831,7 +815,10 @@ const DoctorDashboard = () => {
           response?.success !== false && response !== null && response !== undefined;
 
         if (isSuccess) {
-          showNotification('success', response?.message || 'Consultation started successfully!');
+          showNotification(
+            'success',
+            response?.message || t('doctor.dashboard.notifications.consultationStarted')
+          );
 
           // Refresh queue data to get latest status from server (but preserve optimistic update)
           // Don't let refresh errors affect the success of the operation
@@ -851,7 +838,11 @@ const DoctorDashboard = () => {
             return reverted;
           });
           setSelectedTab('ready');
-          showNotification('error', response?.message || 'Failed to start consultation');
+          showNotification(
+            'error',
+            response?.message ||
+              t('doctor.dashboard.notifications.consultationFailed', { message: '' })
+          );
         }
       } catch (error) {
         // Revert optimistic update on error
@@ -863,39 +854,61 @@ const DoctorDashboard = () => {
         });
         setSelectedTab('ready');
 
-        // Handle different error types
-        if (error.message && error.message.includes('currently in consultation')) {
-          const message = error.message;
+        // Extract error details from response or enhanced error
+        const errorCode = error.code || error.response?.data?.code;
+        const errorMessage = error.response?.data?.message || error.message;
+        const errorDetails = error.details || error.response?.data?.details;
+
+        // Handle queue priority/order violations with specific messages
+        if (errorCode === 'QUEUE_PRIORITY_VIOLATION') {
+          const priorityType = errorDetails?.priorityType || 'higher priority';
+          const waitingToken = errorDetails?.waitingTokenNumber || '?';
+          showNotification(
+            'warning',
+            `⚠️ ${priorityType.toUpperCase()} Patient Waiting!\n${errorMessage}`,
+            `Token #${waitingToken} Priority`
+          );
+        } else if (errorCode === 'QUEUE_ORDER_VIOLATION') {
+          const waitingToken = errorDetails?.waitingTokenNumber || '?';
+          showNotification(
+            'warning',
+            `📋 Please Follow Queue Order\n${errorMessage}`,
+            `Token #${waitingToken} First`
+          );
+        } else if (errorMessage && errorMessage.includes('currently in consultation')) {
+          // Handle different error types
           const confirmAction = window.confirm(
-            `${message}\n\nClick "OK" to go to "In Consultation" tab to see active consultations.`
+            `${errorMessage}\n\n` + t('doctor.dashboard.dialogs.currentlyInConsultation')
           );
           if (confirmAction) {
             // Switch to the "In Consultation" tab and refresh
             setSelectedTab('consulting');
             await refreshQueue(false);
           }
-        } else if (error.message && error.message.includes("should be 'called'")) {
+        } else if (errorMessage && errorMessage.includes("should be 'called'")) {
           const confirmAction = window.confirm(
-            `Cannot start consultation: ${error.message}\n\n` +
-              `The patient needs to be called first. Click "OK" to call next patient.`
+            t('doctor.dashboard.dialogs.patientNeedsCalling', { message: errorMessage })
           );
           if (confirmAction) {
             await handleCallNextPatient();
           }
         } else {
-          showNotification('error', `Failed to start consultation: ${error.message}`);
+          showNotification(
+            'error',
+            t('doctor.dashboard.notifications.consultationFailed', { message: errorMessage })
+          );
         }
       } finally {
         setRefreshing(false);
       }
     },
-    [refreshQueue, showNotification, handleCallNextPatient]
+    [refreshQueue, showNotification, handleCallNextPatient, t]
   );
 
   return (
     <PageLayout
-      title="Doctor Dashboard"
-      subtitle="Manage patient consultations and medical records"
+      title={t('doctor.dashboard.title')}
+      subtitle={t('doctor.dashboard.subtitle')}
       fullWidth
     >
       {/* Notifications now handled by Toast system (top-right corner) */}
@@ -904,12 +917,23 @@ const DoctorDashboard = () => {
         {/* Loading state */}
         {loading ? (
           <div className="py-12">
-            <LoadingSpinner label="Loading patients..." />
+            <LoadingSpinner label={t('doctor.dashboard.loadingPatients')} />
           </div>
         ) : (
           <>
-            {/* Patient Stats */}
-            <PatientStats patients={patients} userRole="doctor" />
+            {/* Patient Stats - Map queue statuses to PatientStats expected statuses */}
+            <PatientStats
+              patients={queueData.map((token) => ({
+                ...token,
+                status:
+                  token.status === 'called' || token.status === 'waiting'
+                    ? 'ready'
+                    : token.status === 'serving'
+                      ? 'seeing_doctor'
+                      : token.status,
+              }))}
+              userRole="doctor"
+            />
 
             {/* Search and actions bar */}
             <div className="flex items-center gap-4">
@@ -917,8 +941,8 @@ const DoctorDashboard = () => {
                 <SearchBar
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
-                  placeholder="Search by patient name or token..."
-                  ariaLabel="Search patients"
+                  placeholder={t('doctor.dashboard.searchPlaceholder')}
+                  ariaLabel={t('doctor.dashboard.searchAriaLabel')}
                 />
               </div>
               <div className="min-w-[200px]">
@@ -927,29 +951,29 @@ const DoctorDashboard = () => {
                   value={timeFilter}
                   onChange={(e) => setTimeFilter(e.target.value)}
                 >
-                  <option value="all">All Time</option>
-                  <option value="morning">Morning (AM)</option>
-                  <option value="afternoon">Afternoon (PM)</option>
+                  <option value="all">{t('doctor.dashboard.timeFilter.all')}</option>
+                  <option value="morning">{t('doctor.dashboard.timeFilter.morning')}</option>
+                  <option value="afternoon">{t('doctor.dashboard.timeFilter.afternoon')}</option>
                 </select>
               </div>
               <Button
                 onClick={handleCallNextAndStart}
                 className="h-12 bg-blue-600 px-6 font-semibold text-white shadow-lg hover:bg-blue-700"
                 disabled={refreshing}
-                title="Call next patient by priority (urgent > appointment > token) and start consultation immediately"
+                title={t('doctor.dashboard.actions.callNextAndStartTitle')}
               >
                 <PlayCircle className="mr-2" size={20} />
-                Call Next & Start
+                {t('doctor.dashboard.actions.callNextAndStart')}
               </Button>
               <Button
                 onClick={handleForceEndConsultation}
                 variant="outline"
                 className="h-12 border-red-300 px-4 text-red-600 hover:bg-red-50"
                 disabled={refreshing}
-                title="End any active consultation (fixes stuck consultations)"
+                title={t('doctor.dashboard.actions.endConsultationTitle')}
               >
                 <XCircle className="mr-2" size={18} />
-                End Consultation
+                {t('doctor.dashboard.actions.endConsultation')}
               </Button>
               <Button
                 onClick={refreshQueue}
@@ -958,7 +982,7 @@ const DoctorDashboard = () => {
                 disabled={refreshing}
               >
                 <RefreshCw className={`${refreshing ? 'animate-spin' : ''}`} size={18} />
-                Refresh
+                {t('doctor.dashboard.actions.refresh')}
               </Button>
               <Button
                 onClick={() => setAutoRefresh(!autoRefresh)}
@@ -966,12 +990,14 @@ const DoctorDashboard = () => {
                 className={`h-12 px-4 ${autoRefresh ? 'bg-green-600 text-white hover:bg-green-700' : ''}`}
                 title={
                   autoRefresh
-                    ? 'Auto-refresh is ON - Click to disable'
-                    : 'Auto-refresh is OFF - Click to enable'
+                    ? t('doctor.dashboard.actions.autoRefreshOnTitle')
+                    : t('doctor.dashboard.actions.autoRefreshOffTitle')
                 }
               >
                 <RefreshCw className={`mr-2 ${autoRefresh ? 'animate-pulse' : ''}`} size={18} />
-                {autoRefresh ? 'Auto-refresh ON' : 'Auto-refresh OFF'}
+                {autoRefresh
+                  ? t('doctor.dashboard.actions.autoRefreshOn')
+                  : t('doctor.dashboard.actions.autoRefreshOff')}
               </Button>
             </div>
 
@@ -991,7 +1017,7 @@ const DoctorDashboard = () => {
                     >
                       <div className="flex items-center justify-center gap-2">
                         <UserCheck className="h-4 w-4" />
-                        Ready (
+                        {t('doctor.dashboard.tabs.ready')} (
                         {
                           queueData.filter((t) => ['ready', 'called', 'waiting'].includes(t.status))
                             .length
@@ -1009,7 +1035,8 @@ const DoctorDashboard = () => {
                     >
                       <div className="flex items-center justify-center gap-2">
                         <UserCog className="h-4 w-4" />
-                        In Consultation ({queueData.filter((t) => t.status === 'serving').length})
+                        {t('doctor.dashboard.tabs.inConsultation')} (
+                        {queueData.filter((t) => t.status === 'serving').length})
                       </div>
                     </button>
                     <button
@@ -1022,7 +1049,7 @@ const DoctorDashboard = () => {
                     >
                       <div className="flex items-center justify-center gap-2">
                         <CheckCircle className="h-4 w-4" />
-                        Completed (
+                        {t('doctor.dashboard.tabs.completed')} (
                         {
                           queueData.filter((t) => ['completed', 'cancelled'].includes(t.status))
                             .length
@@ -1072,7 +1099,7 @@ const DoctorDashboard = () => {
                         ))}
                     {filteredQueueData.length === 0 && filteredPatients.length === 0 && (
                       <div className="col-span-full py-12 text-center text-lg text-gray-500">
-                        No patients ready for consultation.
+                        {t('doctor.dashboard.emptyStates.noReady')}
                       </div>
                     )}
                   </div>
@@ -1117,7 +1144,7 @@ const DoctorDashboard = () => {
                         ))}
                     {filteredQueueData.length === 0 && filteredPatients.length === 0 && (
                       <div className="col-span-full py-12 text-center text-lg text-gray-500">
-                        No patients currently in consultation.
+                        {t('doctor.dashboard.emptyStates.noConsulting')}
                       </div>
                     )}
                   </div>
@@ -1160,7 +1187,7 @@ const DoctorDashboard = () => {
                         ))}
                     {filteredQueueData.length === 0 && filteredPatients.length === 0 && (
                       <div className="col-span-full py-12 text-center text-lg text-gray-500">
-                        No completed consultations today.
+                        {t('doctor.dashboard.emptyStates.noCompleted')}
                       </div>
                     )}
                   </div>

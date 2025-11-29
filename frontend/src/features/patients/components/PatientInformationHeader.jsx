@@ -57,7 +57,7 @@ const PatientInformationHeader = ({
           <div className="grid grid-cols-1 gap-4 text-sm md:grid-cols-2 lg:grid-cols-4">
             <div>
               <span className="text-muted-foreground">Patient ID:</span>
-              <p className="font-medium text-foreground">{patient.patient_number || patient.id}</p>
+              <p className="font-medium text-foreground">{patient.patient_number || 'N/A'}</p>
             </div>
             <div>
               <span className="text-muted-foreground">Age:</span>

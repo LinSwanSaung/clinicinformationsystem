@@ -50,7 +50,7 @@ export function startAppointmentReminders() {
           const lastSent = sentNotifications.get(morningReminderKey);
           const fiveMinutesAgo = now.getTime() - 5 * 60 * 1000;
 
-          // Only send if we haven't sent in the last 5 minutes
+          // Only send if not sent in the last 5 minutes
           if (!lastSent || lastSent < fiveMinutesAgo) {
             try {
               const doctorName = appt.doctor
@@ -80,7 +80,7 @@ export function startAppointmentReminders() {
           const lastSent = sentNotifications.get(oneHourReminderKey);
           const fiveMinutesAgo = now.getTime() - 5 * 60 * 1000;
 
-          // Only send if we haven't sent in the last 5 minutes
+          // Only send if not sent in the last 5 minutes
           if (!lastSent || lastSent < fiveMinutesAgo) {
             try {
               const doctorName = appt.doctor

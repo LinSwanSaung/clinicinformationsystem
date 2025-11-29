@@ -1,12 +1,12 @@
 import { useState, useEffect } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
+import { useTranslation } from 'react-i18next';
 import { useAuth } from '@/contexts/AuthContext';
 import { ROLES } from '@/constants/roles';
 import { Button } from '@/components/ui/button';
 import {
   LogOut,
   UserCircle,
-  Settings,
   ChevronDown,
   Heart,
   UserPlus,
@@ -19,7 +19,6 @@ import {
   Stethoscope,
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { employeeService } from '@/features/admin';
 import NotificationBell from './NotificationBell';
 import ThemeToggle from './ThemeToggle';
 import LanguageSwitcher from './LanguageSwitcher';
@@ -39,6 +38,7 @@ const Navbar = () => {
   const { user, logout } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
+  const { t } = useTranslation();
   // const [showNotifications, setShowNotifications] = useState(false); // TODO: Implement notifications
   const [userDetails, setUserDetails] = useState(null);
   const [clinicSettings, setClinicSettings] = useState({
@@ -52,30 +52,17 @@ const Navbar = () => {
         return;
       }
 
-      // Only fetch employee details for roles that have permission (admin, receptionist, nurse)
-      // Cashiers, pharmacists, doctors, and patients should use user data from auth context
-      const allowedRoles = [ROLES.ADMIN, ROLES.RECEPTIONIST, ROLES.NURSE];
+      // Use user data from auth context directly
+      // The user object from login includes first_name and last_name
+      const firstName = user.first_name || '';
+      const lastName = user.last_name || '';
+      const fullName = `${firstName} ${lastName}`.trim();
 
-      if (allowedRoles.includes(user.role)) {
-        try {
-          const employees = await employeeService.getEmployeesByRole(user.role);
-          const userDetail = employees.find((emp) => emp.email.includes(user?.role.toLowerCase()));
-          setUserDetails(userDetail);
-        } catch (error) {
-          logger.error('Error loading user details:', error);
-          // Fallback: use user from auth context
-          setUserDetails({
-            name:
-              `${user.first_name || ''} ${user.last_name || ''}`.trim() || user.email || user.role,
-          });
-        }
-      } else {
-        // For other roles, use user data from auth context directly
-        setUserDetails({
-          name:
-            `${user.first_name || ''} ${user.last_name || ''}`.trim() || user.email || user.role,
-        });
-      }
+      setUserDetails({
+        name: fullName || user.email || user.role,
+        firstName: firstName,
+        lastName: lastName,
+      });
     };
 
     loadUserDetails();
@@ -118,13 +105,13 @@ const Navbar = () => {
       return [
         {
           icon: Home,
-          label: 'Dashboard',
+          label: t('nav.dashboard'),
           path: '/receptionist/dashboard',
           isActive: location.pathname === '/receptionist/dashboard',
         },
         {
           icon: Activity,
-          label: 'Live Queue',
+          label: t('nav.liveQueue'),
           path: '/receptionist/live-queue',
           isActive:
             location.pathname === '/receptionist/live-queue' ||
@@ -132,19 +119,19 @@ const Navbar = () => {
         },
         {
           icon: UserPlus,
-          label: 'Register Patient',
+          label: t('nav.registerPatient'),
           path: '/receptionist/register-patient',
           isActive: location.pathname === '/receptionist/register-patient',
         },
         {
           icon: Calendar,
-          label: 'Appointments',
+          label: t('nav.appointments'),
           path: '/receptionist/appointments',
           isActive: location.pathname === '/receptionist/appointments',
         },
         {
           icon: FileText,
-          label: 'Patient Records',
+          label: t('nav.patientRecords'),
           path: '/receptionist/patients',
           isActive: location.pathname === '/receptionist/patients',
         },
@@ -155,25 +142,25 @@ const Navbar = () => {
       return [
         {
           icon: Home,
-          label: 'Dashboard',
+          label: t('nav.dashboard'),
           path: '/admin/dashboard',
           isActive: location.pathname === '/admin/dashboard',
         },
         {
           icon: Users,
-          label: 'Manage Staff',
+          label: t('nav.manageStaff'),
           path: '/admin/employees',
           isActive: location.pathname === '/admin/employees',
         },
         {
           icon: UserPlus,
-          label: 'Patient Accounts',
+          label: t('nav.patientAccounts'),
           path: '/admin/patient-accounts',
           isActive: location.pathname === '/admin/patient-accounts',
         },
         {
           icon: Stethoscope,
-          label: 'Doctor Availability',
+          label: t('nav.doctorAvailability'),
           path: '/admin/schedules',
           isActive: location.pathname === '/admin/schedules',
         },
@@ -184,13 +171,13 @@ const Navbar = () => {
       return [
         {
           icon: Home,
-          label: 'Dashboard',
+          label: t('nav.dashboard'),
           path: '/doctor/dashboard',
           isActive: location.pathname === '/doctor/dashboard',
         },
         {
           icon: FileText,
-          label: 'Medical Records',
+          label: t('nav.medicalRecords'),
           path: '/doctor/medical-records',
           isActive: location.pathname === '/doctor/medical-records',
         },
@@ -201,13 +188,13 @@ const Navbar = () => {
       return [
         {
           icon: Home,
-          label: 'Dashboard',
+          label: t('nav.dashboard'),
           path: '/nurse/dashboard',
           isActive: location.pathname === '/nurse/dashboard',
         },
         {
           icon: FileText,
-          label: 'Patient Records',
+          label: t('nav.patientRecords'),
           path: '/nurse/emr',
           isActive: location.pathname === '/nurse/emr',
         },
@@ -218,7 +205,7 @@ const Navbar = () => {
       return [
         {
           icon: Home,
-          label: 'Dashboard',
+          label: t('nav.dashboard'),
           path: '/cashier/dashboard',
           isActive: location.pathname === '/cashier/dashboard' || location.pathname === '/cashier',
         },
@@ -229,19 +216,19 @@ const Navbar = () => {
       return [
         {
           icon: Home,
-          label: 'Dashboard',
+          label: t('nav.dashboard'),
           path: '/patient/dashboard',
           isActive: location.pathname === '/patient/dashboard',
         },
         {
           icon: Activity,
-          label: 'Live Queue',
+          label: t('nav.liveQueue'),
           path: '/patient/queue',
           isActive: location.pathname === '/patient/queue',
         },
         {
           icon: FileText,
-          label: 'Medical Records',
+          label: t('nav.medicalRecords'),
           path: '/patient/medical-records',
           isActive: location.pathname === '/patient/medical-records',
         },
@@ -448,17 +435,12 @@ const Navbar = () => {
               </Button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end" className="w-[200px]">
-              <DropdownMenuItem className="py-3 text-base">
-                <Settings className="mr-2 h-5 w-5" />
-                Settings
-              </DropdownMenuItem>
-              <DropdownMenuSeparator />
               <DropdownMenuItem
                 className="py-3 text-base text-red-500 focus:text-red-500"
                 onClick={handleLogout}
               >
                 <LogOut className="mr-2 h-5 w-5" />
-                Logout
+                {t('common.logout')}
               </DropdownMenuItem>
             </DropdownMenuContent>
           </DropdownMenu>

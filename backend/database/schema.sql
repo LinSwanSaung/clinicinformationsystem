@@ -1,34 +1,29 @@
 -- ===============================================
--- RealCIS Clinic Information System Database
--- Consolidated Schema (Single Source of Truth)
+-- ThriveCare Clinic Information System Database
+-- Schema Definition (Single Source of Truth)
 -- ===============================================
 -- 
--- This schema.sql file is the authoritative baseline for fresh database installations.
--- It consolidates all migrations from backend/database/migrations/ into a single
--- idempotent schema definition.
+-- This schema.sql file is the authoritative database schema definition.
+-- Run this file in Supabase SQL Editor to set up the database.
 --
--- Created: Stage 3 Refactor (2025-11-03)
--- Purpose: Single authoritative schema.sql for fresh installs
+-- Updated: November 2025
 --
 -- Structure:
 --   1. Extensions
---   2. Types/Enums
---   3. Tables (with all columns from migrations)
---   4. Constraints
---   5. Indexes
---   6. Views
---   7. Functions
---   8. Triggers
---   9. Row Level Security (RLS) Policies
---   10. Sample Data (optional)
+--   2. Tables (in dependency order)
+--   3. Constraints
+--   4. Indexes
+--   5. Views
+--   6. Functions
+--   7. Triggers
+--   8. Row Level Security (RLS) Policies
 --
 -- Usage:
 --   - Fresh install: Run entire file in Supabase SQL Editor
 --   - Existing DB: Check for conflicts before applying
 --   - Testing: Apply to clean DB, run pg_dump --schema-only, compare with this file
 --
--- Note: Legacy migrations have been moved to db/legacy_migrations/
---       See db/migration-inventory.md for migration history
+-- Note: This schema creates empty tables. Add your own users and data after setup.
 -- ===============================================
 
 -- Enable required extensions
@@ -36,39 +31,11 @@ CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
 CREATE EXTENSION IF NOT EXISTS pgcrypto;
 
 -- ===============================================
--- USERS TABLE
--- ===============================================
-CREATE TABLE IF NOT EXISTS users (
-    id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
-    email VARCHAR(255) UNIQUE NOT NULL,
-    password_hash VARCHAR(255) NOT NULL,
-    first_name VARCHAR(100) NOT NULL,
-    last_name VARCHAR(100) NOT NULL,
-    phone VARCHAR(20),
-    role VARCHAR(50) NOT NULL DEFAULT 'nurse',
-    specialty VARCHAR(100),
-    license_number VARCHAR(100),
-    is_active BOOLEAN DEFAULT true,
-    patient_id UUID REFERENCES patients(id) ON DELETE SET NULL,
-    last_login TIMESTAMPTZ,
-    created_at TIMESTAMPTZ DEFAULT NOW(),
-    updated_at TIMESTAMPTZ DEFAULT NOW(),
-    deleted_at TIMESTAMPTZ,
-    
-    CONSTRAINT valid_role CHECK (
-        role IN ('admin', 'doctor', 'nurse', 'receptionist', 'cashier', 'pharmacist', 'patient')
-    ),
-    CONSTRAINT valid_email CHECK (email ~* '^[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}$')
-);
-
-COMMENT ON COLUMN users.patient_id IS 'Links a patient portal account to the patients table';
-
--- ===============================================
--- PATIENTS TABLE
+-- PATIENTS TABLE (Created FIRST - referenced by users.patient_id)
 -- ===============================================
 CREATE TABLE IF NOT EXISTS patients (
     id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
-    patient_number VARCHAR(20) UNIQUE NOT NULL,
+    patient_number VARCHAR(20) UNIQUE,
     first_name VARCHAR(100) NOT NULL,
     last_name VARCHAR(100) NOT NULL,
     date_of_birth DATE NOT NULL,
@@ -94,6 +61,34 @@ CREATE TABLE IF NOT EXISTS patients (
     CONSTRAINT valid_blood_group CHECK (blood_group IN ('A+', 'A-', 'B+', 'B-', 'AB+', 'AB-', 'O+', 'O-')),
     CONSTRAINT valid_age CHECK (date_of_birth <= CURRENT_DATE)
 );
+
+-- ===============================================
+-- USERS TABLE (Created AFTER patients - has FK to patients)
+-- ===============================================
+CREATE TABLE IF NOT EXISTS users (
+    id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
+    email VARCHAR(255) UNIQUE NOT NULL,
+    password_hash VARCHAR(255) NOT NULL,
+    first_name VARCHAR(100) NOT NULL,
+    last_name VARCHAR(100) NOT NULL,
+    phone VARCHAR(20),
+    role VARCHAR(50) NOT NULL DEFAULT 'nurse',
+    specialty VARCHAR(100),
+    license_number VARCHAR(100),
+    is_active BOOLEAN DEFAULT true,
+    patient_id UUID REFERENCES patients(id) ON DELETE SET NULL,
+    last_login TIMESTAMPTZ,
+    created_at TIMESTAMPTZ DEFAULT NOW(),
+    updated_at TIMESTAMPTZ DEFAULT NOW(),
+    deleted_at TIMESTAMPTZ,
+    
+    CONSTRAINT valid_role CHECK (
+        role IN ('admin', 'doctor', 'nurse', 'receptionist', 'cashier', 'pharmacist', 'patient')
+    ),
+    CONSTRAINT valid_email CHECK (email ~* '^[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}$')
+);
+
+COMMENT ON COLUMN users.patient_id IS 'Links a patient portal account to the patients table';
 
 -- ===============================================
 -- APPOINTMENTS TABLE
@@ -205,6 +200,7 @@ CREATE TABLE IF NOT EXISTS prescriptions (
     visit_id UUID REFERENCES visits(id) ON DELETE CASCADE,
     patient_id UUID NOT NULL REFERENCES patients(id) ON DELETE CASCADE,
     doctor_id UUID NOT NULL REFERENCES users(id),
+    doctor_note_id UUID REFERENCES doctor_notes(id) ON DELETE SET NULL,
     medication_name VARCHAR(200) NOT NULL,
     dosage VARCHAR(100) NOT NULL,
     frequency VARCHAR(100) NOT NULL,
@@ -301,7 +297,9 @@ CREATE TABLE IF NOT EXISTS audit_logs (
         -- Invoice-specific actions
         'INVOICE.CREATE', 'INVOICE.COMPLETE', 'INVOICE.CANCEL', 'INVOICE.PAYMENT',
         -- Payment-specific actions
-        'PAYMENT.RECORD'
+        'PAYMENT.RECORD',
+        -- Token-specific actions
+        'TOKEN.MISSED_AUTO', 'TOKEN.CANCELLED_DOCTOR_UNAVAILABLE'
     )),
     CONSTRAINT valid_status CHECK (status IN ('success', 'failed', 'denied', 'warning'))
 );
@@ -349,7 +347,7 @@ CREATE TABLE IF NOT EXISTS queue_tokens (
     patient_id UUID NOT NULL REFERENCES patients(id) ON DELETE CASCADE,
     doctor_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
     appointment_id UUID REFERENCES appointments(id) ON DELETE SET NULL,
-    visit_id UUID NOT NULL REFERENCES visits(id) ON DELETE RESTRICT,
+    visit_id UUID REFERENCES visits(id) ON DELETE RESTRICT,
     issued_date DATE DEFAULT CURRENT_DATE,
     issued_time TIMESTAMPTZ DEFAULT NOW(),
     -- Queue lifecycle
@@ -452,6 +450,7 @@ CREATE INDEX IF NOT EXISTS idx_vitals_recorded_at ON vitals(recorded_at);
 CREATE INDEX IF NOT EXISTS idx_prescriptions_patient_id ON prescriptions(patient_id);
 CREATE INDEX IF NOT EXISTS idx_prescriptions_doctor_id ON prescriptions(doctor_id);
 CREATE INDEX IF NOT EXISTS idx_prescriptions_status ON prescriptions(status);
+CREATE INDEX IF NOT EXISTS idx_prescriptions_doctor_note_id ON prescriptions(doctor_note_id);
 
 -- Doctor Availability indexes
 CREATE INDEX IF NOT EXISTS idx_doctor_availability_doctor_id ON doctor_availability(doctor_id);
@@ -655,145 +654,7 @@ BEGIN
 END;
 $$ LANGUAGE plpgsql;
 
--- ===============================================
--- Atomic function to record payment with advisory lock
--- Prevents race conditions when multiple payments are recorded simultaneously
--- for the same invoice
--- ===============================================
-CREATE OR REPLACE FUNCTION record_payment_atomic(
-  p_invoice_id UUID,
-  p_amount DECIMAL(10,2),
-  p_payment_method VARCHAR(50),
-  p_payment_reference TEXT,
-  p_payment_notes TEXT,
-  p_received_by UUID
-)
-RETURNS TABLE (
-  success BOOLEAN,
-  message TEXT,
-  payment_data JSONB,
-  invoice_data JSONB
-) 
-LANGUAGE plpgsql
-AS $$
-DECLARE
-  v_invoice_record RECORD;
-  v_payment_record RECORD;
-  v_lock_key BIGINT;
-  v_total_paid DECIMAL(10,2);
-  v_new_balance DECIMAL(10,2);
-  v_subtotal DECIMAL(10,2);
-  v_discount DECIMAL(10,2);
-  v_tax DECIMAL(10,2);
-  v_total_amount DECIMAL(10,2);
-BEGIN
-  -- Generate a unique lock key based on invoice_id
-  -- Using pg_advisory_lock to ensure only one payment can be recorded
-  -- per invoice at a time
-  v_lock_key := abs(hashtext(p_invoice_id::TEXT))::bigint;
-  
-  -- Acquire advisory lock (blocks until lock is available)
-  PERFORM pg_advisory_xact_lock(v_lock_key);
-  
-  -- Now we have exclusive access to this invoice
-  -- Get current invoice state
-  SELECT * INTO v_invoice_record
-  FROM invoices
-  WHERE id = p_invoice_id;
-  
-  IF NOT FOUND THEN
-    RETURN QUERY SELECT FALSE, 'Invoice not found'::TEXT, NULL::JSONB, NULL::JSONB;
-    RETURN;
-  END IF;
-  
-  -- Validate amount
-  IF p_amount <= 0 THEN
-    RETURN QUERY SELECT FALSE, 'Payment amount must be greater than 0'::TEXT, NULL::JSONB, NULL::JSONB;
-    RETURN;
-  END IF;
-  
-  -- Calculate invoice totals from items (atomic calculation)
-  SELECT COALESCE(SUM(total_price), 0) INTO v_subtotal
-  FROM invoice_items
-  WHERE invoice_id = p_invoice_id;
-  
-  v_discount := COALESCE(v_invoice_record.discount_amount, 0);
-  v_tax := COALESCE(v_invoice_record.tax_amount, 0);
-  v_total_amount := v_subtotal - v_discount + v_tax;
-  
-  -- Get current total paid (sum of all payment transactions)
-  SELECT COALESCE(SUM(amount), 0) INTO v_total_paid
-  FROM payment_transactions
-  WHERE invoice_id = p_invoice_id;
-  
-  -- Create payment transaction
-  INSERT INTO payment_transactions (
-    invoice_id,
-    amount,
-    payment_method,
-    payment_reference,
-    payment_notes,
-    received_by
-  )
-  VALUES (
-    p_invoice_id,
-    p_amount,
-    p_payment_method,
-    p_payment_reference,
-    p_payment_notes,
-    p_received_by
-  )
-  RETURNING * INTO v_payment_record;
-  
-  -- Recalculate total paid (including new payment)
-  v_total_paid := v_total_paid + p_amount;
-  v_new_balance := v_total_amount - v_total_paid;
-  
-  -- Update invoice with new totals and status
-  UPDATE invoices
-  SET 
-    subtotal = v_subtotal,
-    total_amount = v_total_amount,
-    amount_paid = v_total_paid,
-    balance_due = v_new_balance,
-    status = CASE 
-      WHEN v_new_balance <= 0 THEN 'paid'
-      WHEN v_total_paid > 0 THEN 'partial_paid'
-      ELSE 'pending'
-    END,
-    -- Set completed_at and completed_by when invoice becomes fully paid
-    -- This ensures invoice history shows correct dates instead of "N/A at N/A"
-    completed_at = CASE 
-      WHEN v_new_balance <= 0 AND completed_at IS NULL THEN NOW()
-      ELSE completed_at
-    END,
-    completed_by = CASE 
-      WHEN v_new_balance <= 0 AND completed_by IS NULL THEN p_received_by
-      ELSE completed_by
-    END,
-    updated_at = NOW()
-  WHERE id = p_invoice_id
-  RETURNING * INTO v_invoice_record;
-  
-  -- Success - return payment and updated invoice data
-  RETURN QUERY SELECT 
-    TRUE,
-    format('Payment of %s recorded successfully', p_amount)::TEXT,
-    to_jsonb(v_payment_record),
-    to_jsonb(v_invoice_record);
-    
-  -- Lock is automatically released when transaction ends
-END;
-$$;
-
--- Grant execute permission
-GRANT EXECUTE ON FUNCTION record_payment_atomic(UUID, DECIMAL, VARCHAR, TEXT, TEXT, UUID) TO authenticated;
-GRANT EXECUTE ON FUNCTION record_payment_atomic(UUID, DECIMAL, VARCHAR, TEXT, TEXT, UUID) TO service_role;
-
--- Add comment
-COMMENT ON FUNCTION record_payment_atomic IS 
-  'Atomically records a payment and recalculates invoice totals using advisory locks. 
-   Prevents race conditions when multiple payments are recorded simultaneously.';
+-- NOTE: record_payment_atomic function is defined AFTER billing tables (invoices, invoice_items, payment_transactions)
 
 -- Function to check doctor availability
 CREATE OR REPLACE FUNCTION is_doctor_available(
@@ -1131,8 +992,8 @@ BEGIN
                 action,
                 table_name,
                 record_id,
-                performed_by,
-                details
+                user_id,
+                new_values
             ) VALUES (
                 'TOKEN.MISSED_AUTO',
                 'queue_tokens',
@@ -1212,8 +1073,8 @@ BEGIN
             action,
             table_name,
             record_id,
-            performed_by,
-            details
+            user_id,
+            new_values
         ) VALUES (
             'TOKEN.CANCELLED_DOCTOR_UNAVAILABLE',
             'queue_tokens',
@@ -1352,334 +1213,13 @@ DROP POLICY IF EXISTS "Healthcare staff can access all data" ON clinic_settings;
 CREATE POLICY "Healthcare staff can access all data" ON clinic_settings FOR ALL USING (true);
 
 -- ===============================================
--- SAMPLE DATA
--- ===============================================
-
--- Insert default admin user (password: admin123)
-INSERT INTO users (
-    email, 
-    password_hash, 
-    first_name, 
-    last_name, 
-    role, 
-    phone,
-    is_active
-) VALUES (
-    'admin@clinic.com',
-    crypt('admin123', gen_salt('bf')),
-    'System',
-    'Administrator',
-    'admin',
-    '+1234567890',
-    true
-) ON CONFLICT (email) DO NOTHING;
-
--- Insert sample doctor
-INSERT INTO users (
-    email, 
-    password_hash, 
-    first_name, 
-    last_name, 
-    role, 
-    phone,
-    specialty,
-    license_number,
-    is_active
-) VALUES (
-    'dr.smith@clinic.com',
-    crypt('doctor123', gen_salt('bf')),
-    'John',
-    'Smith',
-    'doctor',
-    '+1234567891',
-    'Internal Medicine',
-    'MD12345',
-    true
-) ON CONFLICT (email) DO NOTHING;
-
--- Insert sample nurse
-INSERT INTO users (
-    email, 
-    password_hash, 
-    first_name, 
-    last_name, 
-    role, 
-    phone,
-    specialty,
-    is_active
-) VALUES (
-    'nurse.williams@clinic.com',
-    crypt('nurse123', gen_salt('bf')),
-    'Emily',
-    'Williams',
-    'nurse',
-    '+1234567893',
-    'General Nursing',
-    true
-) ON CONFLICT (email) DO NOTHING;
-
--- Insert sample receptionist
-INSERT INTO users (
-    email, 
-    password_hash, 
-    first_name, 
-    last_name, 
-    role, 
-    phone,
-    is_active
-) VALUES (
-    'reception@clinic.com',
-    crypt('reception123', gen_salt('bf')),
-    'Lisa',
-    'Davis',
-    'receptionist',
-    '+1234567895',
-    true
-) ON CONFLICT (email) DO NOTHING;
-
--- Insert sample patients
-INSERT INTO patients (
-    patient_number,
-    first_name, 
-    last_name, 
-    date_of_birth, 
-    gender, 
-    phone, 
-    email, 
-    address, 
-    emergency_contact_name, 
-    emergency_contact_phone, 
-    emergency_contact_relationship, 
-    blood_group, 
-    allergies, 
-    medical_conditions, 
-    insurance_provider, 
-    insurance_number, 
-    is_active
-) VALUES 
-(
-    'P000001',
-    'Alice', 'Anderson', '1985-03-15', 'Female', '+1234567801', 'alice.anderson@email.com', 
-    '123 Main St, City, State 12345', 'Bob Anderson', '+1234567802', 'Spouse', 
-    'A+', 'Penicillin', 'Hypertension', 'Health Insurance Co', 'HIC123456', true
-),
-(
-    'P000002',
-    'Robert', 'Wilson', '1990-07-22', 'Male', '+1234567803', 'robert.wilson@email.com', 
-    '456 Oak Ave, City, State 12345', 'Mary Wilson', '+1234567804', 'Mother', 
-    'O-', 'None known', 'Diabetes Type 2', 'Medical Plus', 'MP789012', true
-),
-(
-    'P000003',
-    'Maria', 'Garcia', '1978-11-08', 'Female', '+1234567805', 'maria.garcia@email.com', 
-    '789 Pine Rd, City, State 12345', 'Carlos Garcia', '+1234567806', 'Husband', 
-    'B+', 'Shellfish', 'None', 'Family Health', 'FH345678', true
-) ON CONFLICT (patient_number) DO NOTHING;
-
--- Insert sample doctor availability (for Dr. Smith) - More realistic and varied times
--- Using the conversion function to store proper 24-hour format in database
-INSERT INTO doctor_availability (
-    doctor_id, 
-    day_of_week, 
-    start_time, 
-    end_time, 
-    is_active
-) VALUES
--- Monday - Morning shift
-(
-    (SELECT id FROM users WHERE email = 'dr.smith@clinic.com'),
-    'Monday',
-    convert_12hr_to_24hr('9:00', 'AM'),
-    convert_12hr_to_24hr('12:30', 'PM'),
-    true
-),
--- Monday - Afternoon shift
-(
-    (SELECT id FROM users WHERE email = 'dr.smith@clinic.com'),
-    'Monday',
-    convert_12hr_to_24hr('2:00', 'PM'),
-    convert_12hr_to_24hr('6:00', 'PM'),
-    true
-),
--- Tuesday - Morning shift
-(
-    (SELECT id FROM users WHERE email = 'dr.smith@clinic.com'),
-    'Tuesday',
-    convert_12hr_to_24hr('8:30', 'AM'),
-    convert_12hr_to_24hr('1:00', 'PM'),
-    true
-),
--- Tuesday - Evening shift
-(
-    (SELECT id FROM users WHERE email = 'dr.smith@clinic.com'),
-    'Tuesday',
-    convert_12hr_to_24hr('3:00', 'PM'),
-    convert_12hr_to_24hr('7:30', 'PM'),
-    true
-),
--- Wednesday - Full day
-(
-    (SELECT id FROM users WHERE email = 'dr.smith@clinic.com'),
-    'Wednesday',
-    convert_12hr_to_24hr('9:00', 'AM'),
-    convert_12hr_to_24hr('5:00', 'PM'),
-    true
-),
--- Thursday - Morning only
-(
-    (SELECT id FROM users WHERE email = 'dr.smith@clinic.com'),
-    'Thursday',
-    convert_12hr_to_24hr('10:00', 'AM'),
-    convert_12hr_to_24hr('2:00', 'PM'),
-    true
-),
--- Friday - Afternoon/Evening
-(
-    (SELECT id FROM users WHERE email = 'dr.smith@clinic.com'),
-    'Friday',
-    convert_12hr_to_24hr('1:00', 'PM'),
-    convert_12hr_to_24hr('8:00', 'PM'),
-    true
-),
--- Saturday - Half day
-(
-    (SELECT id FROM users WHERE email = 'dr.smith@clinic.com'),
-    'Saturday',
-    convert_12hr_to_24hr('9:00', 'AM'),
-    convert_12hr_to_24hr('1:00', 'PM'),
-    true
-)
-ON CONFLICT (doctor_id, day_of_week, start_time, end_time) DO NOTHING;
-
--- Insert sample appointments for testing
-INSERT INTO appointments (
-    patient_id,
-    doctor_id,
-    appointment_date,
-    appointment_time,
-    duration_minutes,
-    appointment_type,
-    reason_for_visit,
-    status,
-    created_by
-) VALUES 
-(
-    (SELECT id FROM patients WHERE email = 'alice.anderson@email.com'),
-    (SELECT id FROM users WHERE email = 'dr.smith@clinic.com'),
-    CURRENT_DATE,
-    '09:00',
-    30,
-    'Follow-up',
-    'Hypertension check-up',
-    'scheduled',
-    (SELECT id FROM users WHERE email = 'admin@clinic.com')
-),
-(
-    (SELECT id FROM patients WHERE email = 'robert.wilson@email.com'),
-    (SELECT id FROM users WHERE email = 'dr.smith@clinic.com'),
-    CURRENT_DATE,
-    '09:30',
-    30,
-    'Regular Check-up',
-    'Diabetes monitoring',
-    'scheduled',
-    (SELECT id FROM users WHERE email = 'admin@clinic.com')
-),
-(
-    (SELECT id FROM patients WHERE email = 'maria.garcia@email.com'),
-    (SELECT id FROM users WHERE email = 'dr.smith@clinic.com'),
-    CURRENT_DATE,
-    '10:00',
-    30,
-    'Consultation',
-    'General health assessment',
-    'scheduled',
-    (SELECT id FROM users WHERE email = 'admin@clinic.com')
-)
-ON CONFLICT DO NOTHING;
-
--- Insert sample queue tokens
-INSERT INTO queue_tokens (
-    token_number, 
-    patient_id, 
-    doctor_id, 
-    appointment_id, 
-    issued_date, 
-    issued_time, 
-    status, 
-    priority, 
-    estimated_wait_time, 
-    called_at, 
-    served_at, 
-    created_by
-) VALUES 
-(
-    1, 
-    (SELECT id FROM patients WHERE email = 'alice.anderson@email.com'), 
-    (SELECT id FROM users WHERE email = 'dr.smith@clinic.com'), 
-    NULL, 
-    CURRENT_DATE, 
-    NOW(), 
-    'waiting', 
-    1, 
-    DEFAULT, 
-    NULL, 
-    NULL, 
-    (SELECT id FROM users WHERE email = 'admin@clinic.com')
-),
-(
-    2, 
-    (SELECT id FROM patients WHERE email = 'robert.wilson@email.com'), 
-    (SELECT id FROM users WHERE email = 'dr.smith@clinic.com'), 
-    NULL, 
-    CURRENT_DATE, 
-    NOW(), 
-    'waiting', 
-    1, 
-    DEFAULT, 
-    NULL, 
-    NULL, 
-    (SELECT id FROM users WHERE email = 'admin@clinic.com')
-),
-(
-    3, 
-    (SELECT id FROM patients WHERE email = 'maria.garcia@email.com'), 
-    (SELECT id FROM users WHERE email = 'dr.smith@clinic.com'), 
-    NULL, 
-    CURRENT_DATE, 
-    NOW(), 
-    'waiting', 
-    1, 
-    DEFAULT, 
-    NULL, 
-    NULL, 
-    (SELECT id FROM users WHERE email = 'admin@clinic.com')
-) ON CONFLICT (doctor_id, issued_date, token_number) DO NOTHING;
-
-DO $$
-BEGIN
-  IF EXISTS (
-    SELECT 1 FROM information_schema.tables 
-    WHERE table_schema = 'public' AND table_name = 'users'
-  ) THEN
-    BEGIN
-      ALTER TABLE public.users
-        ADD COLUMN IF NOT EXISTS deleted_at TIMESTAMPTZ;
-    EXCEPTION WHEN others THEN
-      -- ignore if race condition
-      NULL;
-    END;
-  END IF;
-END $$;
-
--- ===============================================
 -- COMPLETION MESSAGE
 -- ===============================================
 
 DO $$
 BEGIN
     RAISE NOTICE '';
-    RAISE NOTICE '🎉 RealCIS Database Schema Created Successfully!';
+    RAISE NOTICE '🎉 ThriveCare Database Schema Created Successfully!';
     RAISE NOTICE '================================================';
     RAISE NOTICE '';
     RAISE NOTICE '✅ Tables Created:';
@@ -1694,35 +1234,35 @@ BEGIN
     RAISE NOTICE '   • audit_logs (security tracking)';
     RAISE NOTICE '   • doctor_availability (doctor schedules)';
     RAISE NOTICE '   • queue_tokens (patient queue management)';
+    RAISE NOTICE '   • patient_allergies (allergy tracking)';
+    RAISE NOTICE '   • patient_diagnoses (diagnosis tracking)';
+    RAISE NOTICE '   • patient_documents (document storage)';
+    RAISE NOTICE '   • services (billable services)';
+    RAISE NOTICE '   • invoices (billing)';
+    RAISE NOTICE '   • invoice_items (line items)';
+    RAISE NOTICE '   • payment_transactions (payments)';
+    RAISE NOTICE '   • notifications (user notifications)';
+    RAISE NOTICE '   • clinic_settings (global settings)';
     RAISE NOTICE '';
-    RAISE NOTICE '✅ Sample Users Created:';
-    RAISE NOTICE '   • admin@clinic.com (password: admin123)';
-    RAISE NOTICE '   • dr.smith@clinic.com (password: doctor123)';
-    RAISE NOTICE '   • nurse.williams@clinic.com (password: nurse123)';
-    RAISE NOTICE '   • reception@clinic.com (password: reception123)';
-    RAISE NOTICE '';
-    RAISE NOTICE '✅ Sample Patients Created:';
-    RAISE NOTICE '   • Alice Anderson (Patient P000001)';
-    RAISE NOTICE '   • Robert Wilson (Patient P000002)';
-    RAISE NOTICE '   • Maria Garcia (Patient P000003)';
-    RAISE NOTICE '';
-    RAISE NOTICE '✅ Doctor Availability Features:';
-    RAISE NOTICE '   • Dynamic time input with AM/PM support';
-    RAISE NOTICE '   • Automatic 12hr to 24hr conversion';
-    RAISE NOTICE '   • Flexible scheduling for any time';
-    RAISE NOTICE '   • Multiple shifts per day supported';
-    RAISE NOTICE '';
-    RAISE NOTICE '🔧 Time Conversion Functions Available:';
+    RAISE NOTICE '✅ Helper Functions:';
     RAISE NOTICE '   • convert_12hr_to_24hr(time_str, am_pm)';
     RAISE NOTICE '   • convert_24hr_to_12hr(time)';
     RAISE NOTICE '   • get_doctor_availability_12hr(doctor_id)';
+    RAISE NOTICE '   • generate_patient_number()';
+    RAISE NOTICE '   • generate_token_number()';
+    RAISE NOTICE '   • generate_invoice_number()';
+    RAISE NOTICE '   • start_consultation_atomic(token_id, doctor_id)';
+    RAISE NOTICE '   • record_payment_atomic(...)';
+    RAISE NOTICE '   • calculate_bmi()';
     RAISE NOTICE '';
-    RAISE NOTICE '📝 Usage Examples:';
-    RAISE NOTICE '   SELECT convert_12hr_to_24hr(''2:30'', ''PM''); -- Returns 14:30:00';
-    RAISE NOTICE '   SELECT convert_24hr_to_12hr(''14:30''::TIME); -- Returns "2:30 PM"';
+    RAISE NOTICE '✅ Views Created:';
+    RAISE NOTICE '   • active_patient_allergies';
+    RAISE NOTICE '   • active_patient_diagnoses';
+    RAISE NOTICE '   • current_patient_medications';
+    RAISE NOTICE '   • outstanding_invoices';
     RAISE NOTICE '';
     RAISE NOTICE '🔧 Next Steps:';
-    RAISE NOTICE '   1. Test backend connection: npm run db:test';
+    RAISE NOTICE '   1. Create your first admin user via API or direct INSERT';
     RAISE NOTICE '   2. Start backend server: npm run dev';
     RAISE NOTICE '   3. Test API endpoints at http://localhost:5000';
     RAISE NOTICE '';
@@ -1927,69 +1467,21 @@ CREATE TRIGGER update_patient_diagnoses_updated_at
 ALTER TABLE patient_allergies ENABLE ROW LEVEL SECURITY;
 ALTER TABLE patient_diagnoses ENABLE ROW LEVEL SECURITY;
 
--- Patient Allergies Policies
--- Allow authenticated users to read allergies
-CREATE POLICY "Allow authenticated users to read allergies"
-    ON patient_allergies
-    FOR SELECT
-    USING (auth.role() = 'authenticated');
-
--- Allow doctors and nurses to insert allergies
-CREATE POLICY "Allow doctors and nurses to insert allergies"
-    ON patient_allergies
-    FOR INSERT
-    WITH CHECK (auth.role() = 'authenticated');
-
--- Allow doctors and nurses to update allergies
-CREATE POLICY "Allow doctors and nurses to update allergies"
-    ON patient_allergies
-    FOR UPDATE
-    USING (auth.role() = 'authenticated');
+-- Patient Allergies Policies (using simple true for PostgreSQL compatibility)
+-- Note: Authorization is handled at application layer
+DROP POLICY IF EXISTS "Allow authenticated users to read allergies" ON patient_allergies;
+CREATE POLICY "Healthcare staff can access allergies" ON patient_allergies FOR ALL USING (true);
 
 -- Patient Diagnoses Policies
--- Allow authenticated users to read diagnoses
-CREATE POLICY "Allow authenticated users to read diagnoses"
-    ON patient_diagnoses
-    FOR SELECT
-    USING (auth.role() = 'authenticated');
-
--- Allow doctors to insert diagnoses
-CREATE POLICY "Allow doctors to insert diagnoses"
-    ON patient_diagnoses
-    FOR INSERT
-    WITH CHECK (auth.role() = 'authenticated');
-
--- Allow doctors to update diagnoses
-CREATE POLICY "Allow doctors to update diagnoses"
-    ON patient_diagnoses
-    FOR UPDATE
-    USING (auth.role() = 'authenticated');
+DROP POLICY IF EXISTS "Allow authenticated users to read diagnoses" ON patient_diagnoses;
+CREATE POLICY "Healthcare staff can access diagnoses" ON patient_diagnoses FOR ALL USING (true);
 
 -- Patient Documents Policies
 -- Enable RLS on patient_documents
 ALTER TABLE patient_documents ENABLE ROW LEVEL SECURITY;
 
--- Allow authenticated users to read documents
-CREATE POLICY "Allow authenticated users to read documents"
-    ON patient_documents
-    FOR SELECT
-    USING (auth.role() = 'authenticated');
-
--- Allow authenticated users to upload documents
-CREATE POLICY "Allow authenticated users to upload documents"
-    ON patient_documents
-    FOR INSERT
-    WITH CHECK (auth.role() = 'authenticated');
-
--- Allow admins and doctors to delete documents
-CREATE POLICY "Allow admins and doctors to delete documents"
-    ON patient_documents
-    FOR DELETE
-    USING (
-        auth.uid() IN (
-            SELECT id FROM users WHERE role IN ('admin', 'doctor')
-        )
-    );
+DROP POLICY IF EXISTS "Allow authenticated users to read documents" ON patient_documents;
+CREATE POLICY "Healthcare staff can access documents" ON patient_documents FOR ALL USING (true);
 
 -- ===============================================
 -- HELPER VIEWS
@@ -2035,48 +1527,8 @@ WHERE pr.is_current = true
   AND pr.status = 'active';
 
 -- ===============================================
--- SAMPLE DATA (Optional - for testing)
+-- ADDITIONAL INDEXES
 -- ===============================================
-
--- Uncomment below to insert sample data
-
-/*
--- Sample allergy for existing patient
-INSERT INTO patient_allergies (patient_id, allergy_name, allergen_type, severity, reaction, diagnosed_date)
-SELECT 
-    id,
-    'Penicillin',
-    'medication',
-    'severe',
-    'Anaphylactic reaction - severe breathing difficulty and hives',
-    '2023-01-15'
-FROM patients
-WHERE patient_number = 'P2024-0001'
-LIMIT 1;
-
--- Sample diagnosis for existing patient
-INSERT INTO patient_diagnoses (patient_id, diagnosis_name, diagnosed_by, diagnosed_date, status, severity)
-SELECT 
-    p.id,
-    'Type 2 Diabetes Mellitus',
-    u.id,
-    '2023-06-20',
-    'chronic',
-    'moderate'
-FROM patients p
-CROSS JOIN users u
-WHERE p.patient_number = 'P2024-0001'
-  AND u.role = 'doctor'
-LIMIT 1;
-*/
-
--- ===============================================
--- MIGRATION COMPLETE
--- ===============================================
--- Run this script in Supabase SQL Editor
--- Then create corresponding models, services, and routes in backend
--- ===============================================
-
 
 -- Migration: Add visit_id to queue_tokens table
 -- Purpose: Link each queue token to its specific visit for proper vitals tracking
@@ -2241,23 +1693,171 @@ CREATE TABLE IF NOT EXISTS payment_transactions (
 -- ===============================================
 -- Unique index: One invoice per visit (prevents duplicate invoices)
 CREATE UNIQUE INDEX IF NOT EXISTS uq_invoices_one_per_visit ON invoices(visit_id);
-CREATE INDEX idx_queue_tokens_visit_id ON queue_tokens(visit_id);
-CREATE INDEX idx_invoices_patient_id ON invoices(patient_id);
-CREATE INDEX idx_invoices_status ON invoices(status);
-CREATE INDEX idx_invoices_invoice_number ON invoices(invoice_number);
-CREATE INDEX idx_invoice_items_invoice_id ON invoice_items(invoice_id);
-CREATE INDEX idx_payment_transactions_invoice_id ON payment_transactions(invoice_id);
-CREATE INDEX idx_services_category ON services(category);
-CREATE INDEX idx_services_is_active ON services(is_active);
+CREATE INDEX IF NOT EXISTS idx_queue_tokens_visit_id_billing ON queue_tokens(visit_id);
+CREATE INDEX IF NOT EXISTS idx_invoices_patient_id ON invoices(patient_id);
+CREATE INDEX IF NOT EXISTS idx_invoices_status ON invoices(status);
+CREATE INDEX IF NOT EXISTS idx_invoices_invoice_number ON invoices(invoice_number);
+CREATE INDEX IF NOT EXISTS idx_invoice_items_invoice_id ON invoice_items(invoice_id);
+CREATE INDEX IF NOT EXISTS idx_payment_transactions_invoice_id ON payment_transactions(invoice_id);
+CREATE INDEX IF NOT EXISTS idx_services_category ON services(category);
+CREATE INDEX IF NOT EXISTS idx_services_is_active ON services(is_active);
 
 -- ===============================================
--- TRIGGERS for updated_at
+-- TRIGGERS for updated_at (Billing Tables)
 -- ===============================================
-CREATE TRIGGER update_services_updated_at BEFORE UPDATE ON services 
-    FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
+DO $$
+BEGIN
+    -- Create trigger for services table
+    IF NOT EXISTS (SELECT 1 FROM pg_trigger WHERE tgname = 'update_services_updated_at') THEN
+        CREATE TRIGGER update_services_updated_at BEFORE UPDATE ON services 
+            FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
+    END IF;
+    
+    -- Create trigger for invoices table
+    IF NOT EXISTS (SELECT 1 FROM pg_trigger WHERE tgname = 'update_invoices_updated_at') THEN
+        CREATE TRIGGER update_invoices_updated_at BEFORE UPDATE ON invoices 
+            FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
+    END IF;
+END $$;
 
-CREATE TRIGGER update_invoices_updated_at BEFORE UPDATE ON invoices 
-    FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
+-- ===============================================
+-- Atomic function to record payment with advisory lock
+-- Prevents race conditions when multiple payments are recorded simultaneously
+-- for the same invoice
+-- ===============================================
+CREATE OR REPLACE FUNCTION record_payment_atomic(
+  p_invoice_id UUID,
+  p_amount DECIMAL(10,2),
+  p_payment_method VARCHAR(50),
+  p_payment_reference TEXT,
+  p_payment_notes TEXT,
+  p_received_by UUID
+)
+RETURNS TABLE (
+  success BOOLEAN,
+  message TEXT,
+  payment_data JSONB,
+  invoice_data JSONB
+) 
+LANGUAGE plpgsql
+AS $$
+DECLARE
+  v_invoice_record RECORD;
+  v_payment_record RECORD;
+  v_lock_key BIGINT;
+  v_total_paid DECIMAL(10,2);
+  v_new_balance DECIMAL(10,2);
+  v_subtotal DECIMAL(10,2);
+  v_discount DECIMAL(10,2);
+  v_tax DECIMAL(10,2);
+  v_total_amount DECIMAL(10,2);
+BEGIN
+  -- Generate a unique lock key based on invoice_id
+  -- Using pg_advisory_lock to ensure only one payment can be recorded
+  -- per invoice at a time
+  v_lock_key := abs(hashtext(p_invoice_id::TEXT))::bigint;
+  
+  -- Acquire advisory lock (blocks until lock is available)
+  PERFORM pg_advisory_xact_lock(v_lock_key);
+  
+  -- Now we have exclusive access to this invoice
+  -- Get current invoice state
+  SELECT * INTO v_invoice_record
+  FROM invoices
+  WHERE id = p_invoice_id;
+  
+  IF NOT FOUND THEN
+    RETURN QUERY SELECT FALSE, 'Invoice not found'::TEXT, NULL::JSONB, NULL::JSONB;
+    RETURN;
+  END IF;
+  
+  -- Validate amount
+  IF p_amount <= 0 THEN
+    RETURN QUERY SELECT FALSE, 'Payment amount must be greater than 0'::TEXT, NULL::JSONB, NULL::JSONB;
+    RETURN;
+  END IF;
+  
+  -- Calculate invoice totals from items (atomic calculation)
+  SELECT COALESCE(SUM(total_price), 0) INTO v_subtotal
+  FROM invoice_items
+  WHERE invoice_id = p_invoice_id;
+  
+  v_discount := COALESCE(v_invoice_record.discount_amount, 0);
+  v_tax := COALESCE(v_invoice_record.tax_amount, 0);
+  v_total_amount := v_subtotal - v_discount + v_tax;
+  
+  -- Get current total paid (sum of all payment transactions)
+  SELECT COALESCE(SUM(amount), 0) INTO v_total_paid
+  FROM payment_transactions
+  WHERE invoice_id = p_invoice_id;
+  
+  -- Create payment transaction
+  INSERT INTO payment_transactions (
+    invoice_id,
+    amount,
+    payment_method,
+    payment_reference,
+    payment_notes,
+    received_by
+  )
+  VALUES (
+    p_invoice_id,
+    p_amount,
+    p_payment_method,
+    p_payment_reference,
+    p_payment_notes,
+    p_received_by
+  )
+  RETURNING * INTO v_payment_record;
+  
+  -- Recalculate total paid (including new payment)
+  v_total_paid := v_total_paid + p_amount;
+  v_new_balance := v_total_amount - v_total_paid;
+  
+  -- Update invoice with new totals and status
+  UPDATE invoices
+  SET 
+    subtotal = v_subtotal,
+    total_amount = v_total_amount,
+    amount_paid = v_total_paid,
+    balance_due = v_new_balance,
+    status = CASE 
+      WHEN v_new_balance <= 0 THEN 'paid'
+      WHEN v_total_paid > 0 THEN 'partial_paid'
+      ELSE 'pending'
+    END,
+    -- Set completed_at and completed_by when invoice becomes fully paid
+    completed_at = CASE 
+      WHEN v_new_balance <= 0 AND completed_at IS NULL THEN NOW()
+      ELSE completed_at
+    END,
+    completed_by = CASE 
+      WHEN v_new_balance <= 0 AND completed_by IS NULL THEN p_received_by
+      ELSE completed_by
+    END,
+    updated_at = NOW()
+  WHERE id = p_invoice_id
+  RETURNING * INTO v_invoice_record;
+  
+  -- Success - return payment and updated invoice data
+  RETURN QUERY SELECT 
+    TRUE,
+    format('Payment of %s recorded successfully', p_amount)::TEXT,
+    to_jsonb(v_payment_record),
+    to_jsonb(v_invoice_record);
+    
+  -- Lock is automatically released when transaction ends
+END;
+$$;
+
+-- Grant execute permission
+GRANT EXECUTE ON FUNCTION record_payment_atomic(UUID, DECIMAL, VARCHAR, TEXT, TEXT, UUID) TO authenticated;
+GRANT EXECUTE ON FUNCTION record_payment_atomic(UUID, DECIMAL, VARCHAR, TEXT, TEXT, UUID) TO service_role;
+
+-- Add comment
+COMMENT ON FUNCTION record_payment_atomic IS 
+  'Atomically records a payment and recalculates invoice totals using advisory locks. 
+   Prevents race conditions when multiple payments are recorded simultaneously.';
 
 -- ===============================================
 -- FUNCTION: Increment Invoice Version (Optimistic Locking)
@@ -2573,35 +2173,8 @@ DROP POLICY IF EXISTS "Healthcare staff can access all data" ON payment_transact
 CREATE POLICY "Healthcare staff can access all data" ON payment_transactions FOR ALL USING (true);
 
 -- ===============================================
--- SAMPLE DATA - Common Services
+-- NOTIFICATIONS TABLE
 -- ===============================================
-INSERT INTO services (service_code, service_name, description, category, default_price) VALUES
-('CONS-GEN', 'General Consultation', 'General medical consultation with doctor', 'consultation', 50.00),
-('CONS-SPEC', 'Specialist Consultation', 'Consultation with specialist doctor', 'consultation', 100.00),
-('CONS-FOLL', 'Follow-up Consultation', 'Follow-up visit', 'consultation', 30.00),
-('LAB-CBC', 'Complete Blood Count', 'CBC laboratory test', 'laboratory', 25.00),
-('LAB-URIN', 'Urinalysis', 'Complete urinalysis', 'laboratory', 15.00),
-('LAB-GLUC', 'Blood Glucose Test', 'Fasting blood glucose', 'laboratory', 20.00),
-('IMG-XRAY', 'X-Ray', 'Digital X-Ray imaging', 'imaging', 75.00),
-('PROC-INJ', 'Injection/IV', 'Medication injection or IV administration', 'procedure', 10.00),
-('PROC-DRESS', 'Wound Dressing', 'Wound cleaning and dressing', 'procedure', 20.00),
-('PROC-SUTUR', 'Suturing', 'Minor wound suturing', 'procedure', 50.00);
-
--- ===============================================
--- VERIFICATION QUERIES
--- ===============================================
--- Run these to verify the tables were created successfully:
-
--- Check services
--- SELECT * FROM services ORDER BY category, service_name;
-
--- Check table structure
--- SELECT table_name FROM information_schema.tables 
--- WHERE table_schema = 'public' 
--- AND table_name IN ('services', 'invoices', 'invoice_items', 'payment_transactions')
--- ORDER BY table_name;
-
--- Create notifications table
 CREATE TABLE IF NOT EXISTS notifications (
   id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
   user_id UUID REFERENCES users(id) ON DELETE CASCADE,
@@ -2623,17 +2196,12 @@ CREATE INDEX IF NOT EXISTS idx_notifications_created_at ON notifications(created
 -- Enable RLS
 ALTER TABLE notifications ENABLE ROW LEVEL SECURITY;
 
--- Policy: Users can only see their own notifications
-CREATE POLICY "Users can view own notifications" ON notifications
-  FOR SELECT USING (auth.uid() = user_id);
-
--- Policy: System can create notifications
-CREATE POLICY "System can create notifications" ON notifications
-  FOR INSERT WITH CHECK (true);
-
--- Policy: Users can update their own notifications (mark as read)
-CREATE POLICY "Users can update own notifications" ON notifications
-  FOR UPDATE USING (auth.uid() = user_id);
+-- Notification Policies (using simple true for PostgreSQL compatibility)
+-- Note: Authorization is handled at application layer
+DROP POLICY IF EXISTS "Users can view own notifications" ON notifications;
+DROP POLICY IF EXISTS "System can create notifications" ON notifications;
+DROP POLICY IF EXISTS "Users can update own notifications" ON notifications;
+CREATE POLICY "Healthcare staff can access notifications" ON notifications FOR ALL USING (true);
 
 COMMENT ON TABLE notifications IS 'User notifications for various system events';
 COMMENT ON COLUMN notifications.type IS 'Type of notification: info, success, warning, error';

@@ -11,8 +11,7 @@ class DoctorAvailabilityService {
   async getAllDoctorAvailability() {
     try {
       const response = await apiService.get('/doctor-availability');
-      // The API returns { success: true, data: [...] }
-      // So we need to return the whole response, not just response.data
+      // Return the whole response, not just response.data
       return response;
     } catch (error) {
       // If it's an upstream service error, return empty data instead of throwing

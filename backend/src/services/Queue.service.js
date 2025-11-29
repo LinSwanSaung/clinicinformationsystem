@@ -2,6 +2,7 @@ import QueueTokenModel from '../models/QueueToken.model.js';
 import AppointmentModel from '../models/Appointment.model.js';
 import patientModel from '../models/Patient.model.js';
 import VisitService from './Visit.service.js';
+import VitalsService from './Vitals.service.js';
 import clinicSettingsService from './ClinicSettings.service.js';
 import {
   getDoctorAvailabilityForDay,
@@ -21,6 +22,7 @@ class QueueService {
     this.queueTokenModel = new QueueTokenModel();
     this.appointmentModel = new AppointmentModel();
     this.visitService = new VisitService();
+    this.vitalsService = new VitalsService();
     this.patientModel = patientModel; // Use the exported instance
   }
 
@@ -149,8 +151,7 @@ class QueueService {
       throw new ApplicationError('Patient ID and Doctor ID are required', 400, 'VALIDATION_ERROR');
     }
 
-    // Check if patient already has an active visit (in_progress)
-    // Business rule: If visit status is 'in_progress', block new visits regardless of invoice status
+    // Check if patient already has an active visit
     const activeVisit = await this.visitService.getPatientActiveVisit(patient_id);
 
     if (activeVisit) {
@@ -243,8 +244,6 @@ class QueueService {
       }
     }
 
-    // Check if patient already has an active token today (regardless of doctor)
-    // This is a secondary check in case visit check didn't catch it
     const existingToken = await this.queueTokenModel.getPatientCurrentToken(patient_id);
     if (existingToken) {
       const doctorName = existingToken.doctor
@@ -277,7 +276,7 @@ class QueueService {
     let newToken = null;
 
     try {
-      // Step 1: Create visit (with rollback compensation)
+      // Create visit
       let appointmentType = 'walk_in'; // Default for walk-ins
 
       // Handle empty strings - treat them as null
@@ -341,7 +340,7 @@ class QueueService {
         }
       );
 
-      // Step 2: Create token (with rollback compensation)
+      // Create token
       newToken = await transaction.add(
         async () => {
           return this.queueTokenModel.createToken({
@@ -362,7 +361,7 @@ class QueueService {
         }
       );
 
-      // Step 3: Update appointment status if linked (non-critical, no rollback needed)
+      // Update appointment status if linked
       if (appointment_id) {
         try {
           await this.appointmentModel.update(appointment_id, {
@@ -400,6 +399,31 @@ class QueueService {
       } catch (logError) {
         logger.error('[AUDIT] Failed to log visit creation:', logError.message);
         // Don't fail the operation if audit logging fails
+      }
+
+      // Notify nurses that a new patient has joined the queue
+      try {
+        const { default: NotificationService } = await import('./Notification.service.js');
+        const patientName = newToken.patient
+          ? `${newToken.patient.first_name} ${newToken.patient.last_name}`.trim()
+          : 'A patient';
+        const doctorName = newToken.doctor
+          ? `Dr. ${newToken.doctor.first_name} ${newToken.doctor.last_name}`.trim()
+          : 'a doctor';
+
+        await NotificationService.notifyNurses({
+          title: 'New Patient in Queue',
+          message: `${patientName} (Token #${newToken.token_number}) has joined ${doctorName}'s queue. Please prepare for vitals check.`,
+          type: 'info',
+          relatedEntityType: 'queue_token',
+          relatedEntityId: newToken.id,
+        });
+        logger.info(
+          `[QUEUE] ✅ Notified nurses about new patient ${patientName} in ${doctorName}'s queue`
+        );
+      } catch (notifyError) {
+        logger.warn('[QUEUE] Failed to notify nurses about new patient:', notifyError.message);
+        // Don't fail the operation if notification fails
       }
 
       return {
@@ -469,7 +493,7 @@ class QueueService {
         );
       }
 
-      // Token is already 'called' (marked ready by nurse), so we can proceed to start consultation
+      // Token is already 'called' (marked ready by nurse), proceed to start consultation
       // No need to update status to 'called' again
 
       // Then immediately start consultation
@@ -724,8 +748,7 @@ class QueueService {
         });
       }
 
-      // Auto-create invoice if it doesn't exist (non-critical, no rollback needed)
-      // This allows cashier to add services even if doctor forgot to add them
+      // Auto-create invoice if it doesn't exist
       if (activeConsultation.visit_id) {
         try {
           const { default: invoiceService } = await import('./Invoice.service.js');
@@ -1043,6 +1066,7 @@ class QueueService {
 
   /**
    * Start consultation with a patient
+   * Validates queue priority rules before allowing consultation to start
    */
   async startConsultation(tokenId) {
     try {
@@ -1064,9 +1088,59 @@ class QueueService {
         );
       }
 
-      // Use atomic function with advisory locks to prevent race conditions
-      // This function handles all checks and updates atomically, preventing race conditions
-      // This ensures only one consultation can be started per doctor at a time
+      // QUEUE PRIORITY VALIDATION: Check if there's a patient who should be seen first
+      // Get the next token in queue according to priority rules (highest priority first, then lowest token number)
+      const nextInPriorityOrder = await this.queueTokenModel.getNextToken(currentToken.doctor_id);
+
+      if (nextInPriorityOrder && nextInPriorityOrder.id !== tokenId) {
+        // There's another patient who should be seen first
+        const currentPriority = currentToken.priority || 1;
+        const nextPriority = nextInPriorityOrder.priority || 1;
+        const nextPatientName = nextInPriorityOrder.patient
+          ? `${nextInPriorityOrder.patient.first_name} ${nextInPriorityOrder.patient.last_name}`.trim()
+          : 'Another patient';
+
+        // Check if it's a priority/emergency case
+        if (nextPriority > currentPriority) {
+          // Higher priority patient is waiting (emergency/urgent)
+          let priorityLabel = 'higher priority';
+          if (nextPriority >= 3) {
+            priorityLabel = 'EMERGENCY';
+          } else if (nextPriority === 2) {
+            priorityLabel = 'URGENT';
+          }
+
+          throw new ApplicationError(
+            `Cannot skip queue. ${priorityLabel} patient "${nextPatientName}" (Token #${nextInPriorityOrder.token_number}) is waiting and must be seen first.`,
+            400,
+            'QUEUE_PRIORITY_VIOLATION',
+            {
+              waitingTokenId: nextInPriorityOrder.id,
+              waitingTokenNumber: nextInPriorityOrder.token_number,
+              waitingPriority: nextPriority,
+              currentPriority: currentPriority,
+              priorityType: priorityLabel,
+            }
+          );
+        } else if (
+          nextPriority === currentPriority &&
+          nextInPriorityOrder.token_number < currentToken.token_number
+        ) {
+          // Same priority but earlier token number
+          throw new ApplicationError(
+            `Please follow queue order. Patient "${nextPatientName}" (Token #${nextInPriorityOrder.token_number}) is ahead in the queue and should be seen first.`,
+            400,
+            'QUEUE_ORDER_VIOLATION',
+            {
+              waitingTokenId: nextInPriorityOrder.id,
+              waitingTokenNumber: nextInPriorityOrder.token_number,
+              currentTokenNumber: currentToken.token_number,
+              priority: currentPriority,
+            }
+          );
+        }
+      }
+
       let updatedToken;
       try {
         const atomicResult = await executeWithRetry(
@@ -1244,7 +1318,6 @@ class QueueService {
           error: visitError?.message || String(visitError),
         });
         // Don't fail the consultation start if visit handling fails
-        // This ensures backward compatibility
       }
 
       // Update appointment status if linked
@@ -1299,7 +1372,6 @@ class QueueService {
         throw new ApplicationError('Token not found', 404, 'TOKEN_NOT_FOUND');
       }
 
-      // CRITICAL: Token must have visit_id - error if missing
       if (!token.visit_id) {
         throw new ApplicationError(
           `Cannot complete consultation: Token #${token.token_number} is missing visit information. ` +
@@ -1326,7 +1398,7 @@ class QueueService {
       let _updatedAppointment = null;
 
       try {
-        // Step 1: Update token status (with rollback compensation)
+        // Update token status
         updatedToken = await transaction.add(
           async () => {
             return this.queueTokenModel.updateStatus(tokenId, 'completed');
@@ -1337,9 +1409,7 @@ class QueueService {
           }
         );
 
-        // Step 2: Set visit_end_time when consultation ends (visit stays in_progress until invoice is paid)
-        // Business rule: Visits are ONLY completed when invoice is paid (via InvoiceService.completeInvoice)
-        // This ensures proper billing workflow and prevents premature visit completion
+        // Set visit_end_time when consultation ends (visit stays in_progress until invoice is paid)
         _updatedVisit = await transaction.add(
           async () => {
             // Only set visit_end_time, keep status as 'in_progress' until invoice is paid
@@ -1353,7 +1423,7 @@ class QueueService {
           }
         );
 
-        // Step 3: Update appointment status if linked (with rollback compensation)
+        // Update appointment status if linked
         if (token.appointment_id) {
           _updatedAppointment = await transaction.add(
             async () => {
@@ -1376,8 +1446,7 @@ class QueueService {
           );
         }
 
-        // Step 4: Auto-create invoice if it doesn't exist (non-critical, no rollback needed)
-        // This allows cashier to add services even if doctor forgot to add them
+        // Auto-create invoice if it doesn't exist
         try {
           const { default: invoiceService } = await import('./Invoice.service.js');
 
@@ -1399,10 +1468,9 @@ class QueueService {
           );
         }
 
-        // All steps succeeded - transaction is complete
-        // (TransactionRunner executes operations immediately in add(), no explicit commit needed)
+        // Transaction complete
 
-        // Log visit update for audit (after successful commit)
+        // Log visit update for audit
         try {
           await logAuditEvent({
             userId: null, // System action
@@ -1713,17 +1781,59 @@ class QueueService {
 
   /**
    * Get comprehensive queue status for a doctor
+   * @param {string} doctorId - Doctor ID
+   * @param {string|null} date - Optional date filter (defaults to today)
+   * @param {boolean} skipCompletedVitals - If true, skip fetching vitals for completed/missed tokens (default: false)
    */
-  async getQueueStatus(doctorId, date = null) {
+  async getQueueStatus(doctorId, date = null, skipCompletedVitals = false) {
     const queueDate = date || new Date().toISOString().split('T')[0];
 
     // Get token-based queue
     const tokens = await this.queueTokenModel.getByDoctorAndDate(doctorId, queueDate);
 
-    // Enhance tokens with visit chief_complaint - always fetch if visit_id exists
+    // Skip vitals for completed/missed tokens during polling
+    const tokensForVitals = skipCompletedVitals
+      ? tokens.filter((t) => t.status !== 'completed' && t.status !== 'missed')
+      : tokens;
+    const visitIds = tokensForVitals.filter((t) => t.visit_id).map((t) => t.visit_id);
+
+    // Batch fetch vitals for all visits at once (reduces API calls from N to 1)
+    const vitalsMap = new Map();
+    if (visitIds.length > 0) {
+      try {
+        const vitalsPromises = visitIds.map(async (visitId) => {
+          try {
+            const vitals = await this.vitalsService.getVisitVitals(visitId);
+            // Return latest vitals (first item if array, or the object itself)
+            return {
+              visitId,
+              vitals: Array.isArray(vitals) && vitals.length > 0 ? vitals[0] : vitals || null,
+            };
+          } catch (error) {
+            logger.debug(`[QUEUE] Failed to fetch vitals for visit ${visitId}:`, error.message);
+            return { visitId, vitals: null };
+          }
+        });
+
+        const vitalsResults = await Promise.all(vitalsPromises);
+        vitalsResults.forEach(({ visitId, vitals }) => {
+          if (vitals) {
+            vitalsMap.set(visitId, vitals);
+          }
+        });
+
+        logger.debug(
+          `[QUEUE] Batch fetched vitals for ${vitalsMap.size} out of ${visitIds.length} visits`
+        );
+      } catch (error) {
+        logger.warn('[QUEUE] Error batch fetching vitals:', error.message);
+      }
+    }
+
+    // Enhance tokens with visit chief_complaint and vitals
     const enhancedTokens = await Promise.all(
       tokens.map(async (token) => {
-        // Always fetch visit data if visit_id exists to ensure we have chief_complaint
+        // Always fetch visit data if visit_id exists to ensure chief_complaint is available
         if (token.visit_id) {
           try {
             const visitDetails = await this.visitService.getVisitDetails(token.visit_id);
@@ -1741,16 +1851,36 @@ class QueueService {
               if (token.visit.chief_complaint) {
                 token.chief_complaint = token.visit.chief_complaint;
               }
+
+              // Add vitals from batch fetch
+              const vitals = vitalsMap.get(token.visit_id);
+              if (vitals) {
+                token.patient = token.patient || {};
+                token.patient.vitals = vitals;
+                token.patient.vitalsRecorded = true;
+              } else {
+                token.patient = token.patient || {};
+                token.patient.vitals = null;
+                token.patient.vitalsRecorded = false;
+              }
+
               logger.debug(
-                `[QUEUE] Enhanced token ${token.id} (token #${token.token_number}) with visit data:`,
+                `[QUEUE] Enhanced token ${token.id} (token #${token.token_number}) with visit data and vitals:`,
                 {
                   visit_id: token.visit_id,
                   chief_complaint: token.visit.chief_complaint,
-                  visit_type: token.visit.visit_type,
+                  has_vitals: !!vitals,
                 }
               );
             } else {
               logger.warn(`[QUEUE] Visit details returned no data for visit_id ${token.visit_id}`);
+              // Still try to add vitals if available
+              const vitals = vitalsMap.get(token.visit_id);
+              if (vitals) {
+                token.patient = token.patient || {};
+                token.patient.vitals = vitals;
+                token.patient.vitalsRecorded = true;
+              }
             }
           } catch (error) {
             logger.warn(
@@ -1765,15 +1895,32 @@ class QueueService {
               };
               token.chief_complaint = token.appointment.reason_for_visit;
             }
+            // Still try to add vitals if available
+            const vitals = vitalsMap.get(token.visit_id);
+            if (vitals) {
+              token.patient = token.patient || {};
+              token.patient.vitals = vitals;
+              token.patient.vitalsRecorded = true;
+            }
           }
         } else if (token.appointment?.reason_for_visit) {
-          // If no visit_id but we have appointment reason, use that
+          // No visit_id but appointment reason exists, use that
           token.visit = {
             ...token.visit,
             chief_complaint: token.appointment.reason_for_visit,
           };
           token.chief_complaint = token.appointment.reason_for_visit;
         }
+
+        // Ensure patient object exists
+        if (!token.patient) {
+          token.patient = {};
+        }
+        if (token.patient.vitals === undefined) {
+          token.patient.vitals = null;
+          token.patient.vitalsRecorded = false;
+        }
+
         return token;
       })
     );
@@ -1805,6 +1952,303 @@ class QueueService {
         isAvailable: !activeConsultation,
       },
     };
+  }
+
+  /**
+   * OPTIMIZATION: Get all doctors' queue status in a single batch call
+   * This eliminates N+1 query pattern by fetching all data in parallel
+   * @param {string|null} date - Optional date filter (defaults to today)
+   * @param {boolean} skipCompletedVitals - If true, skip fetching vitals for completed/missed tokens (default: false)
+   * @returns {Promise<Array>} Array of doctors with their queue status and availability
+   */
+  async getAllDoctorsQueueStatusBatch(date = null, skipCompletedVitals = false) {
+    const queueDate = date || new Date().toISOString().split('T')[0];
+
+    try {
+      // Get all doctors
+      const { data: doctors, error: doctorsError } = await this.queueTokenModel.supabase
+        .from('users')
+        .select('id, first_name, last_name, email, specialty, is_active')
+        .eq('role', 'doctor')
+        .eq('is_active', true);
+
+      if (doctorsError) {
+        throw new Error(`Failed to fetch doctors: ${doctorsError.message}`);
+      }
+
+      if (!doctors || doctors.length === 0) {
+        return [];
+      }
+
+      const doctorIds = doctors.map((d) => d.id);
+
+      // Get all availability records
+      const { data: allAvailability, error: availabilityError } =
+        await this.queueTokenModel.supabase
+          .from('doctor_availability')
+          .select('*')
+          .in('doctor_id', doctorIds)
+          .eq('is_active', true);
+
+      if (availabilityError) {
+        logger.warn('[QUEUE BATCH] Failed to fetch availability:', availabilityError.message);
+      }
+
+      // Get all queue tokens
+      const { data: allTokens, error: tokensError } = await this.queueTokenModel.supabase
+        .from('queue_tokens')
+        .select(
+          `
+          *,
+          patient:patients!patient_id (
+            id,
+            patient_number,
+            first_name,
+            last_name,
+            date_of_birth,
+            gender,
+            phone
+          ),
+          appointment:appointments!appointment_id (
+            id,
+            appointment_date,
+            appointment_time,
+            reason_for_visit,
+            status
+          )
+        `
+        )
+        .in('doctor_id', doctorIds)
+        .eq('issued_date', queueDate)
+        .neq('status', 'cancelled')
+        .order('token_number', { ascending: true });
+
+      if (tokensError) {
+        logger.warn('[QUEUE BATCH] Failed to fetch tokens:', tokensError.message);
+      }
+
+      // Collect visit IDs for batch vitals fetching
+      const tokensForVitals = skipCompletedVitals
+        ? (allTokens || []).filter((t) => t.status !== 'completed' && t.status !== 'missed')
+        : allTokens || [];
+      const visitIds = tokensForVitals.filter((t) => t.visit_id).map((t) => t.visit_id);
+
+      // Batch fetch vitals for all visits
+      const vitalsMap = new Map();
+      if (visitIds.length > 0) {
+        try {
+          const vitalsPromises = visitIds.map(async (visitId) => {
+            try {
+              const vitals = await this.vitalsService.getVisitVitals(visitId);
+              return {
+                visitId,
+                vitals: Array.isArray(vitals) && vitals.length > 0 ? vitals[0] : vitals || null,
+              };
+            } catch (error) {
+              logger.debug(
+                `[QUEUE BATCH] Failed to fetch vitals for visit ${visitId}:`,
+                error.message
+              );
+              return { visitId, vitals: null };
+            }
+          });
+
+          const vitalsResults = await Promise.all(vitalsPromises);
+          vitalsResults.forEach(({ visitId, vitals }) => {
+            if (vitals) {
+              vitalsMap.set(visitId, vitals);
+            }
+          });
+        } catch (error) {
+          logger.warn('[QUEUE BATCH] Error batch fetching vitals:', error.message);
+        }
+      }
+
+      // Group tokens by doctor
+      const tokensByDoctor = new Map();
+      (allTokens || []).forEach((token) => {
+        if (!tokensByDoctor.has(token.doctor_id)) {
+          tokensByDoctor.set(token.doctor_id, []);
+        }
+        tokensByDoctor.get(token.doctor_id).push(token);
+      });
+
+      // Process each doctor's queue status
+      const doctorQueuePromises = doctors.map(async (doctor) => {
+        try {
+          const doctorTokens = tokensByDoctor.get(doctor.id) || [];
+
+          const enhancedTokens = doctorTokens.map((token) => {
+            // Ensure patient object exists
+            token.patient = token.patient || {};
+
+            if (token.visit_id) {
+              const vitals = vitalsMap.get(token.visit_id);
+              if (vitals) {
+                token.patient.vitals = vitals;
+                token.patient.vitalsRecorded = true;
+              } else {
+                token.patient.vitals = null;
+                token.patient.vitalsRecorded = false;
+              }
+
+              // Use appointment reason_for_visit as chief_complaint if available
+              // Visit details can be fetched on-demand when needed (not critical for queue list)
+              if (token.appointment?.reason_for_visit) {
+                token.visit = { chief_complaint: token.appointment.reason_for_visit };
+                token.chief_complaint = token.appointment.reason_for_visit;
+              }
+            } else if (token.appointment?.reason_for_visit) {
+              token.visit = { chief_complaint: token.appointment.reason_for_visit };
+              token.chief_complaint = token.appointment.reason_for_visit;
+            }
+
+            return token;
+          });
+
+          // Calculate statistics
+          const tokenStats = {
+            total: enhancedTokens.length,
+            waiting: enhancedTokens.filter((t) => t.status === 'waiting').length,
+            called: enhancedTokens.filter((t) => t.status === 'called').length,
+            serving: enhancedTokens.filter((t) => t.status === 'serving').length,
+            completed: enhancedTokens.filter((t) => t.status === 'completed').length,
+          };
+
+          // Get active consultation and next token
+          const activeConsultation = enhancedTokens.find((t) => t.status === 'serving') || null;
+          const nextToken =
+            enhancedTokens
+              .filter((t) => ['waiting', 'called'].includes(t.status))
+              .sort((a, b) => {
+                const priorityDiff = (b.priority || 3) - (a.priority || 3);
+                return priorityDiff !== 0 ? priorityDiff : a.token_number - b.token_number;
+              })[0] || null;
+
+          // Get availability for this doctor
+          const doctorAvailability = (allAvailability || []).filter(
+            (avail) => avail.doctor_id === doctor.id
+          );
+
+          const hasActiveConsultation = !!activeConsultation;
+          const waitingCount = tokenStats.waiting + tokenStats.called;
+
+          let statusStatus = 'available';
+          if (hasActiveConsultation) {
+            statusStatus = 'consulting';
+          } else if (waitingCount > 0) {
+            statusStatus = 'busy';
+          }
+
+          return {
+            ...doctor,
+            queueStatus: {
+              doctor_id: doctor.id,
+              date: queueDate,
+              tokens: enhancedTokens,
+              appointments: [],
+              statistics: {
+                tokens: tokenStats,
+                appointments: { total: 0, queued: 0, completed: 0 },
+                combined: {
+                  totalPatients: tokenStats.total,
+                  waitingPatients: waitingCount,
+                  completedToday: tokenStats.completed,
+                },
+              },
+              currentStatus: {
+                activeConsultation: activeConsultation,
+                nextInQueue: nextToken,
+                isAvailable: !hasActiveConsultation,
+              },
+            },
+            availability: doctorAvailability,
+            // Return basic status - frontend will enhance with getDoctorStatus()
+            status: {
+              status: statusStatus,
+              canAcceptPatients: !hasActiveConsultation,
+            },
+          };
+        } catch (error) {
+          logger.error(`[QUEUE BATCH] Error processing doctor ${doctor.id}:`, error);
+          // Return doctor with empty queue status instead of failing entire request
+          const doctorAvailability = (allAvailability || []).filter(
+            (avail) => avail.doctor_id === doctor.id
+          );
+          return {
+            ...doctor,
+            queueStatus: {
+              doctor_id: doctor.id,
+              date: queueDate,
+              tokens: [],
+              appointments: [],
+              statistics: {
+                tokens: { total: 0, waiting: 0, completed: 0 },
+                appointments: { total: 0, queued: 0, completed: 0 },
+                combined: { totalPatients: 0, waitingPatients: 0, completedToday: 0 },
+              },
+              currentStatus: {
+                activeConsultation: null,
+                nextInQueue: null,
+                isAvailable: true,
+              },
+            },
+            availability: doctorAvailability,
+            status: {
+              status: 'available',
+              canAcceptPatients: true,
+            },
+          };
+        }
+      });
+
+      // Use allSettled to handle individual failures gracefully
+      const results = await Promise.allSettled(doctorQueuePromises);
+      const doctorQueues = results.map((result, index) => {
+        if (result.status === 'fulfilled') {
+          return result.value;
+        } else {
+          // If a doctor's processing failed, return empty queue status
+          logger.error(
+            `[QUEUE BATCH] Doctor ${doctors[index]?.id} processing failed:`,
+            result.reason
+          );
+          const doctor = doctors[index];
+          const doctorAvailability = (allAvailability || []).filter(
+            (avail) => avail.doctor_id === doctor.id
+          );
+          return {
+            ...doctor,
+            queueStatus: {
+              doctor_id: doctor.id,
+              date: queueDate,
+              tokens: [],
+              appointments: [],
+              statistics: {
+                tokens: { total: 0, waiting: 0, completed: 0 },
+                appointments: { total: 0, queued: 0, completed: 0 },
+                combined: { totalPatients: 0, waitingPatients: 0, completedToday: 0 },
+              },
+              currentStatus: {
+                activeConsultation: null,
+                nextInQueue: null,
+                isAvailable: true,
+              },
+            },
+            availability: doctorAvailability,
+            status: {
+              status: 'available',
+              canAcceptPatients: true,
+            },
+          };
+        }
+      });
+
+      return doctorQueues;
+    } catch (error) {
+      logger.error('[QUEUE BATCH] Error in getAllDoctorsQueueStatusBatch:', error);
+      throw new Error(`Failed to fetch all doctors queue status: ${error.message}`);
+    }
   }
 
   /**

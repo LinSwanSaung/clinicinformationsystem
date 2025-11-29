@@ -88,8 +88,7 @@ class VisitService {
         throw new Error(`Missing required fields: ${missingFields.join(', ')}`);
       }
 
-      // CRITICAL: Check if patient already has an active visit
-      // This prevents patients from having multiple concurrent visits
+      // Check if patient already has an active visit
       const activeVisit = await this.getPatientActiveVisit(visitData.patient_id);
       if (activeVisit) {
         throw new Error(
@@ -158,10 +157,13 @@ class VisitService {
       }
 
       // Validate visit status before completion
-      const visit = await this.getVisitDetails(visitId);
-      if (!visit) {
+      const visitResult = await this.getVisitDetails(visitId);
+      if (!visitResult || !visitResult.data) {
         throw new Error('Visit not found');
       }
+
+      // Extract the actual visit data from the result wrapper
+      const visit = visitResult.data;
 
       if (visit.status === 'completed') {
         throw new Error('Visit is already completed');
@@ -171,26 +173,36 @@ class VisitService {
         throw new Error('Cannot complete a cancelled visit');
       }
 
-      // Note: Business rule - visits can be completed even with partial payments
-      // This allows patients to have new visits even if invoice is not fully paid
+      // Business rule: visits can be completed even with partial payments
       if (visit.invoice_id) {
         // Check invoice status if invoice exists
         try {
           const { default: invoiceService } = await import('./Invoice.service.js');
           const invoice = await invoiceService.getInvoiceById(visit.invoice_id);
 
-          // Allow visit completion for: pending, partial_paid, or paid invoices
-          // This allows patients to have new visits even with outstanding balance
-          const allowedStatuses = ['pending', 'partial_paid', 'paid'];
-          if (invoice && !allowedStatuses.includes(invoice.status)) {
-            logger.warn(
-              `[VISIT] Completing visit ${visitId} with invoice status '${invoice.status}'. This may be unexpected.`
-            );
+          if (invoice) {
+            // If invoice is pending, mark as waived
+            if (invoice.status === 'pending') {
+              logger.info(
+                `[VISIT] Marking pending invoice ${visit.invoice_id} as 'waived' since visit ${visitId} is being completed without payment.`
+              );
+              await invoiceService.updateInvoiceStatus(visit.invoice_id, 'waived', {
+                notes: 'Invoice waived - visit completed without payment',
+              });
+            } else {
+              // Allow visit completion for: partial_paid or paid invoices
+              const allowedStatuses = ['partial_paid', 'paid', 'waived'];
+              if (!allowedStatuses.includes(invoice.status)) {
+                logger.warn(
+                  `[VISIT] Completing visit ${visitId} with invoice status '${invoice.status}'. This may be unexpected.`
+                );
+              }
+            }
           }
         } catch (invoiceError) {
           // If invoice check fails, log but allow completion (invoice might not exist yet)
           logger.warn(
-            `[VISIT] Could not verify invoice status for visit ${visitId}:`,
+            `[VISIT] Could not verify/update invoice status for visit ${visitId}:`,
             invoiceError.message
           );
         }
@@ -396,8 +408,6 @@ class VisitService {
               issue: 'Consultation ended but visit not completed (no invoice)',
             });
           } else if (invoices[0].status === 'paid' || invoices[0].status === 'partial_paid') {
-            // Invoice is paid/partial_paid but visit is still in_progress
-            // This is a data integrity issue - invoice was processed but visit wasn't completed (tech/network issue)
             pendingItems.push({
               entityType: 'visit',
               entityId: visit.id,
@@ -753,6 +763,26 @@ class VisitService {
         throw new Error('Access denied: You can only download your own visit records');
       }
 
+      // Get clinic settings for clinic name
+      let clinicName = 'Healthcare Clinic';
+      let clinicPhone = '';
+      let clinicAddress = '';
+      try {
+        const { default: clinicSettingsService } = await import('./ClinicSettings.service.js');
+        const settings = await clinicSettingsService.getSettings();
+        if (settings?.clinic_name) {
+          clinicName = settings.clinic_name;
+        }
+        if (settings?.clinic_phone) {
+          clinicPhone = settings.clinic_phone;
+        }
+        if (settings?.clinic_address) {
+          clinicAddress = settings.clinic_address;
+        }
+      } catch (settingsError) {
+        logger.warn('[VISIT PDF] Could not load clinic settings:', settingsError.message);
+      }
+
       // Create PDF document with A4 size
       const doc = new PDFDocument({
         size: 'A4',
@@ -775,14 +805,17 @@ class VisitService {
       // Professional Header with colored background
       doc.rect(0, 0, doc.page.width, 120).fillAndStroke('#1e40af', '#1e40af');
 
-      doc
-        .fillColor('#ffffff')
-        .fontSize(28)
-        .font('Helvetica-Bold')
-        .text('ThriveCare', 50, 30)
-        .fontSize(12)
-        .font('Helvetica')
-        .text('Healthcare System', 50, 62);
+      doc.fillColor('#ffffff').fontSize(24).font('Helvetica-Bold').text(clinicName, 50, 25);
+
+      // Add clinic contact info if available
+      let contactY = 52;
+      if (clinicPhone) {
+        doc.fontSize(10).font('Helvetica').text(`Tel: ${clinicPhone}`, 50, contactY);
+        contactY += 14;
+      }
+      if (clinicAddress) {
+        doc.fontSize(9).font('Helvetica').text(clinicAddress, 50, contactY, { width: 250 });
+      }
 
       doc.fontSize(20).font('Helvetica-Bold').text('VISIT SUMMARY', 50, 85, { align: 'right' });
 
@@ -852,17 +885,13 @@ class VisitService {
 
       // Vital Signs Section with Grid Layout
       if (visit.vitals) {
-        // Check if we need a new page
+        // Check page overflow
         if (yPos > 650) {
           doc.addPage();
           yPos = 50;
         }
 
-        doc
-          .fillColor('#dc2626')
-          .fontSize(14)
-          .font('Helvetica-Bold')
-          .text('♥ Vital Signs', 50, yPos);
+        doc.fillColor('#dc2626').fontSize(14).font('Helvetica-Bold').text('Vital Signs', 50, yPos);
 
         yPos += 25;
         const boxWidth = (doc.page.width - 120) / 2;
@@ -999,7 +1028,7 @@ class VisitService {
 
       // Diagnoses Section
       if (visit.visit_diagnoses && visit.visit_diagnoses.length > 0) {
-        // Check if we need a new page
+        // Check page overflow
         if (yPos > 650) {
           doc.addPage();
           yPos = 50;
@@ -1009,14 +1038,14 @@ class VisitService {
           .fillColor('#7c3aed')
           .fontSize(14)
           .font('Helvetica-Bold')
-          .text('⚕ Diagnoses from This Visit', 50, yPos);
+          .text('Diagnoses from This Visit', 50, yPos);
 
         yPos += 25;
 
         visit.visit_diagnoses.forEach((diagnosis, index) => {
           const boxHeight = diagnosis.clinical_notes ? 90 : 70;
 
-          // Check if we need a new page
+          // Check page overflow
           if (yPos + boxHeight > 750) {
             doc.addPage();
             yPos = 50;
@@ -1086,7 +1115,7 @@ class VisitService {
 
       // Prescriptions Section
       if (visit.prescriptions && visit.prescriptions.length > 0) {
-        // Check if we need a new page
+        // Check page overflow
         if (yPos > 650) {
           doc.addPage();
           yPos = 50;
@@ -1096,14 +1125,14 @@ class VisitService {
           .fillColor('#0284c7')
           .fontSize(14)
           .font('Helvetica-Bold')
-          .text('💊 Medications Prescribed', 50, yPos);
+          .text('Medications Prescribed', 50, yPos);
 
         yPos += 25;
 
         visit.prescriptions.forEach((prescription, index) => {
           const boxHeight = prescription.instructions ? 105 : 85;
 
-          // Check if we need a new page
+          // Check page overflow
           if (yPos + boxHeight > 750) {
             doc.addPage();
             yPos = 50;
@@ -1193,17 +1222,13 @@ class VisitService {
 
       // Cost Summary Section
       if (visit.total_cost) {
-        // Check if we need a new page
+        // Check page overflow
         if (yPos > 680) {
           doc.addPage();
           yPos = 50;
         }
 
-        doc
-          .fillColor('#16a34a')
-          .fontSize(14)
-          .font('Helvetica-Bold')
-          .text('💰 Cost Summary', 50, yPos);
+        doc.fillColor('#16a34a').fontSize(14).font('Helvetica-Bold').text('Cost Summary', 50, yPos);
 
         yPos += 25;
 
@@ -1277,17 +1302,13 @@ class VisitService {
 
       // Visit Notes Section
       if (visit.notes) {
-        // Check if we need a new page
+        // Check page overflow
         if (yPos > 650) {
           doc.addPage();
           yPos = 50;
         }
 
-        doc
-          .fillColor('#6366f1')
-          .fontSize(14)
-          .font('Helvetica-Bold')
-          .text('📝 Visit Notes', 50, yPos);
+        doc.fillColor('#6366f1').fontSize(14).font('Helvetica-Bold').text('Visit Notes', 50, yPos);
 
         yPos += 25;
 
@@ -1455,7 +1476,7 @@ class VisitService {
 
       // Visit entries
       visits.forEach((visit, index) => {
-        // Check if we need a new page
+        // Check page overflow
         if (doc.y > 700) {
           doc.addPage();
         }

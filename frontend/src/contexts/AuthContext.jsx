@@ -1,5 +1,6 @@
 import { createContext, useContext, useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { useQueryClient } from '@tanstack/react-query';
 import { authService } from '@/features/auth';
 import logger from '@/utils/logger';
 
@@ -9,14 +10,39 @@ export const AuthProvider = ({ children }) => {
   const [user, setUser] = useState(null);
   const [loading, setLoading] = useState(true);
   const navigate = useNavigate();
+  const queryClient = useQueryClient();
 
   useEffect(() => {
-    // Check for authentication on mount
-    const currentUser = authService.getCurrentUser();
-    if (currentUser && authService.isAuthenticated()) {
-      setUser(currentUser);
-    }
-    setLoading(false);
+    const validateSession = async () => {
+      try {
+        const currentUser = authService.getCurrentUser();
+
+        if (currentUser && authService.isAuthenticated()) {
+          try {
+            const isValid = await authService.verifyToken();
+
+            if (isValid) {
+              setUser(currentUser);
+              logger.debug('Session restored successfully');
+            } else {
+              logger.warn('Stored token is invalid or expired, clearing session');
+              await authService.logout();
+              setUser(null);
+            }
+          } catch (error) {
+            logger.warn('Token validation failed, using cached session:', error.message);
+            setUser(currentUser);
+          }
+        }
+      } catch (error) {
+        logger.error('Session validation error:', error);
+        setUser(null);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    validateSession();
   }, []);
 
   const login = async (email, password) => {
@@ -25,7 +51,6 @@ export const AuthProvider = ({ children }) => {
 
       if (result.success) {
         setUser(result.data);
-        // Centralize role-based redirect via /dashboard
         navigate('/dashboard');
         return { success: true };
       } else {
@@ -68,22 +93,21 @@ export const AuthProvider = ({ children }) => {
   const logout = async () => {
     try {
       await authService.logout();
+      queryClient.clear();
       setUser(null);
       navigate('/');
     } catch (error) {
       logger.error('Logout failed:', error);
-      // Still clear local state even if API call fails
+      queryClient.clear();
       setUser(null);
       navigate('/');
     }
   };
 
-  // Get current user role
   const getUserRole = () => {
     return user?.role || null;
   };
 
-  // Check if user is authenticated
   const isAuthenticated = () => {
     return authService.isAuthenticated();
   };

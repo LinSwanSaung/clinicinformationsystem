@@ -1,23 +1,27 @@
 # Backend Documentation
 
-This directory contains production-ready documentation for the ThriveCare backend.
+This directory contains documentation for the ThriveCare backend API.
 
-## 📚 Documentation
+## 📚 Documentation Index
 
-### Core Documentation
-
-- **[ARCHITECTURE.md](./ARCHITECTURE.md)** - Architecture, design patterns, middleware, logging, and import boundaries
-- **[SETUP_AND_OPERATIONS.md](./SETUP_AND_OPERATIONS.md)** - Setup, configuration, deployment, database operations, and troubleshooting
+| Document | Description |
+|----------|-------------|
+| [ARCHITECTURE.md](./ARCHITECTURE.md) | Architecture, design patterns, middleware, logging, and import boundaries |
+| [SETUP_AND_OPERATIONS.md](./SETUP_AND_OPERATIONS.md) | Setup, configuration, database operations, and troubleshooting |
+| [DEPLOYMENT.md](./DEPLOYMENT.md) | Backend deployment guide for Railway |
 
 ## 🔍 Quick Reference
 
-### Schema Verification
+### Development Commands
 
 ```bash
-npm run db:verify-schema
+npm run dev      # Start development server
+npm run start    # Start production server
+npm run lint     # Run ESLint
+npm run lint:fix # Fix ESLint errors
 ```
 
-### Logging
+### Logging Levels
 
 - Production: `LOG_LEVEL=info`
 - Development: `LOG_LEVEL=debug`
@@ -35,5 +39,6 @@ npm run db:verify-schema
 
 ## 📖 Additional Resources
 
-- Main [README.md](../README.md) - Getting started and API documentation
-- [database/README.md](../database/README.md) - Database schema and migrations
+- [Main README](../README.md) - Backend API overview
+- [Database Schema](../database/schema.sql) - Database structure
+- [Project Documentation](../../docs/) - Project-level documentation

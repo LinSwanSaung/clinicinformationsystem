@@ -26,12 +26,7 @@
     "lint": "eslint .",
     "lint:fix": "eslint . --fix",
     "format": "prettier --write \"src/**/*.js\"",
-    "format:check": "prettier --check \"src/**/*.js\"",
-    "db:migrate": "node database/migrate.js",
-    "db:test": "node database/migrate.js test",
-    "db:seed": "node database/seed.js",
-    "db:reset": "npm run db:migrate && npm run db:seed",
-    "db:verify-schema": "node database/verify-schema.js"
+    "format:check": "prettier --check \"src/**/*.js\""
   },
   "keywords": [
     "clinic",

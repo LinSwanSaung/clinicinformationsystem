@@ -76,9 +76,11 @@ router.post('/token', authenticate, validateQueueToken, async (req, res) => {
 router.get('/doctor/:doctorId/status', authenticate, async (req, res) => {
   try {
     const { doctorId } = req.params;
-    const { date } = req.query;
+    const { date, skipCompletedVitals } = req.query;
+    // Convert string query param to boolean (default: false = fetch all vitals)
+    const skipCompleted = skipCompletedVitals === 'true';
 
-    const status = await queueService.getQueueStatus(doctorId, date);
+    const status = await queueService.getQueueStatus(doctorId, date, skipCompleted);
 
     res.json({
       success: true,
@@ -89,6 +91,51 @@ router.get('/doctor/:doctorId/status', authenticate, async (req, res) => {
     res.status(500).json({
       success: false,
       message: error.message,
+    });
+  }
+});
+
+/**
+ * @route   GET /api/queue/all-doctors-status
+ * @desc    OPTIMIZATION: Get all doctors' queue status in a single batch call
+ *          Eliminates N+1 query pattern by fetching all data efficiently
+ * @access  Private (Nurse, Receptionist, Admin)
+ */
+router.get('/all-doctors-status', authenticate, async (req, res) => {
+  try {
+    const { date, skipCompletedVitals } = req.query;
+    // Convert string query param to boolean (default: false = fetch all vitals)
+    const skipCompleted = skipCompletedVitals === 'true';
+    // If no date provided, backend defaults to today (handled in service)
+    const effectiveDate = date || 'today (default)';
+
+    logger.debug('[QUEUE ROUTE] Batch endpoint called, fetching all doctors queue status...', {
+      date: effectiveDate,
+      hasDateParam: !!date,
+      skipCompletedVitals: skipCompleted,
+    });
+    const doctorQueues = await queueService.getAllDoctorsQueueStatusBatch(date, skipCompleted);
+
+    logger.debug(`[QUEUE ROUTE] Batch endpoint returning ${doctorQueues?.length || 0} doctors`);
+
+    // Ensure we always return an array
+    const result = Array.isArray(doctorQueues) ? doctorQueues : [];
+
+    res.json({
+      success: true,
+      data: result,
+    });
+  } catch (error) {
+    logger.error('[QUEUE ROUTE] Error getting all doctors queue status:', {
+      message: error.message,
+      stack: error.stack,
+      name: error.name,
+      date: req.query.date,
+    });
+    res.status(500).json({
+      success: false,
+      message: error.message || 'Failed to fetch all doctors queue status',
+      error: process.env.NODE_ENV === 'development' ? error.stack : undefined,
     });
   }
 });

@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { useTranslation } from 'react-i18next';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
   Search,
@@ -33,6 +34,7 @@ import logger from '@/utils/logger';
 import { useFeedback } from '@/contexts/FeedbackContext';
 
 const WalkInModal = ({ isOpen, onClose, onSubmit }) => {
+  const { t } = useTranslation();
   const { showError, showWarning } = useFeedback();
   const [step, setStep] = useState(1); // 1: Select Patient, 2: Select Doctor
   const [selectedPatient, setSelectedPatient] = useState(null);
@@ -179,7 +181,7 @@ const WalkInModal = ({ isOpen, onClose, onSubmit }) => {
     try {
       setIsLoadingDoctors(true);
 
-      // Get available doctors with queue status and availability from our enhanced queue service
+      // Get available doctors with queue status and availability from the enhanced queue service
       const response = await queueService.getAvailableDoctorsForWalkIn();
 
       if (response.success && response.data) {
@@ -528,11 +530,9 @@ const WalkInModal = ({ isOpen, onClose, onSubmit }) => {
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
               <UserPlus className="h-5 w-5 text-primary" />
-              Walk-in Appointment
+              {t('receptionist.walkIn.title')}
             </DialogTitle>
-            <DialogDescription>
-              Create a walk-in appointment by selecting a patient and available doctor
-            </DialogDescription>
+            <DialogDescription>{t('receptionist.walkIn.description')}</DialogDescription>
           </DialogHeader>
 
           <div className="my-6 flex items-center gap-2">
@@ -544,7 +544,7 @@ const WalkInModal = ({ isOpen, onClose, onSubmit }) => {
               <span className="flex h-5 w-5 items-center justify-center rounded-full bg-current text-xs text-white">
                 1
               </span>
-              Select Patient
+              {t('receptionist.walkIn.selectPatient')}
             </div>
             <ArrowRight className="h-4 w-4 text-muted-foreground" />
             <div
@@ -555,7 +555,7 @@ const WalkInModal = ({ isOpen, onClose, onSubmit }) => {
               <span className="flex h-5 w-5 items-center justify-center rounded-full bg-current text-xs text-white">
                 2
               </span>
-              Select Doctor
+              {t('receptionist.walkIn.selectDoctor')}
             </div>
           </div>
 
@@ -569,13 +569,15 @@ const WalkInModal = ({ isOpen, onClose, onSubmit }) => {
                 className="space-y-6"
               >
                 <div className="space-y-3">
-                  <p className="mb-2 text-sm font-medium">Search Patient</p>
+                  <p className="mb-2 text-sm font-medium">
+                    {t('receptionist.walkIn.searchPatient')}
+                  </p>
                   <div className="relative">
                     <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 transform text-muted-foreground" />
                     <Input
                       id="patient-search"
                       type="text"
-                      placeholder="Search by name or phone number..."
+                      placeholder={t('receptionist.walkIn.searchPatientPlaceholder')}
                       value={patientSearch}
                       onChange={(e) => setPatientSearch(e.target.value)}
                       className="h-11 pl-10"
@@ -585,12 +587,16 @@ const WalkInModal = ({ isOpen, onClose, onSubmit }) => {
                 {isLoadingPatients && (
                   <div className="py-4 text-center">
                     <div className="mx-auto h-8 w-8 animate-spin rounded-full border-b-2 border-primary"></div>
-                    <p className="mt-2 text-sm text-muted-foreground">Searching patients...</p>
+                    <p className="mt-2 text-sm text-muted-foreground">
+                      {t('receptionist.walkIn.searchingPatients')}
+                    </p>
                   </div>
                 )}
                 {patients.length > 0 && (
                   <div className="space-y-3">
-                    <p className="text-sm font-medium text-muted-foreground">Select a patient:</p>
+                    <p className="text-sm font-medium text-muted-foreground">
+                      {t('receptionist.walkIn.selectAPatient')}
+                    </p>
                     <div className="max-h-64 space-y-3 overflow-y-auto pr-2">
                       {patients.map((patient) => (
                         <motion.div
@@ -768,24 +774,26 @@ const WalkInModal = ({ isOpen, onClose, onSubmit }) => {
 
                 <div className="space-y-4">
                   <div className="space-y-3">
-                    <p className="text-sm font-medium">Reason for Visit *</p>
+                    <p className="text-sm font-medium">
+                      {t('receptionist.walkIn.reasonForVisit')} *
+                    </p>
                     <Textarea
                       value={reasonForVisit}
                       onChange={(e) => setReasonForVisit(e.target.value)}
-                      placeholder="Enter the reason for this visit (e.g., follow-up, new symptoms, routine checkup)..."
+                      placeholder={t('receptionist.walkIn.reasonPlaceholder')}
                       className="min-h-[80px]"
                       required
                     />
                   </div>
 
                   <div className="space-y-3">
-                    <p className="text-sm font-medium">Search Doctor</p>
+                    <p className="text-sm font-medium">{t('receptionist.walkIn.selectDoctor')}</p>
                     <div className="relative">
                       <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 transform text-muted-foreground" />
                       <Input
                         id="doctor-search"
                         type="text"
-                        placeholder="Search by doctor name or specialty..."
+                        placeholder={t('receptionist.walkIn.searchDoctor')}
                         value={doctorSearch}
                         onChange={(e) => setDoctorSearch(e.target.value)}
                         className="h-11 pl-10"
@@ -794,7 +802,7 @@ const WalkInModal = ({ isOpen, onClose, onSubmit }) => {
                   </div>
 
                   <p className="text-sm font-medium">
-                    Available Doctors Today
+                    {t('receptionist.walkIn.availableDoctors')}
                     {doctors.length !== allDoctors.length ? ` (${doctors.length} found)` : ''}:
                   </p>
 
@@ -847,20 +855,13 @@ const WalkInModal = ({ isOpen, onClose, onSubmit }) => {
                                       doctor.status.slice(1).replace('-', ' ')}
                                 </Badge>
                                 <span className="text-sm text-muted-foreground">
-                                  {doctor.waitingPatients} waiting
+                                  {doctor.waitingPatients} {t('receptionist.walkIn.waiting')}
                                 </span>
                               </div>
 
                               {doctor.description && (
                                 <p className="text-xs text-muted-foreground">
                                   {doctor.description}
-                                </p>
-                              )}
-
-                              {doctor.currentlyWith && (
-                                <p className="text-xs text-muted-foreground">
-                                  Currently with: {doctor.currentlyWith.patient?.first_name}{' '}
-                                  {doctor.currentlyWith.patient?.last_name}
                                 </p>
                               )}
 
@@ -872,7 +873,7 @@ const WalkInModal = ({ isOpen, onClose, onSubmit }) => {
 
                               {doctor.slotsRemaining > 0 && doctor.status === 'available' && (
                                 <p className="text-xs font-medium text-green-600">
-                                  ✓ Available now
+                                  ✓ {t('receptionist.walkIn.available')}
                                 </p>
                               )}
                             </div>
@@ -897,7 +898,7 @@ const WalkInModal = ({ isOpen, onClose, onSubmit }) => {
 
         <div className="mx-6 flex justify-between border-t pb-6 pt-4">
           <Button variant="outline" onClick={step === 1 ? handleModalClose : handleBack}>
-            {step === 1 ? 'Cancel' : 'Back'}
+            {step === 1 ? t('common.cancel') : t('receptionist.walkIn.back')}
           </Button>
 
           {step === 2 && (
@@ -925,12 +926,10 @@ const WalkInModal = ({ isOpen, onClose, onSubmit }) => {
                 <UserPlus className="h-4 w-4" />
               )}
               {isSubmitting
-                ? 'Creating...'
+                ? t('receptionist.walkIn.processing')
                 : patientHasActiveAppointment && !bypassCheck
-                  ? 'Patient Already Queued'
-                  : bypassCheck && patientHasActiveAppointment
-                    ? 'Add to Queue (Override)'
-                    : 'Add to Queue'}
+                  ? t('receptionist.walkIn.activeAppointmentWarning')
+                  : t('receptionist.walkIn.createWalkIn')}
             </Button>
           )}
         </div>

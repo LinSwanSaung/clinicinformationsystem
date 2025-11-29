@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useMemo, useState, useEffect } from 'react';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -6,6 +6,7 @@ import { SearchBar, LoadingSpinner } from '@/components/library';
 import DataTable from '@/components/library/DataTable/DataTable';
 import { useDispenses } from '../hooks/useDispenses';
 import dispenseService from '../services/dispenseService';
+import useDebounce from '@/hooks/useDebounce';
 
 function toISOStartOfDay(dateStr) {
   const d = new Date(dateStr);
@@ -24,15 +25,21 @@ export default function DispenseHistoryTab() {
   const [fromDate, setFromDate] = useState(() => today.toISOString().slice(0, 10));
   const [toDate, setToDate] = useState(() => today.toISOString().slice(0, 10));
   const [search, setSearch] = useState('');
+  const debouncedSearch = useDebounce(search, 400);
   const [page, setPage] = useState(1);
   const [pageSize] = useState(25);
   const [sort, setSort] = useState({ key: 'dispensedAt', direction: 'desc' });
   const [exporting, setExporting] = useState(false);
 
+  // Reset page when debounced search changes
+  useEffect(() => {
+    setPage(1);
+  }, [debouncedSearch]);
+
   const params = {
     from: toISOStartOfDay(fromDate),
     to: toISOEndOfDay(toDate),
-    search: search || undefined,
+    search: debouncedSearch || undefined,
     page,
     pageSize,
     sortBy: sort.key,
@@ -52,9 +59,14 @@ export default function DispenseHistoryTab() {
       render: (_, row) => row.dispensedBy?.name || '-',
     },
     {
+      key: 'unitPrice',
+      label: 'Unit Price',
+      render: (v) => (v !== null && v !== undefined ? Number(v).toFixed(2) : '0.00'),
+    },
+    {
       key: 'totalPrice',
       label: 'Amount',
-      render: (v) => (v != null ? Number(v).toFixed(2) : '0.00'),
+      render: (v) => (v !== null && v !== undefined ? Number(v).toFixed(2) : '0.00'),
     },
   ];
 
@@ -86,10 +98,7 @@ export default function DispenseHistoryTab() {
       <div className="min-w-[200px] flex-1">
         <SearchBar
           value={search}
-          onChange={(e) => {
-            setSearch(e.target.value);
-            setPage(1);
-          }}
+          onChange={(e) => setSearch(e.target.value)}
           placeholder="Search medicine name..."
           variant="flat"
         />

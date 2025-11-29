@@ -52,7 +52,7 @@ router.get(
         'id, email, first_name, last_name, phone, role, specialty, is_active, created_at, last_login, deleted_at',
     });
 
-    // Ensure we have a proper data structure
+    // Ensure proper data structure
     const users = result?.data || result || [];
 
     res.status(200).json({

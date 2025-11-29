@@ -594,7 +594,7 @@ const EmployeeManagement = () => {
         {showAddForm && <AddEmployeeForm />}
 
         {/* Edit Employee Form */}
-        {editingEmployee && <EditEmployeeForm />}
+        {editingEmployee && <EditEmployeeForm key={editingEmployee.id} />}
 
         {/* Controls */}
         <TableToolbar

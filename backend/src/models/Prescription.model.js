@@ -113,6 +113,32 @@ class PrescriptionModel extends BaseModel {
   async delete(prescriptionId) {
     return this.updateStatus(prescriptionId, 'cancelled');
   }
+
+  /**
+   * Get prescriptions by doctor note ID
+   */
+  async getByDoctorNoteId(doctorNoteId) {
+    const { data, error } = await this.supabase
+      .from(this.tableName)
+      .select(
+        `
+        *,
+        doctor:users!doctor_id (
+          id,
+          first_name,
+          last_name
+        )
+      `
+      )
+      .eq('doctor_note_id', doctorNoteId)
+      .order('prescribed_date', { ascending: false });
+
+    if (error) {
+      throw new Error(`Failed to fetch prescriptions by note ID: ${error.message}`);
+    }
+
+    return data || [];
+  }
 }
 
 export default PrescriptionModel;

@@ -1,5 +1,6 @@
 import api from '@/services/api';
 import logger from '@/utils/logger';
+import { visitService } from '@/features/visits';
 
 /**
  * Enhanced Diagnosis Service with caching and performance optimizations
@@ -91,6 +92,8 @@ class DiagnosisService {
       // Invalidate cache for this patient
       if (diagnosisData.patient_id) {
         this.clearPatientCache(diagnosisData.patient_id);
+        // Also clear visit cache so visit history shows the new diagnosis
+        visitService.clearPatientCache(diagnosisData.patient_id);
       }
 
       return response.data.data;
@@ -110,6 +113,8 @@ class DiagnosisService {
       // Invalidate cache for this patient
       if (diagnosisData.patient_id) {
         this.clearPatientCache(diagnosisData.patient_id);
+        // Also clear visit cache so visit history reflects the update
+        visitService.clearPatientCache(diagnosisData.patient_id);
       }
 
       return response.data.data;
@@ -132,6 +137,8 @@ class DiagnosisService {
       // Invalidate cache for this patient if provided
       if (patientId) {
         this.clearPatientCache(patientId);
+        // Also clear visit cache so visit history reflects the update
+        visitService.clearPatientCache(patientId);
       }
 
       return response.data.data;
@@ -151,6 +158,8 @@ class DiagnosisService {
       // Invalidate cache for this patient if provided
       if (patientId) {
         this.clearPatientCache(patientId);
+        // Also clear visit cache so visit history reflects the deletion
+        visitService.clearPatientCache(patientId);
       }
 
       return response.data;

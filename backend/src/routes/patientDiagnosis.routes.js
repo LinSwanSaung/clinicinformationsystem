@@ -82,8 +82,6 @@ router.get(
         });
       }
 
-      // Note: Viewing is not logged to avoid excessive audit log entries
-
       res.json({
         success: true,
         data: diagnosis,

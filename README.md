@@ -1,225 +1,229 @@
 # ThriveCare - Clinic Information System
 
-A modern, responsive Clinic Information System designed for low-resource healthcare settings. Built with React, TailwindCSS, and shadcn/ui components.
+A modern, full-stack Clinic Information System designed for low-resource healthcare settings. Built with React, Node.js, and Supabase.
 
-## 🏥 Features
+![License](https://img.shields.io/badge/license-MIT-blue.svg)
+![Node](https://img.shields.io/badge/node-%3E%3D18.0.0-brightgreen)
+![React](https://img.shields.io/badge/react-18.x-61dafb)
 
-- **Multi-role Authentication**: Admin, Receptionist, Nurse, and Doctor roles
-- **Employee Management**: Complete CRUD operations for staff management
-- **Modern UI**: Clean, responsive design following Supabase design patterns
-- **Role-based Access Control**: Secure access based on user roles
-- **Mobile-first Design**: Optimized for all device sizes
+## 🏥 Overview
+
+ThriveCare is a comprehensive clinic management solution that streamlines healthcare operations from patient registration to billing. It supports multiple user roles with role-based access control, real-time queue management, electronic medical records, and integrated billing.
+
+## ✨ Features
+
+### Core Modules
+- **Patient Management** - Registration, medical history, allergies, diagnoses
+- **Appointment Scheduling** - Calendar-based booking with doctor availability
+- **Queue Management** - Real-time token-based queue with priority support
+- **Electronic Medical Records** - Vitals, prescriptions, doctor notes, documents
+- **Billing & Payments** - Invoicing, partial payments, outstanding balance tracking
+- **Notifications** - Real-time in-app and browser notifications
+
+### User Roles
+| Role | Capabilities |
+|------|-------------|
+| **Admin** | Full system access, employee management, clinic settings, analytics |
+| **Receptionist** | Patient registration, appointments, queue token issuance |
+| **Nurse** | Vitals recording, patient preparation, queue management |
+| **Doctor** | Consultations, prescriptions, diagnoses, medical notes |
+| **Cashier/Pharmacist** | Billing, payments, prescription dispensing |
+
+### Additional Features
+- 🌍 **Multilingual** - English and Myanmar language support
+- 🌙 **Dark/Light Mode** - Theme switching for comfortable viewing
+- 📱 **Responsive Design** - Works on desktop, tablet, and mobile
+- 🔔 **Browser Notifications** - Real-time alerts for queue updates
+- 📊 **Analytics Dashboard** - Revenue, patient, and appointment statistics
 
 ## 🚀 Tech Stack
 
-- **Frontend**: Vite + React + TailwindCSS + shadcn/ui
-- **Icons**: Lucide React
-- **Routing**: React Router v6
-- **Design System**: Supabase theme with custom design tokens
-- **Backend**: Node.js + Supabase (PostgreSQL) - *Coming Soon*
-- **Authentication**: Supabase Auth - *Coming Soon*
+| Layer | Technology |
+|-------|------------|
+| **Frontend** | React 18, Vite, TailwindCSS, shadcn/ui |
+| **Backend** | Node.js, Express.js |
+| **Database** | PostgreSQL (Supabase) |
+| **Authentication** | JWT with bcrypt |
+| **State Management** | TanStack Query (React Query) |
+| **Internationalization** | react-i18next |
+| **Icons** | Lucide React |
 
-## 📋 Current Implementation
+## 📋 Prerequisites
 
-### ✅ Completed Features
-- Project setup with Vite, React, TailwindCSS
-- Admin login page with dummy authentication
-- Admin dashboard with stats and quick actions
-- Employee management with full CRUD operations
-- Responsive design following modern UI patterns
-
-### 🔄 In Development
-- Backend integration with Supabase
-- Real authentication system
-- Other role interfaces (Receptionist, Nurse, Doctor)
-- Advanced reporting and analytics
-
-## 🛠️ Installation & Setup
-
-### Prerequisites
-- Node.js (v18 or higher)
+- Node.js v18 or higher
 - npm or yarn
 - Supabase account (for database)
-- Vercel account (for frontend deployment)
-- Railway/Render account (for backend deployment)
+- Git
 
-### Local Development Setup
+## 🛠️ Quick Start
 
-1. **Clone the repository**
-   ```bash
-   git clone <repository-url>
-   cd clinicinformationsystem
+### 1. Clone the Repository
+
+```bash
+git clone https://github.com/LinSwanSaung/clinicinformationsystem.git
+cd clinicinformationsystem
+```
+
+### 2. Install Dependencies
+
+```bash
+# Install frontend dependencies
+cd frontend
+npm install
+
+# Install backend dependencies
+cd ../backend
+npm install
+```
+
+### 3. Configure Environment Variables
+
+**Frontend** (`frontend/.env`):
+```env
+VITE_API_URL=http://localhost:3000/api
+```
+
+**Backend** (`backend/.env`):
+```env
+PORT=3000
+NODE_ENV=development
+
+# Supabase
+SUPABASE_URL=your_supabase_url
+SUPABASE_ANON_KEY=your_anon_key
+SUPABASE_SERVICE_ROLE_KEY=your_service_role_key
+
+# JWT
+JWT_SECRET=your_jwt_secret_key
+JWT_EXPIRES_IN=7d
+
+# Optional: AI Features
+GITHUB_TOKEN=your_github_token
+AI_MODEL=gpt-4o-mini
+```
+
+### 4. Set Up Database
+
+1. Create a new Supabase project
+2. Run the schema in Supabase SQL Editor:
+   ```sql
+   -- Copy and run the contents of:
+   backend/database/schema.sql
    ```
 
-2. **Install frontend dependencies**
-   ```bash
-   cd frontend
-   npm install
-   ```
+### 5. Start Development Servers
 
-3. **Install backend dependencies**
-   ```bash
-   cd ../backend
-   npm install
-   ```
+**Terminal 1 - Backend:**
+```bash
+cd backend
+npm run dev
+```
 
-4. **Set up environment variables**
-   - Copy `.env.example` to `.env` in both `frontend/` and `backend/` directories
-   - Configure your Supabase credentials and other required variables
+**Terminal 2 - Frontend:**
+```bash
+cd frontend
+npm run dev
+```
 
-5. **Start development servers**
-   
-   Frontend (Terminal 1):
-   ```bash
-   cd frontend
-   npm run dev
-   ```
-   
-   Backend (Terminal 2):
-   ```bash
-   cd backend
-   npm run dev
-   ```
+### 6. Access the Application
 
-6. **Open your browser**
-   Navigate to `http://localhost:5173`
+Open http://localhost:5173 in your browser.
 
-### 🚀 Deployment
+## 🔐 Test Credentials
 
-For production deployment instructions, see [DEPLOYMENT.md](./docs/DEPLOYMENT.md)
-
-**Quick Deploy to Vercel:**
-1. Connect your GitHub repository to Vercel
-2. Configure build settings (already set in `vercel.json`)
-3. Add environment variables
-4. Deploy!
-
-The repository includes GitHub Actions CI/CD pipelines for automated deployments.
-
-## 🔐 Demo Credentials
-
-**Admin Access:**
-- Email: `admin@clinic.com`
-- Password: `admin123`
-
-**Receptionist Access:**
-- Email: `receptionist.brown@clinic.com`
-- Password: `clinic123`
-
-**Nurse Access:**
-- Email: `nurse@clinic.com`
-- Password: `nurse123`
-
-## 📱 Usage
-
-1. **Login**: Use the demo credentials to access the admin panel
-2. **Dashboard**: View clinic statistics and quick action cards
-3. **Employee Management**: 
-   - Click on "Employee Management" card from dashboard
-   - Add new employees with role assignments
-   - Edit existing employee information
-   - Activate/deactivate employee accounts
-   - Delete employee records
-
-## 🎨 Design Philosophy
-
-This application follows the Supabase design system for:
-- Clean, modern aesthetics
-- Consistent color palette
-- Intuitive user interactions
-- Mobile-responsive layouts
-- Accessible components
+| Role | Email | Password |
+|------|-------|----------|
+| Admin | admin@clinic.com | admin123 |
+| Receptionist | lin@gmail.com | Lin260702 |
+| Nurse | chue@gmail.com | Lin260702 |
+| Doctor | zawoo@gmail.com | Lin260702 |
+| Cashier/Pharmacist | cashier1@gmail.com | cashier123 |
 
 ## 📁 Project Structure
 
 ```
-thrivecare/
-├── src/
-│   ├── components/
-│   │   ├── ui/               # shadcn/ui components
-│   │   ├── Alert.jsx         # Custom alert component
-│   │   ├── Navbar.jsx        # Navigation component
-│   │   └── PageLayout.jsx    # Layout wrapper
-│   ├── contexts/
-│   │   └── AuthContext.jsx   # Authentication context
-│   ├── data/
-│   │   └── dummyData.js      # Sample data for development
-│   ├── hooks/
-│   │   └── useAuth.js        # Authentication hooks
-│   ├── lib/
-│   │   └── utils.js          # Utility functions
-│   ├── pages/
-│   │   ├── admin/            # Admin role pages
-│   │   ├── receptionist/     # Receptionist role pages
-│   │   └── AdminLogin.jsx    # Login page
-│   ├── styles/
-│   │   ├── theme.css         # Design tokens (Supabase theme)
-│   │   └── README.md         # Styles documentation
-│   ├── App.jsx               # Main app component
-│   ├── index.css             # Global styles
-│   └── main.jsx              # App entry point
-├── public/                   # Static assets
-├── tailwind.config.js        # Tailwind configuration
-└── package.json              # Dependencies and scripts
+clinicinformationsystem/
+├── frontend/                 # React frontend application
+│   ├── src/
+│   │   ├── app/             # App configuration, routes, providers
+│   │   ├── components/      # Reusable UI components
+│   │   ├── contexts/        # React contexts (Auth, Theme, Feedback)
+│   │   ├── features/        # Feature-based modules
+│   │   │   ├── admin/       # Admin management
+│   │   │   ├── appointments/# Appointment scheduling
+│   │   │   ├── auth/        # Authentication
+│   │   │   ├── billing/     # Invoicing & payments
+│   │   │   ├── medical/     # Medical records, vitals, prescriptions
+│   │   │   ├── patients/    # Patient management
+│   │   │   ├── queue/       # Queue management
+│   │   │   ├── services/    # Service catalog
+│   │   │   └── visits/      # Visit management
+│   │   ├── hooks/           # Custom React hooks
+│   │   ├── i18n/            # Internationalization
+│   │   ├── pages/           # Role-specific dashboards
+│   │   ├── services/        # API service layer
+│   │   └── utils/           # Utility functions
+│   └── public/              # Static assets
+│
+├── backend/                  # Node.js backend API
+│   ├── src/
+│   │   ├── config/          # Database, logger configuration
+│   │   ├── constants/       # Constants and enums
+│   │   ├── errors/          # Custom error classes
+│   │   ├── middleware/      # Express middleware
+│   │   ├── models/          # Database models
+│   │   ├── routes/          # API route handlers
+│   │   ├── services/        # Business logic
+│   │   │   └── repositories/# Data access layer
+│   │   ├── utils/           # Utility functions
+│   │   └── validators/      # Input validation
+│   ├── database/
+│   │   └── schema.sql       # Database schema
+│   └── docs/                # Backend documentation
+│
+├── docs/                     # Project documentation
+└── api/                      # Vercel serverless functions
 ```
 
-## 🎨 Design System
+## 📚 Documentation
 
-The application uses a centralized design system based on the **Supabase theme**:
+- [Setup Guide](docs/SETUP.md) - Detailed installation instructions
+- [API Documentation](docs/API.md) - REST API endpoints
+- [Database Schema](docs/DATABASE.md) - Tables and relationships
+- [Deployment Guide](docs/DEPLOYMENT.md) - Production deployment
+- [User Guide](docs/USER_GUIDE.md) - How to use each role
 
-- **Theme File**: `src/styles/theme.css`
-- **Design Tokens**: Colors, typography, spacing, shadows
-- **Dark Mode**: Automatic support via CSS variables
-- **Tailwind Integration**: All design tokens mapped to Tailwind classes
+## 🚀 Deployment
 
-### Available Design Tokens
-- Colors: `primary`, `secondary`, `accent`, `muted`, `destructive`
-- Typography: `font-sans` (Outfit), `font-serif`, `font-mono`
-- Spacing: `radius-sm`, `radius-md`, `radius-lg`, `radius-xl`
-- Shadows: `shadow-xs` through `shadow-2xl`
+### Frontend (Vercel)
+```bash
+# Install Vercel CLI
+npm i -g vercel
 
-## 📱 Usage
-│   ├── admin/           # Admin-specific pages
-│   └── AdminLogin.jsx   # Login page
-├── data/
-│   └── dummyData.js     # Mock data for development
-├── lib/
-│   └── utils.js         # Utility functions
-└── hooks/               # Custom React hooks
+# Deploy
+cd frontend
+vercel
 ```
 
-## 🔧 Available Scripts
-
-- `npm run dev` - Start development server
-- `npm run build` - Build for production
-- `npm run preview` - Preview production build
-- `npm run lint` - Run ESLint
-
-## 🌟 Future Enhancements
-
-- **Backend Integration**: Supabase PostgreSQL database
-- **Real Authentication**: Secure login with Supabase Auth
-- **Multi-role Dashboards**: Specialized interfaces for each role
-- **Patient Management**: Complete patient records system
-- **Appointment Scheduling**: Calendar-based appointment system
-- **Medical Records**: Digital health records management
-- **Reporting & Analytics**: Comprehensive clinic analytics
-- **Mobile App**: React Native companion app
+### Backend (Railway/Render)
+See [DEPLOYMENT.md](docs/DEPLOYMENT.md) for detailed instructions.
 
 ## 🤝 Contributing
 
 1. Fork the repository
-2. Create a feature branch
-3. Make your changes
-4. Submit a pull request
+2. Create a feature branch (`git checkout -b feature/amazing-feature`)
+3. Commit your changes (`git commit -m 'Add amazing feature'`)
+4. Push to the branch (`git push origin feature/amazing-feature`)
+5. Open a Pull Request
 
 ## 📄 License
 
 This project is licensed under the MIT License.
 
-## 📞 Support
+## 👨‍💻 Author
 
-For questions or support, please contact the development team or create an issue in the repository.
+**Lin Swan Saung**
+- GitHub: [@LinSwanSaung](https://github.com/LinSwanSaung)
 
 ---
 

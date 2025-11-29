@@ -1,7 +1,14 @@
 import { z } from 'zod';
 import { supabase } from '../../config/database.js';
 
-const SortByEnum = z.enum(['dispensedAt', 'medicineName', 'patientName', 'quantity']);
+const SortByEnum = z.enum([
+  'dispensedAt',
+  'medicineName',
+  'patientName',
+  'quantity',
+  'totalPrice',
+  'unitPrice',
+]);
 const SortDirEnum = z.enum(['asc', 'desc']);
 
 export const DispenseFiltersSchema = z.object({
@@ -30,14 +37,15 @@ export async function fetchDispenses(filters = {}) {
     DispenseFiltersSchema.parse(filters);
   const { start, end } = normalizeDateRange(from, to);
 
-  // 1) Pull paid invoices within range (minimal columns)
+  // 1) Pull paid/partial_paid invoices within range (minimal columns)
+  // Use updated_at for date filtering since partial_paid invoices may not have completed_at
   const { data: invoices, error: invErr } = await supabase
     .from('invoices')
-    .select('id, completed_at, completed_by, patient_id')
-    .eq('status', 'paid')
-    .gte('completed_at', start)
-    .lte('completed_at', end)
-    .order('completed_at', { ascending: false });
+    .select('id, invoice_number, completed_at, completed_by, patient_id, updated_at')
+    .in('status', ['paid', 'partial_paid'])
+    .gte('updated_at', start)
+    .lte('updated_at', end)
+    .order('updated_at', { ascending: false });
   if (invErr) {
     throw invErr;
   }
@@ -50,7 +58,9 @@ export async function fetchDispenses(filters = {}) {
   // 2) Pull medicine invoice_items for those invoices
   let itemsQuery = supabase
     .from('invoice_items')
-    .select('id, invoice_id, item_name, quantity, unit_price, total_price, added_at, item_type')
+    .select(
+      'id, invoice_id, item_name, quantity, unit_price, total_price, added_at, item_type, added_by'
+    )
     .in('invoice_id', invoiceIds)
     .eq('item_type', 'medicine');
   if (search && search.trim()) {
@@ -65,9 +75,33 @@ export async function fetchDispenses(filters = {}) {
     return { items: [], total: 0, summary: { totalItems: 0, totalUnits: 0, byMedicine: [] } };
   }
 
+  // 2b) Pull payment transactions to get processed_by/received_by for partial_paid invoices
+  const { data: payments, error: payErr } = await supabase
+    .from('payment_transactions')
+    .select('invoice_id, processed_by, received_by')
+    .in('invoice_id', invoiceIds)
+    .order('created_at', { ascending: false });
+
+  // Create map of invoice_id -> first payment's processor
+  const paymentProcessorMap = {};
+  if (!payErr && payments) {
+    payments.forEach((p) => {
+      if (!paymentProcessorMap[p.invoice_id]) {
+        paymentProcessorMap[p.invoice_id] = p.processed_by || p.received_by;
+      }
+    });
+  }
+
   // 3) Build lookup maps for patients and users
   const patientIds = [...new Set(invoices.map((i) => i.patient_id).filter(Boolean))];
-  const userIds = [...new Set(invoices.map((i) => i.completed_by).filter(Boolean))];
+  // Collect user IDs from completed_by, payment processors, and added_by
+  const userIds = [
+    ...new Set([
+      ...invoices.map((i) => i.completed_by).filter(Boolean),
+      ...Object.values(paymentProcessorMap).filter(Boolean),
+      ...invoiceItems.map((i) => i.added_by).filter(Boolean),
+    ]),
+  ];
 
   const patientsMap = {};
   if (patientIds.length > 0) {
@@ -109,10 +143,12 @@ export async function fetchDispenses(filters = {}) {
     .map((it) => {
       const inv = invoiceMap[it.invoice_id];
       const patient = inv?.patient_id ? patientsMap[inv.patient_id] : null;
-      const user = inv?.completed_by ? usersMap[inv.completed_by] : null;
+      // Get user: try completed_by first, then payment processor, then item added_by
+      const userId = inv?.completed_by || paymentProcessorMap[it.invoice_id] || it.added_by;
+      const user = userId ? usersMap[userId] : null;
       return {
         id: it.id,
-        dispensedAt: inv?.completed_at || inv?.added_at || it.added_at,
+        dispensedAt: inv?.completed_at || inv?.updated_at || it.added_at,
         medicineName: it.item_name,
         quantity: Number(it.quantity) || 0,
         unitPrice: Number(it.unit_price) || 0,
@@ -130,6 +166,7 @@ export async function fetchDispenses(filters = {}) {
             }
           : null,
         invoiceId: it.invoice_id,
+        invoiceNumber: inv?.invoice_number || it.invoice_id,
       };
     });
 
@@ -149,6 +186,14 @@ export async function fetchDispenses(filters = {}) {
       case 'quantity':
         valA = a.quantity || 0;
         valB = b.quantity || 0;
+        break;
+      case 'totalPrice':
+        valA = a.totalPrice || 0;
+        valB = b.totalPrice || 0;
+        break;
+      case 'unitPrice':
+        valA = a.unitPrice || 0;
+        valB = b.unitPrice || 0;
         break;
       case 'dispensedAt':
       default:

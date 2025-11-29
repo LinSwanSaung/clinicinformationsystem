@@ -48,7 +48,7 @@ export class UserModel extends BaseModel {
    */
   async updatePassword(userId, newPassword) {
     const passwordHash = await bcrypt.hash(newPassword, 12);
-    // Bypass the user-model override so we can update the hashed password
+    // Bypass the user-model override to update the hashed password
     return super.updateById(userId, { password_hash: passwordHash });
   }
 

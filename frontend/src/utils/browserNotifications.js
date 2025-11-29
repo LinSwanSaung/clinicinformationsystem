@@ -1,6 +1,5 @@
 /**
  * Browser Push Notifications Utility
- * Handles browser notification permissions and displays push notifications
  */
 
 class BrowserNotificationService {
@@ -9,16 +8,10 @@ class BrowserNotificationService {
     this.checkPermission();
   }
 
-  /**
-   * Check if browser supports notifications
-   */
   isSupported() {
     return 'Notification' in window;
   }
 
-  /**
-   * Check current permission status
-   */
   checkPermission() {
     if (!this.isSupported()) {
       this.permission = 'unsupported';
@@ -28,9 +21,6 @@ class BrowserNotificationService {
     return this.permission;
   }
 
-  /**
-   * Request notification permission from user
-   */
   async requestPermission() {
     if (!this.isSupported()) {
       return 'unsupported';
@@ -54,17 +44,11 @@ class BrowserNotificationService {
     }
   }
 
-  /**
-   * Show a browser notification
-   * @param {string} title - Notification title
-   * @param {object} options - Notification options (body, icon, tag, etc.)
-   */
   async show(title, options = {}) {
     if (!this.isSupported()) {
       return null;
     }
 
-    // Check permission first
     if (this.permission !== 'granted') {
       const permission = await this.requestPermission();
       if (permission !== 'granted') {
@@ -85,14 +69,12 @@ class BrowserNotificationService {
     try {
       const notification = new Notification(title, defaultOptions);
 
-      // Auto-close after 5 seconds (unless requireInteraction is true)
       if (!defaultOptions.requireInteraction) {
         setTimeout(() => {
           notification.close();
         }, 5000);
       }
 
-      // Handle click - focus window
       notification.onclick = () => {
         window.focus();
         notification.close();
@@ -105,22 +87,16 @@ class BrowserNotificationService {
     }
   }
 
-  /**
-   * Show notification for queue turn
-   */
   async showQueueTurn(tokenNumber, message) {
     return this.show('Your Turn in Queue', {
       body: `Token #${tokenNumber}: ${message}`,
       icon: '/favicon.ico',
       tag: `queue-${tokenNumber}`,
-      requireInteraction: true, // Important notification, require user interaction
+      requireInteraction: true,
       badge: '/favicon.ico',
     });
   }
 
-  /**
-   * Show notification for appointment reminder
-   */
   async showAppointmentReminder(time, message) {
     return this.show('Appointment Reminder', {
       body: message || `Your appointment is at ${time}`,
@@ -131,9 +107,6 @@ class BrowserNotificationService {
     });
   }
 
-  /**
-   * Show generic notification
-   */
   async showNotification(title, message, type = 'info') {
     const icons = {
       info: '/favicon.ico',
@@ -151,5 +124,4 @@ class BrowserNotificationService {
   }
 }
 
-// Export singleton instance
 export default new BrowserNotificationService();

@@ -3,6 +3,7 @@ import {
   createNotification as repoCreateNotification,
   getReceptionistIds,
   getCashierIds,
+  getNurseIds,
   getAdminIds,
   getDoctorId,
   getPortalUserIdByPatientId as repoGetPortalUserIdByPatientId,
@@ -165,6 +166,31 @@ class NotificationService {
     } catch (error) {
       logger.error('[NotificationService] Error notifying cashiers:', error);
       throw new Error(`Failed to notify cashiers: ${error.message}`);
+    }
+  }
+
+  /**
+   * Notify all nurses
+   */
+  async notifyNurses({ title, message, type = 'info', relatedEntityType, relatedEntityId }) {
+    try {
+      const nurseIds = await getNurseIds();
+
+      if (nurseIds.length === 0) {
+        return [];
+      }
+
+      return await this.createNotification({
+        userIds: nurseIds,
+        title,
+        message,
+        type,
+        relatedEntityType,
+        relatedEntityId,
+      });
+    } catch (error) {
+      logger.error('[NotificationService] Error notifying nurses:', error);
+      throw new Error(`Failed to notify nurses: ${error.message}`);
     }
   }
 

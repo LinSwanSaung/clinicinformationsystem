@@ -39,7 +39,7 @@ class PaymentTransactionModel extends BaseModel {
       ),
     ];
 
-    // Fetch users separately if we have any user IDs
+    // Fetch users separately for non-empty user IDs
     const userMap = {};
     if (userIds.length > 0) {
       const { data: users, error: usersError } = await this.supabase

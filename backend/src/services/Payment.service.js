@@ -98,7 +98,6 @@ class PaymentService {
         : null;
 
       // Check for duplicate payment (same amount, same invoice, within last 5 seconds)
-      // This prevents accidental double-submission
       const recentPayments = await PaymentTransactionModel.getRecentPaymentsByInvoice(
         invoiceId,
         5000
@@ -117,8 +116,7 @@ class PaymentService {
         );
       }
 
-      // Use atomic function with advisory locks to prevent race conditions
-      // This ensures payment recording and invoice recalculation happen atomically
+      // Use atomic function with advisory locks
       const atomicResult = await PaymentTransactionModel.recordPaymentAtomic(
         invoiceId,
         validatedAmount,
@@ -134,9 +132,21 @@ class PaymentService {
 
       // Check if invoice is fully paid and complete it if needed
       const updatedInvoice = atomicResult.invoice;
-      if (parseFloat(updatedInvoice.balance_due || updatedInvoice.balance || 0) <= 0) {
-        // Invoice is fully paid - complete it
-        await InvoiceService.completeInvoice(invoiceId, receivedBy);
+      const balanceDue = parseFloat(updatedInvoice?.balance_due ?? updatedInvoice?.balance ?? 0);
+
+      if (balanceDue <= 0) {
+        // Invoice is fully paid - complete it (which also completes the visit)
+        try {
+          await InvoiceService.completeInvoice(invoiceId, receivedBy);
+        } catch (completeError) {
+          // Critical: Payment was recorded but visit completion failed
+          // Log prominently but don't fail the payment (it was already recorded atomically)
+          logger.error(
+            `[PaymentService] CRITICAL: Payment recorded but invoice/visit completion failed for invoice ${invoiceId}:`,
+            completeError.message
+          );
+          // The idempotency handling in completeInvoice should fix this on next call
+        }
       }
 
       return atomicResult.payment;
@@ -303,8 +313,7 @@ class PaymentService {
       const systemName = 'ThriveCare';
       const systemDescription = 'Healthcare System';
 
-      // Get currency settings ONCE at the start and use throughout PDF generation
-      // This prevents currency from changing mid-generation
+      // Get currency settings once
       const currencySettings = await clinicSettingsService.getCurrencySettings();
       const currencySymbol = currencySettings.currency_symbol || '$';
       const currencyCode = currencySettings.currency_code || 'USD';

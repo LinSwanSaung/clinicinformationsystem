@@ -62,8 +62,6 @@ router.get(
 
     const result = await visitService.getVisitDetails(id);
 
-    // Note: Viewing is not logged to avoid excessive audit log entries
-
     res.status(200).json({
       success: true,
       message: 'Visit details retrieved successfully',

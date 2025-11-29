@@ -1,5 +1,6 @@
 import { useState, useEffect, memo } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { useTranslation } from 'react-i18next';
 import { Card } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -39,9 +40,11 @@ const PatientCard = memo(
     readyTab: _readyTab = false,
     userRole = 'nurse',
     onViewFullPatientData,
+    onModalStateChange, // Callback to notify parent when modals open/close
   }) => {
     const navigate = useNavigate();
     const { showError } = useFeedback();
+    const { t } = useTranslation();
     // Form states for nurse role
     const [vitalsForm, setVitalsForm] = useState({
       bp: patient.vitals?.bp || '',
@@ -60,6 +63,14 @@ const PatientCard = memo(
     // Modal states
     const [isVitalsModalOpen, setIsVitalsModalOpen] = useState(false);
     const [isDelayModalOpen, setIsDelayModalOpen] = useState(false);
+
+    // Notify parent when modal state changes
+    useEffect(() => {
+      if (onModalStateChange) {
+        const hasOpenModal = isVitalsModalOpen || isDelayModalOpen || isAllergyModalOpen;
+        onModalStateChange(hasOpenModal);
+      }
+    }, [isVitalsModalOpen, isDelayModalOpen, isAllergyModalOpen, onModalStateChange]);
     const [delayReason, setDelayReason] = useState(patient.delayReason || '');
     const [_urgency, _setUrgency] = useState(patient.urgency || 'Normal');
     const [notes, setNotes] = useState(patient.notes || '');
@@ -123,23 +134,23 @@ const PatientCard = memo(
     const getStatusText = (status) => {
       switch (status) {
         case 'waiting':
-          return 'Waiting';
+          return t('receptionist.patientCard.statusWaiting');
         case 'delayed':
-          return 'Delayed';
+          return t('receptionist.patientCard.statusDelayed');
         case 'ready':
-          return 'Waiting for Doctor';
+          return t('receptionist.patientCard.statusWaitingForDoctor');
         case 'called':
-          return 'Waiting for Doctor'; // Nurse marked ready
+          return t('receptionist.patientCard.statusWaitingForDoctor'); // Nurse marked ready
         case 'seeing_doctor':
-          return 'In Consultation';
+          return t('receptionist.patientCard.statusInConsultation');
         case 'serving':
-          return 'In Consultation'; // Same as seeing_doctor
+          return t('receptionist.patientCard.statusInConsultation'); // Same as seeing_doctor
         case 'completed':
-          return 'Completed';
+          return t('receptionist.patientCard.statusCompleted');
         case 'missed':
-          return 'Missed';
+          return t('receptionist.patientCard.statusMissed');
         case 'cancelled':
-          return 'Cancelled';
+          return t('receptionist.patientCard.statusCancelled');
         default:
           return 'Unknown';
       }
@@ -158,7 +169,9 @@ const PatientCard = memo(
           onClick={handleViewFullPatientData}
         >
           <FileText size={18} className="mr-2" />
-          {userRole === 'doctor' ? 'View Medical Record' : 'View Full Patient Data'}
+          {userRole === 'doctor'
+            ? t('receptionist.patientCard.viewMedicalRecord')
+            : t('receptionist.patientCard.viewFullPatientData')}
         </Button>
       );
 
@@ -190,7 +203,8 @@ const PatientCard = memo(
                 className="flex h-11 w-full items-center justify-center border-blue-200 text-base font-medium text-blue-700 hover:bg-blue-50"
                 onClick={() => setIsVitalsModalOpen(true)}
               >
-                <FileText size={18} className="mr-2" /> Add Vitals & Notes
+                <FileText size={18} className="mr-2" />{' '}
+                {t('receptionist.patientCard.addVitalsNotes')}
               </Button>
             );
           } else {
@@ -202,7 +216,8 @@ const PatientCard = memo(
                   className="flex h-11 w-full items-center justify-center bg-emerald-600 text-base font-medium text-white hover:bg-emerald-700"
                   onClick={() => onMarkReady(patient.id)}
                 >
-                  <ClipboardCheck size={18} className="mr-2" /> Mark Ready for Doctor
+                  <ClipboardCheck size={18} className="mr-2" />{' '}
+                  {t('receptionist.patientCard.markReadyForDoctor')}
                 </Button>
                 <Button
                   key="edit-vitals"
@@ -210,7 +225,8 @@ const PatientCard = memo(
                   className="flex h-11 w-full items-center justify-center border-orange-200 text-base font-medium text-orange-700 hover:bg-orange-50"
                   onClick={() => setIsVitalsModalOpen(true)}
                 >
-                  <FileText size={18} className="mr-2" /> Edit Vitals & Notes
+                  <FileText size={18} className="mr-2" />{' '}
+                  {t('receptionist.patientCard.editVitalsNotes')}
                 </Button>
               </>
             );
@@ -225,7 +241,7 @@ const PatientCard = memo(
                 className="flex h-11 w-full items-center justify-center border-yellow-200 text-base font-medium text-yellow-700 hover:bg-yellow-50"
                 onClick={() => onUnmarkReady?.(patient.id)}
               >
-                <X size={18} className="mr-2" /> Unmark Ready
+                <X size={18} className="mr-2" /> {t('receptionist.patientCard.unmarkReady')}
               </Button>
               <Button
                 key="edit-vitals"
@@ -233,7 +249,8 @@ const PatientCard = memo(
                 className="flex h-11 w-full items-center justify-center border-orange-200 text-base font-medium text-orange-700 hover:bg-orange-50"
                 onClick={() => setIsVitalsModalOpen(true)}
               >
-                <FileText size={18} className="mr-2" /> Edit Vitals & Notes
+                <FileText size={18} className="mr-2" />{' '}
+                {t('receptionist.patientCard.editVitalsNotes')}
               </Button>
             </>
           );
@@ -252,7 +269,8 @@ const PatientCard = memo(
               className="flex h-11 w-full items-center justify-center text-base font-medium"
               onClick={() => setIsDelayModalOpen(true)}
             >
-              <AlertCircle size={18} className="mr-2" /> Delay Patient
+              <AlertCircle size={18} className="mr-2" />{' '}
+              {t('receptionist.patientCard.delayPatient')}
             </Button>
           );
         } else if (patient.status === 'delayed') {
@@ -264,7 +282,8 @@ const PatientCard = memo(
                 className="flex h-11 w-full items-center justify-center text-base font-medium"
                 onClick={() => setIsDelayModalOpen(true)}
               >
-                <AlertCircle size={18} className="mr-2" /> Update Delay Reason
+                <AlertCircle size={18} className="mr-2" />{' '}
+                {t('receptionist.patientCard.updateDelayReason')}
               </Button>
               <Button
                 key="remove-delay"
@@ -272,7 +291,7 @@ const PatientCard = memo(
                 className="flex h-11 w-full items-center justify-center border-green-200 text-base font-medium text-green-700 hover:bg-green-50"
                 onClick={() => onRemoveDelay?.(patient.id)}
               >
-                <Check size={18} className="mr-2" /> Remove Delay
+                <Check size={18} className="mr-2" /> {t('receptionist.patientCard.removeDelay')}
               </Button>
             </>
           );
@@ -291,7 +310,7 @@ const PatientCard = memo(
               className="flex h-11 w-full items-center justify-center bg-blue-600 text-base font-medium text-white hover:bg-blue-700"
               onClick={() => onStartConsultation?.(patient.id)}
             >
-              <User size={18} className="mr-2" /> Start Consultation
+              <User size={18} className="mr-2" /> {t('receptionist.patientCard.startConsultation')}
             </Button>
           );
         }
@@ -304,7 +323,8 @@ const PatientCard = memo(
               className="flex h-11 w-full items-center justify-center bg-green-600 text-base font-medium text-white hover:bg-green-700"
               onClick={() => onCompleteVisit?.(patient.id)}
             >
-              <ClipboardCheck size={18} className="mr-2" /> Complete Visit
+              <ClipboardCheck size={18} className="mr-2" />{' '}
+              {t('receptionist.patientCard.completeVisit')}
             </Button>
           );
         }
@@ -335,7 +355,11 @@ const PatientCard = memo(
             } flex items-center justify-center gap-1.5 px-2 py-0.5 text-center text-xs font-semibold text-white`}
           >
             <span className="text-sm">⭐</span>
-            <span>{isUrgent ? 'URGENT' : 'PRIORITY'}</span>
+            <span>
+              {isUrgent
+                ? t('receptionist.patientCard.urgencyUrgent').toUpperCase()
+                : t('receptionist.patientCard.urgencyPriority').toUpperCase()}
+            </span>
           </div>
         )}
         <div
@@ -369,7 +393,9 @@ const PatientCard = memo(
               </div>
               {patient.chief_complaint && (
                 <div className="mb-2 rounded-md bg-blue-50 p-2 text-sm text-foreground dark:bg-blue-950/30">
-                  <span className="font-medium text-blue-700 dark:text-blue-300">Reason:</span>{' '}
+                  <span className="font-medium text-blue-700 dark:text-blue-300">
+                    {t('receptionist.patientCard.reason')}:
+                  </span>{' '}
                   {patient.chief_complaint}
                 </div>
               )}
@@ -457,7 +483,9 @@ const PatientCard = memo(
               <div className="flex items-start">
                 <AlertCircle size={16} className="mr-2 mt-0.5 flex-shrink-0 text-red-600" />
                 <div>
-                  <div className="mb-1 text-sm font-medium text-red-800">Delay Reason:</div>
+                  <div className="mb-1 text-sm font-medium text-red-800">
+                    {t('receptionist.patientCard.delayReason')}:
+                  </div>
                   <div className="text-sm text-red-700">{patient.delayReason}</div>
                 </div>
               </div>
@@ -470,7 +498,9 @@ const PatientCard = memo(
               <div className="flex items-start">
                 <FileText size={16} className="mr-2 mt-0.5 flex-shrink-0 text-blue-600" />
                 <div>
-                  <div className="mb-1 text-sm font-medium text-blue-800">Clinical Notes:</div>
+                  <div className="mb-1 text-sm font-medium text-blue-800">
+                    {t('receptionist.patientCard.clinicalNotes')}:
+                  </div>
                   <div className="text-sm text-blue-700">{patient.notes}</div>
                 </div>
               </div>
@@ -482,7 +512,9 @@ const PatientCard = memo(
             <div className="mb-4">
               <div className="mb-2 flex items-center gap-2">
                 <AlertCircle size={16} className="text-red-600 dark:text-red-400" />
-                <span className="text-sm font-medium text-foreground">Allergies:</span>
+                <span className="text-sm font-medium text-foreground">
+                  {t('receptionist.patientCard.allergies')}:
+                </span>
               </div>
               <div className="flex flex-wrap gap-2">
                 {allergies.map((allergy, index) => {
@@ -530,8 +562,8 @@ const PatientCard = memo(
             <FormModal
               isOpen={isVitalsModalOpen}
               onOpenChange={setIsVitalsModalOpen}
-              title={`${patient.vitalsRecorded ? 'Edit' : 'Add'} Vitals & Notes for ${patient.name}`}
-              submitText="Save Vitals"
+              title={`${patient.vitalsRecorded ? t('common.edit') : t('common.add')} ${t('receptionist.patientCard.vitalsModalTitle')} - ${patient.name}`}
+              submitText={t('receptionist.patientCard.saveVitals')}
               onSubmit={(_e) => {
                 // Preserve existing save logic
                 const resolvedPatientId =
@@ -541,7 +573,7 @@ const PatientCard = memo(
                     '[PatientCard] Unable to resolve patient ID for vitals save:',
                     patient
                   );
-                  showError('Could not determine patient ID. Please refresh and try again.');
+                  showError(t('receptionist.patientCard.patientIdError'));
                   return;
                 }
                 const visitId =
@@ -559,7 +591,7 @@ const PatientCard = memo(
                   <div>
                     <label className="mb-1 block text-sm font-medium text-gray-700">
                       <Heart size={16} className="mr-1 inline" />
-                      Blood Pressure
+                      {t('receptionist.patientCard.bloodPressure')}
                     </label>
                     <Input
                       name="bp"
@@ -573,7 +605,7 @@ const PatientCard = memo(
                   <div>
                     <label className="mb-1 block text-sm font-medium text-gray-700">
                       <ThermometerSnowflake size={16} className="mr-1 inline" />
-                      Temperature (°F)
+                      {t('receptionist.patientCard.temperature')} (°F)
                     </label>
                     <Input
                       name="temp"
@@ -589,7 +621,7 @@ const PatientCard = memo(
                   <div>
                     <label className="mb-1 block text-sm font-medium text-gray-700">
                       <Scale size={16} className="mr-1 inline" />
-                      Weight (kg)
+                      {t('receptionist.patientCard.weight')} (kg)
                     </label>
                     <Input
                       name="weight"
@@ -605,7 +637,7 @@ const PatientCard = memo(
                   <div>
                     <label className="mb-1 block text-sm font-medium text-gray-700">
                       <Activity size={16} className="mr-1 inline" />
-                      Heart Rate (bpm)
+                      {t('receptionist.patientCard.heartRate')} (bpm)
                     </label>
                     <Input
                       name="heartRate"
@@ -621,7 +653,7 @@ const PatientCard = memo(
 
                 <div>
                   <label className="mb-1 block text-sm font-medium text-gray-700">
-                    Priority Level
+                    {t('receptionist.patientCard.priorityLevel')}
                   </label>
                   <select
                     value={vitalsForm.priorityLevel || vitalsForm.urgency || 'normal'}
@@ -630,18 +662,18 @@ const PatientCard = memo(
                     }
                     className="w-full rounded-md border border-gray-300 p-2 focus:border-transparent focus:ring-2 focus:ring-blue-500"
                   >
-                    <option value="normal">Normal</option>
-                    <option value="high">High Priority</option>
-                    <option value="urgent">Urgent</option>
+                    <option value="normal">{t('receptionist.patientCard.normal')}</option>
+                    <option value="high">{t('receptionist.patientCard.highPriority')}</option>
+                    <option value="urgent">{t('receptionist.patientCard.urgent')}</option>
                   </select>
                 </div>
 
                 <div>
                   <label className="mb-1 block text-sm font-medium text-gray-700">
-                    Clinical Notes
+                    {t('receptionist.patientCard.clinicalNotesLabel')}
                   </label>
                   <textarea
-                    placeholder="Additional observations or notes..."
+                    placeholder={t('receptionist.patientCard.clinicalNotesPlaceholder')}
                     value={notes}
                     onChange={(e) => setNotes(e.target.value)}
                     className="min-h-[80px] w-full resize-none rounded-md border border-gray-300 p-2 focus:border-transparent focus:ring-2 focus:ring-blue-500"
@@ -653,8 +685,16 @@ const PatientCard = memo(
             <FormModal
               isOpen={isDelayModalOpen}
               onOpenChange={setIsDelayModalOpen}
-              title={patient.status === 'delayed' ? 'Update Delay Reason' : 'Delay Patient'}
-              submitText={patient.status === 'delayed' ? 'Update Delay' : 'Confirm Delay'}
+              title={
+                patient.status === 'delayed'
+                  ? t('receptionist.patientCard.updateDelayReasonTitle')
+                  : t('receptionist.patientCard.delayPatientTitle')
+              }
+              submitText={
+                patient.status === 'delayed'
+                  ? t('receptionist.patientCard.updateDelay')
+                  : t('receptionist.patientCard.confirmDelay')
+              }
               submitDisabled={!delayReason.trim()}
               onSubmit={() => {
                 if (delayReason.trim()) {
@@ -667,10 +707,12 @@ const PatientCard = memo(
               <div className="space-y-4">
                 <div>
                   <label className="mb-2 block text-sm font-medium text-gray-700">
-                    {patient.status === 'delayed' ? 'Update delay reason:' : 'Reason for delay:'}
+                    {patient.status === 'delayed'
+                      ? t('receptionist.patientCard.updateDelayReasonLabel')
+                      : t('receptionist.patientCard.reasonForDelay')}
                   </label>
                   <textarea
-                    placeholder="Enter reason for delaying this patient..."
+                    placeholder={t('receptionist.patientCard.delayPlaceholder')}
                     value={delayReason}
                     onChange={(e) => setDelayReason(e.target.value)}
                     className="min-h-[100px] w-full resize-none rounded-md border border-gray-300 p-3 focus:border-transparent focus:ring-2 focus:ring-blue-500"
@@ -688,12 +730,14 @@ const PatientCard = memo(
               <DialogHeader>
                 <DialogTitle className="flex items-center gap-2">
                   <AlertCircle className="h-5 w-5 text-red-600" />
-                  Allergy Details
+                  {t('receptionist.patientCard.allergyDetails')}
                 </DialogTitle>
               </DialogHeader>
               <div className="space-y-4">
                 <div>
-                  <label className="text-sm font-medium text-muted-foreground">Allergy Name</label>
+                  <label className="text-sm font-medium text-muted-foreground">
+                    {t('receptionist.patientCard.allergyName')}
+                  </label>
                   <p className="mt-1 text-lg font-semibold text-foreground">
                     {selectedAllergy.allergy_name}
                   </p>
@@ -701,7 +745,9 @@ const PatientCard = memo(
 
                 <div className="grid grid-cols-2 gap-4">
                   <div>
-                    <label className="text-sm font-medium text-muted-foreground">Severity</label>
+                    <label className="text-sm font-medium text-muted-foreground">
+                      {t('receptionist.patientCard.severity')}
+                    </label>
                     <div className="mt-1">
                       <Badge
                         variant="destructive"
@@ -722,10 +768,10 @@ const PatientCard = memo(
 
                   <div>
                     <label className="text-sm font-medium text-muted-foreground">
-                      Allergen Type
+                      {t('receptionist.patientCard.allergenType')}
                     </label>
                     <p className="mt-1 capitalize text-foreground">
-                      {selectedAllergy.allergen_type || 'Not specified'}
+                      {selectedAllergy.allergen_type || t('receptionist.patientCard.notSpecified')}
                     </p>
                   </div>
                 </div>
@@ -733,7 +779,7 @@ const PatientCard = memo(
                 {selectedAllergy.reaction && (
                   <div>
                     <label className="text-sm font-medium text-muted-foreground">
-                      Reaction Description
+                      {t('receptionist.patientCard.reactionDescription')}
                     </label>
                     <p className="bg-muted/50 mt-1 rounded-md border border-border p-3 text-foreground">
                       {selectedAllergy.reaction}
@@ -744,7 +790,7 @@ const PatientCard = memo(
                 {selectedAllergy.diagnosed_date && (
                   <div>
                     <label className="text-sm font-medium text-muted-foreground">
-                      Diagnosed Date
+                      {t('receptionist.patientCard.diagnosedDate')}
                     </label>
                     <p className="mt-1 text-foreground">
                       {new Date(selectedAllergy.diagnosed_date).toLocaleDateString('en-US', {

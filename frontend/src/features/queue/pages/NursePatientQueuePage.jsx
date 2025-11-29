@@ -47,9 +47,9 @@ const NursePatientQueuePage = () => {
 
   const debouncedSearchTerm = useDebounce(searchTerm, 300);
 
-  // React Query: doctors queue polling with auth/role guard
+  // React Query: doctors queue polling
   const doctorsQuery = useQuery({
-    queryKey: ['nurse', 'queue', 'doctors'],
+    queryKey: ['queue', 'allDoctors'],
     queryFn: () => queueService.getAllDoctorsQueueStatus(),
     enabled: !!user && user.role === ROLES.NURSE,
     refetchInterval: POLLING_INTERVALS.NURSE_QUEUE,
@@ -167,9 +167,13 @@ const NursePatientQueuePage = () => {
                     key={token.id}
                     patient={{
                       id: token.patient?.id,
+                      patient_number: token.patient?.patient_number,
                       name: `${token.patient?.first_name} ${token.patient?.last_name}`,
                       age: token.patient?.age,
                       gender: token.patient?.gender,
+                      phone: token.patient?.phone,
+                      blood_group: token.patient?.blood_group,
+                      date_of_birth: token.patient?.date_of_birth,
                       tokenNumber: token.token_number,
                       status: token.status,
                       appointmentTime: token.issued_time,

@@ -87,8 +87,7 @@ const LiveQueuePage = () => {
   const debouncedSearchTerm = useDebounce(searchTerm, 300);
   const { user } = useAuth();
 
-  // React Query: doctors + queue status polling with role/auth guard
-  // OPTIMIZATION: Using shared query key ['queue', 'allDoctors'] to enable React Query deduplication
+  // React Query: doctors + queue status polling
   const doctorsQuery = useQuery({
     queryKey: ['queue', 'allDoctors'],
     queryFn: () => queueService.getAllDoctorsQueueStatus(),

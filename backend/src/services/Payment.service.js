@@ -98,7 +98,6 @@ class PaymentService {
         : null;
 
       // Check for duplicate payment (same amount, same invoice, within last 5 seconds)
-      // This prevents accidental double-submission
       const recentPayments = await PaymentTransactionModel.getRecentPaymentsByInvoice(
         invoiceId,
         5000
@@ -117,8 +116,7 @@ class PaymentService {
         );
       }
 
-      // Use atomic function with advisory locks to prevent race conditions
-      // This ensures payment recording and invoice recalculation happen atomically
+      // Use atomic function with advisory locks
       const atomicResult = await PaymentTransactionModel.recordPaymentAtomic(
         invoiceId,
         validatedAmount,
@@ -315,8 +313,7 @@ class PaymentService {
       const systemName = 'ThriveCare';
       const systemDescription = 'Healthcare System';
 
-      // Get currency settings ONCE at the start and use throughout PDF generation
-      // This prevents currency from changing mid-generation
+      // Get currency settings once
       const currencySettings = await clinicSettingsService.getCurrencySettings();
       const currencySymbol = currencySettings.currency_symbol || '$';
       const currencyCode = currencySettings.currency_code || 'USD';

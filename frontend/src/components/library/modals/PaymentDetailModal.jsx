@@ -35,15 +35,9 @@ export function PaymentDetailModal({
     const isSubmitButton =
       submitter?.type === 'submit' || submitter?.getAttribute('data-submit') === 'true';
 
-    // Do NOT call onPay for form submissions - only the "Process Payment" button should trigger it
-    // The onPay callback is called directly from handleApproveInvoice, not from form submission
-    // This prevents accidental triggers from Enter key presses or other form interactions
     if (isSubmitButton && typeof onPay === 'function' && invoice?.id) {
-      // This should not happen in normal flow - onPay is called from handleApproveInvoice
-      // But if it does, we'll call it
       onPay();
     }
-    // Otherwise, do nothing (prevents auto-submit when invoice updates)
   };
 
   return (

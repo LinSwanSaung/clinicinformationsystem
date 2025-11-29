@@ -260,10 +260,7 @@ export const MedicationForm = ({
                       const value = e.target.value;
                       if (value === 'CUSTOM') {
                         handleMedicationChange(index, 'customName', true);
-                        // Focus the custom input after switching to custom mode
                         focusCustomInput(index);
-                        // Don't clear name immediately - let user type in custom input
-                        // This ensures the medication isn't filtered out during validation
                       } else if (value !== '') {
                         handleMedicationChange(index, 'customName', false);
                         handleMedicationChange(index, 'name', value);

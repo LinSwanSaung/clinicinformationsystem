@@ -44,11 +44,13 @@ const Breadcrumbs = () => {
         const label =
           pathMap[segment] || segment.replace('-', ' ').replace(/\b\w/g, (l) => l.toUpperCase());
 
-        // Special handling for doctor queue routes
-        if (pathSegments[index - 1] === 'queue' && segment.length > 20) {
-          // This is likely a doctor UUID, try to get doctor name from context
-          // For now, we'll skip this segment and let the page title handle it
-          return;
+        // Skip UUID segments in breadcrumbs (doctor IDs, patient IDs, etc.)
+        // UUIDs are 36 characters with dashes or 32 characters without
+        const isUUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(
+          segment
+        );
+        if (isUUID) {
+          return; // Skip UUID segments - let page title handle specific names
         }
 
         const path = '/' + pathSegments.slice(0, index + 1).join('/');

@@ -31,12 +31,9 @@ import logger from '@/utils/logger';
 import browserNotifications from '@/utils/browserNotifications';
 
 /**
- * Helper function to get vitals from token (now included in queue response)
- * OPTIMIZATION: Vitals are now included in the queue status response from backend
- * This eliminates the need for individual API calls per patient
+ * Get vitals from token (included in queue response)
  */
 const getTokenVitals = (token) => {
-  // Vitals are now included in token.patient.vitals from backend
   if (token.patient?.vitals) {
     logger.debug(`✅ [NURSE] Token #${token.token_number} has vitals from queue response`);
     return token.patient.vitals;
@@ -77,10 +74,7 @@ const NurseDashboard = () => {
 
   const queryClient = useQueryClient();
 
-  // React Query: Poll doctors queue with auth/role guard and pause only when modal is open or saving
-  // OPTIMIZATION: Added staleTime to prevent unnecessary refetches when data hasn't changed
-  // OPTIMIZATION: Using shared query key ['queue', 'allDoctors'] to enable React Query deduplication
-  // OPTIMIZATION: Only pause polling when modals are open or data is being saved (not on general activity)
+  // React Query: Poll doctors queue
   const shouldPausePolling = isModalOpen || isSaving;
   const doctorsQuery = useQuery({
     queryKey: ['queue', 'allDoctors'],
@@ -239,7 +233,6 @@ const NurseDashboard = () => {
   }, []);
 
   // Manual refresh function
-  // OPTIMIZATION: Use invalidateQueries instead of direct refetch for better caching
   const handleManualRefresh = useCallback(async () => {
     if (selectedDoctor) {
       await handleViewPatients(selectedDoctor);
@@ -282,8 +275,6 @@ const NurseDashboard = () => {
         }, {});
         logger.debug(`📊 [NURSE] Token status breakdown:`, statusBreakdown);
 
-        // Filter out cancelled appointments - include ALL other statuses (waiting, called, serving, completed, missed)
-        // This ensures we show all patients for the day, including completed consultations
         const activeTokens = queueTokens.filter((token) => token.status !== 'cancelled');
         logger.debug(
           `📋 [NURSE] Filtered to ${activeTokens.length} tokens (excluded ${queueTokens.length - activeTokens.length} cancelled). Statuses included: ${Object.keys(
@@ -293,14 +284,9 @@ const NurseDashboard = () => {
             .join(', ')}`
         );
 
-        // Use only queue tokens (no appointment queue)
-        // Show ALL tokens for the day - each token represents a visit, so patients with multiple visits will show multiple entries
         const allPatients = activeTokens.map((t) => ({ ...t, queueType: 'token' }));
 
-        // Sort by token number (ascending) to show patients in order they were seen
-        // This ensures all patients for the day are visible, including completed ones
         allPatients.sort((a, b) => {
-          // First sort by status: serving > called > waiting > completed > missed
           const statusOrder = { serving: 0, called: 1, waiting: 2, completed: 3, missed: 4 };
           const statusDiff = (statusOrder[a.status] ?? 5) - (statusOrder[b.status] ?? 5);
           if (statusDiff !== 0) {
@@ -315,8 +301,6 @@ const NurseDashboard = () => {
           `📋 [NURSE] Showing ${allPatients.length} tokens (all patients for the day, including completed)`
         );
 
-        // Vitals are now included in the queue response from backend (batch fetched)
-        // No need to make individual API calls - just use the vitals from the response
         const patientsWithVitals = allPatients.map((patient) => {
           const vitals = getTokenVitals(patient);
           const patientWithVitals = {
@@ -386,12 +370,9 @@ const NurseDashboard = () => {
                 return (a.token_number || 0) - (b.token_number || 0);
               });
 
-              // Vitals are now included in the queue response from backend (batch fetched)
-              // No need to make individual API calls - just use the vitals from the response
-              // OPTIMIZATION: Skip vitals for completed/missed patients (preserve existing vitals)
+              // Vitals are included in the queue response from backend
               const patientsWithVitals = allPatients.map((patient) => {
-                // Skip vitals fetch for completed/missed patients - preserve existing vitals
-                // They won't change, so no need to refetch
+                // Preserve existing vitals for completed/missed patients
                 if (patient.status === 'completed' || patient.status === 'missed') {
                   // Preserve existing vitals from state if available
                   const existingPatient = patients.find((p) => p.id === patient.id);
@@ -400,7 +381,6 @@ const NurseDashboard = () => {
                     latestVitals: existingPatient?.latestVitals || null,
                   };
                 }
-                // Vitals are already included in patient.patient.vitals from backend
                 const vitals = getTokenVitals(patient);
                 return { ...patient, latestVitals: vitals };
               });
@@ -624,9 +604,7 @@ const NurseDashboard = () => {
                   return (a.token_number || 0) - (b.token_number || 0);
                 });
 
-                // Vitals are now included in the queue response from backend (batch fetched)
-                // No need to make individual API calls - just use the vitals from the response
-                // OPTIMIZATION: Preserve vitals for completed/missed patients
+                // Vitals are included in the queue response from backend
                 const patientsWithVitals = allPatients.map((patient) => {
                   // Preserve existing vitals for completed/missed patients
                   if (patient.status === 'completed' || patient.status === 'missed') {
@@ -636,7 +614,6 @@ const NurseDashboard = () => {
                       latestVitals: existingPatient?.latestVitals || null,
                     };
                   }
-                  // Vitals are already included in patient.patient.vitals from backend
                   const vitals = getTokenVitals(patient);
                   return { ...patient, latestVitals: vitals };
                 });
@@ -647,7 +624,7 @@ const NurseDashboard = () => {
                   setPatients((prevPatients) => {
                     return patientsWithVitals.map((newPatient) => {
                       const existing = prevPatients.find((p) => p.id === newPatient.id);
-                      // If we just saved vitals optimistically, keep them if server hasn't updated yet
+                      // Keep optimistic vitals if server hasn't returned them yet
                       if (existing && existing.latestVitals && !newPatient.latestVitals) {
                         // Keep optimistic vitals if server hasn't returned them yet
                         return { ...newPatient, latestVitals: existing.latestVitals };
@@ -726,9 +703,7 @@ const NurseDashboard = () => {
                   return (a.token_number || 0) - (b.token_number || 0);
                 });
 
-                // Vitals are now included in the queue response from backend (batch fetched)
-                // No need to make individual API calls - just use the vitals from the response
-                // OPTIMIZATION: Preserve vitals for completed/missed patients
+                // Vitals are included in the queue response from backend
                 const patientsWithVitals = allPatients.map((patient) => {
                   // Preserve existing vitals for completed/missed patients
                   if (patient.status === 'completed' || patient.status === 'missed') {
@@ -738,7 +713,6 @@ const NurseDashboard = () => {
                       latestVitals: existingPatient?.latestVitals || null,
                     };
                   }
-                  // Vitals are already included in patient.patient.vitals from backend
                   const vitals = getTokenVitals(patient);
                   return { ...patient, latestVitals: vitals };
                 });
@@ -839,9 +813,7 @@ const NurseDashboard = () => {
                   return (a.token_number || 0) - (b.token_number || 0);
                 });
 
-                // Vitals are now included in the queue response from backend (batch fetched)
-                // No need to make individual API calls - just use the vitals from the response
-                // OPTIMIZATION: Preserve vitals for completed/missed patients
+                // Vitals are included in the queue response from backend
                 const patientsWithVitals = allPatients.map((patient) => {
                   // Preserve existing vitals for completed/missed patients
                   if (patient.status === 'completed' || patient.status === 'missed') {
@@ -851,7 +823,6 @@ const NurseDashboard = () => {
                       latestVitals: existingPatient?.latestVitals || null,
                     };
                   }
-                  // Vitals are already included in patient.patient.vitals from backend
                   const vitals = getTokenVitals(patient);
                   return { ...patient, latestVitals: vitals };
                 });
@@ -1374,6 +1345,7 @@ const NurseDashboard = () => {
                         patient={{
                           id: token.id, // Use token/queue ID for operations
                           patientId: token.patient?.id, // Store actual patient ID separately
+                          patient_number: token.patient?.patient_number, // Include patient_number for display
                           visit_id: token.visit_id, // Add visit_id for vitals linking
                           chief_complaint:
                             token.visit?.chief_complaint ||
@@ -1389,6 +1361,9 @@ const NurseDashboard = () => {
                               : 'N/A',
                           gender: token.patient?.gender || 'N/A',
                           phone: token.patient?.phone || 'N/A',
+                          blood_group: token.patient?.blood_group,
+                          date_of_birth: token.patient?.date_of_birth,
+                          email: token.patient?.email,
                           tokenNumber: token.token_number,
                           status: token.status,
                           priority: token.priority || 3, // Include priority for visual highlighting

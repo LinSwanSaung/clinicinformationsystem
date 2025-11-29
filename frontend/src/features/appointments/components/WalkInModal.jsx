@@ -181,7 +181,7 @@ const WalkInModal = ({ isOpen, onClose, onSubmit }) => {
     try {
       setIsLoadingDoctors(true);
 
-      // Get available doctors with queue status and availability from our enhanced queue service
+      // Get available doctors with queue status and availability from the enhanced queue service
       const response = await queueService.getAvailableDoctorsForWalkIn();
 
       if (response.success && response.data) {

@@ -295,7 +295,10 @@ const AppointmentPatientCard = ({
             </DialogTitle>
             <DialogDescription>
               {t('receptionist.appointments.cancelConfirmation', {
-                name: `${patient.first_name} ${patient.last_name}`,
+                name:
+                  patient?.first_name && patient?.last_name
+                    ? `${patient.first_name} ${patient.last_name}`
+                    : 'this patient',
               })}
             </DialogDescription>
           </DialogHeader>

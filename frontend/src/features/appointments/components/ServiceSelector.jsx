@@ -60,7 +60,7 @@ const ServiceSelector = ({ visitId, onServicesAdded }) => {
         logger.debug('No existing invoice found by visit, will create new one...', error);
       }
 
-      // If we have an invoice in state but no data from API, try by ID
+      // Fallback: try fetching by invoice ID
       if (!invoiceData && invoice && invoice.id) {
         try {
           logger.debug('Fetching invoice by ID:', invoice.id);

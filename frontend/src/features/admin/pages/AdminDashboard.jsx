@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { useTranslation } from 'react-i18next';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import {
@@ -25,6 +26,7 @@ import logger from '@/utils/logger';
 
 const AdminDashboard = () => {
   const navigate = useNavigate();
+  const { i18n } = useTranslation();
   const [health, setHealth] = useState({ status: 'UNKNOWN', db: { connected: false } });
   const [healthLoading, setHealthLoading] = useState(true);
   const [healthError, setHealthError] = useState('');
@@ -38,6 +40,13 @@ const AdminDashboard = () => {
     monthlyVisits: 0,
     availableDoctors: [],
   });
+
+  // Force English language for admin dashboard
+  useEffect(() => {
+    if (i18n.language !== 'en') {
+      i18n.changeLanguage('en');
+    }
+  }, [i18n]);
 
   useEffect(() => {
     let mounted = true;

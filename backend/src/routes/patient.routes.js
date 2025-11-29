@@ -110,8 +110,6 @@ router.get(
   asyncHandler(async (req, res) => {
     const patient = await PatientService.getPatientById(req.params.id);
 
-    // Note: Viewing is not logged to avoid excessive audit log entries
-
     res.status(200).json({
       success: true,
       data: patient,

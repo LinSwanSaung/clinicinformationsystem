@@ -1,10 +1,6 @@
 import { supabase } from '../config/database.js';
 import logger from '../config/logger.js';
 
-/**
- * Log an audit event with enhanced tracking
- * Supports the full audit trail recommended for healthcare compliance
- */
 export async function logAuditEvent({
   userId = null,
   actor_id = null,
@@ -21,7 +17,6 @@ export async function logAuditEvent({
   reason = null,
   ip = null,
   userAgent = null,
-  // Legacy parameters for backward compatibility
   patientId = null,
   result = null,
   meta = null,
@@ -34,7 +29,6 @@ export async function logAuditEvent({
       action: action,
       old_values: old_values,
       new_values: new_values || {
-        // For backward compatibility, wrap legacy fields
         ...(result && { result }),
         ...(patientId && { patient_id: patientId }),
         ...(meta && { meta }),
@@ -57,9 +51,6 @@ export async function logAuditEvent({
   }
 }
 
-/**
- * Helper to seed dummy audit logs for testing
- */
 export async function seedDummyAuditLogs() {
   const samples = [
     { action: 'LOGIN_SUCCESS', role: 'doctor', note: 'seeded' },

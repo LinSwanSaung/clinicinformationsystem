@@ -160,8 +160,6 @@ const RegisterPatient = () => {
       }
     } catch (error) {
       logger.error('Error registering patient:', error);
-      // Don't show alert here - the global error handler will show it
-      // This prevents double error modals
     } finally {
       setIsLoading(false);
     }

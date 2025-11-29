@@ -139,7 +139,6 @@ const ReceptionistDashboard = () => {
   }, []); // Only run once on mount
 
   // Refresh doctor availability periodically (every 60 seconds)
-  // Note: Patient status comes from appointments, so we don't need to refresh patient list
   useEffect(() => {
     const interval = setInterval(() => {
       loadDoctorsAndPatients(); // Refresh doctor availability

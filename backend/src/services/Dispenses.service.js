@@ -38,7 +38,7 @@ class DispensesService {
     const MAX_PAGES = 1000;
 
     // Fetch first page and then continue until all items are collected
-    // Uses server-side total to stop when we have everything
+    // Uses server-side total to stop when all items are fetched
     // pageSize <= 100 as per schema; iterate pages instead of requesting a huge pageSize
     /* eslint-disable no-await-in-loop */
     while (page <= MAX_PAGES) {

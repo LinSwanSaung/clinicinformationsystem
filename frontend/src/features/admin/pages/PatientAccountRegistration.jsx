@@ -500,7 +500,9 @@ const PatientAccountRegistration = () => {
   };
 
   const handleDeactivate = async (account) => {
-    if (!account) return;
+    if (!account) {
+      return;
+    }
     try {
       setRowActionLoading(account.id);
       const response = await patientAccountService.deactivate(account.id);
@@ -522,7 +524,9 @@ const PatientAccountRegistration = () => {
   };
 
   const handleActivate = async (account) => {
-    if (!account) return;
+    if (!account) {
+      return;
+    }
     try {
       setRowActionLoading(account.id);
       const response = await patientAccountService.activate(account.id);
@@ -751,7 +755,7 @@ const PatientAccountRegistration = () => {
               name="phone"
               value={createForm.phone}
               onChange={handleCreateFieldChange}
-              placeholder="+95 9 123 456 789"
+              placeholder="09123456789"
             />
           </div>
 

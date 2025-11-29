@@ -35,7 +35,7 @@ const getCSSVariable = (varName, fallback) => {
     return fallback;
   }
 
-  // If it's oklch, we need to get the computed color
+  // Handle oklch color format
   if (value.startsWith('oklch')) {
     // Create a temporary element to get the computed RGB value
     const tempEl = document.createElement('div');

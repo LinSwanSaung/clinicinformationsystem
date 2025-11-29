@@ -1,5 +1,6 @@
 import { createContext, useContext, useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { useQueryClient } from '@tanstack/react-query';
 import { authService } from '@/features/auth';
 import logger from '@/utils/logger';
 
@@ -9,30 +10,26 @@ export const AuthProvider = ({ children }) => {
   const [user, setUser] = useState(null);
   const [loading, setLoading] = useState(true);
   const navigate = useNavigate();
+  const queryClient = useQueryClient();
 
   useEffect(() => {
-    // Check for authentication on mount and validate token with server
     const validateSession = async () => {
       try {
         const currentUser = authService.getCurrentUser();
 
         if (currentUser && authService.isAuthenticated()) {
           try {
-            // Validate token with server to ensure it's still valid
             const isValid = await authService.verifyToken();
 
             if (isValid) {
               setUser(currentUser);
               logger.debug('Session restored successfully');
             } else {
-              // Token is invalid/expired - clear storage and redirect to login
               logger.warn('Stored token is invalid or expired, clearing session');
               await authService.logout();
               setUser(null);
             }
           } catch (error) {
-            // Server unreachable or error - keep user logged in with cached data
-            // This allows offline usage and prevents logout on network issues
             logger.warn('Token validation failed, using cached session:', error.message);
             setUser(currentUser);
           }
@@ -54,7 +51,6 @@ export const AuthProvider = ({ children }) => {
 
       if (result.success) {
         setUser(result.data);
-        // Centralize role-based redirect via /dashboard
         navigate('/dashboard');
         return { success: true };
       } else {
@@ -97,22 +93,21 @@ export const AuthProvider = ({ children }) => {
   const logout = async () => {
     try {
       await authService.logout();
+      queryClient.clear();
       setUser(null);
       navigate('/');
     } catch (error) {
       logger.error('Logout failed:', error);
-      // Still clear local state even if API call fails
+      queryClient.clear();
       setUser(null);
       navigate('/');
     }
   };
 
-  // Get current user role
   const getUserRole = () => {
     return user?.role || null;
   };
 
-  // Check if user is authenticated
   const isAuthenticated = () => {
     return authService.isAuthenticated();
   };

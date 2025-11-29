@@ -109,7 +109,7 @@ const AppointmentsPage = () => {
   });
 
   useEffect(() => {
-    // If we have pre-filled data from navigation
+    // Handle pre-filled data from navigation
     if (location.state) {
       setShowNewAppointment(true);
       setNewAppointment((prev) => ({
@@ -527,7 +527,7 @@ const AppointmentsPage = () => {
     setSelectedDate(new Date(today)); // Create new Date object
   };
 
-  // Check if we can navigate to previous month
+  // Check if previous month navigation is allowed
   const canNavigatePrevious = () => {
     const today = new Date();
     const currentMonth = new Date(today.getFullYear(), today.getMonth(), 1);
@@ -634,8 +634,6 @@ const AppointmentsPage = () => {
         const today = new Date();
         setSelectedDate(new Date(today));
         setCalendarMonth(new Date(today));
-
-        // Note: Appointments will be refetched automatically via mutation's onSuccess
 
         setTimeout(() => {
           setShowAlert(false);

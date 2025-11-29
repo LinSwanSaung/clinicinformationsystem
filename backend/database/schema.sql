@@ -1,19 +1,16 @@
 -- ===============================================
--- RealCIS Clinic Information System Database
--- Consolidated Schema (Single Source of Truth)
+-- ThriveCare Clinic Information System Database
+-- Schema Definition (Single Source of Truth)
 -- ===============================================
 -- 
--- This schema.sql file is the authoritative baseline for fresh database installations.
--- It consolidates all migrations from backend/database/migrations/ into a single
--- idempotent schema definition.
+-- This schema.sql file is the authoritative database schema definition.
+-- Run this file in Supabase SQL Editor to set up the database.
 --
--- Created: Stage 3 Refactor (2025-11-03)
--- Updated: November 2025 - Removed sample data, fixed table order
--- Purpose: Single authoritative schema.sql for fresh installs
+-- Updated: November 2025
 --
 -- Structure:
 --   1. Extensions
---   2. Tables (in dependency order - patients first, then users, etc.)
+--   2. Tables (in dependency order)
 --   3. Constraints
 --   4. Indexes
 --   5. Views
@@ -1222,7 +1219,7 @@ CREATE POLICY "Healthcare staff can access all data" ON clinic_settings FOR ALL 
 DO $$
 BEGIN
     RAISE NOTICE '';
-    RAISE NOTICE '🎉 RealCIS Database Schema Created Successfully!';
+    RAISE NOTICE '🎉 ThriveCare Database Schema Created Successfully!';
     RAISE NOTICE '================================================';
     RAISE NOTICE '';
     RAISE NOTICE '✅ Tables Created:';

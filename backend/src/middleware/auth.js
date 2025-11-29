@@ -52,7 +52,7 @@ export const authenticate = asyncHandler(async (req, res, next) => {
     }
 
     // Get user from database with retry logic for network resilience
-    const userId = decoded.userId || decoded.sub; // support our token payload or supabase subject
+    const userId = decoded.userId || decoded.sub; // support both token payload and supabase subject
     let user, error;
     try {
       const result = await executeWithRetry(

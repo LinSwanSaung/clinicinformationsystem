@@ -89,6 +89,5 @@ module.exports = {
     'coverage',
     'dist',
     '.eslintrc.cjs',
-    'database/migrations/*.sql',
   ],
 };

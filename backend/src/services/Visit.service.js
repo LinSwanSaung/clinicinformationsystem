@@ -88,8 +88,7 @@ class VisitService {
         throw new Error(`Missing required fields: ${missingFields.join(', ')}`);
       }
 
-      // CRITICAL: Check if patient already has an active visit
-      // This prevents patients from having multiple concurrent visits
+      // Check if patient already has an active visit
       const activeVisit = await this.getPatientActiveVisit(visitData.patient_id);
       if (activeVisit) {
         throw new Error(
@@ -174,8 +173,7 @@ class VisitService {
         throw new Error('Cannot complete a cancelled visit');
       }
 
-      // Note: Business rule - visits can be completed even with partial payments
-      // This allows patients to have new visits even if invoice is not fully paid
+      // Business rule: visits can be completed even with partial payments
       if (visit.invoice_id) {
         // Check invoice status if invoice exists
         try {
@@ -183,8 +181,7 @@ class VisitService {
           const invoice = await invoiceService.getInvoiceById(visit.invoice_id);
 
           if (invoice) {
-            // If invoice is still pending (no payment made), mark it as waived
-            // This prevents orphaned pending invoices in the cashier dashboard
+            // If invoice is pending, mark as waived
             if (invoice.status === 'pending') {
               logger.info(
                 `[VISIT] Marking pending invoice ${visit.invoice_id} as 'waived' since visit ${visitId} is being completed without payment.`
@@ -411,8 +408,6 @@ class VisitService {
               issue: 'Consultation ended but visit not completed (no invoice)',
             });
           } else if (invoices[0].status === 'paid' || invoices[0].status === 'partial_paid') {
-            // Invoice is paid/partial_paid but visit is still in_progress
-            // This is a data integrity issue - invoice was processed but visit wasn't completed (tech/network issue)
             pendingItems.push({
               entityType: 'visit',
               entityId: visit.id,
@@ -890,7 +885,7 @@ class VisitService {
 
       // Vital Signs Section with Grid Layout
       if (visit.vitals) {
-        // Check if we need a new page
+        // Check page overflow
         if (yPos > 650) {
           doc.addPage();
           yPos = 50;
@@ -1033,7 +1028,7 @@ class VisitService {
 
       // Diagnoses Section
       if (visit.visit_diagnoses && visit.visit_diagnoses.length > 0) {
-        // Check if we need a new page
+        // Check page overflow
         if (yPos > 650) {
           doc.addPage();
           yPos = 50;
@@ -1050,7 +1045,7 @@ class VisitService {
         visit.visit_diagnoses.forEach((diagnosis, index) => {
           const boxHeight = diagnosis.clinical_notes ? 90 : 70;
 
-          // Check if we need a new page
+          // Check page overflow
           if (yPos + boxHeight > 750) {
             doc.addPage();
             yPos = 50;
@@ -1120,7 +1115,7 @@ class VisitService {
 
       // Prescriptions Section
       if (visit.prescriptions && visit.prescriptions.length > 0) {
-        // Check if we need a new page
+        // Check page overflow
         if (yPos > 650) {
           doc.addPage();
           yPos = 50;
@@ -1137,7 +1132,7 @@ class VisitService {
         visit.prescriptions.forEach((prescription, index) => {
           const boxHeight = prescription.instructions ? 105 : 85;
 
-          // Check if we need a new page
+          // Check page overflow
           if (yPos + boxHeight > 750) {
             doc.addPage();
             yPos = 50;
@@ -1227,17 +1222,13 @@ class VisitService {
 
       // Cost Summary Section
       if (visit.total_cost) {
-        // Check if we need a new page
+        // Check page overflow
         if (yPos > 680) {
           doc.addPage();
           yPos = 50;
         }
 
-        doc
-          .fillColor('#16a34a')
-          .fontSize(14)
-          .font('Helvetica-Bold')
-          .text('💰 Cost Summary', 50, yPos);
+        doc.fillColor('#16a34a').fontSize(14).font('Helvetica-Bold').text('Cost Summary', 50, yPos);
 
         yPos += 25;
 
@@ -1311,17 +1302,13 @@ class VisitService {
 
       // Visit Notes Section
       if (visit.notes) {
-        // Check if we need a new page
+        // Check page overflow
         if (yPos > 650) {
           doc.addPage();
           yPos = 50;
         }
 
-        doc
-          .fillColor('#6366f1')
-          .fontSize(14)
-          .font('Helvetica-Bold')
-          .text('📝 Visit Notes', 50, yPos);
+        doc.fillColor('#6366f1').fontSize(14).font('Helvetica-Bold').text('Visit Notes', 50, yPos);
 
         yPos += 25;
 
@@ -1489,7 +1476,7 @@ class VisitService {
 
       // Visit entries
       visits.forEach((visit, index) => {
-        // Check if we need a new page
+        // Check page overflow
         if (doc.y > 700) {
           doc.addPage();
         }

@@ -1,6 +1,6 @@
-# Contributing to RealCIS
+# Contributing to ThriveCare
 
-Thank you for your interest in contributing to RealCIS! This guide will help you understand our development workflow and design system.
+Thank you for your interest in contributing to ThriveCare! This guide will help you understand our development workflow and design system.
 
 ## 🎨 Design System Guidelines
 

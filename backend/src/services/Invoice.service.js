@@ -860,8 +860,6 @@ class InvoiceService {
                 `[InvoiceService] Visit ${invoice.visit_id} is already completed (expected for idempotent call)`
               );
             } else {
-              // CRITICAL: Log this prominently - visit completion failed for a paid invoice
-              // This creates data integrity issues (paid invoice but active visit)
               logger.error(
                 `[InvoiceService] CRITICAL: Failed to complete visit ${invoice.visit_id} for already-paid invoice ${invoiceId}. ` +
                   `Error: ${visitError.message}. This requires manual intervention via admin panel.`
@@ -899,7 +897,7 @@ class InvoiceService {
       const _completedVisit = null;
 
       try {
-        // Step 1: Complete the invoice (with rollback compensation)
+        // Complete the invoice
         completedInvoice = await transaction.add(
           async () => {
             return InvoiceModel.completeInvoice(invoiceId, completedBy);
@@ -914,12 +912,11 @@ class InvoiceService {
           }
         );
 
-        // Step 2: Complete the visit (this is the ONLY place visits should be completed)
-        // Business rule: Visits are completed when invoice is paid, not when consultation ends
+        // Complete the visit (only place this should happen)
         const _completedVisit = await transaction.add(
           async () => {
             // Use completeVisit() to ensure costs are calculated correctly
-            // This method calculates total_cost from consultation fee + services
+
             const visitResult = await this.visitService.completeVisit(invoice.visit_id, {
               payment_status: 'paid',
               // Status will be set to 'completed' by completeVisit()
@@ -927,8 +924,8 @@ class InvoiceService {
             return visitResult;
           },
           async () => {
-            // Compensation: if visit completion fails, we need to rollback invoice
-            // (This is handled by the transaction runner calling all compensations)
+            // Compensation: rollback invoice if visit completion fails
+            // (Handled by the transaction runner calling all compensations)
           }
         );
 
@@ -1222,9 +1219,7 @@ class InvoiceService {
 
       const updatedInvoice = atomicResult.invoice;
 
-      // CRITICAL: Complete the visit when any payment is made (partial or full)
-      // This allows patients to have new visits even if invoice is not fully paid
-      // Business rule: Visit completion is separate from invoice payment status
+      // Complete visit when any payment is made (partial or full)
       let visitCompleted = false;
       if (updatedInvoice.visit_id) {
         try {

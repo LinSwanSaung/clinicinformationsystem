@@ -93,7 +93,7 @@ const DoctorQueueDetailPage = () => {
         }
         setError(null);
 
-        // Get queue status from our backend
+        // Get queue status from backend
         const queueStatus = await queueService.getDoctorQueueStatus(doctorId);
         setQueueData(queueStatus);
 

@@ -7,7 +7,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/u
 import { DoctorNotesForm, DiagnosisForm, AllergyForm } from '@/features/medical';
 import { User, Activity, Calendar, FileText, DollarSign, AlertCircle } from 'lucide-react';
 
-// Import our reusable medical components
+// Reusable medical components
 import { PatientInformationHeader } from '@/features/patients';
 import { NavigationTabs } from '@/components/library';
 import { ServiceSelector } from '@/features/appointments';
@@ -44,25 +44,7 @@ const PatientMedicalRecord = () => {
   const [_uploadingFiles, setUploadingFiles] = useState(false);
 
   // Doctor notes management
-  const [doctorNotesList, setDoctorNotesList] = useState([
-    {
-      date: '2024-01-15',
-      note: 'Patient presents with mild symptoms of seasonal allergies. No significant changes since last visit. Vital signs stable and within normal range. Continue current medication regimen. Patient reports good adherence to treatment plan.',
-      diagnosis: 'Seasonal Allergies',
-      prescribedMedications: [
-        { name: 'Loratadine', dosage: '10mg', reason: 'Seasonal allergies' },
-        { name: 'Nasal spray', dosage: '2 sprays daily', reason: 'Congestion relief' },
-      ],
-    },
-    {
-      date: '2023-12-10',
-      note: 'Routine follow-up visit. Patient feeling well overall. Blood pressure slightly elevated, will monitor closely. Recommended lifestyle modifications including diet and exercise.',
-      diagnosis: 'Hypertension (mild)',
-      prescribedMedications: [
-        { name: 'Lisinopril', dosage: '5mg', reason: 'Blood pressure management' },
-      ],
-    },
-  ]);
+  const [doctorNotesList, setDoctorNotesList] = useState([]);
 
   // Modal states
   const [isAddNoteModalOpen, setIsAddNoteModalOpen] = useState(false);
@@ -185,36 +167,38 @@ const PatientMedicalRecord = () => {
     }
 
     try {
-      const notes = await doctorNotesService.getDoctorNotesByPatient(selectedPatient.id);
+      const notes = await doctorNotesService.getNotesByPatient(selectedPatient.id);
 
       if (Array.isArray(notes) && notes.length > 0) {
         const formattedNotes = await Promise.all(
           notes.map(async (note) => {
-            // Parse note content
-            const content = note.notes || '';
-            const diagnosisMatch = content.match(/\*\*Diagnosis:\*\*\s*([^\n*]+)/);
-            const notesMatch = content.match(/\*\*Notes:\*\*\s*([^\n*]+(?:\n(?!\*\*)[^\n*]*)*)/);
+            // Parse note content - use 'content' field from API
+            const content = note.content || '';
+
+            // Parse diagnosis and clinical notes from content
+            const diagnosisMatch = content.match(/Diagnosis:\s*(.+?)(?:\n\n|$)/);
+            const notesMatch = content.match(/Clinical Notes:\s*(.+)/s);
 
             // Fetch linked prescriptions
             let prescriptions = [];
             if (note.id) {
               try {
-                if (note.has_linked_prescriptions) {
-                  const linkedPrescriptions =
-                    await prescriptionService.getPrescriptionsByDoctorNote(note.id);
-                  prescriptions = Array.isArray(linkedPrescriptions)
-                    ? linkedPrescriptions.map((p) => ({
-                        id: p.id,
-                        name: p.medication_name,
-                        dosage: p.dosage,
-                        frequency: p.frequency,
-                        duration: p.duration,
-                        quantity: p.quantity,
-                        refills: p.refills,
-                        instructions: p.instructions,
-                      }))
-                    : [];
-                }
+                // Try to get prescriptions linked to this note
+                const linkedPrescriptions = await prescriptionService.getPrescriptionsByNoteId(
+                  note.id
+                );
+                prescriptions = Array.isArray(linkedPrescriptions)
+                  ? linkedPrescriptions.map((p) => ({
+                      id: p.id,
+                      name: p.medication_name,
+                      dosage: p.dosage,
+                      frequency: p.frequency,
+                      duration: p.duration,
+                      quantity: p.quantity,
+                      refills: p.refills,
+                      instructions: p.instructions,
+                    }))
+                  : [];
               } catch (error) {
                 logger.error('Error fetching prescriptions for note:', note.id, error);
               }
@@ -262,7 +246,6 @@ const PatientMedicalRecord = () => {
             limit: 50,
           });
 
-          // Ensure we have an array
           const visitsArray = Array.isArray(visitHistory) ? visitHistory : [];
 
           // Find active visit (status === 'in_progress' exactly)
@@ -579,8 +562,7 @@ const PatientMedicalRecord = () => {
         }))
         .filter((med) => med.name && med.name.length > 0 && med.dosage && med.frequency);
 
-      // Step 1: Mark previous active prescriptions as completed
-      // This ensures old medications don't remain "active" when new ones are prescribed
+      // Mark previous active prescriptions as completed
       try {
         // Get ALL prescriptions including inactive ones to find active ones
         const allPatientPrescriptions = await prescriptionService.getPrescriptionsByPatient(
@@ -604,7 +586,7 @@ const PatientMedicalRecord = () => {
         logger.error('Error fetching/updating previous prescriptions:', error);
       }
 
-      // Step 2: Save the doctor note to the database
+      // Save the doctor note
       const noteData = {
         visit_id: activeVisitId,
         patient_id: displayPatient.id,
@@ -617,7 +599,7 @@ const PatientMedicalRecord = () => {
       const savedNote = await doctorNotesService.createNote(noteData);
       const doctorNoteId = savedNote?.data?.id || savedNote?.id;
 
-      // Step 3: Save new prescriptions to database (with status: 'active')
+      // Save new prescriptions
       const savedPrescriptions = [];
       for (const med of validMedications) {
         try {
@@ -713,13 +695,13 @@ const PatientMedicalRecord = () => {
         }))
         .filter((med) => med.name && med.name.length > 0 && med.dosage && med.frequency);
 
-      // Step 1: Update the doctor note in the backend
+      // Update the doctor note
       const noteContent = `Diagnosis: ${noteFormData.diagnosis}\n\nClinical Notes: ${noteFormData.note}`;
       await doctorNotesService.updateNote(editingNote.id, {
         content: noteContent,
       });
 
-      // Step 2: Update prescriptions if visit_id exists
+      // Update prescriptions if visit_id exists
       if (editingNote.visit_id) {
         // Get existing prescriptions - try by note ID first, then fallback to time-based
         let notePrescriptions = [];
@@ -795,7 +777,7 @@ const PatientMedicalRecord = () => {
         }
       }
 
-      // Step 3: Update local state
+      // Update local state
       const updatedNote = {
         ...editingNote,
         date: editingNote.date,
@@ -808,7 +790,7 @@ const PatientMedicalRecord = () => {
         prev.map((note, index) => (index === editingNote.index ? updatedNote : note))
       );
 
-      // Step 4: Refresh patient data to update current medications
+      // Refresh patient data
       if (selectedPatient?.id) {
         const visits = await visitService.getPatientVisitHistory(selectedPatient.id, {
           includeCompleted: true,

@@ -110,7 +110,6 @@ const ElectronicMedicalRecords = () => {
       setAllergies(Array.isArray(patientAllergies) ? patientAllergies : []);
       setDiagnoses(Array.isArray(patientDiagnoses) ? patientDiagnoses : []);
 
-      // Ensure we have an array
       const visitsArray = Array.isArray(patientVisitHistory) ? patientVisitHistory : [];
       setVisitHistory(visitsArray);
 
@@ -266,12 +265,6 @@ const ElectronicMedicalRecords = () => {
       setLoading(false);
     }
   };
-
-  const patientFiles = [
-    { name: 'Blood Test Results - Jan 2024', type: 'PDF', size: '2.1 MB' },
-    { name: 'Chest X-Ray - Dec 2023', type: 'DICOM', size: '15.8 MB' },
-    { name: 'Prescription History', type: 'PDF', size: '1.2 MB' },
-  ];
 
   // Event handlers
   const handlePatientSelect = (patient) => {
@@ -545,7 +538,7 @@ const ElectronicMedicalRecords = () => {
               {/* Files & Images Tab */}
               {activeTab === 'files' && (
                 <PatientDocumentManager
-                  files={patientFiles}
+                  files={[]}
                   onUploadFile={handleUploadFile}
                   onViewFile={handleViewFile}
                   onDownloadFile={handleDownloadFile}

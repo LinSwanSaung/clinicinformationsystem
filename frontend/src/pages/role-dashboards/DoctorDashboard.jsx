@@ -17,12 +17,9 @@ import { POLLING_INTERVALS } from '@/constants/polling';
 import logger from '@/utils/logger';
 
 /**
- * Helper function to get vitals from token (now included in queue response)
- * OPTIMIZATION: Vitals are now included in the queue status response from backend
- * This eliminates the need for individual API calls per patient
+ * Get vitals from token (included in queue response)
  */
 const getTokenVitals = (token) => {
-  // Vitals are now included in token.patient.vitals from backend
   if (token.patient?.vitals) {
     logger.debug(`✅ Token #${token.token_number} has vitals from queue response`);
     return token.patient.vitals;
@@ -35,7 +32,7 @@ const getTokenVitals = (token) => {
  * Helper function to transform token data to patient data format
  */
 const transformTokenToPatientData = (token) => {
-  // Construct blood pressure string only if we have valid values
+  // Construct blood pressure string if valid values exist
   let bloodPressure = null;
   if (
     token.patient?.vitals?.blood_pressure_systolic &&
@@ -54,12 +51,16 @@ const transformTokenToPatientData = (token) => {
 
   return {
     id: token.patient?.id || token.id,
+    patient_number: token.patient?.patient_number || null,
     name:
       `${token.patient?.first_name || ''} ${token.patient?.last_name || ''}`.trim() ||
       'Unknown Patient',
     age: age,
     gender: token.patient?.gender || 'N/A',
     phone: token.patient?.phone || 'N/A',
+    blood_group: token.patient?.blood_group || null,
+    date_of_birth: token.patient?.date_of_birth || null,
+    email: token.patient?.email || null,
     tokenNumber: token.token_number,
     status: token.status,
     priority: token.priority || 3, // Include priority for visual highlighting
@@ -163,7 +164,6 @@ const DoctorDashboard = () => {
                 if (activeToken) {
                   // Consultation is still active, restore state
                   logger.info('Recovered active consultation from session:', tokenId);
-                  // The queue data will be loaded by loadDoctorData, so we just need to switch tab
                   setSelectedTab('consulting');
                 } else {
                   // Consultation completed or cancelled, clear session
@@ -210,10 +210,7 @@ const DoctorDashboard = () => {
         // Check if there's an active consultation
         const hasActiveConsultation = activeTokens.some((token) => token.status === 'serving');
 
-        // Vitals are now included in the queue response from backend (batch fetched)
-        // No need to make individual API calls - just use the vitals from the response
         const tokensWithVitals = activeTokens.map((token) => {
-          // Vitals are already included in token.patient.vitals from backend
           const vitals = getTokenVitals(token);
           if (vitals) {
             token.patient.vitals = vitals;
@@ -290,7 +287,6 @@ const DoctorDashboard = () => {
     try {
       setLoading(true);
 
-      // Only proceed if we have a valid doctor ID
       if (!currentDoctorId) {
         setQueueData([]);
         setPatients([]);
@@ -309,10 +305,7 @@ const DoctorDashboard = () => {
           `📋 [DOCTOR] Filtered to ${activeTokens.length} active tokens (excluded ${tokens.length - activeTokens.length} cancelled)`
         );
 
-        // Vitals are now included in the queue response from backend (batch fetched)
-        // No need to make individual API calls - just use the vitals from the response
         const tokensWithVitals = activeTokens.map((token) => {
-          // Vitals are already included in token.patient.vitals from backend
           const vitals = getTokenVitals(token);
           if (vitals) {
             token.patient.vitals = vitals;
@@ -337,10 +330,7 @@ const DoctorDashboard = () => {
         setQueueData([]);
       }
 
-      // OPTIMIZATION: Removed unused getDoctorPatients() call
-      // Queue data from getDoctorQueueStatus is sufficient and includes all needed patient info
-      // This reduces unnecessary API calls and database load
-      setPatients([]); // Keep empty array for fallback compatibility
+      setPatients([]);
     } catch (error) {
       logger.error('Failed to load doctor data:', error);
       // Fallback to empty data
@@ -369,10 +359,7 @@ const DoctorDashboard = () => {
         // Check if there's an active consultation (status === 'serving')
         const hasActiveConsultation = activeTokens.some((token) => token.status === 'serving');
 
-        // Vitals are now included in the queue response from backend (batch fetched)
-        // No need to make individual API calls - just use the vitals from the response
         const tokensWithVitals = activeTokens.map((token) => {
-          // Vitals are already included in token.patient.vitals from backend
           const vitals = getTokenVitals(token);
           if (vitals) {
             token.patient.vitals = vitals;
@@ -392,10 +379,7 @@ const DoctorDashboard = () => {
           // Merge new data with existing, preserving optimistic status updates
           const merged = tokensWithVitals.map((newToken) => {
             const existing = existingMap.get(newToken.id);
-            // If status was optimistically updated and differs, preserve it temporarily
-            // This handles cases where user just clicked start/complete but server hasn't confirmed yet
             if (existing && existing.status !== newToken.status) {
-              // Preserve optimistic 'serving' or 'completed' status if it was just set
               if (
                 (existing.status === 'serving' && newToken.status === 'called') ||
                 (existing.status === 'completed' && newToken.status === 'serving')
@@ -542,17 +526,13 @@ const DoctorDashboard = () => {
           throw new Error('Patient not found');
         }
 
-        // Get visit_id from patient data (could be visit_id, current_visit_id, or active_visit_id)
         const visitId = patient.visit_id || patient.current_visit_id || patient.active_visit_id;
 
         if (!visitId) {
-          // If no visit_id, this patient doesn't have an active visit
-          // This shouldn't happen in normal flow, but handle gracefully
           showNotification('error', t('doctor.dashboard.notifications.noActiveVisit'));
           return;
         }
 
-        // Validate visit status before completion
         try {
           const visitDetails = await visitService.getVisitDetails(visitId);
           if (!visitDetails) {
@@ -572,15 +552,11 @@ const DoctorDashboard = () => {
             return;
           }
 
-          // Check if visit has an invoice and its status
-          // Note: Visits should be completed through invoice payment, not directly
-          // This is a fallback for edge cases
           if (visitDetails.invoice_id) {
             try {
               const { invoiceService } = await import('@/features/billing');
               const invoice = await invoiceService.getInvoiceById(visitDetails.invoice_id);
               if (invoice && invoice.status === 'paid') {
-                // Invoice is paid, visit should be completed through invoice flow
                 showNotification('info', t('doctor.dashboard.notifications.visitInvoicePaid'));
                 await refreshQueue(false);
                 return;
@@ -945,8 +921,19 @@ const DoctorDashboard = () => {
           </div>
         ) : (
           <>
-            {/* Patient Stats */}
-            <PatientStats patients={patients} userRole="doctor" />
+            {/* Patient Stats - Map queue statuses to PatientStats expected statuses */}
+            <PatientStats
+              patients={queueData.map((token) => ({
+                ...token,
+                status:
+                  token.status === 'called' || token.status === 'waiting'
+                    ? 'ready'
+                    : token.status === 'serving'
+                      ? 'seeing_doctor'
+                      : token.status,
+              }))}
+              userRole="doctor"
+            />
 
             {/* Search and actions bar */}
             <div className="flex items-center gap-4">

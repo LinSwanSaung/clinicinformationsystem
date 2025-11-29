@@ -297,14 +297,10 @@ class QueueService {
   // ===============================================
 
   /**
-   * OPTIMIZATION: Get all active doctors with their current queue status and availability
-   * Uses backend batch endpoint to eliminate N+1 query pattern
-   * Reduces API calls from 2+N (where N = number of doctors) to just 2 calls
+   * Get all active doctors with their current queue status and availability
    */
   async getAllDoctorsQueueStatus(date = null, skipCompletedVitals = false) {
     try {
-      // OPTIMIZATION: Use batch endpoint to get all doctors' queue status in one call
-      // Then fetch availability once and combine on frontend
       const params = {};
       if (date) {
         params.date = date;

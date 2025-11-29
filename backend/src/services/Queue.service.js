@@ -151,8 +151,7 @@ class QueueService {
       throw new ApplicationError('Patient ID and Doctor ID are required', 400, 'VALIDATION_ERROR');
     }
 
-    // Check if patient already has an active visit (in_progress)
-    // Business rule: If visit status is 'in_progress', block new visits regardless of invoice status
+    // Check if patient already has an active visit
     const activeVisit = await this.visitService.getPatientActiveVisit(patient_id);
 
     if (activeVisit) {
@@ -245,8 +244,6 @@ class QueueService {
       }
     }
 
-    // Check if patient already has an active token today (regardless of doctor)
-    // This is a secondary check in case visit check didn't catch it
     const existingToken = await this.queueTokenModel.getPatientCurrentToken(patient_id);
     if (existingToken) {
       const doctorName = existingToken.doctor
@@ -279,7 +276,7 @@ class QueueService {
     let newToken = null;
 
     try {
-      // Step 1: Create visit (with rollback compensation)
+      // Create visit
       let appointmentType = 'walk_in'; // Default for walk-ins
 
       // Handle empty strings - treat them as null
@@ -343,7 +340,7 @@ class QueueService {
         }
       );
 
-      // Step 2: Create token (with rollback compensation)
+      // Create token
       newToken = await transaction.add(
         async () => {
           return this.queueTokenModel.createToken({
@@ -364,7 +361,7 @@ class QueueService {
         }
       );
 
-      // Step 3: Update appointment status if linked (non-critical, no rollback needed)
+      // Update appointment status if linked
       if (appointment_id) {
         try {
           await this.appointmentModel.update(appointment_id, {
@@ -496,7 +493,7 @@ class QueueService {
         );
       }
 
-      // Token is already 'called' (marked ready by nurse), so we can proceed to start consultation
+      // Token is already 'called' (marked ready by nurse), proceed to start consultation
       // No need to update status to 'called' again
 
       // Then immediately start consultation
@@ -751,8 +748,7 @@ class QueueService {
         });
       }
 
-      // Auto-create invoice if it doesn't exist (non-critical, no rollback needed)
-      // This allows cashier to add services even if doctor forgot to add them
+      // Auto-create invoice if it doesn't exist
       if (activeConsultation.visit_id) {
         try {
           const { default: invoiceService } = await import('./Invoice.service.js');
@@ -1145,9 +1141,6 @@ class QueueService {
         }
       }
 
-      // Use atomic function with advisory locks to prevent race conditions
-      // This function handles all checks and updates atomically, preventing race conditions
-      // This ensures only one consultation can be started per doctor at a time
       let updatedToken;
       try {
         const atomicResult = await executeWithRetry(
@@ -1325,7 +1318,6 @@ class QueueService {
           error: visitError?.message || String(visitError),
         });
         // Don't fail the consultation start if visit handling fails
-        // This ensures backward compatibility
       }
 
       // Update appointment status if linked
@@ -1380,7 +1372,6 @@ class QueueService {
         throw new ApplicationError('Token not found', 404, 'TOKEN_NOT_FOUND');
       }
 
-      // CRITICAL: Token must have visit_id - error if missing
       if (!token.visit_id) {
         throw new ApplicationError(
           `Cannot complete consultation: Token #${token.token_number} is missing visit information. ` +
@@ -1407,7 +1398,7 @@ class QueueService {
       let _updatedAppointment = null;
 
       try {
-        // Step 1: Update token status (with rollback compensation)
+        // Update token status
         updatedToken = await transaction.add(
           async () => {
             return this.queueTokenModel.updateStatus(tokenId, 'completed');
@@ -1418,9 +1409,7 @@ class QueueService {
           }
         );
 
-        // Step 2: Set visit_end_time when consultation ends (visit stays in_progress until invoice is paid)
-        // Business rule: Visits are ONLY completed when invoice is paid (via InvoiceService.completeInvoice)
-        // This ensures proper billing workflow and prevents premature visit completion
+        // Set visit_end_time when consultation ends (visit stays in_progress until invoice is paid)
         _updatedVisit = await transaction.add(
           async () => {
             // Only set visit_end_time, keep status as 'in_progress' until invoice is paid
@@ -1434,7 +1423,7 @@ class QueueService {
           }
         );
 
-        // Step 3: Update appointment status if linked (with rollback compensation)
+        // Update appointment status if linked
         if (token.appointment_id) {
           _updatedAppointment = await transaction.add(
             async () => {
@@ -1457,8 +1446,7 @@ class QueueService {
           );
         }
 
-        // Step 4: Auto-create invoice if it doesn't exist (non-critical, no rollback needed)
-        // This allows cashier to add services even if doctor forgot to add them
+        // Auto-create invoice if it doesn't exist
         try {
           const { default: invoiceService } = await import('./Invoice.service.js');
 
@@ -1480,10 +1468,9 @@ class QueueService {
           );
         }
 
-        // All steps succeeded - transaction is complete
-        // (TransactionRunner executes operations immediately in add(), no explicit commit needed)
+        // Transaction complete
 
-        // Log visit update for audit (after successful commit)
+        // Log visit update for audit
         try {
           await logAuditEvent({
             userId: null, // System action
@@ -1804,9 +1791,7 @@ class QueueService {
     // Get token-based queue
     const tokens = await this.queueTokenModel.getByDoctorAndDate(doctorId, queueDate);
 
-    // OPTIMIZATION: Optionally skip fetching vitals for completed/missed tokens to reduce database load
-    // On initial load (skipCompletedVitals=false), fetch all vitals including completed/missed
-    // During polling (skipCompletedVitals=true), skip completed/missed since they won't change
+    // Skip vitals for completed/missed tokens during polling
     const tokensForVitals = skipCompletedVitals
       ? tokens.filter((t) => t.status !== 'completed' && t.status !== 'missed')
       : tokens;
@@ -1848,7 +1833,7 @@ class QueueService {
     // Enhance tokens with visit chief_complaint and vitals
     const enhancedTokens = await Promise.all(
       tokens.map(async (token) => {
-        // Always fetch visit data if visit_id exists to ensure we have chief_complaint
+        // Always fetch visit data if visit_id exists to ensure chief_complaint is available
         if (token.visit_id) {
           try {
             const visitDetails = await this.visitService.getVisitDetails(token.visit_id);
@@ -1919,7 +1904,7 @@ class QueueService {
             }
           }
         } else if (token.appointment?.reason_for_visit) {
-          // If no visit_id but we have appointment reason, use that
+          // No visit_id but appointment reason exists, use that
           token.visit = {
             ...token.visit,
             chief_complaint: token.appointment.reason_for_visit,
@@ -1980,7 +1965,7 @@ class QueueService {
     const queueDate = date || new Date().toISOString().split('T')[0];
 
     try {
-      // Step 1: Get all doctors in one query
+      // Get all doctors
       const { data: doctors, error: doctorsError } = await this.queueTokenModel.supabase
         .from('users')
         .select('id, first_name, last_name, email, specialty, is_active')
@@ -1997,7 +1982,7 @@ class QueueService {
 
       const doctorIds = doctors.map((d) => d.id);
 
-      // Step 2: Get all availability records in one query
+      // Get all availability records
       const { data: allAvailability, error: availabilityError } =
         await this.queueTokenModel.supabase
           .from('doctor_availability')
@@ -2009,7 +1994,7 @@ class QueueService {
         logger.warn('[QUEUE BATCH] Failed to fetch availability:', availabilityError.message);
       }
 
-      // Step 3: Get all queue tokens for all doctors in one query (batch)
+      // Get all queue tokens
       const { data: allTokens, error: tokensError } = await this.queueTokenModel.supabase
         .from('queue_tokens')
         .select(
@@ -2042,10 +2027,7 @@ class QueueService {
         logger.warn('[QUEUE BATCH] Failed to fetch tokens:', tokensError.message);
       }
 
-      // Step 4: Collect visit IDs for batch vitals fetching
-      // OPTIMIZATION: Optionally skip fetching vitals for completed/missed tokens to reduce database load
-      // On initial load (skipCompletedVitals=false), fetch all vitals including completed/missed
-      // During polling (skipCompletedVitals=true), skip completed/missed since they won't change
+      // Collect visit IDs for batch vitals fetching
       const tokensForVitals = skipCompletedVitals
         ? (allTokens || []).filter((t) => t.status !== 'completed' && t.status !== 'missed')
         : allTokens || [];
@@ -2082,7 +2064,7 @@ class QueueService {
         }
       }
 
-      // Step 5: Group tokens by doctor and process each doctor's queue
+      // Group tokens by doctor
       const tokensByDoctor = new Map();
       (allTokens || []).forEach((token) => {
         if (!tokensByDoctor.has(token.doctor_id)) {
@@ -2091,22 +2073,15 @@ class QueueService {
         tokensByDoctor.get(token.doctor_id).push(token);
       });
 
-      // Step 6: Process each doctor's queue status
-      // Use Promise.allSettled to handle individual doctor failures gracefully
+      // Process each doctor's queue status
       const doctorQueuePromises = doctors.map(async (doctor) => {
         try {
           const doctorTokens = tokensByDoctor.get(doctor.id) || [];
 
-          // Enhance tokens with vitals (visit details are optional and can be fetched lazily)
-          // OPTIMIZATION: Skip individual visit details fetching to avoid N+1 queries
-          // Visit details are not critical for queue status display
           const enhancedTokens = doctorTokens.map((token) => {
             // Ensure patient object exists
             token.patient = token.patient || {};
 
-            // Add vitals if available (already batch fetched)
-            // NOTE: Completed/missed tokens won't have vitals in vitalsMap (we skip fetching them)
-            // Frontend will preserve existing vitals for these tokens from local state
             if (token.visit_id) {
               const vitals = vitalsMap.get(token.visit_id);
               if (vitals) {
@@ -2155,12 +2130,9 @@ class QueueService {
             (avail) => avail.doctor_id === doctor.id
           );
 
-          // Calculate basic availability - frontend will enhance this with proper logic
-          // For now, return a structure that matches what frontend expects
           const hasActiveConsultation = !!activeConsultation;
           const waitingCount = tokenStats.waiting + tokenStats.called;
 
-          // Basic status calculation (frontend will refine with availability schedule)
           let statusStatus = 'available';
           if (hasActiveConsultation) {
             statusStatus = 'consulting';

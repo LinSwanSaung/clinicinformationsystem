@@ -6,9 +6,6 @@ package-lock.json
 dist
 build
 
-# Database
-database/migrations/*.sql
-
 # Misc
 .DS_Store
 *.log

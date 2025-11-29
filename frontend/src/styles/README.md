@@ -1,6 +1,6 @@
 # Styles Directory
 
-This directory contains all global stylesheets and design tokens for the RealCIS application.
+This directory contains all global stylesheets and design tokens for the ThriveCare application.
 
 ## Files
 

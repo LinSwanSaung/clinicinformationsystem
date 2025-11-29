@@ -98,44 +98,14 @@ The database schema is defined in `database/schema.sql` - this is the **single s
 - Keep your `service_role` key secret - it has full database access
 - The `anon` key is safe for frontend use
 
-### Schema Verification
+### Database Schema
 
-Verify that `database/schema.sql` matches your current database:
+The database schema is defined in `database/schema.sql`. This is the single source of truth for the database structure.
 
-```bash
-npm run db:verify-schema
-```
-
-This script:
-
-- ✅ Reads `database/schema.sql`
-- ✅ Connects to your database
-- ✅ Compares table names
-- ✅ Reports any differences
-
-**Expected Output:**
-
-```
-✅ SCHEMA VERIFICATION PASSED
-   All tables from schema.sql exist in the database
-   No extra tables found in database
-   Schema.sql matches the current database state
-```
-
-**Troubleshooting:**
-
-- Connection issues: Verify `SUPABASE_URL` and `SUPABASE_SERVICE_KEY` in `.env`
-- Missing tables: Apply `schema.sql` in Supabase SQL Editor
-- Extra tables: Add them to `schema.sql` or remove from database
-
-### Database Seeds
-
-Sample data is available in `database/seeds/`:
-
-```bash
-# Run seeds (if needed)
-npm run db:seed
-```
+To set up the database:
+1. Go to your Supabase project's SQL Editor
+2. Copy and paste the contents of `schema.sql`
+3. Run the SQL to create all tables, indexes, and functions
 
 ## 🔧 Configuration
 

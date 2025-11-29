@@ -64,8 +64,6 @@ class VitalsService {
    */
   async getVisitVitals(visitId) {
     try {
-      // Check if user is authenticated before making request
-      // This prevents errors when components make requests after logout
       const token = localStorage.getItem('authToken');
       if (!token) {
         // User is logged out, silently return empty result

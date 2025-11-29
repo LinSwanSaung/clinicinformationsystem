@@ -128,6 +128,9 @@ const AdminLogin = () => {
                 <div>
                   <strong>Cashier/Pharmacist:</strong> cashier1@gmail.com / cashier123
                 </div>
+                <div>
+                  <strong>Patient:</strong> adamthegreat169@gmail.com / Lin260702
+                </div>
               </div>
             </div>
           </CardContent>

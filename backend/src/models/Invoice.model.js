@@ -128,14 +128,14 @@ class InvoiceModel extends BaseModel {
       .select(
         `
         *,
-        patients!invoices_patient_id_fkey(id, first_name, last_name, phone, email, patient_number),
-        visits!invoices_visit_id_fkey(id, visit_type, visit_date, doctor_id),
+        patients!left(id, first_name, last_name, phone, email, patient_number),
+        visits!left(id, visit_type, visit_date, doctor_id),
         invoice_items(*),
         payment_transactions(*)
       `
       )
       .in('status', ['paid', 'partial_paid'])
-      .order('completed_at', { ascending: false, nullsFirst: false })
+      .order('updated_at', { ascending: false })
       .range(offset, offset + limit - 1);
 
     if (error) {

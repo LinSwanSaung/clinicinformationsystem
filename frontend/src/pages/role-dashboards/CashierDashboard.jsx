@@ -1,4 +1,5 @@
-import { useState, useEffect, useMemo, useCallback, memo } from 'react';
+import { useState, useEffect, useMemo, useCallback, memo, useRef } from 'react';
+import { useTranslation } from 'react-i18next';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useFeedback } from '@/contexts/FeedbackContext';
 import { formatCurrencySync, getCurrencySymbol, refreshCurrencyCache } from '@/utils/currency';
@@ -230,6 +231,7 @@ const InvoiceHistoryItem = memo(({ invoice, onView, onDownload }) => {
 InvoiceHistoryItem.displayName = 'InvoiceHistoryItem';
 
 const CashierDashboard = () => {
+  const { t } = useTranslation();
   // Use feedback system instead of inline state
   const { showSuccess, showError, showWarning } = useFeedback();
 
@@ -326,12 +328,27 @@ const CashierDashboard = () => {
     loadClinicSettings();
   }, []);
 
-  // Load invoice history when switching to history tab or when completed invoices data changes
+  // Track if initial history load has been done
+  const initialHistoryLoadedRef = useRef(false);
+
+  // Load invoice history on component mount (for stats) - only once
   useEffect(() => {
-    if (activeTab === 'history') {
+    if (
+      !initialHistoryLoadedRef.current &&
+      completedInvoicesData &&
+      completedInvoicesData.length >= 0
+    ) {
+      initialHistoryLoadedRef.current = true;
       loadInvoiceHistory();
     }
-  }, [activeTab, completedInvoicesData]);
+  }, [completedInvoicesData]);
+
+  // Reload when switching to history tab (force refresh for latest data)
+  useEffect(() => {
+    if (activeTab === 'history') {
+      loadInvoiceHistory(true);
+    }
+  }, [activeTab]);
 
   // Initialize medications and services when invoice is selected
   useEffect(() => {
@@ -384,39 +401,15 @@ const CashierDashboard = () => {
       const invoiceHistory = [];
 
       response.forEach((invoice) => {
-        // Calculate total paid amount for THIS invoice only
-        // Only count payments that were made directly to this invoice
-        const totalPaid =
-          invoice.payment_transactions?.reduce((sum, payment) => {
-            // Only count payments made to this invoice (not payments that went to other invoices)
-            // Payments to other invoices have notes like "Paid with current visit invoice #..."
-            const paymentNotes = (payment.payment_notes || '').toLowerCase();
-            const isPaymentToOtherInvoice =
-              paymentNotes.includes('paid with current visit') ||
-              paymentNotes.includes('previous invoice');
+        // Use the database-stored amount_paid which is the authoritative value
+        // This value is correctly maintained by the payment recording process
+        const amountPaid = parseFloat(invoice.amount_paid || 0);
 
-            // If this payment was made to another invoice, don't count it here
-            if (isPaymentToOtherInvoice) {
-              return sum;
-            }
-
-            return sum + parseFloat(payment.amount || 0);
-          }, 0) || 0;
-
-        // Calculate balance due for this invoice
+        // Calculate balance due for this invoice from database
         const balanceDue = parseFloat(invoice.balance_due || 0);
-
-        // Check if this invoice has payments that mention paying off previous invoices
-        // This happens when outstanding balance is paid from a later visit
-        const _hasOutstandingBalancePayment =
-          invoice.payment_transactions?.some((payment) => {
-            const notes = (payment.payment_notes || '').toLowerCase();
-            return notes.includes('paid with current visit') || notes.includes('previous invoice');
-          }) || false;
 
         // Find payments on OTHER invoices that mention this invoice's number
         // This happens when this invoice's outstanding balance was paid from a later visit
-        // The payment note will say "Paid with current visit invoice #THIS_INVOICE_NUMBER"
         let outstandingBalancePaidFromLater = 0;
         const thisInvoiceNumber = invoice.invoice_number || invoice.id;
         response.forEach((otherInvoice) => {
@@ -480,7 +473,7 @@ const CashierDashboard = () => {
                 })
               : 'N/A',
           totalAmount: parseFloat(invoice.total_amount || 0),
-          amountPaid: totalPaid,
+          amountPaid: amountPaid,
           balanceDue: balanceDue > 0 ? balanceDue : 0,
           status: invoice.status,
           paymentMethod:
@@ -506,8 +499,12 @@ const CashierDashboard = () => {
 
       // Sort by date (newest first)
       consolidatedInvoices.sort((a, b) => {
-        const dateA = new Date(a.rawData?.completed_at || a.rawData?.created_at || 0);
-        const dateB = new Date(b.rawData?.completed_at || b.rawData?.created_at || 0);
+        const dateA = new Date(
+          a.rawData?.completed_at || a.rawData?.updated_at || a.rawData?.created_at || 0
+        );
+        const dateB = new Date(
+          b.rawData?.completed_at || b.rawData?.updated_at || b.rawData?.created_at || 0
+        );
         return dateB - dateA;
       });
 
@@ -599,28 +596,38 @@ const CashierDashboard = () => {
 
   // Calculate statistics - use hook data directly
   const stats = useMemo(() => {
+    // Pending invoices count
     const pending = (pendingInvoicesData || []).filter((inv) => inv.status === 'pending').length;
 
-    // Count today's completed invoices and revenue
-    const today = new Date().toLocaleDateString('en-US', {
-      year: 'numeric',
-      month: 'short',
-      day: 'numeric',
+    // Count today's completed invoices and revenue directly from completedInvoicesData
+    const today = new Date();
+    const todayDateStr = today.toISOString().split('T')[0]; // YYYY-MM-DD format
+
+    // Filter completed invoices for today based on updated_at (when payment was completed)
+    const todayCompletedInvoices = (completedInvoicesData || []).filter((inv) => {
+      const invDate = inv.updated_at ? inv.updated_at.split('T')[0] : '';
+      return invDate === todayDateStr;
     });
-    const todayInvoices = (invoiceHistory || []).filter((inv) => inv.date === today);
-    const todayCompleted = todayInvoices.length;
-    const todayRevenue = todayInvoices.reduce(
-      (sum, inv) => sum + (parseFloat(inv.totalAmount) || 0),
+    const todayCompleted = todayCompletedInvoices.length;
+    const todayRevenue = todayCompletedInvoices.reduce(
+      (sum, inv) => sum + (parseFloat(inv.total_amount) || 0),
       0
     );
 
+    // Total invoices for today = pending invoices created today + completed invoices today
+    const pendingToday = (pendingInvoicesData || []).filter((inv) => {
+      const invDate = inv.created_at ? inv.created_at.split('T')[0] : '';
+      return invDate === todayDateStr;
+    }).length;
+    const totalInvoicesToday = pendingToday + todayCompleted;
+
     return {
-      totalInvoices: (pendingInvoicesData || []).length,
+      totalInvoices: totalInvoicesToday,
       pendingInvoices: pending,
       todayCompleted,
       todayRevenue,
     };
-  }, [pendingInvoicesData, invoiceHistory]);
+  }, [pendingInvoicesData, completedInvoicesData]);
 
   // Advanced filtering - use hook data directly
   const filteredInvoices = useMemo(() => {
@@ -1276,7 +1283,6 @@ const CashierDashboard = () => {
     setIsProcessing(true);
 
     // Save payment state to sessionStorage for browser refresh recovery
-    // (only if we successfully start processing, not if version mismatch occurs immediately)
     const paymentState = {
       invoiceId: selectedInvoice?.id,
       timestamp: Date.now(),
@@ -1287,21 +1293,14 @@ const CashierDashboard = () => {
     try {
       // Use memoized totals
 
-      // Get current user from localStorage
       const currentUser = JSON.parse(localStorage.getItem('user') || '{}');
 
-      // Get current invoice version for optimistic locking
-      // CRITICAL: Store the original version from when payment process started
-      // This is the version we'll check against to detect if another user modified the invoice
       const originalVersion = selectedInvoice?.version || null;
       let currentVersion = originalVersion;
 
-      // Step 1: Update medication items in the invoice
       for (const med of medications) {
         if (med.action === 'dispense' && med.dispensedQuantity > 0) {
           const unitPrice = med.price / med.quantity;
-
-          // Update the invoice item with quantity and price (with version)
           await invoiceService.updateInvoiceItem(
             selectedInvoice.id,
             med.id,
@@ -1350,21 +1349,15 @@ const CashierDashboard = () => {
             currentVersion
           );
 
-          // Refresh invoice to get new version
           const refreshedInvoice = await invoiceService.getInvoiceById(selectedInvoice.id);
           currentVersion = refreshedInvoice?.version || null;
           setSelectedInvoice(refreshedInvoice);
         }
       }
 
-      // Note: Discount should already be applied via handleApplyDiscount button
-      // CRITICAL: Final version check before any payment operations
-      // Refresh invoice to get latest version and verify it hasn't changed since our last update
       const refreshedInvoiceBeforePayment = await invoiceService.getInvoiceById(selectedInvoice.id);
       const latestVersion = refreshedInvoiceBeforePayment?.version || null;
 
-      // Check if version changed during our medication updates by someone else
-      // We compare against currentVersion (which tracks our own updates) not originalVersion
       if (currentVersion !== null && latestVersion !== null && latestVersion !== currentVersion) {
         const error = new Error(
           `Invoice was modified by another user during processing. Current version: ${latestVersion}, Expected: ${currentVersion}. Please refresh and try again.`
@@ -1375,12 +1368,9 @@ const CashierDashboard = () => {
         throw error;
       }
 
-      // Update to latest version for subsequent operations
       currentVersion = latestVersion;
       setSelectedInvoice(refreshedInvoiceBeforePayment);
 
-      // CRITICAL: Check if outstanding balance flag in invoice matches local state
-      // This ensures version consistency - if another user changed the flag, we detect it
       const invoiceOutstandingFlag =
         refreshedInvoiceBeforePayment.include_outstanding_balance || false;
       if (addOutstandingToInvoice !== invoiceOutstandingFlag) {
@@ -1393,7 +1383,7 @@ const CashierDashboard = () => {
         throw error;
       }
 
-      // CRITICAL: If outstanding balance is selected, verify outstanding invoices haven't been paid/modified
+      // Verify outstanding invoices haven't been paid/modified
       if (
         addOutstandingToInvoice &&
         outstandingBalance &&
@@ -1463,7 +1453,7 @@ const CashierDashboard = () => {
             invoices: otherOutstandingInvoices,
           });
         } catch (error) {
-          // Re-throw if it's our custom error
+          // Re-throw custom errors
           if (
             error.code === 'OUTSTANDING_INVOICE_PAID' ||
             error.code === 'OUTSTANDING_INVOICE_VERSION_MISMATCH' ||
@@ -1476,11 +1466,9 @@ const CashierDashboard = () => {
         }
       }
 
-      // Save payment state AFTER we've verified the invoice version is current
-      // This prevents showing generic error on refresh if version mismatch occurs
       sessionStorage.setItem('pendingPayment', JSON.stringify(paymentState));
 
-      // Step 2: If outstanding balance is added, pay off those invoices first
+      // Pay off outstanding invoices first
       if (addOutstandingToInvoice && outstandingBalance && outstandingBalance.totalBalance > 0) {
         // Pay off outstanding invoices in order (oldest first)
         for (const oldInvoice of outstandingBalance.invoices) {
@@ -1517,20 +1505,14 @@ const CashierDashboard = () => {
               throw error;
             }
             if (outstandingError.message?.includes('already fully paid')) {
-              // This is fine - invoice was already paid, continue
               continue;
             }
-            // Re-throw other errors
             throw outstandingError;
           }
         }
       }
 
-      // Step 3: Record payment for current invoice (full or partial)
-      // Skip payment recording if invoice total is $0 (outstanding balance is already handled in Step 2)
       if (totals.total === 0) {
-        // For $0 invoices, just complete the invoice without recording payment
-        // Outstanding balance payments were already processed in Step 2
         await invoiceService.completeInvoice(selectedInvoice.id, currentUser?.id, currentVersion);
 
         let successMsg = `Visit completed successfully (no charge). Invoice ${selectedInvoice.invoice_number || selectedInvoice.id} has been marked as paid.`;
@@ -1561,17 +1543,9 @@ const CashierDashboard = () => {
         }
         showSuccess(successMsg);
       } else {
-        // Process full payment for non-zero invoices
-        // NOTE: recordPayment already calls completeInvoice internally when invoice is fully paid
-        // So we don't need to call completeInvoice again - it's redundant
-
-        // CRITICAL: Final version check before payment - refresh invoice to get absolute latest version
-        // This ensures we detect if another user edited services/items while we were processing
         const finalInvoiceCheck = await invoiceService.getInvoiceById(selectedInvoice.id);
         const finalVersion = finalInvoiceCheck?.version || null;
 
-        // Check if version changed during our processing (medication updates, etc.) by someone else
-        // We compare against currentVersion (which tracks our own updates) not originalVersion
         if (currentVersion !== null && finalVersion !== null && finalVersion !== currentVersion) {
           const error = new Error(
             `Invoice was modified by another user during processing. Current version: ${finalVersion}, Expected: ${currentVersion}. Please refresh and try again.`
@@ -1708,8 +1682,6 @@ const CashierDashboard = () => {
               invoiceCount: updatedOtherInvoices.length,
               invoices: updatedOtherInvoices,
             });
-            // Update outstanding balance flag if no invoices remain (user can still manually uncheck)
-            // Note: Flag is persisted in database, so we don't auto-uncheck it
           } catch (refreshError) {
             logger.error('Error refreshing outstanding balance:', refreshError);
           }
@@ -1718,7 +1690,6 @@ const CashierDashboard = () => {
         return;
       }
 
-      // Handle "already fully paid" error - refresh invoice and show info message
       if (
         error.message?.includes('already fully paid') ||
         error.response?.data?.message?.includes('already fully paid')
@@ -1857,8 +1828,8 @@ const CashierDashboard = () => {
   return (
     <motion.div initial="initial" animate="animate" exit="exit" variants={pageVariants}>
       <PageLayout
-        title="Cashier Dashboard"
-        subtitle="Manage pending invoices and process payments"
+        title={t('cashier.dashboard.title')}
+        subtitle={t('cashier.dashboard.subtitle')}
         fullWidth
       >
         <div className="space-y-6 p-4 md:p-6">
@@ -1873,25 +1844,25 @@ const CashierDashboard = () => {
           >
             {[
               {
-                label: 'Pending',
+                label: t('cashier.dashboard.stats.pending'),
                 value: stats?.pendingInvoices || 0,
                 color: 'yellow',
                 icon: Clock,
               },
               {
-                label: 'Today Completed',
+                label: t('cashier.dashboard.stats.todayCompleted'),
                 value: stats?.todayCompleted || 0,
                 color: 'green',
                 icon: CheckCircle,
               },
               {
-                label: 'Today Revenue',
+                label: t('cashier.dashboard.stats.todayRevenue'),
                 value: formatCurrencySync(stats?.todayRevenue || 0),
                 color: 'blue',
                 icon: DollarSign,
               },
               {
-                label: 'Total Invoices',
+                label: t('cashier.dashboard.stats.totalInvoices'),
                 value: stats?.totalInvoices || 0,
                 color: 'gray',
                 icon: Receipt,
@@ -1926,15 +1897,15 @@ const CashierDashboard = () => {
               <TabsList className="grid w-auto grid-cols-3">
                 <TabsTrigger value="pending" className="gap-2">
                   <Clock className="h-4 w-4" />
-                  Pending Invoices ({stats.pendingInvoices})
+                  {t('cashier.dashboard.tabs.pending')} ({stats.pendingInvoices})
                 </TabsTrigger>
                 <TabsTrigger value="history" className="gap-2">
                   <History className="h-4 w-4" />
-                  Invoice History
+                  {t('cashier.dashboard.tabs.history')}
                 </TabsTrigger>
                 <TabsTrigger value="dispenses" className="gap-2">
                   <Package className="h-4 w-4" />
-                  Dispense History
+                  {t('cashier.dashboard.tabs.dispenses')}
                 </TabsTrigger>
               </TabsList>
 
@@ -1947,10 +1918,10 @@ const CashierDashboard = () => {
                   className="gap-2"
                 >
                   <RefreshCw className={`h-4 w-4 ${isRefreshing ? 'animate-spin' : ''}`} />
-                  Refresh
+                  {t('cashier.dashboard.refresh')}
                 </Button>
                 <div className="text-xs text-muted-foreground">
-                  Last updated: {lastRefreshTime.toLocaleTimeString()}
+                  {t('cashier.dashboard.lastUpdated')}: {lastRefreshTime.toLocaleTimeString()}
                 </div>
               </div>
             </div>
@@ -1966,7 +1937,7 @@ const CashierDashboard = () => {
                         <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 transform text-muted-foreground" />
                         <Input
                           type="text"
-                          placeholder="Search invoices by patient name, invoice ID, or doctor..."
+                          placeholder={t('cashier.dashboard.search.placeholder')}
                           value={searchTerm}
                           onChange={(e) => setSearchTerm(e.target.value)}
                           className="pl-10"
@@ -1976,23 +1947,33 @@ const CashierDashboard = () => {
                     <div className="flex gap-2">
                       <Select value={statusFilter} onValueChange={setStatusFilter}>
                         <SelectTrigger className="w-32">
-                          <SelectValue placeholder="Status" />
+                          <SelectValue placeholder={t('cashier.dashboard.search.status')} />
                         </SelectTrigger>
                         <SelectContent>
-                          <SelectItem value="all">All Status</SelectItem>
-                          <SelectItem value="pending">Pending</SelectItem>
-                          <SelectItem value="processing">Processing</SelectItem>
+                          <SelectItem value="all">
+                            {t('cashier.dashboard.search.allStatus')}
+                          </SelectItem>
+                          <SelectItem value="pending">
+                            {t('cashier.dashboard.search.pending')}
+                          </SelectItem>
+                          <SelectItem value="processing">
+                            {t('cashier.dashboard.search.processing')}
+                          </SelectItem>
                         </SelectContent>
                       </Select>
                       <Select value={priorityFilter} onValueChange={setPriorityFilter}>
                         <SelectTrigger className="w-32">
-                          <SelectValue placeholder="Priority" />
+                          <SelectValue placeholder={t('cashier.dashboard.search.priority')} />
                         </SelectTrigger>
                         <SelectContent>
-                          <SelectItem value="all">All Priority</SelectItem>
-                          <SelectItem value="high">High</SelectItem>
-                          <SelectItem value="normal">Normal</SelectItem>
-                          <SelectItem value="low">Low</SelectItem>
+                          <SelectItem value="all">
+                            {t('cashier.dashboard.search.allPriority')}
+                          </SelectItem>
+                          <SelectItem value="high">{t('cashier.dashboard.search.high')}</SelectItem>
+                          <SelectItem value="normal">
+                            {t('cashier.dashboard.search.normal')}
+                          </SelectItem>
+                          <SelectItem value="low">{t('cashier.dashboard.search.low')}</SelectItem>
                         </SelectContent>
                       </Select>
                       {(searchTerm || statusFilter !== 'all' || priorityFilter !== 'all') && (
@@ -2011,21 +1992,23 @@ const CashierDashboard = () => {
                   {isPendingLoading ? (
                     <div className="p-8 text-center">
                       <div className="inline-block h-8 w-8 animate-spin rounded-full border-b-2 border-primary"></div>
-                      <p className="mt-2 text-muted-foreground">Loading invoices...</p>
+                      <p className="mt-2 text-muted-foreground">{t('cashier.dashboard.loading')}</p>
                     </div>
                   ) : filteredInvoices.length === 0 ? (
                     <div className="p-8 text-center">
                       <Receipt className="mx-auto mb-4 h-12 w-12 text-muted-foreground" />
-                      <p className="mb-2 text-lg text-muted-foreground">No invoices found</p>
+                      <p className="mb-2 text-lg text-muted-foreground">
+                        {t('cashier.dashboard.noInvoices')}
+                      </p>
                       <p className="mb-4 text-sm text-muted-foreground">
                         {searchTerm || statusFilter !== 'all' || priorityFilter !== 'all'
-                          ? 'Try adjusting your search or filter criteria'
-                          : 'No pending invoices at the moment'}
+                          ? t('cashier.dashboard.tryAdjustingSearch')
+                          : t('cashier.dashboard.noInvoicesHint')}
                       </p>
                       {(searchTerm || statusFilter !== 'all' || priorityFilter !== 'all') && (
                         <Button onClick={clearFilters} variant="outline" className="gap-2">
                           <X className="h-4 w-4" />
-                          Clear All Filters
+                          {t('cashier.dashboard.search.clearAllFilters')}
                         </Button>
                       )}
                     </div>
@@ -2035,28 +2018,28 @@ const CashierDashboard = () => {
                         <thead className="bg-muted/50 border-b">
                           <tr>
                             <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-muted-foreground">
-                              Invoice #
+                              {t('cashier.dashboard.table.invoiceNumber')}
                             </th>
                             <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-muted-foreground">
-                              Patient
+                              {t('cashier.dashboard.table.patient')}
                             </th>
                             <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-muted-foreground">
-                              Visit Type
+                              {t('cashier.dashboard.table.visitType')}
                             </th>
                             <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-muted-foreground">
-                              Date
+                              {t('cashier.dashboard.table.date')}
                             </th>
                             <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-muted-foreground">
-                              Items
+                              {t('cashier.dashboard.table.items')}
                             </th>
                             <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-muted-foreground">
-                              Total
+                              {t('cashier.dashboard.table.total')}
                             </th>
                             <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-muted-foreground">
-                              Status
+                              {t('cashier.dashboard.table.status')}
                             </th>
                             <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-muted-foreground">
-                              Action
+                              {t('cashier.dashboard.table.action')}
                             </th>
                           </tr>
                         </thead>
@@ -2107,13 +2090,13 @@ const CashierDashboard = () => {
                                       {invoice.invoice_items?.filter(
                                         (i) => i.item_type === 'service'
                                       ).length || 0}{' '}
-                                      services
+                                      {t('cashier.dashboard.table.services')}
                                     </div>
                                     <div className="text-xs text-muted-foreground">
                                       {invoice.invoice_items?.filter(
                                         (i) => i.item_type === 'medicine'
                                       ).length || 0}{' '}
-                                      medications
+                                      {t('cashier.dashboard.table.medications')}
                                     </div>
                                   </div>
                                 </td>
@@ -2125,7 +2108,7 @@ const CashierDashboard = () => {
                                         variant="outline"
                                         className="border-amber-300 bg-amber-50 text-xs text-amber-800"
                                       >
-                                        No Services
+                                        {t('cashier.dashboard.table.noServices')}
                                       </Badge>
                                     )}
                                   </div>
@@ -2144,14 +2127,14 @@ const CashierDashboard = () => {
                                         handleViewInvoice(invoice);
                                       } catch (error) {
                                         logger.error('Error opening invoice detail:', error);
-                                        showError('Failed to open invoice details');
+                                        showError(t('cashier.dashboard.messages.paymentFailed'));
                                       }
                                     }}
                                     size="sm"
                                     className="gap-2"
                                   >
                                     <Eye className="h-4 w-4" />
-                                    Process
+                                    {t('cashier.dashboard.table.process')}
                                   </Button>
                                 </td>
                               </motion.tr>
@@ -2171,7 +2154,7 @@ const CashierDashboard = () => {
                 <CardHeader>
                   <CardTitle className="flex items-center gap-2">
                     <History className="h-5 w-5" />
-                    Invoice History
+                    {t('cashier.dashboard.history.title')}
                   </CardTitle>
                 </CardHeader>
                 <CardContent>
@@ -2179,7 +2162,9 @@ const CashierDashboard = () => {
                     <div className="flex items-center justify-center py-8">
                       <div className="text-center">
                         <div className="mx-auto mb-4 h-8 w-8 animate-spin rounded-full border-b-2 border-primary"></div>
-                        <p className="text-muted-foreground">Loading invoice history...</p>
+                        <p className="text-muted-foreground">
+                          {t('cashier.dashboard.history.loading')}
+                        </p>
                       </div>
                     </div>
                   ) : historyError ? (
@@ -2192,13 +2177,15 @@ const CashierDashboard = () => {
                           size="sm"
                           className="mt-4"
                         >
-                          Retry
+                          {t('cashier.dashboard.history.retry')}
                         </Button>
                       </div>
                     </div>
                   ) : invoiceHistory.length === 0 ? (
                     <div className="flex items-center justify-center py-8">
-                      <p className="text-muted-foreground">No completed invoices found</p>
+                      <p className="text-muted-foreground">
+                        {t('cashier.dashboard.history.noInvoices')}
+                      </p>
                     </div>
                   ) : (
                     <div className="space-y-4">

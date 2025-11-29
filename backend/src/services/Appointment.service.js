@@ -11,7 +11,7 @@ class AppointmentService {
   async getAllAppointments(filters = {}) {
     const { date, patient_id, doctor_id, status } = filters;
 
-    // If we have multiple filters, use the combined method
+    // Multiple filters use the combined method
     if ((patient_id && date) || status) {
       return this.appointmentModel.getWithFilters(filters);
     }

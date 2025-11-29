@@ -15,27 +15,38 @@ const NotificationBell = () => {
   const [loading, setLoading] = useState(false);
   const dropdownRef = useRef(null);
   const queryClient = useQueryClient();
+  const previousCountRef = useRef(0);
 
-  // React Query: unread count polling with auth guard
+  useEffect(() => {
+    setNotifications([]);
+    setUnreadCount(0);
+    previousCountRef.current = 0;
+
+    return () => {
+      previousCountRef.current = 0;
+    };
+  }, []);
+
   const unreadQuery = useQuery({
     queryKey: ['notifications', 'unreadCount'],
     queryFn: () => notificationService.getUnreadCount(),
     enabled: isAuthed(),
     refetchInterval: POLLING_INTERVALS.NOTIFICATIONS,
-    refetchIntervalInBackground: true,
-    refetchOnWindowFocus: false,
+    refetchIntervalInBackground: false,
+    refetchOnWindowFocus: true,
+    staleTime: 10000,
   });
 
   useEffect(() => {
-    // Backend returns: { success: true, data: { count: number } }
-    // apiService.get() returns the full response, so we need to access data.data.count
     const c = unreadQuery.data?.data?.count ?? unreadQuery.data?.count;
-    const previousCount = unreadCount;
 
     if (typeof c === 'number') {
-      setUnreadCount(c);
+      const previousCount = previousCountRef.current;
 
-      // Show browser notification when new notifications arrive
+      if (c !== unreadCount) {
+        setUnreadCount(c);
+      }
+
       if (c > previousCount && previousCount > 0) {
         const newCount = c - previousCount;
         browserNotifications.showNotification(
@@ -44,34 +55,32 @@ const NotificationBell = () => {
           'info'
         );
       }
+
+      previousCountRef.current = c;
     } else if (unreadQuery.data && !unreadQuery.isError) {
-      // If we got a response but no count, reset to 0
-      setUnreadCount(0);
+      if (unreadCount !== 0) {
+        setUnreadCount(0);
+      }
+      previousCountRef.current = 0;
     }
   }, [unreadQuery.data, unreadQuery.isError]);
 
-  // Fetch notifications
   const fetchNotifications = async () => {
     try {
       setLoading(true);
       const response = await notificationService.getNotifications(10);
-      // Backend returns: { success: true, data: [...] }
-      // notificationService.getNotifications() returns response.data which is { success: true, data: [...] }
       const newNotifications = response?.data || (Array.isArray(response) ? response : []);
 
-      // Check for new notifications and show browser alerts
       setNotifications((prevNotifications) => {
         if (prevNotifications.length > 0) {
           const previousIds = new Set(prevNotifications.map((n) => n.id));
           const newOnes = newNotifications.filter((n) => !previousIds.has(n.id));
 
           newOnes.forEach((notification) => {
-            // Show browser notification for important types
             if (
               notification.type === 'warning' ||
               notification.related_entity_type === 'queue_token'
             ) {
-              // Queue turn notification
               if (
                 notification.title.includes('Turn') ||
                 notification.title.includes('called') ||
@@ -88,7 +97,6 @@ const NotificationBell = () => {
                 );
               }
             } else if (notification.related_entity_type === 'appointment') {
-              // Appointment reminder
               browserNotifications.showAppointmentReminder('', notification.message);
             }
           });
@@ -98,35 +106,28 @@ const NotificationBell = () => {
       });
     } catch (error) {
       logger.error('Error fetching notifications:', error);
-      setNotifications([]); // Set empty array on error
+      setNotifications([]);
     } finally {
       setLoading(false);
     }
   };
 
-  // Mark notification as read
   const handleMarkAsRead = async (notificationId) => {
     try {
       await notificationService.markAsRead(notificationId);
 
-      // Update local state immediately for better UX
       setNotifications((prev) =>
         prev.map((notif) => (notif.id === notificationId ? { ...notif, is_read: true } : notif))
       );
 
-      // Decrease unread count optimistically
       setUnreadCount((prev) => Math.max(0, prev - 1));
-
-      // Invalidate and refetch unread count query to sync with server
       await queryClient.invalidateQueries({ queryKey: ['notifications', 'unreadCount'] });
 
-      // Refetch notifications list to ensure UI is in sync
       if (isOpen) {
         await fetchNotifications();
       }
     } catch (error) {
       logger.error('Error marking notification as read:', error);
-      // Revert optimistic update on error
       await queryClient.invalidateQueries({ queryKey: ['notifications', 'unreadCount'] });
       if (isOpen) {
         await fetchNotifications();
@@ -134,27 +135,19 @@ const NotificationBell = () => {
     }
   };
 
-  // Mark all as read
   const handleMarkAllAsRead = async () => {
     try {
       await notificationService.markAllAsRead();
 
-      // Update local state immediately for better UX
       setNotifications((prev) => prev.map((notif) => ({ ...notif, is_read: true })));
-
-      // Reset unread count optimistically
       setUnreadCount(0);
-
-      // Invalidate and refetch unread count query to sync with server
       await queryClient.invalidateQueries({ queryKey: ['notifications', 'unreadCount'] });
 
-      // Refetch notifications list to ensure UI is in sync
       if (isOpen) {
         await fetchNotifications();
       }
     } catch (error) {
       logger.error('Error marking all as read:', error);
-      // Revert optimistic update on error
       await queryClient.invalidateQueries({ queryKey: ['notifications', 'unreadCount'] });
       if (isOpen) {
         await fetchNotifications();
@@ -162,7 +155,6 @@ const NotificationBell = () => {
     }
   };
 
-  // Toggle dropdown
   const toggleDropdown = () => {
     if (!isOpen) {
       fetchNotifications();
@@ -170,7 +162,6 @@ const NotificationBell = () => {
     setIsOpen(!isOpen);
   };
 
-  // Close dropdown when clicking outside
   useEffect(() => {
     const handleClickOutside = (event) => {
       if (dropdownRef.current && !dropdownRef.current.contains(event.target)) {
@@ -187,9 +178,6 @@ const NotificationBell = () => {
     };
   }, [isOpen]);
 
-  // Remove manual polling; handled by React Query above
-
-  // Format timestamp
   const formatTime = (timestamp) => {
     const date = new Date(timestamp);
     const now = new Date();
@@ -208,7 +196,6 @@ const NotificationBell = () => {
     return date.toLocaleDateString();
   };
 
-  // Get notification icon color based on type
   const getNotificationColor = (type) => {
     switch (type) {
       case 'success':

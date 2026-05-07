@@ -38,9 +38,6 @@ services:
     restart: unless-stopped
     ports:
       - '80:80'
-      - '443:443'
-    environment:
-      API_HOST: ${API_HOST:-34.21.133.28.sslip.io}
     volumes:
       - ./Caddyfile:/etc/caddy/Caddyfile:ro
       - caddy-data:/data

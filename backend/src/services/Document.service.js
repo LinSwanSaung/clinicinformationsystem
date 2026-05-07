@@ -1,6 +1,11 @@
 import { BaseModel } from '../models/BaseModel.js';
 import { supabase } from '../config/database.js';
 import logger from '../config/logger.js';
+import {
+  deleteUploadedFile,
+  getUploadedFileUrl,
+  saveUploadedFile,
+} from '../utils/localStorage.js';
 
 /**
  * Document Service
@@ -29,23 +34,7 @@ class DocumentService {
       const fileExtension = fileName.split('.').pop();
       const uniqueFileName = `${patientId}/${crypto.randomUUID()}.${fileExtension}`;
 
-      // Upload to Supabase Storage
-      const { data: _data, error: uploadError } = await supabase.storage
-        .from(this.storageBucket)
-        .upload(uniqueFileName, fileBuffer, {
-          contentType: mimeType,
-          upsert: false,
-        });
-
-      if (uploadError) {
-        logger.error('Supabase upload error:', uploadError);
-        throw new Error(`Failed to upload file: ${uploadError.message}`);
-      }
-
-      // Get public URL
-      const {
-        data: { publicUrl },
-      } = supabase.storage.from(this.storageBucket).getPublicUrl(uniqueFileName);
+      const { publicUrl } = await saveUploadedFile(fileBuffer, uniqueFileName);
 
       // Store document metadata in database
       const documentData = {
@@ -67,7 +56,7 @@ class DocumentService {
       if (dbError) {
         logger.error('Database insert error:', dbError);
         // Try to delete the uploaded file
-        await supabase.storage.from(this.storageBucket).remove([uniqueFileName]);
+        await deleteUploadedFile(uniqueFileName);
         throw new Error(`Failed to save document metadata: ${dbError.message}`);
       }
 
@@ -111,10 +100,7 @@ class DocumentService {
    * @returns {string} Public URL
    */
   getDocumentPublicUrl(filePath) {
-    const {
-      data: { publicUrl },
-    } = supabase.storage.from(this.storageBucket).getPublicUrl(filePath);
-    return publicUrl;
+    return getUploadedFileUrl(filePath);
   }
 
   /**
@@ -168,15 +154,9 @@ class DocumentService {
         throw new Error('Document not found');
       }
 
-      // Delete from storage
-      const { error: storageError } = await supabase.storage
-        .from(this.storageBucket)
-        .remove([doc.file_path]);
-
-      if (storageError) {
-        logger.error('Storage deletion error:', storageError);
-        // Continue with database deletion even if storage deletion fails
-      }
+      await deleteUploadedFile(doc.file_path).catch((error) => {
+        logger.error('Storage deletion error:', error);
+      });
 
       // Delete from database
       const { error: dbError } = await supabase.from(this.tableName).delete().eq('id', documentId);

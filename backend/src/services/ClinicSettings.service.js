@@ -1,6 +1,7 @@
 import { BaseModel } from '../models/BaseModel.js';
 import { supabase } from '../config/database.js';
 import logger from '../config/logger.js';
+import { saveUploadedFile } from '../utils/localStorage.js';
 
 class ClinicSettingsService {
   constructor() {
@@ -122,33 +123,17 @@ class ClinicSettingsService {
    * @param {string} mimeType - File MIME type
    * @returns {Promise<{publicUrl: string, filePath: string}>}
    */
-  async uploadLogo(fileBuffer, fileName, mimeType) {
+  async uploadLogo(fileBuffer, fileName, _mimeType) {
     try {
       const crypto = (await import('crypto')).default;
       const fileExtension = fileName.split('.').pop();
       const uniqueFileName = `logo/${Date.now()}-${crypto.randomUUID()}.${fileExtension}`;
 
-      // Upload to Supabase Storage
-      const { data: _data, error: uploadError } = await supabase.storage
-        .from('clinic-assets')
-        .upload(uniqueFileName, fileBuffer, {
-          contentType: mimeType,
-          upsert: false,
-        });
-
-      if (uploadError) {
-        logger.error('Supabase upload error:', uploadError);
-        throw new Error(`Failed to upload logo: ${uploadError.message}`);
-      }
-
-      // Get public URL
-      const {
-        data: { publicUrl },
-      } = supabase.storage.from('clinic-assets').getPublicUrl(uniqueFileName);
+      const { publicUrl } = await saveUploadedFile(fileBuffer, `clinic-assets/${uniqueFileName}`);
 
       return {
         publicUrl,
-        filePath: uniqueFileName,
+        filePath: `clinic-assets/${uniqueFileName}`,
       };
     } catch (error) {
       logger.error('Error in ClinicSettingsService.uploadLogo:', error);
@@ -163,33 +148,17 @@ class ClinicSettingsService {
    * @param {string} mimeType - File MIME type
    * @returns {Promise<{publicUrl: string, filePath: string}>}
    */
-  async uploadQRCode(fileBuffer, fileName, mimeType) {
+  async uploadQRCode(fileBuffer, fileName, _mimeType) {
     try {
       const crypto = (await import('crypto')).default;
       const fileExtension = fileName.split('.').pop();
       const uniqueFileName = `qr-codes/${Date.now()}-${crypto.randomUUID()}.${fileExtension}`;
 
-      // Upload to Supabase Storage
-      const { data: _data, error: uploadError } = await supabase.storage
-        .from('clinic-assets')
-        .upload(uniqueFileName, fileBuffer, {
-          contentType: mimeType,
-          upsert: false,
-        });
-
-      if (uploadError) {
-        logger.error('Supabase upload error:', uploadError);
-        throw new Error(`Failed to upload QR code: ${uploadError.message}`);
-      }
-
-      // Get public URL
-      const {
-        data: { publicUrl },
-      } = supabase.storage.from('clinic-assets').getPublicUrl(uniqueFileName);
+      const { publicUrl } = await saveUploadedFile(fileBuffer, `clinic-assets/${uniqueFileName}`);
 
       return {
         publicUrl,
-        filePath: uniqueFileName,
+        filePath: `clinic-assets/${uniqueFileName}`,
       };
     } catch (error) {
       logger.error('Error in ClinicSettingsService.uploadQRCode:', error);

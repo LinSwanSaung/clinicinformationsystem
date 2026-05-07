@@ -49,13 +49,17 @@ const LANGUAGE_CONFIGS = {
 
 class AIService {
   constructor() {
-    // Initialize OpenAI client with GitHub Models endpoint
-    this.client = new OpenAI({
-      baseURL: process.env.AI_BASE_URL || 'https://models.github.ai/inference',
-      apiKey: process.env.GITHUB_TOKEN,
-    });
+    const apiKey = process.env.GITHUB_TOKEN || process.env.OPENAI_API_KEY;
+    this.client = apiKey
+      ? new OpenAI({
+          baseURL: process.env.AI_BASE_URL || 'https://models.github.ai/inference',
+          apiKey,
+        })
+      : null;
     this.model = process.env.AI_MODEL || 'gpt-4o-mini';
-    // AIService initialized with GitHub Models
+    if (!this.client) {
+      logger.warn('[AIService] AI credentials are not configured. AI features will be disabled.');
+    }
   }
 
   getLanguageConfig(language) {
@@ -72,6 +76,10 @@ class AIService {
     language = 'en'
   ) {
     try {
+      if (!this.client) {
+        throw new Error('AI service is not configured');
+      }
+
       const langConfig = this.getLanguageConfig(language);
       const { headings } = langConfig;
 
@@ -128,6 +136,10 @@ Keep paragraphs short (1-2 sentences each) and use bullet lists where it improve
 
   async generateWellnessTips(language = 'en') {
     try {
+      if (!this.client) {
+        throw new Error('AI service is not configured');
+      }
+
       const langConfig = this.getLanguageConfig(language);
       const sections = langConfig.wellnessSections;
 

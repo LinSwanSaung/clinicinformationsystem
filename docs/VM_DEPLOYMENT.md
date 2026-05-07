@@ -52,6 +52,7 @@ nano deploy/vm/.env
 Set at least:
 
 - `POSTGRES_PASSWORD`
+- `API_HOST`
 - `JWT_SECRET`
 - `CLIENT_URL`
 - `PUBLIC_API_URL`
@@ -69,10 +70,10 @@ Check the API:
 curl https://your-api-domain.com/health
 ```
 
-If you do not have a domain yet, use the raw VM IP over HTTP:
+If you do not have a domain yet, use `sslip.io`, which maps the hostname to your VM IP:
 
 ```bash
-curl http://34.21.133.28/health
+curl https://34.21.133.28.sslip.io/health
 ```
 
 ## Vercel Frontend
@@ -83,10 +84,10 @@ Set this environment variable in Vercel:
 VITE_API_URL=https://your-api-domain.com/api
 ```
 
-Without a domain, use:
+Without a purchased domain, use:
 
 ```bash
-VITE_API_URL=http://34.21.133.28/api
+VITE_API_URL=https://34.21.133.28.sslip.io/api
 ```
 
 Then redeploy the frontend.

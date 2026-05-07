@@ -4,6 +4,7 @@ This setup is for a single GCP VM running:
 
 - Express backend
 - PostgreSQL
+- PostgREST bridge for the existing Supabase-style query calls
 - Caddy reverse proxy
 - Local upload storage mounted as a Docker volume
 
@@ -20,7 +21,7 @@ Done:
 Still to migrate:
 
 - The database query layer still uses `@supabase/supabase-js` in many models and repositories.
-- `DATABASE_URL` and PostgreSQL are scaffolded, but the backend is not fully switched to direct PostgreSQL yet.
+- The VM stack runs PostgREST so the existing `@supabase/supabase-js` query calls can talk to local PostgreSQL during migration.
 
 ## VM Setup
 
@@ -102,3 +103,5 @@ Then redeploy the frontend.
 5. Export hosted Supabase data with `pg_dump`.
 6. Restore into VM PostgreSQL.
 7. Remove `SUPABASE_*` env vars and `@supabase/supabase-js`.
+
+The current VM setup uses PostgREST as a bridge, so the direct `pg` refactor can happen gradually instead of blocking deployment.

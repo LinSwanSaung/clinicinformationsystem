@@ -4,7 +4,6 @@ This setup is for a single GCP VM running:
 
 - Express backend
 - PostgreSQL
-- PostgREST bridge for the existing Supabase-style query calls
 - Caddy reverse proxy
 - Local upload storage mounted as a Docker volume
 
@@ -17,11 +16,8 @@ Done:
 - Backend has a Dockerfile.
 - VM Docker Compose scaffold exists in `deploy/vm`.
 - Uploaded documents, clinic logos, and payment QR codes can use VM-local storage through `/uploads`.
-
-Still to migrate:
-
-- The database query layer still uses `@supabase/supabase-js` in many models and repositories.
-- The VM stack runs PostgREST so the existing `@supabase/supabase-js` query calls can talk to local PostgreSQL during migration.
+- Backend database calls now go directly to PostgreSQL through `pg`.
+- The VM stack no longer runs PostgREST or uses hosted Supabase env vars.
 
 ## VM Setup
 
@@ -101,14 +97,7 @@ In that setup, do not set `VITE_API_URL` in Vercel, or set it to `/api`.
 
 Then redeploy the frontend.
 
-## Database Cutover Plan
+## Database Notes
 
-1. Add a PostgreSQL client using `pg`.
-2. Replace `backend/src/config/database.js` with a pool exported from `DATABASE_URL`.
-3. Convert `BaseModel` CRUD helpers first.
-4. Convert custom repositories and complex nested Supabase selects.
-5. Export hosted Supabase data with `pg_dump`.
-6. Restore into VM PostgreSQL.
-7. Remove `SUPABASE_*` env vars and `@supabase/supabase-js`.
-
-The current VM setup uses PostgREST as a bridge, so the direct `pg` refactor can happen gradually instead of blocking deployment.
+The backend reads `DATABASE_URL` and connects directly to the `postgres` Docker service.
+The old hosted Supabase variables are not needed for the VM deployment.

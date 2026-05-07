@@ -76,6 +76,13 @@ If you do not have a domain yet, use the raw VM IP over HTTP:
 curl http://34.21.133.28/health
 ```
 
+Load demo users:
+
+```bash
+cd deploy/vm
+docker compose exec -T postgres psql -U thrivecare -d thrivecare < seed-demo-users.sql
+```
+
 ## Vercel Frontend
 
 Set this environment variable in Vercel:

@@ -23,9 +23,37 @@ const fkTargets = {
   doctor_note_id: 'doctor_notes',
 };
 
+const relationSources = {
+  appointments: { patients: 'patient_id', users: 'doctor_id' },
+  audit_logs: { users: 'user_id' },
+  doctor_availability: { users: 'doctor_id' },
+  doctor_notes: { patients: 'patient_id', users: 'doctor_id', visits: 'visit_id' },
+  invoices: { patients: 'patient_id', visits: 'visit_id' },
+  payment_transactions: { invoices: 'invoice_id', users: 'received_by' },
+  prescriptions: {
+    patients: 'patient_id',
+    users: 'doctor_id',
+    visits: 'visit_id',
+    doctor_notes: 'doctor_note_id',
+  },
+  queue_tokens: {
+    patients: 'patient_id',
+    users: 'doctor_id',
+    appointments: 'appointment_id',
+    visits: 'visit_id',
+  },
+  users: { patients: 'patient_id' },
+  visits: { patients: 'patient_id', users: 'doctor_id', appointments: 'appointment_id' },
+  vitals: { patients: 'patient_id', users: 'recorded_by', visits: 'visit_id' },
+};
+
 const singular = (table) => {
-  if (table.endsWith('ies')) {return `${table.slice(0, -3)}y`;}
-  if (table.endsWith('s')) {return table.slice(0, -1);}
+  if (table.endsWith('ies')) {
+    return `${table.slice(0, -3)}y`;
+  }
+  if (table.endsWith('s')) {
+    return table.slice(0, -1);
+  }
   return table;
 };
 
@@ -42,26 +70,39 @@ const splitTopLevel = (value = '') => {
   let current = '';
 
   for (const char of value) {
-    if (char === '(') {depth += 1;}
-    if (char === ')') {depth -= 1;}
+    if (char === '(') {
+      depth += 1;
+    }
+    if (char === ')') {
+      depth -= 1;
+    }
 
     if (char === ',' && depth === 0) {
-      if (current.trim()) {parts.push(current.trim());}
+      if (current.trim()) {
+        parts.push(current.trim());
+      }
       current = '';
       continue;
     }
     current += char;
   }
 
-  if (current.trim()) {parts.push(current.trim());}
+  if (current.trim()) {
+    parts.push(current.trim());
+  }
   return parts;
 };
 
-const normalizeSelect = (select = '*') => String(select || '*').replace(/\s+/g, ' ').trim();
+const normalizeSelect = (select = '*') =>
+  String(select || '*')
+    .replace(/\s+/g, ' ')
+    .trim();
 
 const parseRelation = (part) => {
   const openIndex = part.indexOf('(');
-  if (openIndex < 0) {return null;}
+  if (openIndex < 0) {
+    return null;
+  }
 
   const relationSpec = part.slice(0, openIndex).trim();
   const inner = part.slice(openIndex + 1, part.lastIndexOf(')')).trim();
@@ -117,7 +158,9 @@ const parseSelect = (select = '*') => {
 };
 
 const parseConstraintHint = (hint) => {
-  if (!hint || hint === 'inner' || hint === 'left') {return null;}
+  if (!hint || hint === 'inner' || hint === 'left') {
+    return null;
+  }
   const match = hint.match(/^[a-z_]+_(.+)_fkey$/i);
   return match?.[1] || hint;
 };
@@ -130,7 +173,9 @@ const makeDbError = (error) => ({
 });
 
 const normalizeValue = (value) => {
-  if (value instanceof Date) {return value.toISOString();}
+  if (value instanceof Date) {
+    return value.toISOString();
+  }
   return value;
 };
 
@@ -271,9 +316,15 @@ class PostgresQueryBuilder {
 
   async execute() {
     try {
-      if (this.operation === 'insert') {return await this.executeInsert();}
-      if (this.operation === 'update') {return await this.executeUpdate();}
-      if (this.operation === 'delete') {return await this.executeDelete();}
+      if (this.operation === 'insert') {
+        return await this.executeInsert();
+      }
+      if (this.operation === 'update') {
+        return await this.executeUpdate();
+      }
+      if (this.operation === 'delete') {
+        return await this.executeDelete();
+      }
       return await this.executeSelect();
     } catch (error) {
       return { data: null, error: makeDbError(error), count: null };
@@ -290,7 +341,9 @@ class PostgresQueryBuilder {
       }
 
       const clause = this.buildFilterClause(filter, params, baseAlias);
-      if (clause) {clauses.push(clause);}
+      if (clause) {
+        clauses.push(clause);
+      }
     }
 
     return clauses.length ? `WHERE ${clauses.join(' AND ')}` : '';
@@ -313,11 +366,15 @@ class PostgresQueryBuilder {
       hint: null,
     };
     const join = this.inferJoin({}, this.table, relation);
-    if (!join) {return 'TRUE';}
+    if (!join) {
+      return 'TRUE';
+    }
 
     const column = `r.${quoteIdent(relationColumn)}`;
     const clause = this.operatorClause(column, filter.operator, filter.value, params);
-    if (!clause) {return 'TRUE';}
+    if (!clause) {
+      return 'TRUE';
+    }
 
     if (join.type === 'direct') {
       return `EXISTS (SELECT 1 FROM ${quoteIdent(join.target)} r WHERE r.id = t.${quoteIdent(join.sourceColumn)} AND ${clause})`;
@@ -329,12 +386,16 @@ class PostgresQueryBuilder {
     const normalizedOperator = operator.toUpperCase();
 
     if (normalizedOperator === 'IS') {
-      if (value === null) {return `${columnSql} IS NULL`;}
+      if (value === null) {
+        return `${columnSql} IS NULL`;
+      }
       return `${columnSql} IS ${value}`;
     }
 
     if (normalizedOperator === 'NOT IS') {
-      if (value === null) {return `${columnSql} IS NOT NULL`;}
+      if (value === null) {
+        return `${columnSql} IS NOT NULL`;
+      }
       return `${columnSql} IS NOT ${value}`;
     }
 
@@ -346,7 +407,9 @@ class PostgresQueryBuilder {
             .split(',')
             .map((item) => item.trim())
             .filter(Boolean);
-      if (!values.length) {return normalizedOperator === 'IN' ? 'FALSE' : 'TRUE';}
+      if (!values.length) {
+        return normalizedOperator === 'IN' ? 'FALSE' : 'TRUE';
+      }
       const placeholders = values.map((item) => {
         params.push(normalizeValue(item));
         return `$${params.length}`;
@@ -372,7 +435,12 @@ class PostgresQueryBuilder {
         like: 'LIKE',
         ilike: 'ILIKE',
       };
-      return this.operatorClause(`${baseAlias}.${quoteIdent(column)}`, opMap[operator] || '=', value, params);
+      return this.operatorClause(
+        `${baseAlias}.${quoteIdent(column)}`,
+        opMap[operator] || '=',
+        value,
+        params
+      );
     });
     return `(${clauses.join(' OR ')})`;
   }
@@ -383,7 +451,15 @@ class PostgresQueryBuilder {
       return { sql: 't.*', parsed };
     }
 
-    const columns = parsed.columns.map((column) => {
+    const neededColumns = [...parsed.columns];
+    for (const relation of parsed.relations) {
+      const sourceColumn = this.resolveDirectSourceColumn(this.table, relation);
+      if (sourceColumn && !neededColumns.includes(sourceColumn)) {
+        neededColumns.push(sourceColumn);
+      }
+    }
+
+    const columns = neededColumns.map((column) => {
       const cleanColumn = column.trim();
       if (cleanColumn.includes(':')) {
         const [alias, source] = cleanColumn.split(':').map((part) => part.trim());
@@ -401,7 +477,13 @@ class PostgresQueryBuilder {
     const where = this.buildWhere(params);
     const order = this.orders.length
       ? `ORDER BY ${this.orders
-          .map((item) => `t.${quoteIdent(item.column)} ${item.ascending ? 'ASC' : 'DESC'}`)
+          .flatMap((item) =>
+            String(item.column)
+              .split(',')
+              .map((column) => column.trim())
+              .filter(Boolean)
+              .map((column) => `t.${quoteIdent(column)} ${item.ascending ? 'ASC' : 'DESC'}`)
+          )
           .join(', ')}`
       : '';
 
@@ -495,7 +577,10 @@ class PostgresQueryBuilder {
   async executeDelete() {
     const params = [];
     const where = this.buildWhere(params);
-    const result = await this.client.query(`DELETE FROM ${quoteIdent(this.table)} t ${where}`, params);
+    const result = await this.client.query(
+      `DELETE FROM ${quoteIdent(this.table)} t ${where}`,
+      params
+    );
     return { data: null, error: null, count: result.rowCount };
   }
 
@@ -513,10 +598,17 @@ class PostgresQueryBuilder {
 
   inferJoin(row, baseTable, relation) {
     let hint = parseConstraintHint(relation.hint);
-    if (hint === 'inner' || hint === 'left') {hint = null;}
+    if (hint === 'inner' || hint === 'left') {
+      hint = null;
+    }
 
     if (hint && fkTargets[hint]) {
       return { type: 'direct', sourceColumn: hint, target: fkTargets[hint] };
+    }
+
+    const mappedSource = this.resolveDirectSourceColumn(baseTable, relation);
+    if (mappedSource) {
+      return { type: 'direct', sourceColumn: mappedSource, target: relation.target };
     }
 
     const directCandidates = [
@@ -539,12 +631,24 @@ class PostgresQueryBuilder {
     };
   }
 
+  resolveDirectSourceColumn(baseTable, relation) {
+    const hint = parseConstraintHint(relation.hint);
+    if (hint && fkTargets[hint]) {
+      return hint;
+    }
+    return relationSources[baseTable]?.[relation.target] || null;
+  }
+
   async hydrateRows(rows, baseTable, relations) {
-    if (!rows.length) {return rows;}
+    if (!rows.length) {
+      return rows;
+    }
 
     for (const relation of relations) {
       const join = this.inferJoin(rows[0], baseTable, relation);
-      if (!join) {continue;}
+      if (!join) {
+        continue;
+      }
 
       if (join.type === 'direct') {
         await this.hydrateDirect(rows, relation, join);
@@ -569,7 +673,9 @@ class PostgresQueryBuilder {
       .select(this.selectFromParsed(relation.parsedSelect, ['id']))
       .in('id', ids);
     const { data, error } = await query.execute();
-    if (error) {throw new Error(error.message);}
+    if (error) {
+      throw new Error(error.message);
+    }
     const map = new Map((data || []).map((record) => [record.id, record]));
     rows.forEach((row) => {
       row[relation.outputKey] = map.get(row[join.sourceColumn]) || null;
@@ -589,11 +695,15 @@ class PostgresQueryBuilder {
       .select(this.selectFromParsed(relation.parsedSelect, [join.targetColumn]))
       .in(join.targetColumn, ids);
     const { data, error } = await query.execute();
-    if (error) {throw new Error(error.message);}
+    if (error) {
+      throw new Error(error.message);
+    }
     const grouped = new Map();
     for (const record of data || []) {
       const key = record[join.targetColumn];
-      if (!grouped.has(key)) {grouped.set(key, []);}
+      if (!grouped.has(key)) {
+        grouped.set(key, []);
+      }
       grouped.get(key).push(record);
     }
     rows.forEach((row) => {
@@ -605,12 +715,17 @@ class PostgresQueryBuilder {
     const columns = [...parsed.columns];
     if (!columns.includes('*')) {
       for (const requiredColumn of requiredColumns) {
-        if (!columns.includes(requiredColumn)) {columns.unshift(requiredColumn);}
+        if (!columns.includes(requiredColumn)) {
+          columns.unshift(requiredColumn);
+        }
       }
     }
     const columnSelect = columns.length ? columns.join(', ') : '*';
     const relations = parsed.relations
-      .map((relation) => `${relation.outputKey}:${relation.target}${relation.hint ? `!${relation.hint}` : ''}(${this.selectFromParsed(relation.parsedSelect)})`)
+      .map(
+        (relation) =>
+          `${relation.outputKey}:${relation.target}${relation.hint ? `!${relation.hint}` : ''}(${this.selectFromParsed(relation.parsedSelect)})`
+      )
       .join(', ');
     return [columnSelect, relations].filter(Boolean).join(', ');
   }
@@ -627,7 +742,10 @@ export class PostgresSupabaseCompatClient {
 
   async rpc(functionName, params = {}) {
     try {
-      if (functionName === 'get_doctor_availability_12hr' && Object.keys(params || {}).length === 0) {
+      if (
+        functionName === 'get_doctor_availability_12hr' &&
+        Object.keys(params || {}).length === 0
+      ) {
         const result = await this.pool.query(`
           SELECT
             da.id,

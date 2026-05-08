@@ -199,7 +199,7 @@ router.get('/late-threshold', authenticate, async (req, res) => {
 
 /**
  * @route   POST /api/clinic-settings/upload-logo
- * @desc    Upload clinic logo to Supabase Storage
+ * @desc    Upload clinic logo to configured file storage
  * @access  Private (Admin only)
  */
 router.post(
@@ -241,7 +241,7 @@ router.post(
 
 /**
  * @route   POST /api/clinic-settings/upload-qr-code
- * @desc    Upload payment QR code image to Supabase Storage
+ * @desc    Upload payment QR code image to configured file storage
  * @access  Private (Admin only)
  */
 router.post(

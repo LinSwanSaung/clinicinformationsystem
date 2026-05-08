@@ -39,20 +39,9 @@ export const authenticate = asyncHandler(async (req, res, next) => {
       return next();
     }
 
-    // Verify JWT token (support app-issued or Supabase-issued tokens)
-    let decoded;
-    try {
-      decoded = jwt.verify(token, config.jwt.secret);
-    } catch (primaryError) {
-      const supabaseSecret = process.env.SUPABASE_JWT_SECRET;
-      if (!supabaseSecret) {
-        throw primaryError;
-      }
-      decoded = jwt.verify(token, supabaseSecret);
-    }
+    const decoded = jwt.verify(token, config.jwt.secret);
 
-    // Get user from database with retry logic for network resilience
-    const userId = decoded.userId || decoded.sub; // support both token payload and supabase subject
+    const userId = decoded.userId || decoded.sub;
     let user, error;
     try {
       const result = await executeWithRetry(
@@ -69,7 +58,7 @@ export const authenticate = asyncHandler(async (req, res, next) => {
       user = result.data;
       error = result.error;
     } catch (networkError) {
-      // Handle network connectivity issues (e.g., VPN blocking Supabase)
+      // Handle database connectivity issues
       const errMsg = networkError?.message?.toLowerCase() || '';
       if (
         errMsg.includes('fetch failed') ||
@@ -80,7 +69,7 @@ export const authenticate = asyncHandler(async (req, res, next) => {
         errMsg.includes('abort')
       ) {
         throw new AppError(
-          'Database connection failed. Please check your network connection or try disabling VPN.',
+          'Database connection failed. Please try again shortly.',
           503
         );
       }

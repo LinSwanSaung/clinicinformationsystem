@@ -30,6 +30,24 @@
 CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
 CREATE EXTENSION IF NOT EXISTS pgcrypto;
 
+-- Supabase compatibility roles for local PostgreSQL installs.
+-- Supabase creates these automatically; plain PostgreSQL on the VM does not.
+DO $$
+BEGIN
+    IF NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'authenticated') THEN
+        CREATE ROLE authenticated NOLOGIN;
+    END IF;
+
+    IF NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'service_role') THEN
+        CREATE ROLE service_role NOLOGIN;
+    END IF;
+
+    IF NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'anon') THEN
+        CREATE ROLE anon NOLOGIN;
+    END IF;
+END
+$$;
+
 -- ===============================================
 -- PATIENTS TABLE (Created FIRST - referenced by users.patient_id)
 -- ===============================================
@@ -193,6 +211,23 @@ CREATE TABLE IF NOT EXISTS vitals (
 );
 
 -- ===============================================
+-- DOCTOR NOTES TABLE (Created BEFORE prescriptions - referenced by prescriptions.doctor_note_id)
+-- ===============================================
+CREATE TABLE IF NOT EXISTS doctor_notes (
+    id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
+    visit_id UUID NOT NULL REFERENCES visits(id) ON DELETE CASCADE,
+    patient_id UUID NOT NULL REFERENCES patients(id) ON DELETE CASCADE,
+    doctor_id UUID NOT NULL REFERENCES users(id),
+    note_type VARCHAR(50),
+    content TEXT NOT NULL,
+    is_private BOOLEAN DEFAULT false,
+    created_at TIMESTAMPTZ DEFAULT NOW(),
+    updated_at TIMESTAMPTZ DEFAULT NOW(),
+    
+    CONSTRAINT valid_note_type CHECK (note_type IN ('assessment', 'plan', 'observation', 'follow_up', 'general'))
+);
+
+-- ===============================================
 -- PRESCRIPTIONS TABLE
 -- ===============================================
 CREATE TABLE IF NOT EXISTS prescriptions (
@@ -226,23 +261,6 @@ CREATE TABLE IF NOT EXISTS prescriptions (
     CONSTRAINT valid_refills CHECK (refills >= 0 AND refills <= 12),
     CONSTRAINT valid_quantity CHECK (quantity IS NULL OR quantity > 0),
     CONSTRAINT valid_date_range CHECK (end_date IS NULL OR start_date IS NULL OR end_date >= start_date)
-);
-
--- ===============================================
--- DOCTOR NOTES TABLE
--- ===============================================
-CREATE TABLE IF NOT EXISTS doctor_notes (
-    id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
-    visit_id UUID NOT NULL REFERENCES visits(id) ON DELETE CASCADE,
-    patient_id UUID NOT NULL REFERENCES patients(id) ON DELETE CASCADE,
-    doctor_id UUID NOT NULL REFERENCES users(id),
-    note_type VARCHAR(50),
-    content TEXT NOT NULL,
-    is_private BOOLEAN DEFAULT false,
-    created_at TIMESTAMPTZ DEFAULT NOW(),
-    updated_at TIMESTAMPTZ DEFAULT NOW(),
-    
-    CONSTRAINT valid_note_type CHECK (note_type IN ('assessment', 'plan', 'observation', 'follow_up', 'general'))
 );
 
 -- ===============================================

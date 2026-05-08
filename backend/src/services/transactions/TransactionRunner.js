@@ -1,8 +1,7 @@
 /**
  * Transaction Runner Utility
  *
- * Since Supabase JS client doesn't support native transactions,
- * we use a compensation pattern: execute operations and rollback on failure.
+ * Lightweight compensation-based transaction runner.
  *
  * For true atomicity, use database RPC functions (see db/functions/).
  * This utility provides a service-layer transaction-like pattern.

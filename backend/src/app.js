@@ -3,6 +3,7 @@ import cors from 'cors';
 import dotenv from 'dotenv';
 import helmet from 'helmet';
 import compression from 'compression';
+import { uploadRoot } from './utils/localStorage.js';
 
 // Load environment variables FIRST - before any config imports
 dotenv.config();
@@ -137,6 +138,7 @@ app.use(compression());
 // 5. Body parsers - Parse JSON and URL-encoded bodies
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true, limit: '10mb' }));
+app.use('/uploads', express.static(uploadRoot));
 
 // 6. Request logger - Log all incoming requests
 app.use(requestLogger);

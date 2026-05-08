@@ -517,8 +517,25 @@ class PostgresQueryBuilder {
       if (data.length === 0 && this.singleMode === 'maybeSingle') {
         return { data: null, error: null, count: null };
       }
-      if (data.length !== 1 && this.singleMode === 'single') {
-        return { data: null, error: { message: 'Expected a single row' }, count: null };
+      if (data.length === 0 && this.singleMode === 'single') {
+        return {
+          data: null,
+          error: {
+            message: 'JSON object requested, multiple (or no) rows returned',
+            code: 'PGRST116',
+          },
+          count: null,
+        };
+      }
+      if (data.length > 1 && this.singleMode === 'single') {
+        return {
+          data: null,
+          error: {
+            message: 'JSON object requested, multiple (or no) rows returned',
+            code: 'PGRST116',
+          },
+          count: null,
+        };
       }
       return { data: data[0] || null, error: null, count: null };
     }
@@ -568,7 +585,7 @@ class PostgresQueryBuilder {
     const where = this.buildWhere(params);
     const returning = this.shouldReturnRows ? 'RETURNING *' : '';
     const result = await this.client.query(
-      `UPDATE ${quoteIdent(this.table)} SET ${assignments.join(', ')} ${where} ${returning}`,
+      `UPDATE ${quoteIdent(this.table)} AS t SET ${assignments.join(', ')} ${where} ${returning}`,
       params
     );
     return this.formatMutationResult(result.rows);

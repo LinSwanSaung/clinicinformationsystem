@@ -57,12 +57,14 @@ class ApiService {
 
   // Health check against server root /health
   async health() {
-    // Derive API origin (strip trailing /api if present)
-    let base = this.baseURL;
-    if (base.endsWith('/api')) {
-      base = base.slice(0, -4);
-    }
-    const res = await fetch(`${base}/health`);
+    const res = await fetch(`${this.baseURL}/health`, {
+      cache: 'no-store',
+      headers: {
+        Accept: 'application/json',
+        'Cache-Control': 'no-cache',
+        Pragma: 'no-cache',
+      },
+    });
     if (!res.ok) {
       throw new Error(`Health check failed: ${res.status}`);
     }

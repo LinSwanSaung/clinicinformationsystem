@@ -157,14 +157,13 @@ app.use((req, res, next) => {
 // 8. Global rate limiter - Apply to all routes except health check
 // Health check should be exempt to allow monitoring systems to check status
 app.use((req, res, next) => {
-  if (req.path === '/health') {
+  if (req.path === '/health' || req.path === '/api/health') {
     return next(); // Skip rate limiting for health check
   }
   rateLimiter(req, res, next);
 });
 
-// Health check endpoint (includes DB connectivity) - Must be before routes
-app.get('/health', async (req, res) => {
+const healthCheckHandler = async (req, res) => {
   const dbConnected = await testConnection();
   res.status(200).json({
     status: 'OK',
@@ -175,7 +174,11 @@ app.get('/health', async (req, res) => {
       connected: dbConnected,
     },
   });
-});
+};
+
+// Health check endpoint (includes DB connectivity) - Must be before routes
+app.get('/health', healthCheckHandler);
+app.get('/api/health', healthCheckHandler);
 
 // API routes
 app.use('/api/auth', authRoutes);

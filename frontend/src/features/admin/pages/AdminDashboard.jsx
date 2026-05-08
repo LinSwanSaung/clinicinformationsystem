@@ -41,6 +41,10 @@ const AdminDashboard = () => {
     availableDoctors: [],
   });
 
+  const apiHealthy =
+    !healthLoading && !healthError && String(health?.status).toUpperCase() === 'OK';
+  const databaseHealthy = apiHealthy && health?.db?.connected === true;
+
   // Force English language for admin dashboard
   useEffect(() => {
     if (i18n.language !== 'en') {
@@ -348,13 +352,13 @@ const AdminDashboard = () => {
         ? 'Performing health check...'
         : healthError
           ? 'Health check failed'
-          : health?.db?.connected
+          : databaseHealthy
             ? 'Database connected'
             : 'Database offline',
       icon: Settings,
       color: healthLoading
         ? 'text-muted-foreground'
-        : healthError || !health?.db?.connected
+        : healthError || !databaseHealthy
           ? 'text-red-500'
           : 'text-green-500',
     },
@@ -541,31 +545,47 @@ const AdminDashboard = () => {
               </CardHeader>
               <CardContent>
                 <div className="space-y-6">
-                  <div className="flex items-center justify-between rounded-lg bg-accent p-4">
-                    <span className="text-lg font-medium text-foreground">API Status</span>
+                  <div className="flex flex-wrap items-center justify-between gap-2 rounded-lg bg-accent p-4">
+                    <span className="text-base font-medium text-foreground sm:text-lg">
+                      API Status
+                    </span>
                     {healthLoading ? (
-                      <span className="text-lg text-muted-foreground">Checking...</span>
+                      <span className="text-base text-muted-foreground sm:text-lg">
+                        Checking...
+                      </span>
                     ) : healthError ? (
-                      <span className="text-lg font-bold text-red-500">Unavailable</span>
-                    ) : (
-                      <span className="text-lg font-bold text-green-500">{health.status}</span>
-                    )}
-                  </div>
-                  <div className="flex items-center justify-between rounded-lg bg-accent p-4">
-                    <span className="text-lg font-medium text-foreground">Database Status</span>
-                    {healthLoading ? (
-                      <span className="text-lg text-muted-foreground">Checking...</span>
+                      <span className="text-base font-bold text-red-500 sm:text-lg">
+                        Unavailable
+                      </span>
                     ) : (
                       <span
-                        className={`text-lg font-bold ${health?.db?.connected ? 'text-green-500' : 'text-red-500'}`}
+                        className={`text-base font-bold sm:text-lg ${apiHealthy ? 'text-green-500' : 'text-red-500'}`}
                       >
-                        {health?.db?.connected ? 'Healthy' : 'Unavailable'}
+                        {apiHealthy ? 'Healthy' : health.status || 'Unavailable'}
                       </span>
                     )}
                   </div>
-                  <div className="flex items-center justify-between rounded-lg bg-accent p-4">
-                    <span className="text-lg font-medium text-foreground">Last Backup</span>
-                    <span className="text-lg text-muted-foreground">2 hours ago</span>
+                  <div className="flex flex-wrap items-center justify-between gap-2 rounded-lg bg-accent p-4">
+                    <span className="text-base font-medium text-foreground sm:text-lg">
+                      Database Status
+                    </span>
+                    {healthLoading ? (
+                      <span className="text-base text-muted-foreground sm:text-lg">
+                        Checking...
+                      </span>
+                    ) : (
+                      <span
+                        className={`text-base font-bold sm:text-lg ${databaseHealthy ? 'text-green-500' : 'text-red-500'}`}
+                      >
+                        {databaseHealthy ? 'Healthy' : 'Unavailable'}
+                      </span>
+                    )}
+                  </div>
+                  <div className="flex flex-wrap items-center justify-between gap-2 rounded-lg bg-accent p-4">
+                    <span className="text-base font-medium text-foreground sm:text-lg">
+                      Last Backup
+                    </span>
+                    <span className="text-base text-muted-foreground sm:text-lg">2 hours ago</span>
                   </div>
                 </div>
               </CardContent>

@@ -49,11 +49,27 @@ const LANGUAGE_CONFIGS = {
 
 class AIService {
   constructor() {
-    const apiKey = process.env.GITHUB_TOKEN || process.env.OPENAI_API_KEY;
+    const apiKey =
+      process.env.OPENROUTER_API_KEY ||
+      process.env.AI_API_KEY ||
+      process.env.GITHUB_TOKEN ||
+      process.env.OPENAI_API_KEY;
+    const isOpenRouterKey = apiKey?.startsWith('sk-or-');
+    const baseURL =
+      process.env.AI_BASE_URL ||
+      process.env.OPENROUTER_BASE_URL ||
+      (isOpenRouterKey ? 'https://openrouter.ai/api/v1' : 'https://models.github.ai/inference');
+
     this.client = apiKey
       ? new OpenAI({
-          baseURL: process.env.AI_BASE_URL || 'https://models.github.ai/inference',
+          baseURL,
           apiKey,
+          defaultHeaders: isOpenRouterKey
+            ? {
+                'HTTP-Referer': process.env.CLIENT_URL || 'http://localhost:5173',
+                'X-Title': 'ThriveCare Clinic Information System',
+              }
+            : undefined,
         })
       : null;
     this.model = process.env.AI_MODEL || 'gpt-4o-mini';

@@ -163,8 +163,10 @@ SUPABASE_SERVICE_ROLE_KEY=your-service-role-key
 JWT_SECRET=your-super-secret-jwt-key-min-32-chars
 JWT_EXPIRES_IN=7d
 
-# Optional: AI Features (GitHub Models)
+# Optional: AI Features (GitHub Models or OpenRouter)
 GITHUB_TOKEN=your-github-personal-access-token
+OPENROUTER_API_KEY=sk-or-v1-your-openrouter-key
+AI_BASE_URL=https://openrouter.ai/api/v1
 AI_MODEL=gpt-4o-mini
 
 # Optional: Email Notifications
@@ -190,7 +192,10 @@ RATE_LIMIT_MAX=100
 | `SUPABASE_SERVICE_ROLE_KEY` | Yes | Supabase service role key |
 | `JWT_SECRET` | Yes | Secret for JWT signing (min 32 chars) |
 | `JWT_EXPIRES_IN` | No | Token expiration (default: 7d) |
-| `GITHUB_TOKEN` | No | For AI features |
+| `GITHUB_TOKEN` | No | For GitHub Models AI features |
+| `OPENROUTER_API_KEY` | No | For OpenRouter AI features |
+| `AI_BASE_URL` | No | AI provider base URL, for example `https://openrouter.ai/api/v1` |
+| `AI_MODEL` | No | AI model id |
 | `SMTP_*` | No | For email notifications |
 
 ---

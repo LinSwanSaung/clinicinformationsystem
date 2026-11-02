@@ -66,6 +66,14 @@ const ElectronicMedicalRecords = () => {
         const response = await patientService.getAllPatients();
         if (response.success) {
           setPatientsData(response.data);
+
+          // Open the patient with the lowest ID unless one was passed in or already picked
+          if (response.data?.length) {
+            const [firstPatient] = [...response.data].sort((a, b) =>
+              (a.patient_number || '').localeCompare(b.patient_number || '')
+            );
+            setSelectedPatient((current) => current ?? firstPatient);
+          }
         }
       } catch (error) {
         logger.error('Error loading patients:', error);

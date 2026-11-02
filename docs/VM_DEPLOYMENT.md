@@ -69,7 +69,7 @@ curl https://your-api-domain.com/health
 If you do not have a domain yet, use the raw VM IP over HTTP:
 
 ```bash
-curl http://34.21.133.28/health
+curl http://122.248.227.221/health
 ```
 
 Load demo users:
@@ -90,7 +90,7 @@ VITE_API_URL=https://your-api-domain.com/api
 Without a purchased domain, keep the frontend on the same Vercel origin and let Vercel proxy `/api` to the VM. The current `vercel.json` forwards:
 
 ```text
-/api/* -> http://34.21.133.28/api/*
+/api/* -> http://122.248.227.221/api/*
 ```
 
 In that setup, do not set `VITE_API_URL` in Vercel, or set it to `/api`.

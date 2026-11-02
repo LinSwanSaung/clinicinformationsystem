@@ -8,6 +8,7 @@ export { default as PatientList } from './components/PatientList';
 export { default as ReceptionistPatientCard } from './components/ReceptionistPatientCard';
 export { default as PatientCard } from './components/PatientCard';
 export { default as PatientSearchInterface } from './components/PatientSearchInterface';
+export { default as PatientCardGrid } from './components/PatientCardGrid';
 export { default as PatientInformationHeader } from './components/PatientInformationHeader';
 export { PatientStats } from './components/PatientStats';
 

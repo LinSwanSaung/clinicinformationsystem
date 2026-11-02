@@ -867,7 +867,9 @@
       "placeholder": "Search patients by name or ID...",
       "noResults": "No patients found matching your search.",
       "hint": "Enter at least {count} characters to search for patients by name or ID number.",
-      "years": "years"
+      "years": "years",
+      "allPatients": "All Patients ({count})",
+      "allPatientsHint": "Click a patient to open their medical record, or use the search bar above."
     }
   },
   "doctor": {

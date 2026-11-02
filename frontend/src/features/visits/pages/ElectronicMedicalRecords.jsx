@@ -7,6 +7,7 @@ import { Button } from '@/components/ui/button';
 import { VisitHistoryCard, visitService } from '@/features/visits';
 import { LoadingSpinner } from '@/components/library/feedback/LoadingSpinner';
 import {
+  PatientCardGrid,
   PatientInformationHeader,
   PatientSearchInterface,
   patientService,
@@ -66,14 +67,6 @@ const ElectronicMedicalRecords = () => {
         const response = await patientService.getAllPatients();
         if (response.success) {
           setPatientsData(response.data);
-
-          // Open the patient with the lowest ID unless one was passed in or already picked
-          if (response.data?.length) {
-            const [firstPatient] = [...response.data].sort((a, b) =>
-              (a.patient_number || '').localeCompare(b.patient_number || '')
-            );
-            setSelectedPatient((current) => current ?? firstPatient);
-          }
         }
       } catch (error) {
         logger.error('Error loading patients:', error);
@@ -557,7 +550,12 @@ const ElectronicMedicalRecords = () => {
         )}
 
         {/* Empty State */}
-        {!selectedPatient && <EmptyState />}
+        {!selectedPatient &&
+          (patientsData.length > 0 ? (
+            <PatientCardGrid patients={patientsData} onPatientSelect={handlePatientSelect} />
+          ) : (
+            <EmptyState />
+          ))}
       </div>
     </PageLayout>
   );

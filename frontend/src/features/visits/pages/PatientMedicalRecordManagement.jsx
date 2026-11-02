@@ -20,6 +20,7 @@ import {
 import { VisitHistoryCard, visitService } from '@/features/visits';
 import { LoadingSpinner } from '@/components/library/feedback/LoadingSpinner';
 import {
+  PatientCardGrid,
   PatientInformationHeader,
   PatientSearchInterface,
   patientService,
@@ -743,7 +744,12 @@ const PatientMedicalRecordManagement = () => {
         )}
 
         {/* Empty State */}
-        {!selectedPatient && <EmptyState />}
+        {!selectedPatient &&
+          (patientsData.length > 0 ? (
+            <PatientCardGrid patients={patientsData} onPatientSelect={handlePatientSelect} />
+          ) : (
+            <EmptyState />
+          ))}
       </div>
 
       {/* Allergy Modal - DOCTOR ACCESS ONLY */}
